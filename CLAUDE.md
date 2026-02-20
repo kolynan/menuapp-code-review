@@ -55,17 +55,94 @@ Combine findings from both reviewers into a single report using this format:
 - Lines of code: ~X
 ```
 
-### Step 3: Get Second Opinion from Codex (Optional)
-If configured, call Codex via MCP or Bash for an independent review:
+### Step 3: Get Second Opinion from Codex (Patch-Based)
 
+After synthesizing the report, call Codex for an independent review via Bash.
+**Key principle:** Discussion is PATCH-BASED — both AI discuss concrete code fixes, not abstract issues. This leads to faster consensus.
+
+**How to call Codex:**
 ```bash
-codex exec "You are reviewing Base44/React code. Check for: crashes, security, i18n violations, logic errors. Here is the code and Claude's findings. Give your independent opinion — agree, disagree, add missed issues. File: [filename]"
+codex exec "You are an independent code reviewer for a React/Base44 restaurant app (MenuApp).
+
+RULES TO CHECK:
+- usePartnerAccess() must only be inside <PartnerShell> wrapper
+- ALL user-facing strings must use t('key') from useI18n, key format: page.section.element
+- No hardcoded fallbacks like || 'Error'
+- No conditional React hooks
+- dangerouslySetInnerHTML needs sanitization (XSS risk)
+- Every createObjectURL needs revokeObjectURL
+- No console.log in production
+
+YOUR TASK:
+1. Read the code below
+2. Read Claude's findings AND proposed patches below
+3. For each patch: APPROVE, REJECT (with reason), or IMPROVE (provide better patch)
+4. Add any issues Claude MISSED — with your own patch
+5. For rejections, explain WHY and provide alternative fix
+
+FORMAT your response as:
+## Codex Patch Review: [filename]
+### Approved Patches (I agree with Claude's fix)
+### Rejected Patches (wrong fix — here's why + alternative)
+### Improved Patches (right idea, better implementation)
+### New Issues + Patches (things Claude missed)
+### Summary: Approved X, Rejected X, Improved X, New X
+
+CODE:
+$(cat [filename])
+
+CLAUDE'S FINDINGS + PATCHES:
+[paste the synthesized report with code patches here]"
 ```
 
-Then compare Claude's and Codex's findings:
-- ✅ **Both agree** — high confidence, definitely fix
-- ⚠️ **Disagree** — present both views, let Arman decide
-- 🆕 **Only one found** — investigate further
+### Step 4: Patch Discussion (Multi-Round)
+
+After receiving Codex's response, compare patch-by-patch:
+
+**For each patch, determine status:**
+- ✅ **Both approve same patch** → Confirmed. Include in final report.
+- ✅ **Codex improved patch** → Review improvement. If better, use Codex's version.
+- ⚠️ **Codex rejected patch** → Re-examine. If Codex has a point, revise or drop.
+- 🆕 **Codex found new issue + patch** → Validate. If real issue, add to report.
+
+**If disagreements remain on P0/P1 patches:**
+Run another round — send revised patches to Codex:
+```bash
+codex exec "Round N: Here are the disputed patches from Round N-1.
+For each one, I've revised my patch based on your feedback.
+Please review the REVISED patches and give APPROVE/REJECT/IMPROVE.
+[revised patches + reasoning]"
+```
+
+**Discussion rules:**
+- Maximum 3 rounds (enough for most cases)
+- Each round focuses ONLY on unresolved patches (already-agreed patches are locked)
+- If after 3 rounds patches still disputed → present both versions to Arman
+- Goal: converge on ONE agreed patch per issue
+
+### Step 5: Final Consensus Report
+
+Produce the final report with agreed patches:
+
+```
+## Final Code Review Report: [filename]
+## Reviewed by: Claude (correctness + style) + Codex (patch review)
+## Rounds of discussion: X
+
+### Confirmed Patches (both AI agree on fix)
+[For each: priority, issue description, FINAL PATCH code, who proposed]
+
+### Disputed Patches (AI disagree — Arman decides)
+| Issue | Claude's Patch | Codex's Patch | Priority |
+|---|---|---|---|
+| ... | [code] | [code] | ... |
+
+### Summary
+- Total confirmed patches: X
+- Total disputed patches: X
+- New issues found by Codex: X
+- Rounds of discussion: X
+```
 
 ---
 
