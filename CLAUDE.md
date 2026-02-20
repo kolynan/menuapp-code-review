@@ -17,6 +17,15 @@ MenuApp is a QR-menu and ordering system for restaurants built on the **Base44 n
 | `PartnerShell.jsx` | Shell/wrapper component for partner pages |
 | `PageHelpButton.jsx` | Help button component with markdown rendering |
 
+## Output Rules
+
+**IMPORTANT:** After completing ANY review, discussion, or analysis:
+1. Save the full final report to `reviews/` folder as `[filename]_review_[date].md` (e.g., `reviews/PageHelpButton_review_2026-02-20.md`)
+2. Save a log of ALL Bash commands you executed (including `codex exec` calls) to `reviews/[filename]_commands_[date].log`
+3. If Codex discussion happened, save each round separately: `reviews/[filename]_round1.md`, `reviews/[filename]_round2.md`, etc.
+
+This allows the project manager (who works in a separate tool) to read your results without copy-paste.
+
 ## Code Review Workflow
 
 When asked to review a file, follow this process:
