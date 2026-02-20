@@ -10,19 +10,42 @@ MenuApp is a QR-menu and ordering system for restaurants built on the **Base44 n
 - Waiters see orders on mobile interface
 - Restaurant owners manage via Partner admin panel (partner cabinet)
 
-### Files in This Repo
-| File | What it is |
-|---|---|
-| `partnertables.js` | Main table management page (~2500 lines) |
-| `PartnerShell.jsx` | Shell/wrapper component for partner pages |
-| `PageHelpButton.jsx` | Help button component with markdown rendering |
+### Repository Structure
+
+```
+menuapp-code-review/
+├── .claude/agents/              ← Sub-reviewers (correctness, style)
+├── pages/                       ← One folder per page
+│   ├── PageHelpButton/
+│   │   ├── PageHelpButton_v1.1_BASE.jsx    ← Original from Base44
+│   │   ├── PageHelpButton_v1.2_RELEASE.jsx ← Patched, ready for Base44
+│   │   ├── review_2026-02-20.md            ← Review report
+│   │   └── archive/                        ← Old versions (when needed)
+│   ├── partnertables/
+│   │   ├── partnertables_v1.0_BASE.js
+│   │   └── ...
+│   └── PartnerShell/
+│       ├── PartnerShell_v1.0_BASE.jsx
+│       └── ...
+├── CLAUDE.md                    ← This file
+└── README.md
+```
+
+### File Naming Convention
+- **`_BASE`** = Original code exported from Base44. Never modify. Read-only backup.
+- **`_RELEASE`** = All patches applied, ready to copy-paste into Base44.
+- **`_HOLD`** = Was RELEASE, but decided to postpone. Rename back to _RELEASE when ready.
+- Version numbers: `_v1.1_`, `_v1.2_`, etc. BASE gets odd step, RELEASE gets next.
+
+### When reviewing a file
+Always look for the **latest `_BASE`** file in the page folder. That is the current source code.
 
 ## Output Rules
 
-**IMPORTANT:** After completing ANY review, discussion, or analysis:
-1. Save the full final report to `reviews/` folder as `[filename]_review_[date].md` (e.g., `reviews/PageHelpButton_review_2026-02-20.md`)
-2. Save a log of ALL Bash commands you executed (including `codex exec` calls) to `reviews/[filename]_commands_[date].log`
-3. If Codex discussion happened, save each round separately: `reviews/[filename]_round1.md`, `reviews/[filename]_round2.md`, etc.
+**IMPORTANT:** After completing ANY review, discussion, or analysis, save results into the **page's folder** (not a separate reviews/ folder):
+1. Save the full final report as `pages/[PageName]/review_[date].md`
+2. Save a log of ALL Bash commands you executed (including `codex exec` calls) as `pages/[PageName]/commands_[date].log`
+3. If Codex discussion happened, save each round separately: `pages/[PageName]/round1_[date].md`, `pages/[PageName]/round2_[date].md`, etc.
 
 This allows the project manager (who works in a separate tool) to read your results without copy-paste.
 
