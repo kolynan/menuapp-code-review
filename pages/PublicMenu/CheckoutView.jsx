@@ -11,6 +11,10 @@ export default function CheckoutView({
   updateQuantity,
   formatPrice,
   finalTotal,
+  cartTotalAmount,
+  discountAmount,
+  pointsDiscountAmount,
+  earnedPoints,
   activeCurrency,
   defaultCurrency,
   orderMode,
@@ -70,11 +74,43 @@ export default function CheckoutView({
       </Card>
 
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-2">
+          {cartTotalAmount != null && cartTotalAmount !== finalTotal && (
+            <>
+              <div className="flex justify-between text-sm text-slate-600">
+                <span>{t('checkout.subtotal')}</span>
+                {/* TODO: add translation key — "Подытог" */}
+                <span>{formatPrice(cartTotalAmount)}</span>
+              </div>
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span>{t('checkout.qr_discount')}</span>
+                  {/* TODO: add translation key — "Скидка за QR-заказ" */}
+                  <span>-{formatPrice(discountAmount)}</span>
+                </div>
+              )}
+              {pointsDiscountAmount > 0 && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span>{t('checkout.points_discount')}</span>
+                  {/* TODO: add translation key — "Списание баллов" */}
+                  <span>-{formatPrice(pointsDiscountAmount)}</span>
+                </div>
+              )}
+              <div className="border-t border-slate-200 pt-2" />
+            </>
+          )}
           <div className="flex justify-between items-center">
             <span className="font-semibold text-slate-900">{t('cart.total')}:</span>
             <span className="text-xl font-bold text-indigo-600">{formatPrice(finalTotal)}</span>
           </div>
+          {earnedPoints > 0 && (
+            <div className="flex justify-between text-sm text-amber-600">
+              <span>{t('checkout.earned_bonus')}</span>
+              {/* TODO: add translation key — "Бонусы за заказ" */}
+              <span>+{earnedPoints}{t('loyalty.points_symbol')}</span>
+              {/* TODO: add translation key for points_symbol — "Б" */}
+            </div>
+          )}
         </CardContent>
       </Card>
 
