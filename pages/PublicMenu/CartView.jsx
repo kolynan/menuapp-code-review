@@ -1212,6 +1212,12 @@ export default function CartView({
               >
                 {isSubmitting ? tr('cart.submitting', 'Отправка...') : tr('cart.send_to_waiter', 'Отправить заказ официанту')}
               </Button>
+              {isTableVerified === false && (
+                <p className="text-xs text-amber-600 text-center mt-1">
+                  {tr('cart.verify_table_hint', 'Подтвердите стол для отправки заказа')}
+                  {/* TODO: add translation key */}
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
