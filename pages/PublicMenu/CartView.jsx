@@ -977,13 +977,6 @@ export default function CartView({
 
             {/* Subtotal and submit */}
             <div className="mt-4 pt-4 border-t space-y-3">
-              {partner?.loyalty_enabled && earnedPoints > 0 && !loyaltyExpanded && (
-                <div className="flex justify-between text-sm text-green-600">
-                  <span>{tr('loyalty.online_bonus_label', 'Бонусы за онлайн-заказ')}</span>
-                  <span>+{Number(earnedPoints || 0).toLocaleString('ru-RU')}Б</span>
-                </div>
-              )}
-
               {/* ИТОГО - bold total */}
               <div className="flex justify-between items-end pt-2 border-t">
                 <span className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
