@@ -73,6 +73,7 @@ export default function CartView({
   const [splitExpanded, setSplitExpanded] = React.useState(false);
   const [loyaltyExpanded, setLoyaltyExpanded] = React.useState(false);
   const [myOrdersExpanded, setMyOrdersExpanded] = React.useState(true); // default open
+  const [onlineBlockExpanded, setOnlineBlockExpanded] = React.useState(!isTableVerified);
   const [showRewardEmailForm, setShowRewardEmailForm] = React.useState(false);
   const [rewardEmail, setRewardEmail] = React.useState('');
   const [rewardEmailSubmitting, setRewardEmailSubmitting] = React.useState(false);
@@ -985,51 +986,71 @@ export default function CartView({
                 <span className="text-lg font-bold text-slate-900">{formatPrice(Number(cartTotalAmount) || 0)}</span>
               </div>
 
-              {/* Online order to waiter (verification + benefits) */}
+              {/* Online order to waiter (verification + benefits) — collapsible */}
               <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-amber-900 font-semibold text-sm">
-                    {tr('cart.verify.online_order_title', 'Онлайн-заказ официанту')}
-                  </p>
-                  <button
-                    type="button"
-                    className="text-amber-700 hover:text-amber-900 text-sm px-2"
-                    onClick={() => setInfoModal('online')}
-                    title={tr('common.info', 'Информация')}
-                  >
-                    ⓘ
-                  </button>
-                </div>
-
-                {/* Benefits are shown only when partner enabled them; no "if enabled" text */}
-                {discountAmount > 0 && (
-                  <div className="flex justify-between text-sm text-amber-900">
-                    <span>{tr('cart.verify.discount_label', 'Скидка за онлайн-заказ')}</span>
-                    <span>−{formatPrice(discountAmount)}</span>
+                {/* Clickable header — toggles expand/collapse */}
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between"
+                  onClick={() => setOnlineBlockExpanded(!onlineBlockExpanded)}
+                >
+                  <div className="flex items-center gap-2">
+                    <p className="text-amber-900 font-semibold text-sm">
+                      {tr('cart.verify.online_order_title', 'Онлайн-заказ официанту')}
+                    </p>
+                    {isTableVerified === true && !onlineBlockExpanded && (
+                      <span className="text-xs text-green-700">✅ {tr('cart.verify.table_verified', 'Стол подтверждён')}</span>
+                    )}
                   </div>
-                )}
-
-                {partner?.loyalty_enabled && earnedPoints > 0 && (
-                  <div className="flex justify-between text-sm text-amber-900">
-                    <span>{tr('cart.verify.bonus_label', 'Бонусы за онлайн-заказ')}</span>
-                    <span>+{Number(earnedPoints || 0).toLocaleString('ru-RU')}Б</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      className="text-amber-700 hover:text-amber-900 text-sm px-1"
+                      onClick={(e) => { e.stopPropagation(); setInfoModal('online'); }}
+                      title={tr('common.info', 'Информация')}
+                    >
+                      ⓘ
+                    </button>
+                    {onlineBlockExpanded ? (
+                      <ChevronUp className="w-4 h-4 text-amber-600" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-amber-600" />
+                    )}
                   </div>
-                )}
+                </button>
 
-                {/* Redeem points (if user applied) */}
-                {pointsDiscountAmount > 0 && (
-                  <div className="flex justify-between text-sm text-amber-900">
-                    <span>{tr('cart.verify.points_discount_label', 'Списание баллов')}</span>
-                    <span>−{formatPrice(pointsDiscountAmount)}</span>
-                  </div>
-                )}
+                {/* Collapsible content */}
+                {onlineBlockExpanded && (
+                  <>
+                    {/* Benefits are shown only when partner enabled them; no "if enabled" text */}
+                    {discountAmount > 0 && (
+                      <div className="flex justify-between text-sm text-amber-900 mt-2">
+                        <span>{tr('cart.verify.discount_label', 'Скидка за онлайн-заказ')}</span>
+                        <span>−{formatPrice(discountAmount)}</span>
+                      </div>
+                    )}
 
-                <div className="mt-3 pt-3 border-t border-amber-200">
-                  {isTableVerified === true ? (
-                    <div className="text-sm text-green-700 text-center">
-                      ✅ {tr('cart.verify.table_verified', 'Стол подтверждён')}
-                    </div>
-                  ) : (
+                    {partner?.loyalty_enabled && earnedPoints > 0 && (
+                      <div className="flex justify-between text-sm text-amber-900 mt-1">
+                        <span>{tr('cart.verify.bonus_label', 'Бонусы за онлайн-заказ')}</span>
+                        <span>+{Number(earnedPoints || 0).toLocaleString('ru-RU')}Б</span>
+                      </div>
+                    )}
+
+                    {/* Redeem points (if user applied) */}
+                    {pointsDiscountAmount > 0 && (
+                      <div className="flex justify-between text-sm text-amber-900 mt-1">
+                        <span>{tr('cart.verify.points_discount_label', 'Списание баллов')}</span>
+                        <span>−{formatPrice(pointsDiscountAmount)}</span>
+                      </div>
+                    )}
+
+                    <div className="mt-3 pt-3 border-t border-amber-200">
+                      {isTableVerified === true ? (
+                        <div className="text-sm text-green-700 text-center">
+                          ✅ {tr('cart.verify.table_verified', 'Стол подтверждён')}
+                        </div>
+                      ) : (
                     <>
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-amber-900 font-medium text-sm">
@@ -1136,6 +1157,8 @@ export default function CartView({
                     </>
                   )}
                 </div>
+                  </>
+                )}
               </div>
 
               {/* Info modal */}
