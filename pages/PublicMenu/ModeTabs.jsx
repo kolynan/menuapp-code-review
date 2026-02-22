@@ -15,6 +15,17 @@ export default function ModeTabs({
   verifiedByCode,
   t,
 }) {
+  // Deduplicate table label: avoid "Стол Стол 3"
+  const verifiedTableLabel = React.useMemo(() => {
+    const tablePrefix = t('form.table');
+    const rawName = currentTable?.name || currentTable?.code || "";
+    if (typeof rawName === "string" && typeof tablePrefix === "string" &&
+        rawName.trim().toLowerCase().startsWith(tablePrefix.trim().toLowerCase())) {
+      return rawName;
+    }
+    return `${tablePrefix} ${rawName}`;
+  }, [currentTable?.name, currentTable?.code, t]);
+
   return (
     <div className="max-w-2xl mx-auto px-4 mt-4">
       {visibleModeTabs.length > 1 ? (
@@ -56,7 +67,7 @@ export default function ModeTabs({
           <div className="flex items-center justify-center gap-2 text-green-800">
             <CheckCircle2 className="w-5 h-5" />
             <span className="font-medium">
-              {t('form.table')} {currentTable?.name || currentTable?.code || ""} {t('x.hall.verified')}
+              {verifiedTableLabel} {t('x.hall.verified')}
             </span>
           </div>
         </div>
