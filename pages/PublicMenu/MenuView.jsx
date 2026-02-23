@@ -107,19 +107,19 @@ export default function MenuView({
                 <Plus className="w-5 h-5 text-white" />
               </button>
             ) : (
-              <div className="flex items-center bg-slate-100 rounded-lg p-1">
+              <div className="flex items-center bg-slate-100 rounded-lg px-2 py-1.5">
                 <button
                   onClick={() => updateQuantity(dish.id, -1)}
-                  className="p-1 hover:bg-white rounded-md transition-colors"
+                  className="w-11 h-11 flex items-center justify-center hover:bg-white rounded-md transition-colors"
                 >
-                  <Minus className="w-4 h-4 text-slate-600" />
+                  <Minus className="w-5 h-5 text-slate-600" />
                 </button>
                 <span className="mx-2 font-medium text-slate-900 text-sm">{inCart.quantity}</span>
                 <button
                   onClick={() => updateQuantity(dish.id, 1)}
-                  className="p-1 hover:bg-white rounded-md transition-colors"
+                  className="w-11 h-11 flex items-center justify-center hover:bg-white rounded-md transition-colors"
                 >
-                  <Plus className="w-4 h-4 text-slate-600" />
+                  <Plus className="w-5 h-5 text-slate-600" />
                 </button>
               </div>
             )}
@@ -178,19 +178,19 @@ export default function MenuView({
           )}
           {/* Stepper — shown when item is in cart */}
           {inCart && (
-            <div className="flex items-center justify-center bg-slate-100 rounded-lg p-1 mt-1">
+            <div className="w-full flex items-center justify-between bg-slate-100 rounded-lg px-2 py-1.5 mt-1">
               <button
                 onClick={() => updateQuantity(dish.id, -1)}
-                className="p-1 hover:bg-white rounded-md transition-colors"
+                className="w-11 h-11 flex items-center justify-center hover:bg-white rounded-md transition-colors"
               >
-                <Minus className="w-4 h-4 text-slate-600" />
+                <Minus className="w-5 h-5 text-slate-600" />
               </button>
-              <span className="mx-3 font-medium text-slate-900 text-sm">{inCart.quantity}</span>
+              <span className="font-medium text-slate-900 text-sm">{inCart.quantity}</span>
               <button
                 onClick={() => updateQuantity(dish.id, 1)}
-                className="p-1 hover:bg-white rounded-md transition-colors"
+                className="w-11 h-11 flex items-center justify-center hover:bg-white rounded-md transition-colors"
               >
-                <Plus className="w-4 h-4 text-slate-600" />
+                <Plus className="w-5 h-5 text-slate-600" />
               </button>
             </div>
           )}
