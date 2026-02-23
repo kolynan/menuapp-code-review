@@ -1162,49 +1162,6 @@ export default function CartView({
                 )}
               </div>
 
-              {/* Info modal */}
-              {infoModal && (
-                <div
-                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-                  onMouseDown={() => setInfoModal(null)}
-                >
-                  <div
-                    className="w-full max-w-sm bg-white rounded-xl shadow-lg border p-4"
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="font-semibold text-slate-900">
-                        {infoModal === 'online'
-                          ? tr('cart.verify.info_online_title', 'Онлайн-заказ официанту')
-                          : tr('cart.verify.info_table_code_title', 'Код стола')}
-                      </div>
-                      <button
-                        type="button"
-                        className="p-1 rounded hover:bg-slate-100 text-slate-500"
-                        onClick={() => setInfoModal(null)}
-                        aria-label={tr('common.close', 'Закрыть')}
-                      >
-                        ✕
-                      </button>
-                    </div>
-
-                    {infoModal === 'online' ? (
-                      <ul className="text-sm text-slate-700 list-disc pl-5 space-y-2">
-                        <li>{tr('cart.verify.info_online_point1', 'Заказ сразу попадает официанту')}</li>
-                        <li>{tr('cart.verify.info_online_point2', 'Обычно быстрее')}</li>
-                        <li>{tr('cart.verify.info_online_point3', 'Скидка и бонусы (если есть) применяются автоматически')}</li>
-                      </ul>
-                    ) : (
-                      <ul className="text-sm text-slate-700 list-disc pl-5 space-y-2">
-                        <li>{tr('cart.verify.info_table_code_point1', 'Код обычно указан на столе')}</li>
-                        <li>{tr('cart.verify.info_table_code_point2', 'Если не видно — спросите у официанта')}</li>
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              )}
-
-
               <Button
                 size="lg"
                 className="w-full bg-green-600 hover:bg-green-700 mt-3"
@@ -1225,6 +1182,48 @@ export default function CartView({
       )}
 
       {/* Add more link - removed, use ✕ to close */}
+
+      {/* Info modal — outside Card to avoid clipping */}
+      {infoModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onMouseDown={() => setInfoModal(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-white rounded-xl shadow-lg border p-4 overflow-y-auto max-h-[80vh]"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="font-semibold text-slate-900">
+                {infoModal === 'online'
+                  ? tr('cart.verify.info_online_title', 'Онлайн-заказ официанту')
+                  : tr('cart.verify.info_table_code_title', 'Код стола')}
+              </div>
+              <button
+                type="button"
+                className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                onClick={() => setInfoModal(null)}
+                aria-label={tr('common.close', 'Закрыть')}
+              >
+                ✕
+              </button>
+            </div>
+
+            {infoModal === 'online' ? (
+              <ul className="text-sm text-slate-700 list-disc pl-5 space-y-2">
+                <li>{tr('cart.verify.info_online_point1', 'Заказ сразу попадает официанту')}</li>
+                <li>{tr('cart.verify.info_online_point2', 'Обычно быстрее')}</li>
+                <li>{tr('cart.verify.info_online_point3', 'Скидка и бонусы (если есть) применяются автоматически')}</li>
+              </ul>
+            ) : (
+              <ul className="text-sm text-slate-700 list-disc pl-5 space-y-2">
+                <li>{tr('cart.verify.info_table_code_point1', 'Код обычно указан на столе')}</li>
+                <li>{tr('cart.verify.info_table_code_point2', 'Если не видно — спросите у официанта')}</li>
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
