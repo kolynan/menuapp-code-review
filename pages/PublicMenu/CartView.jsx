@@ -1,5 +1,5 @@
 import React from "react";
-import { XIcon, Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, X } from "lucide-react";
+import { XIcon, Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, X, Info } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1002,19 +1002,11 @@ export default function CartView({
                       <span className="text-xs text-green-700">✅ {tr('cart.verify.table_verified', 'Стол подтверждён')}</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      className="text-amber-700 hover:text-amber-900 text-sm px-1"
-                      onClick={(e) => { e.stopPropagation(); setInfoModal('online'); }}
-                      title={tr('common.info', 'Информация')}
-                    >
-                      ⓘ
-                    </button>
+                  <div className="flex items-center">
                     {onlineBlockExpanded ? (
-                      <ChevronUp className="w-4 h-4 text-amber-600" />
+                      <ChevronUp className="w-5 h-5 text-amber-600" />
                     ) : (
-                      <ChevronDown className="w-4 h-4 text-amber-600" />
+                      <ChevronDown className="w-5 h-5 text-amber-600" />
                     )}
                   </div>
                 </button>
@@ -1044,6 +1036,15 @@ export default function CartView({
                         <span>−{formatPrice(pointsDiscountAmount)}</span>
                       </div>
                     )}
+
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 text-xs text-amber-700 hover:text-amber-900 mt-2"
+                      onClick={() => setInfoModal('online')}
+                    >
+                      <Info className="w-3.5 h-3.5" />
+                      {tr('cart.verify.info_link', 'Как работает онлайн-заказ')}
+                    </button>
 
                     <div className="mt-3 pt-3 border-t border-amber-200">
                       {isTableVerified === true ? (
