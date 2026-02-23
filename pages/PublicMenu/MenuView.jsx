@@ -41,6 +41,9 @@ export default function MenuView({
   t,
 }) {
   const [selectedDish, setSelectedDish] = React.useState(null);
+  const drawerRef = React.useRef(null);
+  const touchStartY = React.useRef(0);
+  const touchCurrentY = React.useRef(0);
 
   // Lock body scroll when photo drawer is open
   React.useEffect(() => {
@@ -242,13 +245,39 @@ export default function MenuView({
 
         {/* Drawer */}
         <div
+          ref={drawerRef}
           role="dialog"
           aria-modal="true"
           aria-label={getDishName(selectedDish)}
           onKeyDown={(e) => e.key === 'Escape' && setSelectedDish(null)}
           tabIndex={-1}
-          className="fixed bottom-0 left-0 right-0 z-[60] bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto"
+          className="fixed bottom-0 left-0 right-0 z-[60] bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto transition-transform"
+          onTouchStart={(e) => {
+            touchStartY.current = e.touches[0].clientY;
+            touchCurrentY.current = e.touches[0].clientY;
+          }}
+          onTouchMove={(e) => {
+            touchCurrentY.current = e.touches[0].clientY;
+            const diff = touchCurrentY.current - touchStartY.current;
+            if (diff > 0 && drawerRef.current) {
+              drawerRef.current.style.transform = `translateY(${diff}px)`;
+            }
+          }}
+          onTouchEnd={() => {
+            const diff = touchCurrentY.current - touchStartY.current;
+            if (diff > 80) {
+              setSelectedDish(null);
+            }
+            if (drawerRef.current) {
+              drawerRef.current.style.transform = '';
+            }
+          }}
         >
+          {/* Drag indicator */}
+          <div className="flex justify-center pt-2 pb-1">
+            <div className="w-10 h-1 bg-slate-300 rounded-full" />
+          </div>
+
           {/* Close button */}
           <button
             onClick={() => setSelectedDish(null)}
