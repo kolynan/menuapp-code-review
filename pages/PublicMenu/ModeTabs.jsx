@@ -59,7 +59,7 @@ export default function ModeTabs({
         </div>
       ) : null}
 
-      <p className="text-xs text-slate-500 text-center px-2 mb-2">{getModeDescription()}</p>
+      {/* Mode description removed — redundant with tab selection */}
       
       {/* Verified badge removed — shown inside CartView online-order block */}
 
