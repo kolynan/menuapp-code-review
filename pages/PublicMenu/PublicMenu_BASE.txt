@@ -1144,25 +1144,30 @@ export default function X() {
   // Это решает проблему F5 — не нужно ждать восстановления session/orders
   const showCartButton = isHallMode && (isTableVerified || (cart?.length || 0) > 0);
 
+  // After F5, table is verified from localStorage but session data is still loading from server
+  const isSessionLoading = isTableVerified && !tableSession;
+
   // Hall StickyBar mode: определяем что показывать
-  const hallStickyMode = 
-    (cart?.length || 0) > 0 
-      ? "cart" 
-      : (myOrders?.length || 0) > 0 
-        ? "myBill" 
-        : (sessionOrders?.length || 0) > 0 
-          ? "tableOrders" 
+  const hallStickyMode =
+    (cart?.length || 0) > 0
+      ? "cart"
+      : (myOrders?.length || 0) > 0
+        ? "myBill"
+        : (sessionOrders?.length || 0) > 0
+          ? "tableOrders"
           : "cartEmpty";
 
   // Hall StickyBar label: текст кнопки
-  const hallStickyButtonLabel = 
-    hallStickyMode === "cart" 
-      ? t("cart.checkout") 
-      : hallStickyMode === "myBill" 
-        ? (t("cart.my_bill") || "Мой счёт") 
-        : hallStickyMode === "tableOrders" 
-          ? (t("cart.table_orders") || "Заказы стола →") 
-          : (t("cart.view") || "Открыть");
+  const hallStickyButtonLabel =
+    hallStickyMode === "cart"
+      ? t("cart.checkout")
+      : hallStickyMode === "myBill"
+        ? (t("cart.my_bill") || "Мой счёт")
+        : hallStickyMode === "tableOrders"
+          ? (t("cart.table_orders") || "Заказы стола →")
+          : isSessionLoading
+            ? (t("common.loading") || "Загрузка...")
+            : (t("cart.view") || "Открыть");
 
   // Hall StickyBar: заголовок (для режимов без корзины)
   const hallStickyModeLabel = 
@@ -2414,7 +2419,13 @@ export default function X() {
               formattedCartTotal={formatPrice(cartTotalAmount)}
               isLoadingBill={hallStickyIsLoadingBill}
               formattedBillTotal={hallStickyBillTotal}
-              onButtonClick={() => setDrawerMode(drawerMode === 'cart' ? null : 'cart')}
+              onButtonClick={() => {
+                if (hallStickyMode === 'cartEmpty' && isSessionLoading) {
+                  toast.info(t('common.loading') || 'Загрузка...', { id: 'mm1', duration: 1500 });
+                  return;
+                }
+                setDrawerMode(drawerMode === 'cart' ? null : 'cart');
+              }}
               buttonLabel={drawerMode === 'cart' ? (t('common.close') || 'Закрыть') : hallStickyButtonLabel}
               hallModeLabel={hallStickyModeLabel}
               showBillAmount={hallStickyShowBillAmount}
