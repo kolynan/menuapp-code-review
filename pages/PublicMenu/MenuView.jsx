@@ -315,6 +315,7 @@ export default function MenuView({
   };
 
   return (
+    <>
     <div className="max-w-2xl mx-auto px-4 mt-4 space-y-8" ref={listTopRef}>
       {/* Mobile layout toggle - only visible on mobile */}
       {isMobile && onSetMobileLayout && !loadingDishes && sortedCategories.length > 0 && (
@@ -383,5 +384,7 @@ export default function MenuView({
         </div>
       )}
     </div>
+    {renderPhotoDrawer()}
+    </>
   );
 }
