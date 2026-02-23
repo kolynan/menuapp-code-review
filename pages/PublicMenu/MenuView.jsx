@@ -218,6 +218,102 @@ export default function MenuView({
     );
   };
 
+  // Photo drawer — bottom sheet shown when user taps a dish photo
+  const renderPhotoDrawer = () => {
+    if (!selectedDish) return null;
+
+    const inCart = cart.find((i) => i.dishId === selectedDish.id);
+
+    return (
+      <>
+        {/* Dark overlay */}
+        <div
+          className="fixed inset-0 bg-black/60 z-50"
+          onClick={() => setSelectedDish(null)}
+        />
+
+        {/* Drawer */}
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto">
+          {/* Close button */}
+          <button
+            onClick={() => setSelectedDish(null)}
+            className="absolute top-3 right-3 z-10 w-11 h-11 flex items-center justify-center bg-black/40 hover:bg-black/60 rounded-full transition-colors"
+          >
+            <span className="text-white text-lg font-bold leading-none">{'\u2715'}</span>
+          </button>
+
+          {/* Large photo */}
+          {selectedDish.image && (
+            <div className="w-full h-[50vh] bg-slate-100">
+              <img
+                src={selectedDish.image}
+                alt={getDishName(selectedDish)}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+
+          {/* Content */}
+          <div className="p-5 space-y-3">
+            {/* Name */}
+            <h2 className="text-xl font-bold text-slate-900">
+              {getDishName(selectedDish)}
+            </h2>
+
+            {/* Description — full, not truncated */}
+            {getDishDescription(selectedDish) && (
+              <p className="text-sm text-slate-600 leading-relaxed">
+                {getDishDescription(selectedDish)}
+              </p>
+            )}
+
+            {/* Price */}
+            <div className="text-lg font-bold text-indigo-600">
+              {formatPrice(selectedDish.price)}
+            </div>
+
+            {/* Rating */}
+            {showReviews && dishRatings?.[selectedDish.id] && (
+              <DishRating
+                avgRating={dishRatings[selectedDish.id]?.avg}
+                reviewCount={dishRatings[selectedDish.id]?.count}
+                onClick={onOpenReviews ? () => onOpenReviews(selectedDish.id) : undefined}
+              />
+            )}
+
+            {/* Add / Stepper */}
+            <div className="pt-2">
+              {!inCart ? (
+                <button
+                  onClick={() => addToCart(selectedDish)}
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition-colors text-base"
+                >
+                  {t('menu.add') || 'Добавить'}
+                </button>
+              ) : (
+                <div className="flex items-center justify-center bg-slate-100 rounded-xl py-2 px-4">
+                  <button
+                    onClick={() => updateQuantity(selectedDish.id, -1)}
+                    className="w-11 h-11 flex items-center justify-center hover:bg-white rounded-lg transition-colors"
+                  >
+                    <Minus className="w-5 h-5 text-slate-600" />
+                  </button>
+                  <span className="mx-6 text-lg font-bold text-slate-900">{inCart.quantity}</span>
+                  <button
+                    onClick={() => updateQuantity(selectedDish.id, 1)}
+                    className="w-11 h-11 flex items-center justify-center hover:bg-white rounded-lg transition-colors"
+                  >
+                    <Plus className="w-5 h-5 text-slate-600" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
+
   return (
     <div className="max-w-2xl mx-auto px-4 mt-4 space-y-8" ref={listTopRef}>
       {/* Mobile layout toggle - only visible on mobile */}
