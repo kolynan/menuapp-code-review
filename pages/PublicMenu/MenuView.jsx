@@ -42,6 +42,16 @@ export default function MenuView({
 }) {
   const [selectedDish, setSelectedDish] = React.useState(null);
 
+  // Lock body scroll when photo drawer is open
+  React.useEffect(() => {
+    if (selectedDish) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [selectedDish]);
+
   // Read grid settings from partner with safe fallback
   const rawDesktop = partner?.menu_grid_desktop;
   const rawMobile = partner?.menu_grid_mobile;
