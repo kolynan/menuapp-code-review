@@ -40,6 +40,8 @@ export default function MenuView({
   updateQuantity,
   t,
 }) {
+  const [selectedDish, setSelectedDish] = React.useState(null);
+
   // Read grid settings from partner with safe fallback
   const rawDesktop = partner?.menu_grid_desktop;
   const rawMobile = partner?.menu_grid_mobile;
