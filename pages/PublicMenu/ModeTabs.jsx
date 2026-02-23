@@ -1,31 +1,16 @@
 import React from "react";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
 export default function ModeTabs({
   visibleModeTabs,
   orderMode,
   onModeChange,
-  getModeDescription,
   isHallMode,
-  isTableVerified,
-  currentTableId,
-  currentTable,
   tableCodeParam,
   resolvedTable,
   verifiedByCode,
   t,
 }) {
-  // Deduplicate table label: avoid "Стол Стол 3"
-  const verifiedTableLabel = React.useMemo(() => {
-    const tablePrefix = t('form.table');
-    const rawName = currentTable?.name || currentTable?.code || "";
-    if (typeof rawName === "string" && typeof tablePrefix === "string" &&
-        rawName.trim().toLowerCase().startsWith(tablePrefix.trim().toLowerCase())) {
-      return rawName;
-    }
-    return `${tablePrefix} ${rawName}`;
-  }, [currentTable?.name, currentTable?.code, t]);
-
   return (
     <div className="max-w-2xl mx-auto px-4 mt-4">
       {visibleModeTabs.length > 1 ? (

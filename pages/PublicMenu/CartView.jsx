@@ -1187,11 +1187,11 @@ export default function CartView({
       {infoModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onMouseDown={() => setInfoModal(null)}
+          onClick={() => setInfoModal(null)}
         >
           <div
             className="w-full max-w-sm bg-white rounded-xl shadow-lg border p-4 overflow-y-auto max-h-[80vh]"
-            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
               <div className="font-semibold text-slate-900">
