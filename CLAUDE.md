@@ -49,9 +49,33 @@ Always look for the **latest `_BASE`** file in the page folder. That is the curr
 
 This allows the project manager (who works in a separate tool) to read your results without copy-paste.
 
-## Code Review Workflow
+## Implementation + Review Workflow (Default)
 
-When asked to review a file, follow this process:
+When asked to implement fixes/features AND review them, follow this process:
+
+### Phase A: Implement
+1. Read all files that need changes
+2. Implement each fix one by one, committing after each
+3. Push to remote after all fixes
+
+### Phase B: Auto-Review (КК + Codex)
+After implementation, automatically run review:
+1. Use **correctness-reviewer** subagent on all modified files
+2. Use **style-reviewer** subagent on all modified files
+3. Call Codex CLI for independent review:
+   ```bash
+   codex exec "Review the git diff for the last N commits. Check for bugs, missing imports, broken JSX, invalid Tailwind classes, and regressions. Be concise."
+   ```
+4. If ANY reviewer found issues → fix immediately, commit, and push
+5. Summarize all findings at the end
+
+This is the default workflow for all implementation tasks. The prompt will include both implementation instructions and the review block.
+
+---
+
+## Code Review Workflow (Standalone)
+
+When asked to ONLY review a file (not implement), follow this process:
 
 ### Step 1: Run Sub-Reviewers
 Use **both** subagents to analyze the file:

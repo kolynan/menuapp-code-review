@@ -107,19 +107,19 @@ export default function MenuView({
                 <Plus className="w-5 h-5 text-white" />
               </button>
             ) : (
-              <div className="flex items-center bg-slate-100 rounded-lg px-2 py-1.5">
+              <div className="flex items-center bg-slate-100 rounded-lg p-1">
                 <button
                   onClick={() => updateQuantity(dish.id, -1)}
-                  className="w-11 h-11 flex items-center justify-center hover:bg-white rounded-md transition-colors"
+                  className="p-1 hover:bg-white rounded-md transition-colors"
                 >
-                  <Minus className="w-5 h-5 text-slate-600" />
+                  <Minus className="w-4 h-4 text-slate-600" />
                 </button>
                 <span className="mx-2 font-medium text-slate-900 text-sm">{inCart.quantity}</span>
                 <button
                   onClick={() => updateQuantity(dish.id, 1)}
-                  className="w-11 h-11 flex items-center justify-center hover:bg-white rounded-md transition-colors"
+                  className="p-1 hover:bg-white rounded-md transition-colors"
                 >
-                  <Plus className="w-5 h-5 text-slate-600" />
+                  <Plus className="w-4 h-4 text-slate-600" />
                 </button>
               </div>
             )}
@@ -132,13 +132,12 @@ export default function MenuView({
   // Render dish card for TILE mode (grid layout)
   const renderTileCard = (dish) => {
     const inCart = cart.find((i) => i.dishId === dish.id);
-
+    
     return (
       <Card
         key={dish.id}
         className="overflow-hidden hover:shadow-md transition-shadow border-slate-200 flex flex-col"
       >
-        {/* Photo with floating "+" button */}
         <div className="w-full h-48 bg-slate-100 relative">
           {dish.image ? (
             <img
@@ -153,47 +152,59 @@ export default function MenuView({
               <span className="text-xs font-medium">{t('menu.photo_later')}</span>
             </div>
           )}
-          {/* Floating "+" button on photo — only when not in cart */}
-          {!inCart && (
-            <button
-              onClick={() => addToCart(dish)}
-              className="absolute bottom-2 right-2 w-8 h-8 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 rounded-full shadow-md transition-colors"
-            >
-              <Plus className="w-4 h-4 text-white" />
-            </button>
-          )}
         </div>
 
-        <CardContent className="p-3 flex flex-col gap-1">
-          <h3 className="font-semibold text-sm text-slate-900 line-clamp-2">{getDishName(dish)}</h3>
-          <div className="font-bold text-indigo-600 text-sm">
-            {formatPrice(dish.price)}
-          </div>
-          {showReviews && dishRatings?.[dish.id] && (
-            <DishRating
-              avgRating={dishRatings[dish.id]?.avg}
-              reviewCount={dishRatings[dish.id]?.count}
-              onClick={onOpenReviews ? () => onOpenReviews(dish.id) : undefined}
-            />
-          )}
-          {/* Stepper — shown when item is in cart */}
-          {inCart && (
-            <div className="w-full flex items-center justify-between bg-slate-100 rounded-lg px-2 py-1.5 mt-1">
-              <button
-                onClick={() => updateQuantity(dish.id, -1)}
-                className="w-11 h-11 flex items-center justify-center hover:bg-white rounded-md transition-colors"
-              >
-                <Minus className="w-5 h-5 text-slate-600" />
-              </button>
-              <span className="font-medium text-slate-900 text-sm">{inCart.quantity}</span>
-              <button
-                onClick={() => updateQuantity(dish.id, 1)}
-                className="w-11 h-11 flex items-center justify-center hover:bg-white rounded-md transition-colors"
-              >
-                <Plus className="w-5 h-5 text-slate-600" />
-              </button>
+        <CardContent className="p-4 flex-1">
+          <div className="flex justify-between gap-4 h-full">
+            <div className="flex-1">
+              <h3 className="font-semibold text-lg text-slate-900">{getDishName(dish)}</h3>
+              {getDishDescription(dish) && (
+                <p className="text-sm text-slate-500 mt-1 leading-relaxed">
+                  {getDishDescription(dish)}
+                </p>
+              )}
+              <div className="mt-2 font-bold text-indigo-600">
+                {formatPrice(dish.price)}
+              </div>
+              {showReviews && dishRatings?.[dish.id] && (
+                <div className="mt-2">
+                  <DishRating
+                    avgRating={dishRatings[dish.id]?.avg}
+                    reviewCount={dishRatings[dish.id]?.count}
+                    onClick={onOpenReviews ? () => onOpenReviews(dish.id) : undefined}
+                  />
+                </div>
+              )}
             </div>
-          )}
+
+            <div className="flex items-center self-end">
+              {!inCart ? (
+                <Button
+                  size="sm"
+                  onClick={() => addToCart(dish)}
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                >
+                  {t('menu.add')}
+                </Button>
+              ) : (
+                <div className="flex items-center bg-slate-100 rounded-lg p-1">
+                  <button
+                    onClick={() => updateQuantity(dish.id, -1)}
+                    className="p-1 hover:bg-white rounded-md transition-colors"
+                  >
+                    <Minus className="w-4 h-4 text-slate-600" />
+                  </button>
+                  <span className="mx-3 font-medium text-slate-900 text-sm">{inCart.quantity}</span>
+                  <button
+                    onClick={() => updateQuantity(dish.id, 1)}
+                    className="p-1 hover:bg-white rounded-md transition-colors"
+                  >
+                    <Plus className="w-4 h-4 text-slate-600" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
     );
