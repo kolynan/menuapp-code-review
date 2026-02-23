@@ -61,8 +61,11 @@ export default function MenuView({
         className="overflow-hidden hover:shadow-md transition-shadow border-slate-200"
       >
         <CardContent className="p-3 flex gap-3 items-center">
-          {/* Image LEFT - fixed size */}
-          <div className="w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100">
+          {/* Image LEFT - fixed size, tappable when has image */}
+          <div
+            className={`w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100${dish.image ? ' cursor-pointer' : ''}`}
+            onClick={() => dish.image && setSelectedDish(dish)}
+          >
             {dish.image ? (
               <img
                 src={dish.image}
@@ -140,7 +143,10 @@ export default function MenuView({
         key={dish.id}
         className="overflow-hidden hover:shadow-md transition-shadow border-slate-200 flex flex-col"
       >
-        <div className="w-full h-48 bg-slate-100 relative">
+        <div
+          className={`w-full h-48 bg-slate-100 relative${dish.image ? ' cursor-pointer' : ''}`}
+          onClick={() => dish.image && setSelectedDish(dish)}
+        >
           {dish.image ? (
             <img
               src={dish.image}
