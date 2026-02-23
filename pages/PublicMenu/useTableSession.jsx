@@ -12,7 +12,7 @@ import {
 const TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
 
 // BUG-PM-004: TTL for optimistic data before server confirms
-const OPTIMISTIC_TTL = 30000; // 30 seconds
+const OPTIMISTIC_TTL_MS = 30000; // 30 seconds
 
 // FIX-260131-06: Normalize guest id (support both id and _id)
 const normalizeGuestId = (g) => String(g?.id ?? g?._id ?? "");
@@ -551,7 +551,7 @@ export function useTableSession({
             !o._fromServer &&
             o._optimisticAt &&
             !serverIds.has(String(o.id)) &&
-            (now - o._optimisticAt) < OPTIMISTIC_TTL
+            (now - o._optimisticAt) < OPTIMISTIC_TTL_MS
           );
           return [...serverOrders, ...optimistic];
         });
@@ -594,7 +594,7 @@ export function useTableSession({
               const optimistic = prev.filter(item =>
                 String(item.id || '').startsWith('temp_') &&
                 item._optimisticAt &&
-                (now - item._optimisticAt) < OPTIMISTIC_TTL &&
+                (now - item._optimisticAt) < OPTIMISTIC_TTL_MS &&
                 !serverOrderIds.has(String(
                   typeof item.order === 'object'
                     ? (item.order?.id ?? item.order?._id) : item.order || ''
@@ -611,7 +611,7 @@ export function useTableSession({
               return prev.filter(item =>
                 String(item.id || '').startsWith('temp_') &&
                 item._optimisticAt &&
-                (now - item._optimisticAt) < OPTIMISTIC_TTL
+                (now - item._optimisticAt) < OPTIMISTIC_TTL_MS
               );
             });
           }

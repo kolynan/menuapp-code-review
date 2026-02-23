@@ -179,11 +179,16 @@ const getCartFromStorage = (partnerId) => {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    // Support legacy format (plain array)
-    if (Array.isArray(data)) return data;
+    // Migrate legacy format (plain array) — accept but rewrite with timestamp
+    if (Array.isArray(data)) {
+      try {
+        localStorage.setItem(key, JSON.stringify({ items: data, ts: Date.now() }));
+      } catch {}
+      return data;
+    }
     if (!data || !Array.isArray(data.items)) return null;
-    // TTL check
-    if (data.ts && (Date.now() - data.ts) > CART_TTL_MS) {
+    // TTL check — require valid ts
+    if (!data.ts || typeof data.ts !== 'number' || (Date.now() - data.ts) > CART_TTL_MS) {
       localStorage.removeItem(key);
       return null;
     }
@@ -553,15 +558,16 @@ export default function X() {
   }, [cart, partner?.id]);
 
   // Restore cart from localStorage on page load (once)
+  // BUG-PM-005: mark restored before setCart to prevent save effect from firing on stale empty cart
   useEffect(() => {
     if (cartRestoredRef.current) return;
     if (!partner?.id) return;
-    
+    cartRestoredRef.current = true;
+
     const savedCart = getCartFromStorage(partner.id);
     if (savedCart && savedCart.length > 0 && cart.length === 0) {
       setCart(savedCart);
     }
-    cartRestoredRef.current = true;
   }, [partner?.id]);
 
   // Scroll refs
@@ -1640,12 +1646,17 @@ export default function X() {
 
       // Optimistic update session data with proper guest link
       // BUG-PM-004: add _optimisticAt so polling merge preserves this until server confirms
+      const optimisticAt = Date.now();
       const orderWithGuest = {
         ...order,
         guest: guestToUse?.id,
-        _optimisticAt: Date.now(),
+        _optimisticAt: optimisticAt,
       };
-      setSessionOrders(prev => [orderWithGuest, ...prev]);
+      // Dedup: skip if a poll already delivered this order
+      setSessionOrders(prev => {
+        if (prev.some(o => String(o.id) === String(order.id))) return prev;
+        return [orderWithGuest, ...prev];
+      });
       
       const tempIdBase = typeof crypto !== 'undefined' && crypto.randomUUID 
         ? crypto.randomUUID() 
@@ -1656,7 +1667,7 @@ export default function X() {
         ...item,
         id: `temp_${tempIdBase}_${i}`,
         order: order.id,
-        _optimisticAt: Date.now(),
+        _optimisticAt: optimisticAt,
       }));
       
       setSessionItems(prev => [...prev, ...itemsWithLinks]);
