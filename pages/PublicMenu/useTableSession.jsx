@@ -11,6 +11,9 @@ import {
 // Persistence helpers (FIX-260131-01: session + guest, 8h TTL)
 const TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
 
+// BUG-PM-004: TTL for optimistic data before server confirms
+const OPTIMISTIC_TTL = 30000; // 30 seconds
+
 // FIX-260131-06: Normalize guest id (support both id and _id)
 const normalizeGuestId = (g) => String(g?.id ?? g?._id ?? "");
 
@@ -536,10 +539,22 @@ export function useTableSession({
           }
         }
         
-        // Load orders
+        // Load orders — BUG-PM-004: merge strategy preserves optimistic data
         const orders = await getSessionOrders(sessionId);
         if (cancelled) return;
-        setSessionOrders(orders || []);
+        setSessionOrders(prev => {
+          const serverOrders = (orders || []).map(o => ({ ...o, _fromServer: true }));
+          const serverIds = new Set(serverOrders.map(o => String(o.id)));
+          const now = Date.now();
+          // Keep optimistic orders not yet confirmed by server, within TTL
+          const optimistic = prev.filter(o =>
+            !o._fromServer &&
+            o._optimisticAt &&
+            !serverIds.has(String(o.id)) &&
+            (now - o._optimisticAt) < OPTIMISTIC_TTL
+          );
+          return [...serverOrders, ...optimistic];
+        });
         
         // Load OrderItems
         if (orders && orders.length > 0) {
@@ -567,9 +582,39 @@ export function useTableSession({
             }
           }
           
-          if (!cancelled) setSessionItems(items);
+          if (!cancelled) {
+            // BUG-PM-004: merge strategy — keep optimistic items (temp_ IDs)
+            setSessionItems(prev => {
+              const serverOrderIds = new Set(items.map(item => {
+                const oid = typeof item.order === 'object'
+                  ? (item.order?.id ?? item.order?._id) : item.order;
+                return String(oid || '');
+              }));
+              const now = Date.now();
+              const optimistic = prev.filter(item =>
+                String(item.id || '').startsWith('temp_') &&
+                item._optimisticAt &&
+                (now - item._optimisticAt) < OPTIMISTIC_TTL &&
+                !serverOrderIds.has(String(
+                  typeof item.order === 'object'
+                    ? (item.order?.id ?? item.order?._id) : item.order || ''
+                ))
+              );
+              return [...items, ...optimistic];
+            });
+          }
         } else {
-          if (!cancelled) setSessionItems([]);
+          if (!cancelled) {
+            // BUG-PM-004: keep optimistic items even when no server orders yet
+            setSessionItems(prev => {
+              const now = Date.now();
+              return prev.filter(item =>
+                String(item.id || '').startsWith('temp_') &&
+                item._optimisticAt &&
+                (now - item._optimisticAt) < OPTIMISTIC_TTL
+              );
+            });
+          }
         }
         
         sessionOrdersErrRef.current = null;

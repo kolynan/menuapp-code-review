@@ -157,14 +157,19 @@ function getContactIcon(type) {
 }
 
 // Cart persistence helpers
+// BUG-PM-005: Cart persistence with 4h TTL
+const CART_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
+
 const saveCartToStorage = (partnerId, cartData) => {
   if (!partnerId) return;
   try {
     const key = `menuapp_cart_${partnerId}`;
-    localStorage.setItem(key, JSON.stringify(cartData));
-  } catch (e) {
-    console.error("Failed to save cart", e);
-  }
+    if (!cartData || cartData.length === 0) {
+      localStorage.removeItem(key);
+      return;
+    }
+    localStorage.setItem(key, JSON.stringify({ items: cartData, ts: Date.now() }));
+  } catch {}
 };
 
 const getCartFromStorage = (partnerId) => {
@@ -174,7 +179,15 @@ const getCartFromStorage = (partnerId) => {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    return Array.isArray(data) ? data : null;
+    // Support legacy format (plain array)
+    if (Array.isArray(data)) return data;
+    if (!data || !Array.isArray(data.items)) return null;
+    // TTL check
+    if (data.ts && (Date.now() - data.ts) > CART_TTL_MS) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return data.items;
   } catch {
     return null;
   }
@@ -532,8 +545,10 @@ export default function X() {
   };
 
   // Save cart to localStorage on every change
+  // BUG-PM-005: guard against saving empty cart before restore completes
   useEffect(() => {
     if (!partner?.id) return;
+    if (!cartRestoredRef.current) return;
     saveCartToStorage(partner.id, cart);
   }, [cart, partner?.id]);
 
@@ -1624,9 +1639,11 @@ export default function X() {
       );
 
       // Optimistic update session data with proper guest link
-      const orderWithGuest = { 
-        ...order, 
-        guest: guestToUse?.id 
+      // BUG-PM-004: add _optimisticAt so polling merge preserves this until server confirms
+      const orderWithGuest = {
+        ...order,
+        guest: guestToUse?.id,
+        _optimisticAt: Date.now(),
       };
       setSessionOrders(prev => [orderWithGuest, ...prev]);
       
@@ -1634,10 +1651,12 @@ export default function X() {
         ? crypto.randomUUID() 
         : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
       
-      const itemsWithLinks = newItems.map((item, i) => ({ 
-        ...item, 
+      // BUG-PM-004: add _optimisticAt so polling merge preserves temp items
+      const itemsWithLinks = newItems.map((item, i) => ({
+        ...item,
         id: `temp_${tempIdBase}_${i}`,
-        order: order.id 
+        order: order.id,
+        _optimisticAt: Date.now(),
       }));
       
       setSessionItems(prev => [...prev, ...itemsWithLinks]);
