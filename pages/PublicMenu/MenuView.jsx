@@ -282,9 +282,13 @@ export default function MenuView({
           <button
             onClick={() => setSelectedDish(null)}
             aria-label={t('common.close')}
-            className="absolute top-3 right-3 z-10 w-11 h-11 flex items-center justify-center bg-black/40 hover:bg-black/60 rounded-full transition-colors"
+            className={`absolute top-3 right-3 z-10 w-11 h-11 flex items-center justify-center rounded-full transition-colors ${
+              selectedDish.image
+                ? 'bg-black/40 hover:bg-black/60'
+                : 'bg-slate-200 hover:bg-slate-300'
+            }`}
           >
-            <X className="w-5 h-5 text-white" />
+            <X className={`w-5 h-5 ${selectedDish.image ? 'text-white' : 'text-slate-600'}`} />
           </button>
 
           {/* Large photo */}
@@ -299,7 +303,7 @@ export default function MenuView({
           )}
 
           {/* Content */}
-          <div className="p-5 space-y-3">
+          <div className={`p-5 space-y-3 ${!selectedDish.image ? 'pt-14' : ''}`}>
             {/* Name */}
             <h2 className="text-xl font-bold text-slate-900">
               {getDishName(selectedDish)}
