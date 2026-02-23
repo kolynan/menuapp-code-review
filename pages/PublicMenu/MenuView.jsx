@@ -44,6 +44,15 @@ export default function MenuView({
   const drawerRef = React.useRef(null);
   const touchStartY = React.useRef(0);
   const touchCurrentY = React.useRef(0);
+  const swipeEligibleRef = React.useRef(false);
+
+  // Focus drawer and reset transform when it opens
+  React.useEffect(() => {
+    if (selectedDish && drawerRef.current) {
+      drawerRef.current.style.transform = '';
+      drawerRef.current.focus();
+    }
+  }, [selectedDish]);
 
   // Lock body scroll when photo drawer is open
   React.useEffect(() => {
@@ -117,6 +126,7 @@ export default function MenuView({
             {!inCart ? (
               <button
                 onClick={() => addToCart(dish)}
+                aria-label={t('menu.add')}
                 className="w-10 h-10 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
               >
                 <Plus className="w-5 h-5 text-white" />
@@ -253,22 +263,28 @@ export default function MenuView({
           tabIndex={-1}
           className="fixed bottom-0 left-0 right-0 z-[60] bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto transition-transform"
           onTouchStart={(e) => {
+            if (!e.touches[0]) return;
             touchStartY.current = e.touches[0].clientY;
             touchCurrentY.current = e.touches[0].clientY;
+            swipeEligibleRef.current = drawerRef.current?.scrollTop === 0;
           }}
           onTouchMove={(e) => {
+            if (!e.touches[0]) return;
             touchCurrentY.current = e.touches[0].clientY;
             const diff = touchCurrentY.current - touchStartY.current;
-            if (diff > 0 && drawerRef.current) {
+            if (diff > 0 && swipeEligibleRef.current && drawerRef.current) {
+              e.preventDefault();
               drawerRef.current.style.transform = `translateY(${diff}px)`;
             }
           }}
           onTouchEnd={() => {
             const diff = touchCurrentY.current - touchStartY.current;
-            if (diff > 80) {
-              setSelectedDish(null);
-            }
-            if (drawerRef.current) {
+            if (diff > 80 && swipeEligibleRef.current) {
+              if (drawerRef.current) {
+                drawerRef.current.style.transform = 'translateY(100%)';
+              }
+              setTimeout(() => setSelectedDish(null), 200);
+            } else if (drawerRef.current) {
               drawerRef.current.style.transform = '';
             }
           }}
