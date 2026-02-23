@@ -1,5 +1,5 @@
 import React from "react";
-import { Loader2, ImageIcon, Minus, Plus, LayoutGrid, List } from "lucide-react";
+import { Loader2, ImageIcon, Minus, Plus, LayoutGrid, List, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import DishRating from "@/components/publicMenu/DishRating";
@@ -44,12 +44,10 @@ export default function MenuView({
 
   // Lock body scroll when photo drawer is open
   React.useEffect(() => {
-    if (selectedDish) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => { document.body.style.overflow = ''; };
+    if (!selectedDish) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
   }, [selectedDish]);
 
   // Read grid settings from partner with safe fallback
@@ -73,7 +71,7 @@ export default function MenuView({
         <CardContent className="p-3 flex gap-3 items-center">
           {/* Image LEFT - fixed size, tappable when has image */}
           <div
-            className={`w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100${dish.image ? ' cursor-pointer' : ''}`}
+            className={`w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100 ${dish.image ? 'cursor-pointer' : ''}`}
             onClick={() => dish.image && setSelectedDish(dish)}
           >
             {dish.image ? (
@@ -154,7 +152,7 @@ export default function MenuView({
         className="overflow-hidden hover:shadow-md transition-shadow border-slate-200 flex flex-col"
       >
         <div
-          className={`w-full h-48 bg-slate-100 relative${dish.image ? ' cursor-pointer' : ''}`}
+          className={`w-full h-48 bg-slate-100 relative ${dish.image ? 'cursor-pointer' : ''}`}
           onClick={() => dish.image && setSelectedDish(dish)}
         >
           {dish.image ? (
@@ -238,18 +236,27 @@ export default function MenuView({
       <>
         {/* Dark overlay */}
         <div
-          className="fixed inset-0 bg-black/60 z-50"
+          className="fixed inset-0 bg-black/60 z-[60]"
           onClick={() => setSelectedDish(null)}
+          aria-hidden="true"
         />
 
         {/* Drawer */}
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={getDishName(selectedDish)}
+          onKeyDown={(e) => e.key === 'Escape' && setSelectedDish(null)}
+          tabIndex={-1}
+          className="fixed bottom-0 left-0 right-0 z-[60] bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto"
+        >
           {/* Close button */}
           <button
             onClick={() => setSelectedDish(null)}
+            aria-label={t('common.close')}
             className="absolute top-3 right-3 z-10 w-11 h-11 flex items-center justify-center bg-black/40 hover:bg-black/60 rounded-full transition-colors"
           >
-            <span className="text-white text-lg font-bold leading-none">{'\u2715'}</span>
+            <X className="w-5 h-5 text-white" />
           </button>
 
           {/* Large photo */}
@@ -298,7 +305,7 @@ export default function MenuView({
                   onClick={() => addToCart(selectedDish)}
                   className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition-colors text-base"
                 >
-                  {t('menu.add') || 'Добавить'}
+                  {t('menu.add')}
                 </button>
               ) : (
                 <div className="flex items-center justify-center bg-slate-100 rounded-xl py-2 px-4">
@@ -339,7 +346,7 @@ export default function MenuView({
             }`}
           >
             <LayoutGrid className="w-4 h-4" />
-            <span>{t('menu.tile') || 'Плитка'}</span>
+            <span>{t('menu.tile')}</span>
           </button>
           <button
             onClick={() => onSetMobileLayout('list')}
@@ -350,7 +357,7 @@ export default function MenuView({
             }`}
           >
             <List className="w-4 h-4" />
-            <span>{t('menu.list') || 'Список'}</span>
+            <span>{t('menu.list')}</span>
           </button>
         </div>
       )}
