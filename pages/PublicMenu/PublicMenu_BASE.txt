@@ -555,6 +555,14 @@ export default function X() {
   const listTopRef = useRef(null);
   const isManualScroll = useRef(false);
   const submitLockRef = useRef(false); // CODE-024: protect from double-tap
+  const viewTransitionTimerRef = useRef(null);
+
+  // Cleanup view transition timer on unmount
+  useEffect(() => {
+    return () => {
+      if (viewTransitionTimerRef.current) clearTimeout(viewTransitionTimerRef.current);
+    };
+  }, []);
 
   // Language change handler (updates URL)
   const handleLangChange = (newLang) => {
@@ -1145,7 +1153,14 @@ export default function X() {
   const showCartButton = isHallMode && (isTableVerified || (cart?.length || 0) > 0);
 
   // After F5, table is verified from localStorage but session data is still loading from server
-  const isSessionLoading = isTableVerified && !tableSession;
+  // Time-bounded: after 3s assume no session exists (prevents permanent "loading" for new visits)
+  const [sessionCheckTimedOut, setSessionCheckTimedOut] = useState(false);
+  useEffect(() => {
+    if (!isTableVerified || tableSession) return;
+    const timer = setTimeout(() => setSessionCheckTimedOut(true), 3000);
+    return () => clearTimeout(timer);
+  }, [isTableVerified, tableSession]);
+  const isSessionLoading = isTableVerified && !tableSession && !sessionCheckTimedOut;
 
   // Hall StickyBar mode: определяем что показывать
   const hallStickyMode =
@@ -1636,7 +1651,7 @@ export default function X() {
       setLoyaltyAccount(null);
       setRedeemedPoints(0);
 
-      // Stay on menu with cart drawer open to show the order
+      // Stay on menu view; drawer state unchanged (cart drawer remains open if it was open)
       setView("menu");
       
       toast.success(t('toast.order_sent'), { id: 'mm1' });
@@ -1937,7 +1952,8 @@ export default function X() {
         toast.success(t('toast.order_sent'), { id: 'mm1', duration: 3000 });
 
         // Brief delay so user sees the success toast before view transitions
-        setTimeout(() => {
+        if (viewTransitionTimerRef.current) clearTimeout(viewTransitionTimerRef.current);
+        viewTransitionTimerRef.current = setTimeout(() => {
           setView("menu");
           setDrawerMode(null);
         }, 300);
@@ -2414,6 +2430,7 @@ export default function X() {
             <StickyCartBar
               t={t}
               isHallMode={true}
+              isDrawerOpen={drawerMode === 'cart'}
               hasCart={(cart?.length || 0) > 0}
               cartTotalItems={cartTotalItems}
               formattedCartTotal={formatPrice(cartTotalAmount)}
@@ -2421,12 +2438,12 @@ export default function X() {
               formattedBillTotal={hallStickyBillTotal}
               onButtonClick={() => {
                 if (hallStickyMode === 'cartEmpty' && isSessionLoading) {
-                  toast.info(t('common.loading') || 'Загрузка...', { id: 'mm1', duration: 1500 });
+                  toast.info(t('common.loading'), { id: 'mm1', duration: 1500 });
                   return;
                 }
                 setDrawerMode(drawerMode === 'cart' ? null : 'cart');
               }}
-              buttonLabel={drawerMode === 'cart' ? (t('common.close') || 'Закрыть') : hallStickyButtonLabel}
+              buttonLabel={hallStickyButtonLabel}
               hallModeLabel={hallStickyModeLabel}
               showBillAmount={hallStickyShowBillAmount}
             />
