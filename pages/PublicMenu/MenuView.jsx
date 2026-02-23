@@ -68,11 +68,10 @@ export default function MenuView({
         key={dish.id}
         className="overflow-hidden hover:shadow-md transition-shadow border-slate-200"
       >
-        <CardContent className="p-3 flex gap-3 items-center">
-          {/* Image LEFT - fixed size, tappable when has image */}
+        <CardContent className="p-3 flex gap-3 items-center cursor-pointer" onClick={() => setSelectedDish(dish)}>
+          {/* Image LEFT - fixed size */}
           <div
-            className={`w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100 ${dish.image ? 'cursor-pointer' : ''}`}
-            onClick={() => dish.image && setSelectedDish(dish)}
+            className="w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100"
           >
             {dish.image ? (
               <img
@@ -111,7 +110,7 @@ export default function MenuView({
           </div>
 
           {/* Plus button RIGHT - stable */}
-          <div className="shrink-0">
+          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
             {!inCart ? (
               <button
                 onClick={() => addToCart(dish)}
@@ -149,11 +148,11 @@ export default function MenuView({
     return (
       <Card
         key={dish.id}
-        className="overflow-hidden hover:shadow-md transition-shadow border-slate-200 flex flex-col"
+        className="overflow-hidden hover:shadow-md transition-shadow border-slate-200 flex flex-col cursor-pointer"
+        onClick={() => setSelectedDish(dish)}
       >
         <div
-          className={`w-full h-48 bg-slate-100 relative ${dish.image ? 'cursor-pointer' : ''}`}
-          onClick={() => dish.image && setSelectedDish(dish)}
+          className="w-full h-48 bg-slate-100 relative"
         >
           {dish.image ? (
             <img
@@ -193,7 +192,7 @@ export default function MenuView({
               )}
             </div>
 
-            <div className="flex items-center self-end">
+            <div className="flex items-center self-end" onClick={(e) => e.stopPropagation()}>
               {!inCart ? (
                 <Button
                   size="sm"
