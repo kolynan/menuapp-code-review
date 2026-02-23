@@ -1,5 +1,5 @@
 import React from "react";
-import { XIcon, Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, X, Info } from "lucide-react";
+import { XIcon, Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,7 +73,6 @@ export default function CartView({
   const [splitExpanded, setSplitExpanded] = React.useState(false);
   const [loyaltyExpanded, setLoyaltyExpanded] = React.useState(false);
   const [myOrdersExpanded, setMyOrdersExpanded] = React.useState(true); // default open
-  const [onlineBlockExpanded, setOnlineBlockExpanded] = React.useState(!isTableVerified);
   const [showRewardEmailForm, setShowRewardEmailForm] = React.useState(false);
   const [rewardEmail, setRewardEmail] = React.useState('');
   const [rewardEmailSubmitting, setRewardEmailSubmitting] = React.useState(false);
@@ -978,6 +977,13 @@ export default function CartView({
 
             {/* Subtotal and submit */}
             <div className="mt-4 pt-4 border-t space-y-3">
+              {partner?.loyalty_enabled && earnedPoints > 0 && !loyaltyExpanded && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span>{tr('loyalty.online_bonus_label', 'Бонусы за онлайн-заказ')}</span>
+                  <span>+{Number(earnedPoints || 0).toLocaleString('ru-RU')}Б</span>
+                </div>
+              )}
+
               {/* ИТОГО - bold total */}
               <div className="flex justify-between items-end pt-2 border-t">
                 <span className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
@@ -986,72 +992,51 @@ export default function CartView({
                 <span className="text-lg font-bold text-slate-900">{formatPrice(Number(cartTotalAmount) || 0)}</span>
               </div>
 
-              {/* Online order to waiter (verification + benefits) — collapsible */}
+              {/* Online order to waiter (verification + benefits) */}
               <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                {/* Clickable header — toggles expand/collapse */}
-                <button
-                  type="button"
-                  className="w-full flex items-center justify-between"
-                  onClick={() => setOnlineBlockExpanded(!onlineBlockExpanded)}
-                >
-                  <div className="flex items-center gap-2">
-                    <p className="text-amber-900 font-semibold text-sm">
-                      {tr('cart.verify.online_order_title', 'Онлайн-заказ официанту')}
-                    </p>
-                    {isTableVerified === true && !onlineBlockExpanded && (
-                      <span className="text-xs text-green-700">✅ {tr('cart.verify.table_verified', 'Стол подтверждён')}</span>
-                    )}
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-amber-900 font-semibold text-sm">
+                    {tr('cart.verify.online_order_title', 'Онлайн-заказ официанту')}
+                  </p>
+                  <button
+                    type="button"
+                    className="text-amber-700 hover:text-amber-900 text-sm px-2"
+                    onClick={() => setInfoModal('online')}
+                    title={tr('common.info', 'Информация')}
+                  >
+                    ⓘ
+                  </button>
+                </div>
+
+                {/* Benefits are shown only when partner enabled them; no "if enabled" text */}
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-sm text-amber-900">
+                    <span>{tr('cart.verify.discount_label', 'Скидка за онлайн-заказ')}</span>
+                    <span>−{formatPrice(discountAmount)}</span>
                   </div>
-                  <div className="flex items-center">
-                    {onlineBlockExpanded ? (
-                      <ChevronUp className="w-5 h-5 text-amber-600" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-amber-600" />
-                    )}
+                )}
+
+                {partner?.loyalty_enabled && earnedPoints > 0 && (
+                  <div className="flex justify-between text-sm text-amber-900">
+                    <span>{tr('cart.verify.bonus_label', 'Бонусы за онлайн-заказ')}</span>
+                    <span>+{Number(earnedPoints || 0).toLocaleString('ru-RU')}Б</span>
                   </div>
-                </button>
+                )}
 
-                {/* Collapsible content */}
-                {onlineBlockExpanded && (
-                  <>
-                    {/* Benefits are shown only when partner enabled them; no "if enabled" text */}
-                    {discountAmount > 0 && (
-                      <div className="flex justify-between text-sm text-amber-900 mt-2">
-                        <span>{tr('cart.verify.discount_label', 'Скидка за онлайн-заказ')}</span>
-                        <span>−{formatPrice(discountAmount)}</span>
-                      </div>
-                    )}
+                {/* Redeem points (if user applied) */}
+                {pointsDiscountAmount > 0 && (
+                  <div className="flex justify-between text-sm text-amber-900">
+                    <span>{tr('cart.verify.points_discount_label', 'Списание баллов')}</span>
+                    <span>−{formatPrice(pointsDiscountAmount)}</span>
+                  </div>
+                )}
 
-                    {partner?.loyalty_enabled && earnedPoints > 0 && (
-                      <div className="flex justify-between text-sm text-amber-900 mt-1">
-                        <span>{tr('cart.verify.bonus_label', 'Бонусы за онлайн-заказ')}</span>
-                        <span>+{Number(earnedPoints || 0).toLocaleString('ru-RU')}Б</span>
-                      </div>
-                    )}
-
-                    {/* Redeem points (if user applied) */}
-                    {pointsDiscountAmount > 0 && (
-                      <div className="flex justify-between text-sm text-amber-900 mt-1">
-                        <span>{tr('cart.verify.points_discount_label', 'Списание баллов')}</span>
-                        <span>−{formatPrice(pointsDiscountAmount)}</span>
-                      </div>
-                    )}
-
-                    <button
-                      type="button"
-                      className="flex items-center gap-1.5 text-xs text-amber-700 hover:text-amber-900 mt-2"
-                      onClick={() => setInfoModal('online')}
-                    >
-                      <Info className="w-3.5 h-3.5" />
-                      {tr('cart.verify.info_link', 'Как работает онлайн-заказ')}
-                    </button>
-
-                    <div className="mt-3 pt-3 border-t border-amber-200">
-                      {isTableVerified === true ? (
-                        <div className="text-sm text-green-700 text-center">
-                          ✅ {tr('cart.verify.table_verified', 'Стол подтверждён')}
-                        </div>
-                      ) : (
+                <div className="mt-3 pt-3 border-t border-amber-200">
+                  {isTableVerified === true ? (
+                    <div className="text-sm text-green-700 text-center">
+                      ✅ {tr('cart.verify.table_verified', 'Стол подтверждён')}
+                    </div>
+                  ) : (
                     <>
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-amber-900 font-medium text-sm">
@@ -1158,9 +1143,50 @@ export default function CartView({
                     </>
                   )}
                 </div>
-                  </>
-                )}
               </div>
+
+              {/* Info modal */}
+              {infoModal && (
+                <div
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                  onMouseDown={() => setInfoModal(null)}
+                >
+                  <div
+                    className="w-full max-w-sm bg-white rounded-xl shadow-lg border p-4"
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="font-semibold text-slate-900">
+                        {infoModal === 'online'
+                          ? tr('cart.verify.info_online_title', 'Онлайн-заказ официанту')
+                          : tr('cart.verify.info_table_code_title', 'Код стола')}
+                      </div>
+                      <button
+                        type="button"
+                        className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                        onClick={() => setInfoModal(null)}
+                        aria-label={tr('common.close', 'Закрыть')}
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {infoModal === 'online' ? (
+                      <ul className="text-sm text-slate-700 list-disc pl-5 space-y-2">
+                        <li>{tr('cart.verify.info_online_point1', 'Заказ сразу попадает официанту')}</li>
+                        <li>{tr('cart.verify.info_online_point2', 'Обычно быстрее')}</li>
+                        <li>{tr('cart.verify.info_online_point3', 'Скидка и бонусы (если есть) применяются автоматически')}</li>
+                      </ul>
+                    ) : (
+                      <ul className="text-sm text-slate-700 list-disc pl-5 space-y-2">
+                        <li>{tr('cart.verify.info_table_code_point1', 'Код обычно указан на столе')}</li>
+                        <li>{tr('cart.verify.info_table_code_point2', 'Если не видно — спросите у официанта')}</li>
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              )}
+
 
               <Button
                 size="lg"
@@ -1170,60 +1196,12 @@ export default function CartView({
               >
                 {isSubmitting ? tr('cart.submitting', 'Отправка...') : tr('cart.send_to_waiter', 'Отправить заказ официанту')}
               </Button>
-              {isTableVerified === false && (
-                <p className="text-xs text-amber-600 text-center mt-1">
-                  {tr('cart.verify_table_hint', 'Подтвердите стол для отправки заказа')}
-                  {/* TODO: add translation key */}
-                </p>
-              )}
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* Add more link - removed, use ✕ to close */}
-
-      {/* Info modal — outside Card to avoid clipping */}
-      {infoModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setInfoModal(null)}
-        >
-          <div
-            className="w-full max-w-sm bg-white rounded-xl shadow-lg border p-4 overflow-y-auto max-h-[80vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="font-semibold text-slate-900">
-                {infoModal === 'online'
-                  ? tr('cart.verify.info_online_title', 'Онлайн-заказ официанту')
-                  : tr('cart.verify.info_table_code_title', 'Код стола')}
-              </div>
-              <button
-                type="button"
-                className="p-1 rounded hover:bg-slate-100 text-slate-500"
-                onClick={() => setInfoModal(null)}
-                aria-label={tr('common.close', 'Закрыть')}
-              >
-                ✕
-              </button>
-            </div>
-
-            {infoModal === 'online' ? (
-              <ul className="text-sm text-slate-700 list-disc pl-5 space-y-2">
-                <li>{tr('cart.verify.info_online_point1', 'Заказ сразу попадает официанту')}</li>
-                <li>{tr('cart.verify.info_online_point2', 'Обычно быстрее')}</li>
-                <li>{tr('cart.verify.info_online_point3', 'Скидка и бонусы (если есть) применяются автоматически')}</li>
-              </ul>
-            ) : (
-              <ul className="text-sm text-slate-700 list-disc pl-5 space-y-2">
-                <li>{tr('cart.verify.info_table_code_point1', 'Код обычно указан на столе')}</li>
-                <li>{tr('cart.verify.info_table_code_point2', 'Если не видно — спросите у официанта')}</li>
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
