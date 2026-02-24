@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import PartnerShell, { usePartnerAccess } from "@/components/PartnerShell";
@@ -60,8 +60,12 @@ function PartnerLoyaltyContent() {
     enabled: !!partnerId,
   });
 
+  // FIX BUG-PL-001: seed form only once to prevent background refetch from discarding unsaved edits
+  const formSeeded = useRef(false);
+
   useEffect(() => {
-    if (partner) {
+    if (partner && !formSeeded.current) {
+      formSeeded.current = true;
       setFormData({
         loyalty_enabled: partner.loyalty_enabled ?? false,
         loyalty_order_percent: partner.loyalty_order_percent ?? 5,
@@ -80,27 +84,48 @@ function PartnerLoyaltyContent() {
   const saveMutation = useMutation({
     mutationFn: (data) => base44.entities.Partner.update(partnerId, data),
     onSuccess: () => {
+      // FIX BUG-PL-001: allow re-seeding after save to pick up server-normalized values
+      formSeeded.current = false;
       queryClient.invalidateQueries({ queryKey: ["partner", partnerId] });
       setSaveStatus("success");
       toast.success(t("toast.saved"), { id: "mm1" });
       setTimeout(() => setSaveStatus("idle"), 2000);
     },
-    onError: (err) => {
-      console.error(err);
+    onError: () => {
       toast.error(t("toast.error"), { id: "mm1" });
       setSaveStatus("idle");
     },
   });
 
+  // FIX BUG-PL-003: validate numeric fields before save to prevent NaN corruption
+  const NUMERIC_FIELDS = [
+    "loyalty_order_percent", "loyalty_review_points", "loyalty_redeem_rate",
+    "loyalty_max_redeem_percent", "loyalty_expiry_days", "discount_percent",
+  ];
+
   const handleSave = () => {
     if (saveStatus === "saving") return;
+
+    for (const field of NUMERIC_FIELDS) {
+      const val = formData[field];
+      if (val === "" || val === null || val === undefined || isNaN(val) || val < 0) {
+        toast.error(t("error.invalid_number"), { id: "mm1" });
+        return;
+      }
+    }
+
     setSaveStatus("saving");
     saveMutation.mutate(formData);
   };
 
+  // FIX BUG-PL-002: compare against null (not formData self-reference) so null fields detect changes
   const hasChanges = useMemo(() => {
     if (!partner) return false;
-    return Object.keys(formData).some(key => formData[key] !== (partner[key] ?? formData[key]));
+    return Object.keys(formData).some(key => {
+      const serverVal = partner[key] ?? null;
+      const localVal = formData[key] ?? null;
+      return String(serverVal) !== String(localVal);
+    });
   }, [formData, partner]);
 
   if (loadingPartner || loadingStats) {
