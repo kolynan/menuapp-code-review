@@ -308,9 +308,11 @@ function getShiftStartTime(workingHours) {
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   
   // Parse time string "HH:MM" to minutes since midnight
+  // BUG-SM-005: validate parsed values to prevent NaN propagation
   const parseTime = (timeStr) => {
     if (!timeStr) return null;
     const [h, m] = timeStr.split(':').map(Number);
+    if (isNaN(h) || isNaN(m)) return null;
     return h * 60 + m;
   };
   
@@ -1654,8 +1656,14 @@ export default function StaffOrdersMobile() {
 
   const audioRef = useRef(null);
   const audioUnlockedRef = useRef(false);
+  // BUG-SM-003: close AudioContext on unmount to prevent resource leak
   useEffect(() => {
-    audioRef.current = createBeep();
+    const beep = createBeep();
+    audioRef.current = beep;
+    return () => {
+      if (beep?.ctx) beep.ctx.close().catch(() => {});
+      audioRef.current = null;
+    };
   }, []);
   const unlockAudio = async () => {
     if (audioUnlockedRef.current) return;
@@ -1926,14 +1934,19 @@ export default function StaffOrdersMobile() {
     });
   }, [isTokenMode, link, tokenState, currentUser, currentUserId, rateLimitHit, token, queryClient]);
 
-  const handleLogout = () => {
+  // BUG-SM-004: await unbind before clearing localStorage to prevent stale lock
+  const handleLogout = async () => {
     if (isTokenMode && link?.id) {
-      updateLinkMutation.mutate({
-        id: link.id,
-        payload: { bound_device_id: null, bound_at: null },
-      });
+      try {
+        await base44.entities.StaffAccessLink.update(link.id, {
+          bound_device_id: null,
+          bound_at: null,
+        });
+      } catch {
+        // best-effort — continue logout even if server fails
+      }
     }
-    
+
     clearAllStaffData();
     showToast("Выход выполнен");
     setTimeout(() => {
@@ -2684,6 +2697,8 @@ export default function StaffOrdersMobile() {
       if (isRateLimitError(err)) {
         queryClient.cancelQueries();
         setRateLimitHit(true);
+      } else {
+        showToast('Ошибка при закрытии стола'); // BUG-SM-002: was silently swallowed
       }
     }
   }, [sortedStages, queryClient]);
