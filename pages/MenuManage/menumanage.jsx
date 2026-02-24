@@ -201,7 +201,8 @@ async function listFor(entity, pid) {
       if (Array.isArray(res)) return res;
     } catch {}
   }
-  try { return await base44.entities[entity].list(); } catch { return []; }
+  // BUG-MM-001: removed .list() fallback — it leaks other partners' data
+  return [];
 }
 
 async function loadPartner(pid) {
@@ -460,29 +461,32 @@ export default function MenuManage() {
     if (el) e.dataTransfer.setDragImage(el, 40, 20);
   }
 
-  // Batch reindex
+  // Batch reindex — BUG-MM-002/003: defer state update until all batches succeed
   async function batchedReindex(entity, items, setter) {
     const stepped = items.map((it, i) => ({ ...it, sort_order: (i + 1) * ORDER_STEP }));
-    setter(old => {
-      const map = new Map(stepped.map(x => [String(x.id), x]));
-      return old.map(x => map.get(String(x.id)) || x);
-    });
     for (let i = 0; i < stepped.length; i += BATCH_SIZE) {
       const chunk = stepped.slice(i, i + BATCH_SIZE);
       await Promise.all(chunk.map(it => updateRec(entity, it.id, { sort_order: it.sort_order })));
     }
+    // Only update state after all API calls succeed
+    setter(old => {
+      const map = new Map(stepped.map(x => [String(x.id), x]));
+      return old.map(x => map.get(String(x.id)) || x);
+    });
   }
 
-  // Category reorder
+  // Category reorder — BUG-MM-002: save snapshot for rollback on error
   async function reorderCats(from, to) {
     if (!canReorder || from === to) return;
     const sorted = sortByOrder(catsRaw);
     const next = moveIndex(sorted, from, to);
+    const snapshot = catsRaw;
     setCatsRaw(next);
     setReordering(true);
     try {
       await batchedReindex("Category", next, setCatsRaw);
     } catch (e) {
+      setCatsRaw(snapshot);
       toast.error(t('toast.error'), { id: "mm1" });
     } finally {
       setReordering(false);
@@ -540,14 +544,16 @@ export default function MenuManage() {
   }
 
   // Dish move (supports cross-category with duplicate protection)
+  // BUG-MM-002: save snapshot for rollback on error
   async function moveDish(dishId, targetCatId, targetIndex) {
     if (reordering) return;
     const dish = dishesRaw.find(d => String(d.id) === String(dishId));
     if (!dish) return;
-    
+
     const newCatId = String(targetCatId || "none");
     const currentCatIds = getDishCategoryIds(dish);
-    
+    const snapshot = dishesRaw;
+
     // Check if dish is already in target category (duplicate protection)
     if (currentCatIds.includes(newCatId)) {
       // Dish already in this category - just reorder within category
@@ -568,6 +574,7 @@ export default function MenuManage() {
           await batchedReindex("Dish", targetCatDishes, setDishesRaw);
         }
       } catch (e) {
+        setDishesRaw(snapshot);
         toast.error(t('toast.error'), { id: "mm1" });
       } finally {
         setReordering(false);
@@ -576,7 +583,7 @@ export default function MenuManage() {
       }
       return;
     }
-    
+
     // Moving to a different category - update category assignment
     setReordering(true);
     try {
@@ -586,41 +593,42 @@ export default function MenuManage() {
       const prev = targetCatDishes[insertAt - 1];
       const next = targetCatDishes[insertAt];
       let newOrder = computeMidOrder(prev?.sort_order, next?.sort_order, isFloat);
-      
+
       // Build new category_ids: remove from old, add to new
       const newCategoryIds = [newCatId === "none" ? null : newCatId].filter(Boolean);
       const newPrimaryCategory = newCatId === "none" ? null : newCatId;
-      
+
       if (newOrder !== null) {
-        const updatedDish = { 
-          ...dish, 
-          sort_order: newOrder, 
+        const updatedDish = {
+          ...dish,
+          sort_order: newOrder,
           category: newPrimaryCategory,
-          category_ids: newCategoryIds 
+          category_ids: newCategoryIds
         };
         setDishesRaw(old => old.map(d => String(d.id) === String(dishId) ? updatedDish : d));
-        await updateRec("Dish", dishId, { 
-          sort_order: newOrder, 
+        await updateRec("Dish", dishId, {
+          sort_order: newOrder,
           category: newPrimaryCategory,
-          category_ids: newCategoryIds 
+          category_ids: newCategoryIds
         });
         toast.success(t('toast.dish_moved'), { id: "mm1" });
       } else {
-        const updatedDish = { 
-          ...dish, 
+        const updatedDish = {
+          ...dish,
           category: newPrimaryCategory,
-          category_ids: newCategoryIds 
+          category_ids: newCategoryIds
         };
         targetCatDishes.splice(insertAt, 0, updatedDish);
         setDishesRaw(old => old.map(d => String(d.id) === String(dishId) ? updatedDish : d));
         await batchedReindex("Dish", targetCatDishes, setDishesRaw);
-        await updateRec("Dish", dishId, { 
+        await updateRec("Dish", dishId, {
           category: newPrimaryCategory,
-          category_ids: newCategoryIds 
+          category_ids: newCategoryIds
         });
         toast.success(t('toast.dish_moved'), { id: "mm1" });
       }
     } catch (e) {
+      setDishesRaw(snapshot);
       toast.error(t('toast.error'), { id: "mm1" });
     } finally {
       setReordering(false);
