@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -688,25 +688,26 @@ function OrderProcessContent() {
     }
   }, [error, queryClient, partnerId]);
 
-  // Handler: создать дефолтные этапы (по кнопке, НЕ автоматически!)
+  // FIX BUG-OP-004: ref guard prevents double-click race (state update is async, ref is sync)
+  const creatingRef = useRef(false);
+
   const handleCreateDefaults = async () => {
-    if (isCreatingDefaults) return;
-    
+    if (creatingRef.current) return;
+    creatingRef.current = true;
     setIsCreatingDefaults(true);
     try {
-      // КРИТИЧНО: Проверяем ещё раз перед созданием
       const existingCheck = await base44.entities.OrderStage.filter({ partner: partnerId });
       if (existingCheck.length > 0) {
         toast.info(t("orderprocess.toast.already_exists"), { id: TOAST_ID });
         queryClient.invalidateQueries({ queryKey: ["orderStages", partnerId] });
         return;
       }
-      
+
       const defaultStages = [
-        { 
-          name: t("orderprocess.default.new"), 
-          internal_code: "start", 
-          sort_order: 0, 
+        {
+          name: t("orderprocess.default.new"),
+          internal_code: "start",
+          sort_order: 0,
           color: "#3b82f6",
           is_locked: true,
           allowed_roles: ["partner_manager", "partner_staff"],
@@ -714,10 +715,10 @@ function OrderProcessContent() {
           enabled_pickup: true,
           enabled_delivery: true,
         },
-        { 
-          name: t("orderprocess.default.accepted"), 
-          internal_code: "middle", 
-          sort_order: 10, 
+        {
+          name: t("orderprocess.default.accepted"),
+          internal_code: "middle",
+          sort_order: 10,
           color: "#f59e0b",
           is_locked: false,
           allowed_roles: ["partner_manager", "partner_staff"],
@@ -725,10 +726,10 @@ function OrderProcessContent() {
           enabled_pickup: true,
           enabled_delivery: true,
         },
-        { 
-          name: t("orderprocess.default.served"), 
-          internal_code: "finish", 
-          sort_order: 20, 
+        {
+          name: t("orderprocess.default.served"),
+          internal_code: "finish",
+          sort_order: 20,
           color: "#6b7280",
           is_locked: true,
           allowed_roles: ["partner_manager", "partner_staff"],
@@ -737,7 +738,7 @@ function OrderProcessContent() {
           enabled_delivery: true,
         },
       ];
-      
+
       for (const stage of defaultStages) {
         await base44.entities.OrderStage.create({
           ...stage,
@@ -745,13 +746,13 @@ function OrderProcessContent() {
           is_active: true,
         });
       }
-      
+
       queryClient.invalidateQueries({ queryKey: ["orderStages", partnerId] });
       toast.success(t("orderprocess.toast.initialized"), { id: TOAST_ID });
-    } catch (err) {
-      console.error("Failed to create stages:", err);
+    } catch {
       toast.error(t("toast.error"), { id: TOAST_ID });
     } finally {
+      creatingRef.current = false;
       setIsCreatingDefaults(false);
     }
   };
@@ -787,20 +788,20 @@ function OrderProcessContent() {
     onError: () => toast.error(t("toast.error"), { id: TOAST_ID }),
   });
 
+  // FIX BUG-OP-003: removed invalidateQueries from onSuccess — done manually after rebalance
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.OrderStage.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["orderStages", partnerId] });
       toast.success(t("toast.saved"), { id: TOAST_ID });
       setEditDialog({ open: false, stage: null });
     },
     onError: () => toast.error(t("toast.error"), { id: TOAST_ID }),
   });
 
+  // FIX BUG-OP-003: removed invalidateQueries from onSuccess — done manually after rebalance
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.OrderStage.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["orderStages", partnerId] });
       toast.success(t("toast.deleted"), { id: TOAST_ID });
       setDeleteDialog({ open: false, stage: null });
     },
@@ -840,19 +841,28 @@ function OrderProcessContent() {
     setEditDialog({ open: true, stage });
   };
 
+  // FIX BUG-OP-001: wrap entire create+rebalance in try/catch to prevent unhandled rejection
   const handleSaveStage = async (data) => {
     if (editDialog.stage?.isNew) {
-      await createMutation.mutateAsync({
-        ...data,
-        partner: partnerId,
-        internal_code: "middle",
-        sort_order: editDialog.stage.sort_order,
-        is_active: true,
-      });
-      // FIX P1: rebalance после создания
-      const updatedStages = await base44.entities.OrderStage.filter({ partner: partnerId });
-      await rebalanceSortOrder(updatedStages, partnerId);
-      queryClient.invalidateQueries({ queryKey: ["orderStages", partnerId] });
+      try {
+        await createMutation.mutateAsync({
+          ...data,
+          partner: partnerId,
+          internal_code: "middle",
+          sort_order: editDialog.stage.sort_order,
+          is_active: true,
+        });
+        // Rebalance after create — non-critical, wrapped separately
+        try {
+          const updatedStages = await base44.entities.OrderStage.filter({ partner: partnerId });
+          await rebalanceSortOrder(updatedStages, partnerId);
+        } catch {
+          // rebalance failure is non-critical; stage was created successfully
+        }
+        queryClient.invalidateQueries({ queryKey: ["orderStages", partnerId] });
+      } catch {
+        // createMutation.onError already shows toast
+      }
     } else if (editDialog.stage?.id) {
       updateMutation.mutate({ id: editDialog.stage.id, data });
     }
@@ -862,13 +872,34 @@ function OrderProcessContent() {
     setDeleteDialog({ open: true, stage });
   };
 
+  // FIX BUG-OP-001 + BUG-OP-002: try/catch + check orders before delete
   const handleConfirmDelete = async () => {
-    if (deleteDialog.stage?.id) {
+    if (!deleteDialog.stage?.id) return;
+
+    try {
+      // FIX BUG-OP-002: check for orders referencing this stage before deleting
+      const ordersInStage = await base44.entities.Order.filter({
+        partner: partnerId,
+        current_stage: deleteDialog.stage.id,
+      });
+      if (ordersInStage.length > 0) {
+        toast.error(t("orderprocess.error.stage_has_orders", { count: ordersInStage.length }), { id: TOAST_ID });
+        setDeleteDialog({ open: false, stage: null });
+        return;
+      }
+
       await deleteMutation.mutateAsync(deleteDialog.stage.id);
-      // FIX P1: rebalance после удаления
-      const updatedStages = await base44.entities.OrderStage.filter({ partner: partnerId });
-      await rebalanceSortOrder(updatedStages, partnerId);
+
+      // Rebalance after delete — non-critical, wrapped separately
+      try {
+        const updatedStages = await base44.entities.OrderStage.filter({ partner: partnerId });
+        await rebalanceSortOrder(updatedStages, partnerId);
+      } catch {
+        // rebalance failure is non-critical; stage was deleted successfully
+      }
       queryClient.invalidateQueries({ queryKey: ["orderStages", partnerId] });
+    } catch {
+      // deleteMutation.onError already shows toast
     }
   };
 
