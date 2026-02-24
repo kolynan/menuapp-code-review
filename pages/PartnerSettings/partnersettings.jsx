@@ -249,7 +249,6 @@ async function listFor(entity, pid) {
   } catch (e) {
     // P1-1: Пробрасываем rate limit ошибки
     if (isRateLimitError(e)) throw e;
-    console.error(`listFor ${entity} error:`, e);
     return [];
   }
 }
@@ -263,7 +262,6 @@ async function loadPartner(pid) {
   } catch (e) {
     // P1-1: Пробрасываем rate limit ошибки
     if (isRateLimitError(e)) throw e;
-    console.error("loadPartner error:", e);
     return null;
   }
 }
@@ -276,7 +274,6 @@ async function loadPartnerContacts(pid) {
   } catch (e) {
     // P1-1: Пробрасываем rate limit ошибки
     if (isRateLimitError(e)) throw e;
-    console.error("loadPartnerContacts error:", e);
     return null;
   }
 }
@@ -288,7 +285,6 @@ async function loadWifiConfig(pid) {
     return list?.[0] || null;
   } catch (e) {
     if (isRateLimitError(e)) throw e;
-    console.error("loadWifiConfig error:", e);
     return null;
   }
 }
@@ -768,10 +764,10 @@ function HallOrderingSection({ partner, onSave, saving, t }) {
 
       {/* Table Code Verification Settings */}
       <div className="space-y-3 pt-2 pb-2 border-b">
-        <Label className="text-sm font-medium">{t("settings.hall.code_settings") || "Настройки кода стола"}</Label>
+        <Label className="text-sm font-medium">{t("settings.hall.code_settings")}</Label>
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
-            <Label className="text-xs text-slate-600">{t("settings.hall.code_length") || "Длина кода"}</Label>
+            <Label className="text-xs text-slate-600">{t("settings.hall.code_length")}</Label>
             <Input
               type="number"
               min={3}
@@ -785,11 +781,11 @@ function HallOrderingSection({ partner, onSave, saving, t }) {
               className="h-9 text-sm"
               disabled={isSaving}
             />
-            <p className="text-xs text-slate-500">{t("settings.hall.code_length_hint") || "3-8 цифр"}</p>
+            <p className="text-xs text-slate-500">{t("settings.hall.code_length_hint")}</p>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs text-slate-600">{t("settings.hall.max_attempts") || "Макс. попыток"}</Label>
+            <Label className="text-xs text-slate-600">{t("settings.hall.max_attempts")}</Label>
             <Input
               type="number"
               min={1}
@@ -803,11 +799,11 @@ function HallOrderingSection({ partner, onSave, saving, t }) {
               className="h-9 text-sm"
               disabled={isSaving}
             />
-            <p className="text-xs text-slate-500">{t("settings.hall.max_attempts_hint") || "1-10"}</p>
+            <p className="text-xs text-slate-500">{t("settings.hall.max_attempts_hint")}</p>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs text-slate-600">{t("settings.hall.cooldown_seconds") || "Блокировка (сек)"}</Label>
+            <Label className="text-xs text-slate-600">{t("settings.hall.cooldown_seconds")}</Label>
             <Input
               type="number"
               min={0}
@@ -821,7 +817,7 @@ function HallOrderingSection({ partner, onSave, saving, t }) {
               className="h-9 text-sm"
               disabled={isSaving}
             />
-            <p className="text-xs text-slate-500">{t("settings.hall.cooldown_hint") || "0-600 сек"}</p>
+            <p className="text-xs text-slate-500">{t("settings.hall.cooldown_hint")}</p>
           </div>
         </div>
 
@@ -929,7 +925,7 @@ function WifiSection({ partner, wifiConfig, onSave, saving, t }) {
 
       {/* Plan Badge */}
       <div className="flex items-center gap-3 pt-2">
-        <span className="text-sm font-medium text-slate-600">{t("settings.wifi.planLabel") || "Текущий план:"}:</span>
+        <span className="text-sm font-medium text-slate-600">{t("settings.wifi.planLabel")}</span>
         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
           isPaid 
             ? "bg-green-100 text-green-700" 
@@ -1183,6 +1179,9 @@ function CurrenciesSection({ partner, onSave, saving, t }) {
     return Array.isArray(saved) && saved.length > 0 ? saved : ["KZT"];
   });
   const [rates, setRates] = useState(() => partner?.currency_rates || {});
+  // BUG-PS-005 FIX: Ref to always have fresh rates for onBlur handler
+  const ratesRef = useRef(rates);
+  useEffect(() => { ratesRef.current = rates; }, [rates]);
   const [pendingCount, setPendingCount] = useState(0); // pending counter вместо boolean
   const [customCurrency, setCustomCurrency] = useState("");
 
@@ -1236,7 +1235,8 @@ function CurrenciesSection({ partner, onSave, saving, t }) {
     setRates(newRates);
   };
 
-  const saveRate = () => debouncedSave(defaultCurrency, enabledCurrencies, rates);
+  // BUG-PS-005 FIX: Read from ref to get post-setRates value on blur
+  const saveRate = () => debouncedSave(defaultCurrency, enabledCurrencies, ratesRef.current);
 
   const addCustomCurrency = () => {
     const code = customCurrency.trim().toUpperCase();
