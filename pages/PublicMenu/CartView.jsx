@@ -83,6 +83,8 @@ export default function CartView({
   const [codeLockedUntil, setCodeLockedUntil] = React.useState(null); // timestamp ms
   const [nowTs, setNowTs] = React.useState(() => Date.now());
 
+  const topRef = React.useRef(null);
+  const prevTableVerifiedRef = React.useRef(isTableVerified);
   const codeInputRef = React.useRef(null);
   const lastVerifyCodeRef = React.useRef(null);
   const countedErrorForCodeRef = React.useRef(null);
@@ -132,6 +134,17 @@ export default function CartView({
       setCodeAttempts(0);
       setCodeLockedUntil(null);
     }
+  }, [isTableVerified]);
+
+  // BUG-PM-006: Scroll drawer to top when table gets verified
+  React.useEffect(() => {
+    const becameVerified = prevTableVerifiedRef.current !== true && isTableVerified === true;
+    prevTableVerifiedRef.current = isTableVerified;
+    if (!becameVerified) return;
+    if (typeof window === "undefined") return;
+    window.requestAnimationFrame(() => {
+      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }, [isTableVerified]);
 
   // Count failed attempts (UI-level), and apply cooldown after max attempts.
@@ -406,7 +419,7 @@ export default function CartView({
   }, [partner?.loyalty_review_points]);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 mt-2 pb-4">
+    <div ref={topRef} className="max-w-2xl mx-auto px-4 mt-2 pb-4">
       {/* P0 Header: [🔔] Стол · Гость [✕] */}
       <div className="bg-white rounded-lg shadow-sm border p-3 mb-4">
         <div className="flex items-center justify-between">
