@@ -115,6 +115,17 @@ function shouldRetry(failureCount, error) {
     return failureCount < 2;
 }
 
+// HTML sanitization for document.write contexts (XSS prevention)
+function escapeHtml(str) {
+    if (!str) return '';
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+}
+
 // Clipboard with fallback
 async function copyToClipboard(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -129,8 +140,7 @@ async function copyToClipboard(text) {
     document.body.appendChild(textarea);
     textarea.select();
     try {
-        document.execCommand('copy');
-        return true;
+        return document.execCommand('copy');
     } catch (e) {
         return false;
     } finally {
@@ -352,21 +362,22 @@ function QRCodeModal({ isOpen, onClose, token, staffName, t }) {
         }
     };
 
-    // #2: Print QR
+    // #2: Print QR (BUG-SA-001: sanitize staffName to prevent XSS)
     const printQR = () => {
         if (!qrDataUrl) return;
-        
+
         const printWindow = window.open('', '_blank');
         if (!printWindow) {
             toast.error(t('partnerstaffaccess.toast.print_blocked'), { id: 'mm1' });
             return;
         }
-        
+
+        const safeName = escapeHtml(staffName);
         printWindow.document.write(`
             <!DOCTYPE html>
             <html>
             <head>
-                <title>QR - ${staffName || 'Staff'}</title>
+                <title>QR - ${safeName || 'Staff'}</title>
                 <style>
                     body { 
                         display: flex; 
@@ -384,7 +395,7 @@ function QRCodeModal({ isOpen, onClose, token, staffName, t }) {
             </head>
             <body>
                 <img src="${qrDataUrl}" alt="QR Code" />
-                <h2>${staffName || ''}</h2>
+                <h2>${safeName || ''}</h2>
                 <p>${t('partnerstaffaccess.qr.print_hint')}</p>
                 <script>
                     window.onload = function() {
@@ -1886,10 +1897,20 @@ function PartnerStaffAccessContent() {
         setSelectedIds(new Set());
     };
 
+    // BUG-SA-002: Filter bulk operations through permission checks
+    const getPermittedBulkIds = () => {
+        if (!links) return [];
+        return links
+            .filter(l => selectedIds.has(l.id) && canDeleteLink(l))
+            .map(l => l.id);
+    };
+
     const handleBulkEnable = async () => {
+        const permittedIds = getPermittedBulkIds();
+        if (permittedIds.length === 0) return;
         setBulkLoading(true);
         try {
-            const promises = Array.from(selectedIds).map(id => 
+            const promises = permittedIds.map(id =>
                 base44.entities.StaffAccessLink.update(id, { is_active: true })
             );
             await Promise.all(promises);
@@ -1904,9 +1925,11 @@ function PartnerStaffAccessContent() {
     };
 
     const handleBulkDisable = async () => {
+        const permittedIds = getPermittedBulkIds();
+        if (permittedIds.length === 0) return;
         setBulkLoading(true);
         try {
-            const promises = Array.from(selectedIds).map(id => 
+            const promises = permittedIds.map(id =>
                 base44.entities.StaffAccessLink.update(id, { is_active: false })
             );
             await Promise.all(promises);
@@ -1930,10 +1953,17 @@ function PartnerStaffAccessContent() {
 
     const handleBulkDeleteConfirm = async () => {
         if (confirmModal.type !== 'bulk_delete') return;
-        
+
+        // BUG-SA-002: re-check permissions before deleting
+        const permittedIds = (confirmModal.data.ids || []).filter(id => {
+            const link = links?.find(l => l.id === id);
+            return link && canDeleteLink(link);
+        });
+        if (permittedIds.length === 0) return;
+
         setBulkLoading(true);
         try {
-            const promises = confirmModal.data.ids.map(id => 
+            const promises = permittedIds.map(id =>
                 base44.entities.StaffAccessLink.delete(id)
             );
             await Promise.all(promises);
