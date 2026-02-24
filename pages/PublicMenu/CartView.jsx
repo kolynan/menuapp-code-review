@@ -143,7 +143,14 @@ export default function CartView({
     if (!becameVerified) return;
     if (typeof window === "undefined") return;
     window.requestAnimationFrame(() => {
-      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const el = topRef.current;
+      if (!el) return;
+      // Walk up to the nearest scrollable ancestor (the drawer's overflow container)
+      let parent = el.parentElement;
+      while (parent && parent.scrollHeight <= parent.clientHeight) {
+        parent = parent.parentElement;
+      }
+      if (parent) parent.scrollTo({ top: 0, behavior: "smooth" });
     });
   }, [isTableVerified]);
 
