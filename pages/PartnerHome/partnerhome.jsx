@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { ArrowRight, AlertTriangle, Utensils, Package, Truck, LayoutGrid } from "lucide-react";
-import PartnerShell from "@/components/PartnerShell";
+import PartnerShell, { usePartnerAccess } from "@/components/PartnerShell";
 import { useI18n } from "@/components/i18n";
 
 /* =======================
@@ -36,30 +36,33 @@ function getTablesText(count, t) {
    MAIN COMPONENT
    ======================= */
 
-export default function PartnerHome() {
+// FIX BUG-PH-001: use usePartnerAccess() inside PartnerShell wrapper
+function PartnerHomeContent() {
   const navigate = useNavigate();
   const { t } = useI18n();
+  const { partnerId } = usePartnerAccess();
 
-  // Load partner
-  const partnersQ = useQuery({
-    queryKey: ["Partner", "list"],
-    queryFn: () => base44.entities.Partner.list(),
+  // Load partner details
+  const partnerQ = useQuery({
+    queryKey: ["partner", partnerId],
+    queryFn: () => base44.entities.Partner.get(partnerId),
+    enabled: !!partnerId,
   });
 
-  const partner = partnersQ.data?.[0] || null;
+  const partner = partnerQ.data || null;
 
   // Load active table sessions (status = open)
   const sessionsQ = useQuery({
-    queryKey: ["TableSession", "byPartner", partner?.id],
-    enabled: !!partner?.id,
-    queryFn: () => base44.entities.TableSession.filter({ partner: partner.id }),
+    queryKey: ["TableSession", "byPartner", partnerId],
+    enabled: !!partnerId,
+    queryFn: () => base44.entities.TableSession.filter({ partner: partnerId }),
   });
 
   // Load today's orders
   const ordersQ = useQuery({
-    queryKey: ["Order", "byPartner", partner?.id],
-    enabled: !!partner?.id,
-    queryFn: () => base44.entities.Order.filter({ partner: partner.id }),
+    queryKey: ["Order", "byPartner", partnerId],
+    enabled: !!partnerId,
+    queryFn: () => base44.entities.Order.filter({ partner: partnerId }),
   });
 
   // Calculate statistics
@@ -68,12 +71,13 @@ export default function PartnerHome() {
     const orders = ordersQ.data || [];
     const todayStart = getTodayStart();
 
-    // Active tables (open sessions)
+    // FIX BUG-PH-002: exclude locally-expired from open count to avoid double-counting
+    const now = new Date();
     const openSessions = sessions.filter(
-      (s) => s.status === "open"
+      (s) => s.status === "open" && !(s.expires_at && new Date(s.expires_at) < now)
     );
     const expiredSessions = sessions.filter(
-      (s) => s.status === "expired" || (s.status === "open" && s.expires_at && new Date(s.expires_at) < new Date())
+      (s) => s.status === "expired" || (s.status === "open" && s.expires_at && new Date(s.expires_at) < now)
     );
 
     // Today's orders
@@ -130,13 +134,13 @@ export default function PartnerHome() {
   const hasChannels = !!partner?.channels_configured_at;
 
   // Loading state
-  const isLoading = partnersQ.isLoading || sessionsQ.isLoading || ordersQ.isLoading;
+  const isLoading = partnerQ.isLoading || sessionsQ.isLoading || ordersQ.isLoading;
 
   // Error state
-  const hasError = partnersQ.isError || sessionsQ.isError || ordersQ.isError;
+  const hasError = partnerQ.isError || sessionsQ.isError || ordersQ.isError;
 
   return (
-    <PartnerShell partnerName={partner?.name} activeTab="home">
+    <>
       {/* Loading */}
       {isLoading && (
         <div className="flex items-center justify-center py-12">
@@ -275,6 +279,15 @@ export default function PartnerHome() {
           )}
         </div>
       )}
+    </>
+  );
+}
+
+// FIX BUG-PH-001: wrapper + content pattern (usePartnerAccess inside PartnerShell)
+export default function PartnerHome() {
+  return (
+    <PartnerShell activeTab="home">
+      <PartnerHomeContent />
     </PartnerShell>
   );
 }
