@@ -1,5 +1,5 @@
 import React from "react";
-import { XIcon, Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, X } from "lucide-react";
+import { XIcon, Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, Info, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -307,6 +307,13 @@ export default function CartView({
     0,
     (Number(cartTotalAmount) || 0) - (Number(discountAmount) || 0) - (Number(pointsDiscountAmount) || 0)
   );
+
+  // BUG-PM-007: Hide yellow block when verified and no online benefits to show
+  const hasOnlineBenefits =
+    (Number(discountAmount) || 0) > 0 ||
+    (Boolean(partner?.loyalty_enabled) && (Number(earnedPoints) || 0) > 0) ||
+    (Number(pointsDiscountAmount) || 0) > 0;
+  const shouldShowOnlineOrderBlock = isTableVerified !== true || hasOnlineBenefits;
 
   // ===== Guest count (stable, from orders OR guests) =====
   const guestCountFromOrders = React.useMemo(() => {
@@ -1006,22 +1013,27 @@ export default function CartView({
               </div>
 
               {/* Online order to waiter (verification + benefits) */}
+              {shouldShowOnlineOrderBlock && (
               <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
+                <div className="mb-2">
                   <p className="text-amber-900 font-semibold text-sm">
                     {tr('cart.verify.online_order_title', 'Онлайн-заказ официанту')}
                   </p>
-                  <button
-                    type="button"
-                    className="text-amber-700 hover:text-amber-900 text-sm px-2"
-                    onClick={() => setInfoModal('online')}
-                    title={tr('common.info', 'Информация')}
-                  >
-                    ⓘ
-                  </button>
                 </div>
 
-                {/* Benefits are shown only when partner enabled them; no "if enabled" text */}
+                {/* BUG-PM-008: Accessible info link (44px touch target) */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setInfoModal('online')}
+                  className="mb-2 h-11 w-full justify-start gap-2 px-2 text-amber-800 hover:bg-amber-100 hover:text-amber-900"
+                >
+                  <Info className="w-4 h-4" />
+                  <span>{tr('cart.verify.how_online_order_works', 'Как работает онлайн-заказ')}</span>
+                </Button>
+
+                {/* Benefits are shown only when partner enabled them */}
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-sm text-amber-900">
                     <span>{tr('cart.verify.discount_label', 'Скидка за онлайн-заказ')}</span>
@@ -1044,119 +1056,119 @@ export default function CartView({
                   </div>
                 )}
 
-                <div className="mt-3 pt-3 border-t border-amber-200">
-                  {isTableVerified === true ? (
-                    <div className="text-sm text-green-700 text-center">
-                      ✅ {tr('cart.verify.table_verified', 'Стол подтверждён')}
+                {/* BUG-PM-007: Table code entry — only when NOT verified */}
+                {isTableVerified !== true && (
+                  <div className="mt-3 pt-3 border-t border-amber-200">
+                    <div className="mb-2">
+                      <p className="text-amber-900 font-medium text-sm">
+                        {tr('cart.verify.enter_table_code', 'Введите код стола')}
+                      </p>
                     </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-amber-900 font-medium text-sm">
-                          {tr('cart.verify.enter_table_code', 'Введите код стола')}
-                        </p>
-                        <button
-                          type="button"
-                          className="text-amber-700 hover:text-amber-900 text-sm px-2"
-                          onClick={() => setInfoModal('tableCode')}
-                          title={tr('common.info', 'Информация')}
-                        >
-                          ⓘ
-                        </button>
+
+                    {/* BUG-PM-008: Accessible info link for table code (44px touch target) */}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setInfoModal('tableCode')}
+                      className="mb-2 h-11 w-full justify-start gap-2 px-2 text-amber-800 hover:bg-amber-100 hover:text-amber-900"
+                    >
+                      <Info className="w-4 h-4" />
+                      <span>{tr('cart.verify.where_table_code', 'Где найти код стола')}</span>
+                    </Button>
+
+                    {/* Slots UI + invisible input (auto-verify when fully entered) */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-center gap-3">
+                        <div className={`relative ${isCodeLocked ? 'opacity-60' : ''}`}>
+                          <div
+                            className="flex items-center gap-2"
+                            onClick={() => !isCodeLocked && codeInputRef.current && codeInputRef.current.focus()}
+                          >
+                            <div className="flex gap-2">
+                              {Array.from({ length: tableCodeLength }).map((_, idx) => {
+                                const safe = String(tableCodeInput || '').replace(/\D/g, '').slice(0, tableCodeLength);
+                                const ch = safe[idx] || '_';
+                                return (
+                                  <div
+                                    key={idx}
+                                    className="w-9 h-11 rounded-lg border border-amber-200 bg-white flex items-center justify-center text-xl font-mono text-amber-900"
+                                  >
+                                    {ch}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {isVerifyingCode && (
+                              <Loader2 className="w-4 h-4 animate-spin text-amber-700" />
+                            )}
+                          </div>
+
+                          <Input
+                            ref={codeInputRef}
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={tableCodeLength}
+                            value={String(tableCodeInput || '').replace(/\D/g, '').slice(0, tableCodeLength)}
+                            disabled={isCodeLocked}
+                            onChange={(e) => {
+                              const next = String(e.target.value || '').replace(/\D/g, '').slice(0, tableCodeLength);
+                              if (typeof setTableCodeInput === 'function') setTableCodeInput(next);
+                            }}
+                            className="absolute inset-0 opacity-0 cursor-text"
+                            aria-label={tr('cart.verify.enter_table_code', 'Введите код стола')}
+                            placeholder={tr('cart.verify.enter_code_placeholder', 'Введите код')}
+                          />
+                        </div>
                       </div>
 
-                      {/* Slots UI + invisible input (auto-verify when fully entered) */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-center gap-3">
-                          <div className={`relative ${isCodeLocked ? 'opacity-60' : ''}`}>
-                            <div
-                              className="flex items-center gap-2"
-                              onClick={() => !isCodeLocked && codeInputRef.current && codeInputRef.current.focus()}
-                            >
-                              <div className="flex gap-2">
-                                {Array.from({ length: tableCodeLength }).map((_, idx) => {
-                                  const safe = String(tableCodeInput || '').replace(/\D/g, '').slice(0, tableCodeLength);
-                                  const ch = safe[idx] || '_';
-                                  return (
-                                    <div
-                                      key={idx}
-                                      className="w-9 h-11 rounded-lg border border-amber-200 bg-white flex items-center justify-center text-xl font-mono text-amber-900"
-                                    >
-                                      {ch}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              {isVerifyingCode && (
-                                <Loader2 className="w-4 h-4 animate-spin text-amber-700" />
+                      {!String(tableCodeInput || '').trim() && (
+                        <div className="text-center text-xs text-amber-700">
+                          {tr('cart.verify.enter_code_placeholder', 'Введите код')}
+                        </div>
+                      )}
+
+                      {isCodeLocked ? (
+                        <div className="text-center text-xs text-amber-800">
+                          ⏳ {tr('cart.verify.locked', 'Слишком много попыток. Повторите через')}{' '}
+                          {String(Math.floor(codeSecondsLeft / 60)).padStart(2, '0')}:{String(codeSecondsLeft % 60).padStart(2, '0')}
+                        </div>
+                      ) : (
+                        <>
+                          {codeVerificationError && !isVerifyingCode && (
+                            <div className="text-center text-xs text-red-700">
+                              {codeVerificationError}
+                              {maxCodeAttempts > 0 && (
+                                <div className="mt-1 text-red-600">
+                                  {tr('cart.verify.attempts', 'Попытки')}: {Math.min(codeAttempts, maxCodeAttempts)} {tr('common.of', 'из')} {maxCodeAttempts}
+                                </div>
                               )}
                             </div>
+                          )}
+                        </>
+                      )}
 
-                            <Input
-                              ref={codeInputRef}
-                              type="text"
-                              inputMode="numeric"
-                              maxLength={tableCodeLength}
-                              value={String(tableCodeInput || '').replace(/\D/g, '').slice(0, tableCodeLength)}
-                              disabled={isCodeLocked}
-                              onChange={(e) => {
-                                const next = String(e.target.value || '').replace(/\D/g, '').slice(0, tableCodeLength);
-                                if (typeof setTableCodeInput === 'function') setTableCodeInput(next);
-                              }}
-                              className="absolute inset-0 opacity-0 cursor-text"
-                              aria-label={tr('cart.verify.enter_table_code', 'Введите код стола')}
-                              placeholder={tr('cart.verify.enter_code_placeholder', 'Введите код')}
-                            />
+                      {/* Option 2: Tell code to waiter (same effect) */}
+                      {hallGuestCodeEnabled && effectiveGuestCode && (
+                        <div className="mt-3 pt-3 border-t border-amber-200 text-center">
+                          <div className="flex items-center justify-center gap-2 text-xs text-amber-600 mb-2">
+                            <span className="flex-1 border-t border-amber-300"></span>
+                            <span>{tr('common.or', 'или')}</span>
+                            <span className="flex-1 border-t border-amber-300"></span>
                           </div>
+                          <p className="text-xs text-amber-800 mb-1">
+                            {tr('cart.tell_code_to_waiter', 'Назовите официанту этот код')}:
+                          </p>
+                          <p className="text-2xl font-bold text-amber-900 font-mono">
+                            {String(effectiveGuestCode)}
+                          </p>
                         </div>
-
-                        {!String(tableCodeInput || '').trim() && (
-                          <div className="text-center text-xs text-amber-700">
-                            {tr('cart.verify.enter_code_placeholder', 'Введите код')}
-                          </div>
-                        )}
-
-                        {isCodeLocked ? (
-                          <div className="text-center text-xs text-amber-800">
-                            ⏳ {tr('cart.verify.locked', 'Слишком много попыток. Повторите через')}{' '}
-                            {String(Math.floor(codeSecondsLeft / 60)).padStart(2, '0')}:{String(codeSecondsLeft % 60).padStart(2, '0')}
-                          </div>
-                        ) : (
-                          <>
-                            {codeVerificationError && !isVerifyingCode && (
-                              <div className="text-center text-xs text-red-700">
-                                {codeVerificationError}
-                                {maxCodeAttempts > 0 && (
-                                  <div className="mt-1 text-red-600">
-                                    {tr('cart.verify.attempts', 'Попытки')}: {Math.min(codeAttempts, maxCodeAttempts)} {tr('common.of', 'из')} {maxCodeAttempts}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </>
-                        )}
-
-                        {/* Option 2: Tell code to waiter (same effect) */}
-                        {hallGuestCodeEnabled && effectiveGuestCode && (
-                          <div className="mt-3 pt-3 border-t border-amber-200 text-center">
-                            <div className="flex items-center justify-center gap-2 text-xs text-amber-600 mb-2">
-                              <span className="flex-1 border-t border-amber-300"></span>
-                              <span>{tr('common.or', 'или')}</span>
-                              <span className="flex-1 border-t border-amber-300"></span>
-                            </div>
-                            <p className="text-xs text-amber-800 mb-1">
-                              {tr('cart.tell_code_to_waiter', 'Назовите официанту этот код')}:
-                            </p>
-                            <p className="text-2xl font-bold text-amber-900 font-mono">
-                              {String(effectiveGuestCode)}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
+              )}
 
               {/* Info modal */}
               {infoModal && (
