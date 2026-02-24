@@ -1229,9 +1229,11 @@ function CurrenciesSection({ partner, onSave, saving, t }) {
     debouncedSave(code, newEnabled, rates);
   };
 
+  // BUG-PS-005 FIX: Pass updated rates directly to avoid stale closure
   const handleRateChange = (code, value) => {
     const num = parseFloat(value) || 0;
-    setRates((prev) => ({ ...prev, [code]: num }));
+    const newRates = { ...rates, [code]: num };
+    setRates(newRates);
   };
 
   const saveRate = () => debouncedSave(defaultCurrency, enabledCurrencies, rates);
@@ -1620,7 +1622,9 @@ export default function PartnerSettings() {
   
   // Core state
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  // BUG-PS-001/002 FIX: Replace boolean with counter to avoid early unlock on overlapping saves
+  const [savingCount, setSavingCount] = useState(0);
+  const saving = savingCount > 0;
   const [rateLimitHit, setRateLimitHit] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [user, setUser] = useState(null);
@@ -1726,7 +1730,7 @@ export default function PartnerSettings() {
   // Partner saves
   async function saveProfile() {
     if (!partner?.id) return;
-    setSaving(true);
+    setSavingCount(c => c + 1);
     try {
       await updateRec("Partner", partner.id, { 
         name: partner?.name, 
@@ -1742,14 +1746,14 @@ export default function PartnerSettings() {
     } catch (e) {
       showError(t("settings.errors.error"), String(e?.message || e));
     } finally {
-      setSaving(false);
+      setSavingCount(c => c - 1);
     }
   }
 
   async function saveWorkingHours(data) {
     if (!partner?.id) return;
     const seq = ++saveSeq.current.hours;
-    setSaving(true);
+    setSavingCount(c => c + 1);
     try {
       await updateRec("Partner", partner.id, data);
       if (seq !== saveSeq.current.hours) return; // устаревший ответ — игнор
@@ -1759,13 +1763,13 @@ export default function PartnerSettings() {
       if (seq !== saveSeq.current.hours) return; // устаревшая ошибка — игнор
       showError(t("settings.errors.error"), String(e?.message || e));
     } finally {
-      setSaving(false);
+      setSavingCount(c => c - 1);
     }
   }
 
   async function saveChannels(channels) {
     if (!partner?.id) return;
-    setSaving(true);
+    setSavingCount(c => c + 1);
     const now = new Date().toISOString();
     const payload = {
       channels_hall_enabled: channels.hall, 
@@ -1782,13 +1786,13 @@ export default function PartnerSettings() {
       showError(t("settings.errors.error"), String(e?.message || e));
       throw e; // re-throw для отката UI в секции
     } finally {
-      setSaving(false);
+      setSavingCount(c => c - 1);
     }
   }
 
   async function saveHallOrdering(data) {
     if (!partner?.id) return;
-    setSaving(true);
+    setSavingCount(c => c + 1);
     try {
       await updateRec("Partner", partner.id, data);
       setPartner(prev => ({ ...prev, ...data }));
@@ -1797,14 +1801,14 @@ export default function PartnerSettings() {
       showError(t("settings.errors.error"), String(e?.message || e));
       throw e; // re-throw для отката UI в секции
     } finally {
-      setSaving(false);
+      setSavingCount(c => c - 1);
     }
   }
 
   async function saveLanguages(data) {
     if (!partner?.id) return;
     const seq = ++saveSeq.current.languages;
-    setSaving(true);
+    setSavingCount(c => c + 1);
     try {
       await updateRec("Partner", partner.id, data);
       if (seq !== saveSeq.current.languages) return; // устаревший ответ — игнор
@@ -1814,14 +1818,14 @@ export default function PartnerSettings() {
       if (seq !== saveSeq.current.languages) return; // устаревшая ошибка — игнор
       showError(t("settings.errors.error"), String(e?.message || e));
     } finally {
-      setSaving(false);
+      setSavingCount(c => c - 1);
     }
   }
 
   async function saveCurrencies(data) {
     if (!partner?.id) return;
     const seq = ++saveSeq.current.currencies;
-    setSaving(true);
+    setSavingCount(c => c + 1);
     try {
       await updateRec("Partner", partner.id, data);
       if (seq !== saveSeq.current.currencies) return; // устаревший ответ — игнор
@@ -1831,13 +1835,14 @@ export default function PartnerSettings() {
       if (seq !== saveSeq.current.currencies) return; // устаревшая ошибка — игнор
       showError(t("settings.errors.error"), String(e?.message || e));
     } finally {
-      setSaving(false);
+      setSavingCount(c => c - 1);
     }
   }
 
-  // Contact View Mode
+  // BUG-PS-004 FIX: Add pid guard to prevent creating orphaned records
   async function saveContactViewMode(viewMode) {
-    setSaving(true);
+    if (!pid) return;
+    setSavingCount(c => c + 1);
     try {
       if (contactSettings?.id) {
         await updateRec("PartnerContacts", contactSettings.id, { view_mode: viewMode });
@@ -1850,14 +1855,14 @@ export default function PartnerSettings() {
     } catch (e) {
       showError(t("settings.errors.error"), String(e?.message || e));
     } finally {
-      setSaving(false);
+      setSavingCount(c => c - 1);
     }
   }
 
   // WiFi Config Save
   async function saveWifiConfig(data) {
     if (!partner?.id) return;
-    setSaving(true);
+    setSavingCount(c => c + 1);
     try {
       if (wifiConfig?.id) {
         await updateRec("WiFiConfig", wifiConfig.id, data);
@@ -1871,7 +1876,7 @@ export default function PartnerSettings() {
       showError(t("settings.errors.error"), String(e?.message || e));
       throw e;
     } finally {
-      setSaving(false);
+      setSavingCount(c => c - 1);
     }
   }
 
@@ -1903,7 +1908,7 @@ export default function PartnerSettings() {
       is_active: true, 
       sort_order
     };
-    setSaving(true);
+    setSavingCount(c => c + 1);
     try {
       if (contactForm.id) {
         await updateRec("PartnerContactLink", contactForm.id, payload);
@@ -1918,18 +1923,24 @@ export default function PartnerSettings() {
     } catch (e) {
       showError(t("settings.errors.error"), String(e?.message || e));
     } finally {
-      setSaving(false);
+      setSavingCount(c => c - 1);
     }
   }
 
+  // BUG-PS-003 FIX: Add optimistic rollback on error + saving guard
   async function deleteContact(c) {
     if (!window.confirm(t("settings.contacts.deleteConfirm"))) return;
+    setSavingCount(cnt => cnt + 1);
+    const snapshot = [...contactsRaw];
+    setContactsRaw(old => old.filter(x => x.id !== c.id));
     try {
       await deleteRec("PartnerContactLink", c.id);
-      setContactsRaw(old => old.filter(x => x.id !== c.id));
       showToast(t("settings.toasts.contactDeleted"));
     } catch (e) {
+      setContactsRaw(snapshot);
       showError(t("settings.errors.error"), String(e?.message || e));
+    } finally {
+      setSavingCount(cnt => cnt - 1);
     }
   }
 
