@@ -169,15 +169,26 @@ function shouldRetry(failureCount, error) {
    BATCHED UPDATES HELPER (P0.4)
    ============================================================ */
 
+// BUG-MD-002 FIX: Use Promise.allSettled to avoid partial failure leaving DB inconsistent
 async function batchedUpdates(items, updateFn, batchSize = 5, delayMs = 100) {
   const results = [];
+  const failed = [];
   for (let i = 0; i < items.length; i += batchSize) {
     const batch = items.slice(i, i + batchSize);
-    const batchResults = await Promise.all(batch.map(updateFn));
-    results.push(...batchResults);
+    const settled = await Promise.allSettled(batch.map(updateFn));
+    settled.forEach((r, idx) => {
+      if (r.status === "fulfilled") results.push(r.value);
+      else failed.push({ item: batch[idx], reason: r.reason });
+    });
     if (i + batchSize < items.length) {
       await new Promise(r => setTimeout(r, delayMs));
     }
+  }
+  if (failed.length > 0) {
+    const err = new Error(`${failed.length} of ${items.length} updates failed`);
+    err.failed = failed;
+    err.results = results;
+    throw err;
   }
   return results;
 }
@@ -814,24 +825,26 @@ export default function MenuDishes() {
   // MUTATIONS
   // ─────────────────────────────────────────────────────────────
 
+  // BUG-MD-005 FIX: Close dialog in onSuccess, not immediately after mutate()
   const savePartnerMutation = useMutation({
     mutationFn: async (payload) => {
       return base44.entities.Partner.update(partnerId, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["partner", partnerId] });
+      setSettingsDialogOpen(false);
       toast.success("Настройки сохранены", { id: TOAST_ID });
     },
     onError: () => toast.error("Не удалось сохранить", { id: TOAST_ID }),
   });
 
+  // BUG-MD-006 FIX: Accept sort_order via payload to avoid stale closure
   const createContactLinkMutation = useMutation({
     mutationFn: async (payload) => {
       return base44.entities.PartnerContactLink.create({
         ...payload,
         partner: partnerId,
         is_active: true,
-        sort_order: (editingContactLinks.length + 1) * 10,
       });
     },
     onSuccess: (newLink) => {
@@ -855,21 +868,22 @@ export default function MenuDishes() {
     onError: () => toast.error("Не удалось удалить контакт", { id: TOAST_ID }),
   });
 
+  // BUG-MD-004 FIX: Pass metadata through mutation to avoid stale closure
   const saveCategoryMutation = useMutation({
-    mutationFn: async (payload) => {
-      if (editingCategory) {
-        return base44.entities.Category.update(editingCategory.id, payload);
+    mutationFn: async ({ payload, meta }) => {
+      if (meta.isEdit) {
+        return base44.entities.Category.update(meta.editId, payload);
       }
       return base44.entities.Category.create({ ...payload, partner: partnerId });
     },
-    onSuccess: () => {
+    onSuccess: (_, { meta }) => {
       queryClient.invalidateQueries({ queryKey: ["categories", partnerId] });
       setCategoryDialogOpen(false);
       setEditingCategory(null);
       toast.success(
-        editingCategory
-          ? `Раздел «${normStr(categoryForm.name)}» обновлён`
-          : `Раздел «${normStr(categoryForm.name)}» создан`,
+        meta.isEdit
+          ? `Раздел «${meta.name}» обновлён`
+          : `Раздел «${meta.name}» создан`,
         { id: TOAST_ID }
       );
     },
@@ -889,21 +903,22 @@ export default function MenuDishes() {
     onError: () => toast.error("Не удалось удалить раздел", { id: TOAST_ID }),
   });
 
+  // BUG-MD-004 FIX: Pass metadata through mutation to avoid stale closure
   const saveDishMutation = useMutation({
-    mutationFn: async (payload) => {
-      if (editingDish) {
-        return base44.entities.Dish.update(editingDish.id, payload);
+    mutationFn: async ({ payload, meta }) => {
+      if (meta.isEdit) {
+        return base44.entities.Dish.update(meta.editId, payload);
       }
       return base44.entities.Dish.create(payload);
     },
-    onSuccess: () => {
+    onSuccess: (_, { meta }) => {
       queryClient.invalidateQueries({ queryKey: ["dishes", partnerId] });
       setDishDialogOpen(false);
       setEditingDish(null);
       toast.success(
-        editingDish
-          ? `Блюдо «${normStr(dishForm.name)}» обновлено`
-          : `Блюдо «${normStr(dishForm.name)}» добавлено`,
+        meta.isEdit
+          ? `Блюдо «${meta.name}» обновлено`
+          : `Блюдо «${meta.name}» добавлено`,
         { id: TOAST_ID }
       );
     },
@@ -1000,7 +1015,9 @@ export default function MenuDishes() {
       toast.error("Не удалось сохранить порядок блюд", { id: TOAST_ID }),
   });
 
-  const isSavingDish = moveDishToCategoryMutation.isPending || saveDishOrderMutation.isPending;
+  // BUG-MD-003 FIX: Also block during refetch after successful cross-category move
+  const isSavingDish = moveDishToCategoryMutation.isPending || saveDishOrderMutation.isPending ||
+    (moveDishToCategoryMutation.isSuccess && loadingDishes);
 
   // ─────────────────────────────────────────────────────────────
   // HANDLERS
@@ -1067,6 +1084,7 @@ export default function MenuDishes() {
     setSettingsDialogOpen(true);
   }
 
+  // BUG-MD-005 FIX: Don't close dialog immediately — close in onSuccess
   function saveSettings() {
     const payload = {
       name: normStr(settingsForm.name).trim(),
@@ -1077,7 +1095,6 @@ export default function MenuDishes() {
       return;
     }
     savePartnerMutation.mutate(payload);
-    setSettingsDialogOpen(false);
   }
 
   // P0.6: XSS protection - validate URL before saving
@@ -1091,10 +1108,12 @@ export default function MenuDishes() {
       toast.error("Недопустимый формат ссылки", { id: TOAST_ID });
       return;
     }
+    // BUG-MD-006 FIX: Evaluate sort_order at call time, not closure time
     createContactLinkMutation.mutate({
       type: newContactForm.type,
       label: normStr(newContactForm.label).trim() || getDefaultContactLabel(newContactForm.type),
       url: url,
+      sort_order: (editingContactLinks.length + 1) * 10,
     });
   }
 
@@ -1146,7 +1165,15 @@ export default function MenuDishes() {
       payload.translations = cleanTranslations;
     }
 
-    saveCategoryMutation.mutate(payload);
+    // BUG-MD-004 FIX: Pass metadata to avoid stale closure in onSuccess
+    saveCategoryMutation.mutate({
+      payload,
+      meta: {
+        name: normStr(categoryForm.name).trim(),
+        isEdit: !!editingCategory,
+        editId: editingCategory?.id,
+      },
+    });
   }
 
   function handleDeleteCategory() {
@@ -1277,7 +1304,15 @@ export default function MenuDishes() {
 
     if (!editingDish) payload.partner = partnerId;
 
-    saveDishMutation.mutate(payload);
+    // BUG-MD-004 FIX: Pass metadata to avoid stale closure in onSuccess
+    saveDishMutation.mutate({
+      payload,
+      meta: {
+        name: normStr(dishForm.name).trim(),
+        isEdit: !!editingDish,
+        editId: editingDish?.id,
+      },
+    });
   }
 
   // Confirm dialog
@@ -1303,6 +1338,12 @@ export default function MenuDishes() {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
       /* no capture */
+    }
+
+    // BUG-MD-007 FIX: Cancel any in-flight dish RAF before starting category drag
+    if (dragDishRafRef.current) {
+      window.cancelAnimationFrame(dragDishRafRef.current);
+      dragDishRafRef.current = 0;
     }
 
     setDraggingDishId("");
@@ -1450,7 +1491,7 @@ export default function MenuDishes() {
 
   function onDishGripPointerDown(e, sourceCatId, dishId) {
     if (isSavingDish) return;
-    
+
     e.preventDefault();
     e.stopPropagation();
 
@@ -1458,6 +1499,12 @@ export default function MenuDishes() {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
       /* no capture */
+    }
+
+    // BUG-MD-007 FIX: Cancel any in-flight category RAF before starting dish drag
+    if (dragRafRef.current) {
+      window.cancelAnimationFrame(dragRafRef.current);
+      dragRafRef.current = 0;
     }
 
     setDraggingCatId("");
@@ -1645,7 +1692,7 @@ export default function MenuDishes() {
       const targetBaseIds = targetBaseList.map((d) => d.id);
       const targetStoredIds = dishOrderByCatRef.current?.[targetCatId] || [];
       const targetOrderedIds = syncOrderIds(targetStoredIds, targetBaseIds);
-      
+
       const gridEl = dishGridRefs.current[targetCatId];
       const insertIndex = getGridInsertIndex(
         pointerX,
@@ -1656,10 +1703,13 @@ export default function MenuDishes() {
         targetOrderedIds,
         dishId
       );
-      
+
       const newOrderIds = [...targetOrderedIds];
       const safeIndex = Math.max(0, Math.min(insertIndex, newOrderIds.length));
       newOrderIds.splice(safeIndex, 0, dishId);
+
+      // BUG-MD-001 FIX: Snapshot order state before optimistic update for rollback
+      const snapshotOrderByCat = { ...dishOrderByCatRef.current };
 
       setPendingMoveDish({ dishId, fromCatId: sourceCatId, toCatId: targetCatId });
       setDishOrderByCat((prev) => {
@@ -1672,8 +1722,14 @@ export default function MenuDishes() {
       });
 
       const dish = dishesRaw.find((d) => d.id === dishId);
+      // BUG-MD-001 FIX: Guard against undefined dish (deleted/archived during drag)
+      if (!dish) {
+        setPendingMoveDish(null);
+        setDishOrderByCat(snapshotOrderByCat);
+        return;
+      }
       const currentCats = getDishCategoryIds(dish);
-      
+
       const newCategories = currentCats.filter((id) => id !== sourceCatId);
       if (!newCategories.includes(targetCatId)) {
         newCategories.push(targetCatId);
@@ -1689,9 +1745,9 @@ export default function MenuDishes() {
       }, {
         onSuccess: () => {
           setPendingMoveDish(null);
-          
+
           toast.success(`Перемещено в «${targetCatName}»`, { id: TOAST_ID });
-          
+
           setTimeout(() => {
             const movedDishRefKey = `${targetCatId}-${dishId}`;
             const movedDishEl = dishItemRefs.current[movedDishRefKey];
@@ -1705,7 +1761,9 @@ export default function MenuDishes() {
           }, 500);
         },
         onError: () => {
+          // BUG-MD-001 FIX: Restore pre-drag order state on error
           setPendingMoveDish(null);
+          setDishOrderByCat(snapshotOrderByCat);
         }
       });
     };
