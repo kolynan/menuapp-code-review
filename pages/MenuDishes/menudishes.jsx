@@ -620,7 +620,8 @@ export default function MenuDishes() {
     initialData: [],
   });
 
-  const { data: dishesRaw = [], isLoading: loadingDishes, error: dishesError } = useQuery({
+  // BUG-MD-003 FIX (round 2): Also destructure isFetching for refetch-window guard
+  const { data: dishesRaw = [], isLoading: loadingDishes, isFetching: fetchingDishes, error: dishesError } = useQuery({
     queryKey: ["dishes", partnerId],
     enabled: !!partnerId && !rateLimitHit,
     retry: shouldRetry,
@@ -1016,8 +1017,9 @@ export default function MenuDishes() {
   });
 
   // BUG-MD-003 FIX: Also block during refetch after successful cross-category move
+  // Uses fetchingDishes (isFetching) not loadingDishes (isLoading) — isLoading is false during background refetch
   const isSavingDish = moveDishToCategoryMutation.isPending || saveDishOrderMutation.isPending ||
-    (moveDishToCategoryMutation.isSuccess && loadingDishes);
+    (moveDishToCategoryMutation.isSuccess && fetchingDishes);
 
   // ─────────────────────────────────────────────────────────────
   // HANDLERS

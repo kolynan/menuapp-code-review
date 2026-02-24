@@ -1091,20 +1091,18 @@ function LanguagesSection({ partner, onSave, saving, t }) {
     500
   );
 
+  // BUG-PS-008 FIX: Compute outside state setter to avoid stale closure
   const toggleLang = (code) => {
-    let newEnabled;
-    setEnabledLangs((prev) => {
-      const set = new Set(prev);
-      if (set.has(code)) {
-        if (set.size <= 1 || code === defaultLang) return prev;
-        set.delete(code);
-      } else {
-        set.add(code);
-      }
-      newEnabled = Array.from(set);
-      return newEnabled;
-    });
-    if (newEnabled) setTimeout(() => debouncedSave(defaultLang, newEnabled), 0);
+    const set = new Set(enabledLangs);
+    if (set.has(code)) {
+      if (set.size <= 1 || code === defaultLang) return;
+      set.delete(code);
+    } else {
+      set.add(code);
+    }
+    const newEnabled = Array.from(set);
+    setEnabledLangs(newEnabled);
+    debouncedSave(defaultLang, newEnabled);
   };
 
   const handleDefaultChange = (code) => {
@@ -1205,20 +1203,18 @@ function CurrenciesSection({ partner, onSave, saving, t }) {
     500
   );
 
+  // BUG-PS-008 FIX: Compute outside state setter to avoid stale closure
   const toggleCurrency = (code) => {
-    let newEnabled;
-    setEnabledCurrencies((prev) => {
-      const set = new Set(prev);
-      if (set.has(code)) {
-        if (set.size <= 1 || code === defaultCurrency) return prev;
-        set.delete(code);
-      } else {
-        set.add(code);
-      }
-      newEnabled = Array.from(set);
-      return newEnabled;
-    });
-    if (newEnabled) setTimeout(() => debouncedSave(defaultCurrency, newEnabled, rates), 0);
+    const set = new Set(enabledCurrencies);
+    if (set.has(code)) {
+      if (set.size <= 1 || code === defaultCurrency) return;
+      set.delete(code);
+    } else {
+      set.add(code);
+    }
+    const newEnabled = Array.from(set);
+    setEnabledCurrencies(newEnabled);
+    debouncedSave(defaultCurrency, newEnabled, ratesRef.current);
   };
 
   const handleDefaultChange = (code) => {
