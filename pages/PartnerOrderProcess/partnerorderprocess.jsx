@@ -899,7 +899,10 @@ function OrderProcessContent() {
       }
       queryClient.invalidateQueries({ queryKey: ["orderStages", partnerId] });
     } catch {
-      // deleteMutation.onError already shows toast
+      // Show error toast for pre-check failures (Order.filter) that aren't handled by deleteMutation.onError
+      if (!deleteMutation.isPending) {
+        toast.error(t("toast.error"), { id: TOAST_ID });
+      }
     }
   };
 

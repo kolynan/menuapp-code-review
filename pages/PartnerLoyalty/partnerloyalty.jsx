@@ -108,7 +108,10 @@ function PartnerLoyaltyContent() {
 
     for (const field of NUMERIC_FIELDS) {
       const val = formData[field];
-      if (val === "" || val === null || val === undefined || isNaN(val) || val < 0) {
+      const isInvalid = val === "" || val === null || val === undefined || isNaN(val) || val < 0;
+      // expiry_days must be >= 1 (0 days = instant expiry, corrupts loyalty data)
+      const requiresPositive = field === "loyalty_expiry_days";
+      if (isInvalid || (requiresPositive && val <= 0)) {
         toast.error(t("error.invalid_number"), { id: "mm1" });
         return;
       }

@@ -19,7 +19,7 @@ function getClientNumber(account, allAccounts) {
     new Date(a.created_at || 0) - new Date(b.created_at || 0)
   );
   const index = sorted.findIndex(a => a.id === account.id);
-  return index >= 0 ? index + 1 : parseInt(account.id.slice(-4), 16) || 0;
+  return index >= 0 ? index + 1 : parseInt(String(account.id).slice(-4), 16) || 0;
 }
 
 // FIX BUG-PC-002: removed hardcoded Russian locale — use locale-neutral format
@@ -322,10 +322,13 @@ function PartnerClientsContent() {
       </Sheet>
 
       {/* Message Dialog */}
-      {/* FIX BUG-PC-001: clear messageTarget when dialog closes */}
+      {/* FIX BUG-PC-001: clear messageTarget + form when dialog closes */}
       <Dialog open={messageDialogOpen} onOpenChange={(open) => {
         setMessageDialogOpen(open);
-        if (!open) setMessageTarget(null);
+        if (!open) {
+          setMessageTarget(null);
+          setMessageForm({ title: "", body: "" });
+        }
       }}>
         <DialogContent>
           <DialogHeader>
