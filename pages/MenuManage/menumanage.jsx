@@ -619,7 +619,7 @@ export default function MenuManage() {
           category_ids: newCategoryIds
         };
         targetCatDishes.splice(insertAt, 0, updatedDish);
-        setDishesRaw(old => old.map(d => String(d.id) === String(dishId) ? updatedDish : d));
+        // BUG-MM-002: batchedReindex handles state update after all API calls succeed
         await batchedReindex("Dish", targetCatDishes, setDishesRaw);
         await updateRec("Dish", dishId, {
           category: newPrimaryCategory,

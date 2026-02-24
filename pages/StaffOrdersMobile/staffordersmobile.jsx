@@ -2477,9 +2477,10 @@ export default function StaffOrdersMobile() {
 
   // v2.7.1: Tab filtering (active vs completed)
   const filteredGroups = useMemo(() => {
-    if (!orderGroups) return [];
-    
-    return orderGroups.filter(group => {
+    if (!sortedGroups) return [];
+
+    // BUG-SM-006: use sortedGroups (not orderGroups) to preserve priority sort from v2.7.0
+    return sortedGroups.filter(group => {
       const hasActiveOrder = group.orders.some(o => {
         const config = getStatusConfig(o);
         return !config.isFinishStage && o.status !== 'cancelled';
@@ -2487,7 +2488,7 @@ export default function StaffOrdersMobile() {
       
       return activeTab === 'active' ? hasActiveOrder : !hasActiveOrder;
     });
-  }, [orderGroups, activeTab, getStatusConfig]);
+  }, [sortedGroups, activeTab, getStatusConfig]);
 
   // v2.7.1: Tab counts
   const tabCounts = useMemo(() => {

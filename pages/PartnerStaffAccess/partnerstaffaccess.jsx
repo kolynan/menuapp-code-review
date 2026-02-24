@@ -1915,7 +1915,7 @@ function PartnerStaffAccessContent() {
             );
             await Promise.all(promises);
             queryClient.invalidateQueries({ queryKey: ['staffAccessLinks', partnerId] });
-            toast.success(t('partnerstaffaccess.bulk.enabled_success', { count: selectedIds.size }), { id: 'mm1' });
+            toast.success(t('partnerstaffaccess.bulk.enabled_success', { count: permittedIds.length }), { id: 'mm1' });
             setSelectedIds(new Set());
         } catch (err) {
             toast.error(t('toast.error'), { id: 'mm1' });
@@ -1934,7 +1934,7 @@ function PartnerStaffAccessContent() {
             );
             await Promise.all(promises);
             queryClient.invalidateQueries({ queryKey: ['staffAccessLinks', partnerId] });
-            toast.success(t('partnerstaffaccess.bulk.disabled_success', { count: selectedIds.size }), { id: 'mm1' });
+            toast.success(t('partnerstaffaccess.bulk.disabled_success', { count: permittedIds.length }), { id: 'mm1' });
             setSelectedIds(new Set());
         } catch (err) {
             toast.error(t('toast.error'), { id: 'mm1' });
@@ -1947,7 +1947,7 @@ function PartnerStaffAccessContent() {
         setConfirmModal({
             isOpen: true,
             type: 'bulk_delete',
-            data: { count: selectedIds.size, ids: Array.from(selectedIds) }
+            data: { count: getPermittedBulkIds().length, ids: Array.from(selectedIds) }
         });
     };
 
