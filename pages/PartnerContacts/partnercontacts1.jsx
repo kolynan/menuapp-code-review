@@ -338,7 +338,14 @@ export default function PartnerContacts1() {
     };
 
     const so = normStr(linkForm.sort_order).trim();
-    if (so) payload.sort_order = Number.parseInt(so, 10);
+    if (so) {
+      const soNum = Number.parseInt(so, 10);
+      if (Number.isNaN(soNum)) {
+        toast.error(t('partnercontacts.toast.sort_invalid', 'Порядок должен быть числом'));
+        return;
+      }
+      payload.sort_order = soNum;
+    }
 
     saveLinkMutation.mutate(payload);
   };
