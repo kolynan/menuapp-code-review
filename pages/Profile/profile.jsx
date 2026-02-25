@@ -70,7 +70,8 @@ export default function Profile() {
     };
 
     loadUser();
-  }, [t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ============================================================
   // BLOCK 03 — HANDLERS
@@ -87,7 +88,7 @@ export default function Profile() {
       await base44.auth.updateMe({ full_name: fullName.trim() });
       setInitialFullName(fullName.trim());
       setSaveStatus("success");
-      toast.success(t("toast.profile_saved"), { id: "mm1" });
+      toast.success(t("toast.saved"), { id: "mm1" });
 
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (error) {
@@ -98,7 +99,8 @@ export default function Profile() {
   };
 
   const getRoleLabel = (userRole) => {
-    return t(`profile.role.${userRole}`) || userRole;
+    if (!userRole) return t("profile.role.unknown");
+    return t(`profile.role.${userRole}`);
   };
 
   const getRoleBadgeClass = (userRole) => {
