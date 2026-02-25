@@ -590,7 +590,7 @@ function TranslationRow({ translation, languages, unusedInfo, onUpdate, onDelete
         setEditing(null); // Only close on success
       } catch {
         // Keep editing open, user's text is preserved
-        toast.error('Failed to save, please try again', { id: 'edit-error' });
+        // (error toast already shown by updateTranslation)
       } finally {
         setEditSaving(false);
       }
@@ -870,10 +870,11 @@ export default function TranslationAdmin() {
     try {
       // Set new default FIRST — failure here leaves old default intact (safe)
       await Language.update(lang.id, { is_default: true, is_active: true });
+      // Update state right after first call succeeds — UI reflects API truth
+      setLanguages(prev => prev.map(l => ({ ...l, is_default: l.id === lang.id, is_active: l.id === lang.id ? true : l.is_active })));
       // Un-set old default SECOND — failure here leaves two defaults (recoverable by retry)
       const currentDefault = languages.find(l => l.is_default && l.id !== lang.id);
       if (currentDefault) await Language.update(currentDefault.id, { is_default: false });
-      setLanguages(prev => prev.map(l => ({ ...l, is_default: l.id === lang.id, is_active: l.id === lang.id ? true : l.is_active })));
       toast.success(`${lang.name} set as default`, { id: 'ta1' });
     } catch (err) {
       console.error("Failed to set default language:", err);
