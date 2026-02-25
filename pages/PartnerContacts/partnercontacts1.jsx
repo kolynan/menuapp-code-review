@@ -111,7 +111,7 @@ function getUrlPrefix(type) {
 // ================================
 // BLOCK 02: ERROR BOUNDARY
 // ================================
-class PageErrorBoundary extends React.Component {
+class PageErrorBoundaryInner extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -119,21 +119,19 @@ class PageErrorBoundary extends React.Component {
   static getDerivedStateFromError(err) {
     return { hasError: true, error: err };
   }
-  componentDidCatch(err) {
-    console.error("PartnerContacts1 crashed:", err);
-  }
   render() {
     if (!this.state.hasError) return this.props.children;
+    const { t } = this.props;
     return (
       <div className="min-h-screen bg-slate-50 p-8">
         <Card className="max-w-2xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-lg">{tr('partnercontacts.error.title','Ошибка на странице контактов')}</CardTitle>
+            <CardTitle className="text-lg">{t('partnercontacts.error.title','Ошибка на странице контактов')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-sm text-slate-600">{tr('partnercontacts.error.instruction','Откройте DevTools → Console и пришлите верхнюю ошибку.')}</p>
+            <p className="text-sm text-slate-600">{t('partnercontacts.error.instruction','Откройте DevTools → Console и пришлите верхнюю ошибку.')}</p>
             <Button variant="outline" onClick={() => window.location.reload()}>
-              {tr('common.reload','Перезагрузить')}
+              {t('common.reload','Перезагрузить')}
             </Button>
             <p className="text-xs text-slate-500 break-words">{normStr(this.state.error?.message || this.state.error)}</p>
           </CardContent>
@@ -141,6 +139,11 @@ class PageErrorBoundary extends React.Component {
       </div>
     );
   }
+}
+
+function PageErrorBoundary({ children }) {
+  const { t } = useI18n();
+  return <PageErrorBoundaryInner t={t}>{children}</PageErrorBoundaryInner>;
 }
 
 // ================================
