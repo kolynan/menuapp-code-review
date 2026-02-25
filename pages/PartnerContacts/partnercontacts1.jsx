@@ -306,7 +306,7 @@ export default function PartnerContacts1() {
     setEditingLink(null);
     setLinkForm({
       type: "phone",
-      label: "Phone",
+      label: getTypeLabel("phone", t),
       url: "tel:",
       sort_order: "",
       is_active: true,
