@@ -127,7 +127,7 @@ export default function AdminPageHelp() {
     window.location.href = "/";
   };
 
-  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
+  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
   
   // Load data ONLY for admins
   useEffect(() => {
@@ -140,7 +140,6 @@ export default function AdminPageHelp() {
         const list = await base44.entities.PageHelp.list();
         setPageHelps(list || []);
       } catch (e) {
-        console.error("Failed to load PageHelp:", e);
         toast.error(t('toast.error', 'Ошибка'), { id: 'mm1' });
       }
       setLoading(false);
@@ -223,7 +222,7 @@ export default function AdminPageHelp() {
       } else {
         // Create
         const created = await base44.entities.PageHelp.create(payload);
-        setPageHelps(prev => [...prev, created]);
+        if (created) setPageHelps(prev => [...prev, created]);
         toast.success(t('toast.saved', 'Сохранено'), { id: 'mm1' });
       }
       
@@ -231,7 +230,6 @@ export default function AdminPageHelp() {
       setEditingHelp(null);
       setFormData({ pageKey: '', title: '', markdown: '', isActive: true });
     } catch (err) {
-      console.error("Failed to save PageHelp:", err);
       // Check for unique constraint error
       const errMsg = err?.message || '';
       if (errMsg.toLowerCase().includes('duplicate') || errMsg.toLowerCase().includes('unique')) {
@@ -254,7 +252,6 @@ export default function AdminPageHelp() {
       setPageHelps(prev => prev.filter(h => h.id !== help.id));
       toast.success(t('toast.deleted', 'Удалено'), { id: 'mm1' });
     } catch (err) {
-      console.error("Failed to delete PageHelp:", err);
       toast.error(t('toast.error', 'Ошибка'), { id: 'mm1' });
     } finally {
       setSaving(false);
