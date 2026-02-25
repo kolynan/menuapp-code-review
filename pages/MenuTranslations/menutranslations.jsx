@@ -120,12 +120,15 @@ function MenuTranslationsInner() {
   const [recentLangs, setRecentLangs] = useState([]);
 
   useEffect(() => {
-    if (!storageKey) return;
+    if (!storageKey) {
+      setRecentLangs([]);
+      return;
+    }
     try {
       const saved = localStorage.getItem(storageKey);
-      if (saved) setRecentLangs(JSON.parse(saved));
+      setRecentLangs(saved ? JSON.parse(saved) : []);
     } catch {
-      // ignore corrupted localStorage
+      setRecentLangs([]);
     }
   }, [storageKey]);
 
@@ -741,6 +744,7 @@ function MenuTranslationsInner() {
                     <button
                       key={lang}
                       onClick={() => {
+                        if (selectedLang === lang) return;
                         if (hasUnsavedChanges) {
                           if (!window.confirm(t('menu_translations.confirm.unsaved_lang', 'You have unsaved changes. Switch language and discard them?'))) return;
                         }
@@ -783,6 +787,7 @@ function MenuTranslationsInner() {
         <div className="flex items-center gap-6 border-b border-slate-200 mb-6">
           <button
             onClick={() => {
+              if (activeTab === 'categories') return;
               if (hasUnsavedChanges) {
                 if (!window.confirm(t('menu_translations.confirm.unsaved_tab', 'You have unsaved changes. Switch tab and discard them?'))) return;
               }
@@ -799,6 +804,7 @@ function MenuTranslationsInner() {
           </button>
           <button
             onClick={() => {
+              if (activeTab === 'dishes') return;
               if (hasUnsavedChanges) {
                 if (!window.confirm(t('menu_translations.confirm.unsaved_tab', 'You have unsaved changes. Switch tab and discard them?'))) return;
               }
