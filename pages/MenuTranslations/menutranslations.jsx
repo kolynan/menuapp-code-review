@@ -782,7 +782,13 @@ function MenuTranslationsInner() {
         {/* Tabs */}
         <div className="flex items-center gap-6 border-b border-slate-200 mb-6">
           <button
-            onClick={() => setActiveTab('categories')}
+            onClick={() => {
+              if (hasUnsavedChanges) {
+                if (!window.confirm('You have unsaved changes. Switch tab and discard them?')) return;
+              }
+              setEditingTranslations({});
+              setActiveTab('categories');
+            }}
             className={`pb-3 text-sm font-medium transition-all border-b-2 ${
               activeTab === 'categories'
                 ? 'border-indigo-600 text-indigo-600'
@@ -792,7 +798,13 @@ function MenuTranslationsInner() {
             Категории ({categoryProgress.translated}/{categoryProgress.total})
           </button>
           <button
-            onClick={() => setActiveTab('dishes')}
+            onClick={() => {
+              if (hasUnsavedChanges) {
+                if (!window.confirm('You have unsaved changes. Switch tab and discard them?')) return;
+              }
+              setEditingTranslations({});
+              setActiveTab('dishes');
+            }}
             className={`pb-3 text-sm font-medium transition-all border-b-2 ${
               activeTab === 'dishes'
                 ? 'border-indigo-600 text-indigo-600'
