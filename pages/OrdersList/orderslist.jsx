@@ -21,10 +21,47 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Search, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
+import { useI18n } from "@/components/i18n";
+
+const getStatusColor = (status) => {
+    const colors = {
+        new:         'bg-blue-100 text-blue-800',
+        accepted:    'bg-indigo-100 text-indigo-800',
+        in_progress: 'bg-yellow-100 text-yellow-800',
+        ready:       'bg-green-100 text-green-800',
+        served:      'bg-gray-100 text-gray-800',
+        closed:      'bg-gray-200 text-gray-600',
+        cancelled:   'bg-red-100 text-red-800',
+    };
+    return colors[status] ?? 'bg-slate-100 text-slate-800';
+};
+
+const getStatusLabel = (status, t) => {
+    const labels = {
+        new:         t('orders_list.status.new'),
+        accepted:    t('orders_list.status.accepted'),
+        in_progress: t('orders_list.status.in_progress'),
+        ready:       t('orders_list.status.ready'),
+        served:      t('orders_list.status.served'),
+        closed:      t('orders_list.status.closed'),
+        cancelled:   t('orders_list.status.cancelled'),
+    };
+    return labels[status] ?? status;
+};
+
+const getTypeLabel = (type, t) => {
+    const labels = {
+        hall:     t('orders_list.type.hall'),
+        pickup:   t('orders_list.type.pickup'),
+        delivery: t('orders_list.type.delivery'),
+    };
+    return labels[type] ?? type;
+};
 
 export default function OrdersList() {
+    const { t } = useI18n();
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [typeFilter, setTypeFilter] = useState("all");
@@ -37,10 +74,9 @@ export default function OrdersList() {
         retry: false
     });
 
-    const { data: orders, isLoading } = useQuery({
+    const { data: orders = [], isLoading, isError } = useQuery({
         queryKey: ['orders'],
         queryFn: () => base44.entities.Order.list('-created_date', 100),
-        initialData: []
     });
 
     const filteredOrders = orders.filter(order => {
@@ -56,26 +92,13 @@ export default function OrdersList() {
         return matchesSearch && matchesStatus && matchesType && matchesTab;
     });
 
-    const getStatusColor = (status) => {
-        switch(status) {
-            case 'new': return 'bg-blue-100 text-blue-800';
-            case 'accepted': return 'bg-indigo-100 text-indigo-800';
-            case 'in_progress': return 'bg-yellow-100 text-yellow-800';
-            case 'ready': return 'bg-green-100 text-green-800';
-            case 'served': return 'bg-gray-100 text-gray-800';
-            case 'closed': return 'bg-gray-200 text-gray-600';
-            case 'cancelled': return 'bg-red-100 text-red-800';
-            default: return 'bg-slate-100 text-slate-800';
-        }
-    };
-
     return (
         <div className="p-8 max-w-7xl mx-auto space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">История заказов</h1>
+                    <h1 className="text-2xl font-bold text-slate-900">{t('orders_list.title')}</h1>
                     <p className="text-slate-500 mt-1 text-sm">
-                        История заказов с фильтрами по статусу и типу. Удобно для проверки истории и отчётности.
+                        {t('orders_list.description')}
                     </p>
                 </div>
             </div>
@@ -89,7 +112,7 @@ export default function OrdersList() {
                             : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                     }`}
                 >
-                    Все заказы
+                    {t('orders_list.tab.all')}
                 </button>
                 <button
                     onClick={() => setActiveTab('mine')}
@@ -99,7 +122,7 @@ export default function OrdersList() {
                             : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                     }`}
                 >
-                    Мои заказы
+                    {t('orders_list.tab.mine')}
                 </button>
             </div>
 
@@ -108,7 +131,7 @@ export default function OrdersList() {
                     <div className="relative w-full md:w-64">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
                         <Input
-                            placeholder="Search order # or client..."
+                            placeholder={t('orders_list.search.placeholder')}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="pl-9"
@@ -116,28 +139,28 @@ export default function OrdersList() {
                     </div>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
                         <SelectTrigger className="w-[150px]">
-                            <SelectValue placeholder="Status" />
+                            <SelectValue placeholder={t('orders_list.filter.status')} />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">All Status</SelectItem>
-                            <SelectItem value="new">New</SelectItem>
-                            <SelectItem value="accepted">Accepted</SelectItem>
-                            <SelectItem value="in_progress">In Progress</SelectItem>
-                            <SelectItem value="ready">Ready</SelectItem>
-                            <SelectItem value="served">Served</SelectItem>
-                            <SelectItem value="closed">Closed</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                            <SelectItem value="all">{t('orders_list.filter.all_status')}</SelectItem>
+                            <SelectItem value="new">{t('orders_list.status.new')}</SelectItem>
+                            <SelectItem value="accepted">{t('orders_list.status.accepted')}</SelectItem>
+                            <SelectItem value="in_progress">{t('orders_list.status.in_progress')}</SelectItem>
+                            <SelectItem value="ready">{t('orders_list.status.ready')}</SelectItem>
+                            <SelectItem value="served">{t('orders_list.status.served')}</SelectItem>
+                            <SelectItem value="closed">{t('orders_list.status.closed')}</SelectItem>
+                            <SelectItem value="cancelled">{t('orders_list.status.cancelled')}</SelectItem>
                         </SelectContent>
                     </Select>
                     <Select value={typeFilter} onValueChange={setTypeFilter}>
                         <SelectTrigger className="w-[150px]">
-                            <SelectValue placeholder="Order Type" />
+                            <SelectValue placeholder={t('orders_list.filter.type')} />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">All Types</SelectItem>
-                            <SelectItem value="hall">Hall</SelectItem>
-                            <SelectItem value="pickup">Pickup</SelectItem>
-                            <SelectItem value="delivery">Delivery</SelectItem>
+                            <SelectItem value="all">{t('orders_list.filter.all_types')}</SelectItem>
+                            <SelectItem value="hall">{t('orders_list.type.hall')}</SelectItem>
+                            <SelectItem value="pickup">{t('orders_list.type.pickup')}</SelectItem>
+                            <SelectItem value="delivery">{t('orders_list.type.delivery')}</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -148,28 +171,37 @@ export default function OrdersList() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Order #</TableHead>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Client</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Total</TableHead>
+                                <TableHead>{t('orders_list.header.order_number')}</TableHead>
+                                <TableHead>{t('orders_list.header.date')}</TableHead>
+                                <TableHead>{t('orders_list.header.client')}</TableHead>
+                                <TableHead>{t('orders_list.header.type')}</TableHead>
+                                <TableHead>{t('orders_list.header.status')}</TableHead>
+                                <TableHead className="text-right">{t('orders_list.header.total')}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {isLoading ? (
+                            {isError ? (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="h-24 text-center text-red-500">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <AlertCircle className="h-4 w-4" />
+                                            {t('orders_list.error.load_failed')}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ) : isLoading ? (
                                 <TableRow>
                                     <TableCell colSpan={6} className="h-24 text-center">
                                         <div className="flex items-center justify-center gap-2">
                                             <Loader2 className="h-4 w-4 animate-spin" />
-                                            Loading orders...
+                                            {t('common.loading')}
                                         </div>
                                     </TableCell>
                                 </TableRow>
                             ) : filteredOrders.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={6} className="h-24 text-center text-slate-500">
-                                        {activeTab === 'mine' ? 'У тебя пока нет заказов.' : 'Нет заказов.'}
+                                        {activeTab === 'mine' ? t('orders_list.empty.mine') : t('orders_list.empty.all')}
                                     </TableCell>
                                 </TableRow>
                             ) : (
@@ -183,15 +215,15 @@ export default function OrdersList() {
                                         <TableCell>
                                             {order.created_date ? format(new Date(order.created_date), 'PP p') : '-'}
                                         </TableCell>
-                                        <TableCell>{order.client_name || 'Guest'}</TableCell>
-                                        <TableCell className="capitalize">{order.order_type}</TableCell>
+                                        <TableCell>{order.client_name || t('orders_list.client.guest')}</TableCell>
+                                        <TableCell>{getTypeLabel(order.order_type, t)}</TableCell>
                                         <TableCell>
                                             <Badge variant="secondary" className={getStatusColor(order.status)}>
-                                                {order.status}
+                                                {getStatusLabel(order.status, t)}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right font-medium">
-                                            ${Number(order.total_amount || 0).toFixed(2)}
+                                            ${Number(order.total_amount ?? 0).toFixed(2)}
                                         </TableCell>
                                     </TableRow>
                                 ))
