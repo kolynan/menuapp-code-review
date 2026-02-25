@@ -181,16 +181,16 @@ function MenuTranslationsInner() {
   // Build translation maps
   const catTransMap = useMemo(() => {
     const map = {};
-    categoryTranslations.forEach(t => {
-      map[t.category] = t;
+    categoryTranslations.forEach(trans => {
+      map[trans.category] = trans;
     });
     return map;
   }, [categoryTranslations]);
 
   const dishTransMap = useMemo(() => {
     const map = {};
-    dishTranslations.forEach(t => {
-      map[t.dish] = t;
+    dishTranslations.forEach(trans => {
+      map[trans.dish] = trans;
     });
     return map;
   }, [dishTranslations]);
