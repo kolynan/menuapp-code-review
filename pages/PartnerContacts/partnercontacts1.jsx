@@ -322,7 +322,7 @@ export default function PartnerContacts1() {
 
   const saveLink = () => {
     if (!normStr(linkForm.url).trim()) {
-      toast.error("URL обязателен");
+      toast.error(t('partnercontacts.toast.url_required', 'URL обязателен'));
       return;
     }
 
@@ -377,7 +377,7 @@ export default function PartnerContacts1() {
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-2">
               <FlaskConical className="w-5 h-5 text-yellow-700" />
-              <span className="text-sm font-medium text-yellow-800">LAB VERSION — Partner Contacts</span>
+              <span className="text-sm font-medium text-yellow-800">{t('partnercontacts.lab_version', 'LAB VERSION — Partner Contacts')}</span>
             </div>
             <div className="flex gap-2">
               <Link to="/menumanage1">
