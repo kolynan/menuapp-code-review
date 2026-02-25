@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -116,15 +116,17 @@ function MenuTranslationsInner() {
 
   // Recent languages (partner-specific)
   const storageKey = partnerId ? `menu_trans_langs_${partnerId}` : null;
-  const [recentLangs, setRecentLangs] = useState(() => {
-    if (!storageKey) return [];
+  const [recentLangs, setRecentLangs] = useState([]);
+
+  useEffect(() => {
+    if (!storageKey) return;
     try {
       const saved = localStorage.getItem(storageKey);
-      return saved ? JSON.parse(saved) : [];
+      if (saved) setRecentLangs(JSON.parse(saved));
     } catch {
-      return [];
+      // ignore corrupted localStorage
     }
-  });
+  }, [storageKey]);
 
   const allLangs = useMemo(() => {
     const combined = [...DEFAULT_LANGS, ...recentLangs];
