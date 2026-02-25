@@ -4,11 +4,13 @@ import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Shield, Settings, LogOut, AlertTriangle, Loader2, Store } from "lucide-react";
+import { useI18n } from "@/components/i18n";
 
 const ADMIN_EMAILS = ["linkgabinfo@gmail.com"];
 
 // BLOCK 01 — Main Component
 export default function Admin456Page() {
+  const { t } = useI18n();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -42,7 +44,7 @@ export default function Admin456Page() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
-          <p className="text-gray-500">Loading...</p>
+          <p className="text-gray-500">{t('common.loading', 'Loading...')}</p>
         </div>
       </div>
     );
@@ -57,18 +59,18 @@ export default function Admin456Page() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-2" />
-            <CardTitle>Access Denied</CardTitle>
+            <CardTitle>{t('common.accessDenied', 'Access Denied')}</CardTitle>
             <CardDescription>
-              You don't have permission to access this page.
+              {t('common.noPermission', "You don't have permission to access this page.")}
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <p className="text-sm text-gray-500 mb-4">
-              Logged in as: {user?.email || "Unknown"}
+              {t('common.loggedInAs', 'Logged in as')}: {user?.email || t('common.unknown', 'Unknown')}
             </p>
             <Button variant="outline" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
-              Logout
+              {t('common.logout', 'Logout')}
             </Button>
           </CardContent>
         </Card>
@@ -85,13 +87,13 @@ export default function Admin456Page() {
           <div className="flex items-center gap-3">
             <Shield className="h-8 w-8 text-blue-600" />
             <div>
-              <h1 className="text-2xl font-bold">Admin Hub</h1>
+              <h1 className="text-2xl font-bold">{t('admin456.title', 'Admin Hub')}</h1>
               <p className="text-sm text-gray-500">{user?.email}</p>
             </div>
           </div>
           <Button variant="ghost" size="sm" onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-2" />
-            Logout
+            {t('common.logout', 'Logout')}
           </Button>
         </div>
 
@@ -103,9 +105,9 @@ export default function Admin456Page() {
                 <div className="flex items-center gap-3">
                   <Settings className="h-6 w-6 text-gray-600" />
                   <div>
-                    <CardTitle className="text-lg">Translation Admin</CardTitle>
+                    <CardTitle className="text-lg">{t('admin456.translationAdmin.title', 'Translation Admin')}</CardTitle>
                     <CardDescription>
-                      Manage interface translations (RU, EN, KK)
+                      {t('admin456.translationAdmin.description', 'Manage interface translations (RU, EN, KK)')}
                     </CardDescription>
                   </div>
                 </div>
@@ -119,9 +121,9 @@ export default function Admin456Page() {
                 <div className="flex items-center gap-3">
                   <Store className="h-6 w-6 text-gray-600" />
                   <div>
-                    <CardTitle className="text-lg">Рестораны</CardTitle>
+                    <CardTitle className="text-lg">{t('admin456.partners.title', 'Рестораны')}</CardTitle>
                     <CardDescription>
-                      Список партнёров, статистика, статус
+                      {t('admin456.partners.description', 'Список партнёров, статистика, статус')}
                     </CardDescription>
                   </div>
                 </div>
@@ -132,7 +134,7 @@ export default function Admin456Page() {
 
         {/* Footer info */}
         <p className="text-xs text-gray-400 text-center mt-8">
-          MenuApp Admin • Authorized users only
+          {t('admin456.footer', 'MenuApp Admin • Authorized users only')}
         </p>
       </div>
     </div>
