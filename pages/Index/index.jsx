@@ -1,5 +1,4 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useI18n } from "@/components/i18n";
 import { Button } from "@/components/ui/button";
@@ -8,14 +7,17 @@ import { toast } from "sonner";
 import Footer from "@/components/Footer";
 
 export default function Index() {
-  const navigate = useNavigate();
   const { t } = useI18n();
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const handleLogin = async () => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
     try {
       await base44.auth.redirectToLogin("/partnerhome");
     } catch (err) {
       toast.error(t("toast.error"), { id: "mm1" });
+      setIsLoggingIn(false);
     }
   };
 
@@ -44,7 +46,7 @@ export default function Index() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="text-2xl font-bold text-indigo-600">MenuApp</div>
-            <Button variant="outline" size="sm" onClick={handleLogin}>
+            <Button variant="outline" size="sm" onClick={handleLogin} disabled={isLoggingIn}>
               {t("index.header.login")}
             </Button>
           </div>
@@ -61,11 +63,11 @@ export default function Index() {
             {t("index.hero.subtitle")}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8" onClick={handleLogin}>
+            <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8" onClick={handleLogin} disabled={isLoggingIn}>
               {t("index.hero.create_restaurant")}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-            <Button size="lg" variant="outline" onClick={handleLogin}>
+            <Button size="lg" variant="outline" onClick={handleLogin} disabled={isLoggingIn}>
               {t("index.hero.login")}
             </Button>
           </div>
@@ -103,7 +105,7 @@ export default function Index() {
           <p className="text-indigo-100 text-lg mb-8">
             {t("index.cta.subtitle")}
           </p>
-          <Button size="lg" className="bg-white text-indigo-600 hover:bg-slate-100" onClick={handleLogin}>
+          <Button size="lg" className="bg-white text-indigo-600 hover:bg-slate-100" onClick={handleLogin} disabled={isLoggingIn}>
             {t("index.cta.start")}
           </Button>
         </div>
