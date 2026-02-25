@@ -27,7 +27,7 @@ export default function ClientMessagesPage() {
   }, [navigate]);
 
   // Load loyalty accounts for this customer
-  const { data: accounts, error: accountsError, refetch: refetchAccounts } = useQuery({
+  const { data: accounts, isLoading: loadingAccounts, error: accountsError, refetch: refetchAccounts } = useQuery({
     queryKey: ["customerAccounts", customerEmail],
     queryFn: () => base44.entities.LoyaltyAccount.filter({ email: customerEmail }),
     enabled: !!customerEmail,
@@ -147,7 +147,7 @@ export default function ClientMessagesPage() {
     return null;
   }
 
-  if (loadingMessages) {
+  if (loadingAccounts || loadingMessages) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
