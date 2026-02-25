@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { useI18n } from "@/components/i18n";
 import { Button } from "@/components/ui/button";
 import { QrCode, ClipboardList, UtensilsCrossed, ArrowRight } from "lucide-react";
+import { toast } from "sonner";
 import Footer from "@/components/Footer";
 
 export default function Index() {
@@ -11,7 +12,11 @@ export default function Index() {
   const { t } = useI18n();
 
   const handleLogin = async () => {
-    await base44.auth.redirectToLogin("/partnerhome");
+    try {
+      await base44.auth.redirectToLogin("/partnerhome");
+    } catch (err) {
+      toast.error(t("toast.error"), { id: "mm1" });
+    }
   };
 
   const features = [
