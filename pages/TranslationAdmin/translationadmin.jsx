@@ -1083,7 +1083,7 @@ export default function TranslationAdmin() {
         }
 
         toast.success(`Added ${added} new keys`, { id: 'ta1' });
-        try { await refreshTranslations(); } catch {}
+        try { await refreshTranslations(); } catch { toast.error('Live sync failed. Reload to see changes.', { id: 'ta-sync' }); }
       } else {
         toast.success('No new keys found', { id: 'ta1' });
       }
@@ -1273,7 +1273,7 @@ export default function TranslationAdmin() {
       setScanResults(prev => ({ ...prev, new: [] }));
       toast.success(`Added ${added} keys${errors > 0 ? `, ${errors} errors` : ''}`, { id: 'ta1' });
 
-      try { await refreshTranslations(); } catch {}
+      try { await refreshTranslations(); } catch { toast.error('Live sync failed. Reload to see changes.', { id: 'ta-sync' }); }
     } catch { toast.error('Failed', { id: 'ta1' }); }
     finally { setSaving(false); setAddKeysProgress({ current: 0, total: 0, status: '' }); }
   };
