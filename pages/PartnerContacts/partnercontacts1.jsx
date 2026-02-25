@@ -196,13 +196,15 @@ export default function PartnerContacts1() {
   });
 
   const partnerContactsRecord = partnerContactsRaw?.[0] || null;
+  const recordId = partnerContactsRecord?.id;
+  const recordViewMode = partnerContactsRecord?.view_mode;
 
   useEffect(() => {
-    if (partnerContactsRecord) {
-      setViewMode(partnerContactsRecord.view_mode || "icons");
+    if (recordId) {
+      setViewMode(recordViewMode || "icons");
       setViewModeDirty(false);
     }
-  }, [partnerContactsRecord]);
+  }, [recordId, recordViewMode]);
 
   const sortedLinks = useMemo(() => {
     return [...links].sort((a, b) => {
