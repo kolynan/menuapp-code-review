@@ -24,6 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import PartnerShell from "@/components/PartnerShell";
+import { useI18n } from "@/components/i18n";
 
 const DEFAULT_LANGS = ['ru', 'en', 'kk'];
 
@@ -84,6 +85,7 @@ class ErrorBoundary extends React.Component {
 }
 
 function MenuTranslationsInner() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -229,18 +231,18 @@ function MenuTranslationsInner() {
     if (!lang) return;
 
     if (lang.length < 2 || lang.length > 5) {
-      toast.error('Language code should be 2-5 characters');
+      toast.error(t('menu_translations.toast.invalid_lang_code', 'Language code should be 2-5 characters'));
       return;
     }
 
     if (allLangs.includes(lang)) {
-      toast.error('Language already added');
+      toast.error(t('menu_translations.toast.lang_exists', 'Language already added'));
       setCustomLangInput('');
       return;
     }
 
     if (hasUnsavedChanges) {
-      if (!window.confirm('You have unsaved changes. Switch language and discard them?')) return;
+      if (!window.confirm(t('menu_translations.confirm.unsaved_lang', 'You have unsaved changes. Switch language and discard them?'))) return;
     }
 
     const updated = [...recentLangs, lang];
@@ -249,7 +251,7 @@ function MenuTranslationsInner() {
     setEditingTranslations({});
     setSelectedLang(lang);
     setCustomLangInput('');
-    toast.success(`Language "${lang}" added`);
+    toast.success(t('menu_translations.toast.lang_added', 'Language added'));
   };
 
   // Copy Template
@@ -269,9 +271,9 @@ function MenuTranslationsInner() {
     }
 
     navigator.clipboard.writeText(tsv).then(() => {
-      toast.success('Template copied to clipboard');
+      toast.success(t('menu_translations.toast.template_copied', 'Template copied to clipboard'));
     }).catch(() => {
-      toast.error('Failed to copy template');
+      toast.error(t('menu_translations.toast.copy_failed', 'Failed to copy template'));
     });
   };
 
@@ -300,7 +302,7 @@ function MenuTranslationsInner() {
     a.click();
     URL.revokeObjectURL(url);
 
-    toast.success('TSV file downloaded');
+    toast.success(t('menu_translations.toast.tsv_downloaded', 'TSV file downloaded'));
   };
 
   // Inline editing handlers
@@ -384,10 +386,10 @@ function MenuTranslationsInner() {
       if (failed > 0) {
         toast.warning(`Saved ${succeeded}, failed: ${failed}`);
       } else {
-        toast.success('Translations saved');
+        toast.success(t('menu_translations.toast.saved', 'Translations saved'));
       }
     } catch (err) {
-      toast.error('Failed to save translations');
+      toast.error(t('menu_translations.toast.save_failed', 'Failed to save translations'));
     } finally {
       setIsSaving(false);
     }
@@ -588,7 +590,7 @@ function MenuTranslationsInner() {
       }, 3000);
     } catch (err) {
       console.error('Bulk paste error:', err);
-      toast.error('Failed to process bulk paste');
+      toast.error(t('menu_translations.toast.paste_failed', 'Failed to process bulk paste'));
     } finally {
       setIsPasting(false);
     }
@@ -604,7 +606,7 @@ function MenuTranslationsInner() {
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
               <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-3" />
-              <p className="text-slate-500">Loading user context...</p>
+              <p className="text-slate-500">{t('common.loading', 'Loading...')}</p>
             </div>
           </div>
         </div>
@@ -621,14 +623,14 @@ function MenuTranslationsInner() {
             <CardContent className="p-6 text-center space-y-4">
               <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
               <div>
-                <h2 className="text-xl font-bold text-slate-900 mb-2">Failed to load user</h2>
+                <h2 className="text-xl font-bold text-slate-900 mb-2">{t('menu_translations.error.user_load', 'Failed to load user')}</h2>
                 <p className="text-sm text-slate-600 mb-2">
-                  {userError.message || 'Unknown error'}
+                  {userError.message || t('common.error', 'Unknown error')}
                 </p>
-                <p className="text-xs text-slate-400">Try logging in again</p>
+                <p className="text-xs text-slate-400">{t('menu_translations.error.try_login', 'Try logging in again')}</p>
               </div>
               <Button onClick={() => window.location.reload()} className="w-full">
-                Reload Page
+                {t('menu_translations.action.reload', 'Reload Page')}
               </Button>
             </CardContent>
           </Card>
@@ -646,16 +648,13 @@ function MenuTranslationsInner() {
             <CardContent className="p-6 text-center space-y-4">
               <AlertCircle className="w-12 h-12 text-amber-500 mx-auto" />
               <div>
-                <h2 className="text-xl font-bold text-slate-900 mb-2">No partner context</h2>
+                <h2 className="text-xl font-bold text-slate-900 mb-2">{t('menu_translations.error.no_partner', 'No partner context')}</h2>
                 <p className="text-sm text-slate-600 mb-2">
-                  Open Menu page first or select a partner.
-                </p>
-                <p className="text-xs text-slate-400 font-mono">
-                  partnerId: {partnerId || '(empty)'}
+                  {t('menu_translations.error.open_menu_first', 'Open Menu page first or select a partner.')}
                 </p>
               </div>
               <Button onClick={() => navigate('/menudishes')} className="w-full">
-                Go to Menu
+                {t('menu_translations.action.go_to_menu', 'Go to Menu')}
               </Button>
             </CardContent>
           </Card>
@@ -674,16 +673,13 @@ function MenuTranslationsInner() {
             <CardContent className="p-6 text-center space-y-4">
               <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
               <div>
-                <h2 className="text-xl font-bold text-slate-900 mb-2">Failed to load translations</h2>
+                <h2 className="text-xl font-bold text-slate-900 mb-2">{t('menu_translations.error.load_failed', 'Failed to load translations')}</h2>
                 <p className="text-sm text-slate-600 mb-2">
-                  {dataError.message || 'Unknown error occurred'}
+                  {dataError.message || t('common.error', 'Unknown error')}
                 </p>
-                <pre className="text-xs text-left bg-slate-100 p-2 rounded overflow-auto max-h-32">
-                  {JSON.stringify(dataError, null, 2)}
-                </pre>
               </div>
               <Button onClick={() => queryClient.invalidateQueries()} className="w-full">
-                Retry
+                {t('common.retry', 'Retry')}
               </Button>
             </CardContent>
           </Card>
@@ -701,9 +697,9 @@ function MenuTranslationsInner() {
       <div className="p-8 max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Переводы меню</h1>
+            <h1 className="text-3xl font-bold text-slate-900">{t('menu_translations.title', 'Menu Translations')}</h1>
             <p className="text-slate-500 mt-1">
-              Управление переводами категорий и блюд на разные языки
+              {t('menu_translations.subtitle', 'Manage translations for categories and dishes')}
             </p>
           </div>
 
@@ -716,12 +712,12 @@ function MenuTranslationsInner() {
               {isSaving ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Сохранение...
+                  {t('common.saving', 'Saving...')}
                 </>
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  Сохранить изменения
+                  {t('menu_translations.action.save_changes', 'Save changes')}
                 </>
               )}
             </Button>
@@ -733,14 +729,14 @@ function MenuTranslationsInner() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Globe className="w-5 h-5" />
-              Выбрать язык
+              {t('menu_translations.lang.select', 'Select language')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {isLoadingData ? (
               <div className="flex items-center gap-2 text-slate-400">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm">Загрузка языков...</span>
+                <span className="text-sm">{t('common.loading', 'Loading...')}</span>
               </div>
             ) : (
               <>
@@ -750,7 +746,7 @@ function MenuTranslationsInner() {
                       key={lang}
                       onClick={() => {
                         if (hasUnsavedChanges) {
-                          if (!window.confirm('You have unsaved changes. Switch language and discard them?')) return;
+                          if (!window.confirm(t('menu_translations.confirm.unsaved_lang', 'You have unsaved changes. Switch language and discard them?'))) return;
                         }
                         setEditingTranslations({});
                         setSelectedLang(lang);
@@ -765,7 +761,7 @@ function MenuTranslationsInner() {
                     </button>
                   ))}
                   {allLangs.length > 6 && (
-                    <span className="text-xs text-slate-500">+{allLangs.length - 6} more</span>
+                    <span className="text-xs text-slate-500">+{allLangs.length - 6} {t('menu_translations.lang.more', 'more')}</span>
                   )}
                 </div>
 
@@ -773,13 +769,13 @@ function MenuTranslationsInner() {
                   <Input
                     value={customLangInput}
                     onChange={(e) => setCustomLangInput(e.target.value)}
-                    placeholder="Добавить код языка (e.g., 'es', 'de', 'tr')"
+                    placeholder={t('menu_translations.lang.add_placeholder', "Language code (e.g., 'es', 'de', 'tr')")}
                     className="max-w-sm"
                     onKeyDown={(e) => e.key === 'Enter' && handleAddLanguage()}
                   />
                   <Button onClick={handleAddLanguage} variant="outline">
                     <Plus className="w-4 h-4 mr-2" />
-                    Добавить язык
+                    {t('menu_translations.lang.add', 'Add language')}
                   </Button>
                 </div>
               </>
@@ -792,7 +788,7 @@ function MenuTranslationsInner() {
           <button
             onClick={() => {
               if (hasUnsavedChanges) {
-                if (!window.confirm('You have unsaved changes. Switch tab and discard them?')) return;
+                if (!window.confirm(t('menu_translations.confirm.unsaved_tab', 'You have unsaved changes. Switch tab and discard them?'))) return;
               }
               setEditingTranslations({});
               setActiveTab('categories');
@@ -803,12 +799,12 @@ function MenuTranslationsInner() {
                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
             }`}
           >
-            Категории ({categoryProgress.translated}/{categoryProgress.total})
+            {t('menu_translations.tab.categories', 'Categories')} ({categoryProgress.translated}/{categoryProgress.total})
           </button>
           <button
             onClick={() => {
               if (hasUnsavedChanges) {
-                if (!window.confirm('You have unsaved changes. Switch tab and discard them?')) return;
+                if (!window.confirm(t('menu_translations.confirm.unsaved_tab', 'You have unsaved changes. Switch tab and discard them?'))) return;
               }
               setEditingTranslations({});
               setActiveTab('dishes');
@@ -819,7 +815,7 @@ function MenuTranslationsInner() {
                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
             }`}
           >
-            Блюда ({dishProgress.translated}/{dishProgress.total})
+            {t('menu_translations.tab.dishes', 'Dishes')} ({dishProgress.translated}/{dishProgress.total})
           </button>
         </div>
 
@@ -827,7 +823,7 @@ function MenuTranslationsInner() {
           <Card>
             <CardContent className="p-12 text-center">
               <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-3" />
-              <p className="text-slate-500">Загрузка данных меню...</p>
+              <p className="text-slate-500">{t('common.loading', 'Loading...')}</p>
             </CardContent>
           </Card>
         ) : (
@@ -837,7 +833,7 @@ function MenuTranslationsInner() {
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
                 <Input
-                  placeholder={activeTab === 'categories' ? 'Поиск категорий...' : 'Поиск блюд...'}
+                  placeholder={activeTab === 'categories' ? t('menu_translations.search.categories', 'Search categories...') : t('menu_translations.search.dishes', 'Search dishes...')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -847,10 +843,10 @@ function MenuTranslationsInner() {
               {activeTab === 'dishes' && (
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                   <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Все категории" />
+                    <SelectValue placeholder={t('menu_translations.filter.all_categories', 'All categories')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Все категории</SelectItem>
+                    <SelectItem value="all">{t('menu_translations.filter.all_categories', 'All categories')}</SelectItem>
                     {categories.map(cat => (
                       <SelectItem key={cat.id} value={cat.id}>
                         {cat.name}
@@ -862,17 +858,17 @@ function MenuTranslationsInner() {
 
               <Button onClick={handleCopyTemplate} variant="outline">
                 <Copy className="w-4 h-4 mr-2" />
-                Копировать шаблон
+                {t('menu_translations.toolbar.copy_template', 'Copy template')}
               </Button>
 
               <Button onClick={handleExportTSV} variant="outline">
                 <Download className="w-4 h-4 mr-2" />
-                Экспорт TSV
+                {t('menu_translations.toolbar.export_tsv', 'Export TSV')}
               </Button>
 
               <Button onClick={() => setIsPasteModalOpen(true)} variant="outline">
                 <Upload className="w-4 h-4 mr-2" />
-                Вставить
+                {t('menu_translations.toolbar.paste', 'Paste')}
               </Button>
             </div>
 
@@ -884,19 +880,19 @@ function MenuTranslationsInner() {
                     <thead className="bg-slate-50 border-b">
                       <tr>
                         <th className="text-left p-3 text-sm font-medium text-slate-700">ID</th>
-                        <th className="text-left p-3 text-sm font-medium text-slate-700">Оригинал</th>
+                        <th className="text-left p-3 text-sm font-medium text-slate-700">{t('menu_translations.table.original', 'Original')}</th>
                         {activeTab === 'dishes' && (
-                          <th className="text-left p-3 text-sm font-medium text-slate-700">Описание (оригинал)</th>
+                          <th className="text-left p-3 text-sm font-medium text-slate-700">{t('menu_translations.table.desc_original', 'Description (original)')}</th>
                         )}
                         <th className="text-left p-3 text-sm font-medium text-slate-700">
-                          Перевод ({selectedLang.toUpperCase()})
+                          {t('menu_translations.table.translation', 'Translation')} ({selectedLang.toUpperCase()})
                         </th>
                         {activeTab === 'dishes' && (
                           <th className="text-left p-3 text-sm font-medium text-slate-700">
-                            Описание ({selectedLang.toUpperCase()})
+                            {t('menu_translations.table.desc_translation', 'Description')} ({selectedLang.toUpperCase()})
                           </th>
                         )}
-                        <th className="text-center p-3 text-sm font-medium text-slate-700 w-20">Статус</th>
+                        <th className="text-center p-3 text-sm font-medium text-slate-700 w-20">{t('menu_translations.table.status', 'Status')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -911,21 +907,21 @@ function MenuTranslationsInner() {
                                       <Utensils className="w-12 h-12 mx-auto" />
                                     </div>
                                     <h3 className="text-lg font-semibold text-slate-900">
-                                      Нет категорий
+                                      {t('menu_translations.empty.no_categories', 'No categories')}
                                     </h3>
                                     <p className="text-sm text-slate-600 leading-relaxed">
-                                      Создайте категории и назначьте их блюдам, чтобы включить переводы категорий.
+                                      {t('menu_translations.empty.create_categories_hint', 'Create categories and assign them to dishes to enable category translations.')}
                                     </p>
                                     <div className="flex gap-3 justify-center pt-2">
                                       <Button
                                         onClick={() => navigate("/menudishes")}
                                         className="bg-indigo-600 hover:bg-indigo-700"
                                       >
-                                        Перейти к меню
+                                        {t('menu_translations.action.go_to_menu', 'Go to Menu')}
                                       </Button>
                                     </div>
                                     <p className="text-xs text-slate-500 pt-2">
-                                      Подсказка: Категории можно создать на странице Меню или через вкладку Данные на панели управления.
+                                      {t('menu_translations.empty.categories_tip', 'Tip: Categories can be created on the Menu page or via the Data tab in the dashboard.')}
                                     </p>
                                   </div>
                                 </CardContent>
@@ -935,7 +931,7 @@ function MenuTranslationsInner() {
                         ) : filteredCategories.length === 0 ? (
                           <tr>
                             <td colSpan="4" className="text-center py-8 text-slate-500">
-                              Категории не найдены
+                              {t('menu_translations.empty.no_categories_found', 'No categories found')}
                             </td>
                           </tr>
                         ) : (
@@ -956,7 +952,7 @@ function MenuTranslationsInner() {
                                   <Input
                                     value={displayName}
                                     onChange={(e) => handleEditChange(cat.id, 'name', e.target.value)}
-                                    placeholder={`Введите ${selectedLang.toUpperCase()} название...`}
+                                    placeholder={t('menu_translations.placeholder.name', 'Enter translation...')}
                                     className="h-9"
                                   />
                                 </td>
@@ -975,7 +971,7 @@ function MenuTranslationsInner() {
                         filteredDishes.length === 0 ? (
                           <tr>
                             <td colSpan="6" className="text-center py-8 text-slate-500">
-                              Блюда не найдены
+                              {t('menu_translations.empty.no_dishes_found', 'No dishes found')}
                             </td>
                           </tr>
                         ) : (
@@ -1000,7 +996,7 @@ function MenuTranslationsInner() {
                                   <Input
                                     value={displayName}
                                     onChange={(e) => handleEditChange(dish.id, 'name', e.target.value)}
-                                    placeholder={`Введите ${selectedLang.toUpperCase()} название...`}
+                                    placeholder={t('menu_translations.placeholder.name', 'Enter translation...')}
                                     className="h-9"
                                   />
                                 </td>
@@ -1008,7 +1004,7 @@ function MenuTranslationsInner() {
                                   <Input
                                     value={displayDesc}
                                     onChange={(e) => handleEditChange(dish.id, 'description', e.target.value)}
-                                    placeholder={`Введите ${selectedLang.toUpperCase()} описание...`}
+                                    placeholder={t('menu_translations.placeholder.description', 'Enter description...')}
                                     className="h-9"
                                   />
                                 </td>
@@ -1037,13 +1033,13 @@ function MenuTranslationsInner() {
       <Dialog open={isPasteModalOpen} onOpenChange={setIsPasteModalOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Массовая вставка переводов</DialogTitle>
+            <DialogTitle>{t('menu_translations.paste.title', 'Bulk paste translations')}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="bg-slate-50 p-4 rounded-lg text-sm space-y-2">
               <p className="font-medium text-slate-900">
-                {activeTab === 'categories' ? 'Формат для категорий:' : 'Формат для блюд:'}
+                {activeTab === 'categories' ? t('menu_translations.paste.format_categories', 'Format for categories:') : t('menu_translations.paste.format_dishes', 'Format for dishes:')}
               </p>
               {activeTab === 'categories' ? (
                 <>
@@ -1051,7 +1047,7 @@ function MenuTranslationsInner() {
                     category_id{'\t'}original_name{'\t'}translated_name
                   </pre>
                   <p className="text-xs text-slate-500">
-                    Пример: Скопируйте шаблон, заполните столбец translated_name в таблице, и вставьте сюда.
+                    {t('menu_translations.paste.hint_categories', 'Copy the template, fill in the translated_name column, and paste here.')}
                   </p>
                 </>
               ) : (
@@ -1060,12 +1056,12 @@ function MenuTranslationsInner() {
                     dish_id{'\t'}original_name{'\t'}original_description{'\t'}translated_name{'\t'}translated_description
                   </pre>
                   <p className="text-xs text-slate-500">
-                    Пример: Скопируйте шаблон, заполните столбцы переводов в таблице, и вставьте сюда.
+                    {t('menu_translations.paste.hint_dishes', 'Copy the template, fill in translation columns, and paste here.')}
                   </p>
                 </>
               )}
               <p className="text-xs text-slate-500 font-medium">
-                💡 Совет: Используйте кнопку "Копировать шаблон" для получения TSV с ID и оригинальным текстом, редактируйте в Excel/Sheets, затем вставьте обратно.
+                {t('menu_translations.paste.tip', 'Tip: Use "Copy template" to get a TSV with IDs and original text, edit in Excel/Sheets, then paste back.')}
               </p>
             </div>
 
@@ -1076,7 +1072,7 @@ function MenuTranslationsInner() {
                 setPastePreview(null);
               }}
               placeholder={activeTab === 'categories'
-                ? "category_id\tOriginal Name\tTranslated Name\ncategory_id\tAnother Name\tПереведённое имя"
+                ? "category_id\tOriginal Name\tTranslated Name"
                 : "dish_id\tOriginal Name\tOriginal Description\tTranslated Name\tTranslated Description"
               }
               className="font-mono text-sm h-64"
@@ -1086,12 +1082,12 @@ function MenuTranslationsInner() {
               <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
                 <div className="flex items-center gap-2 text-blue-800 font-medium mb-2">
                   <AlertCircle className="w-5 h-5" />
-                  Предпросмотр
+                  {t('menu_translations.paste.preview', 'Preview')}
                 </div>
                 <div className="text-sm text-blue-700 space-y-1">
-                  <p>✅ Будет создано: {pastePreview.willCreate}</p>
-                  <p>🔄 Будет обновлено: {pastePreview.willUpdate}</p>
-                  <p>⏭️ Будет пропущено: {pastePreview.willSkip}</p>
+                  <p>{t('menu_translations.paste.will_create', 'Will create')}: {pastePreview.willCreate}</p>
+                  <p>{t('menu_translations.paste.will_update', 'Will update')}: {pastePreview.willUpdate}</p>
+                  <p>{t('menu_translations.paste.will_skip', 'Will skip')}: {pastePreview.willSkip}</p>
                 </div>
               </div>
             )}
@@ -1100,12 +1096,12 @@ function MenuTranslationsInner() {
               <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
                 <div className="flex items-center gap-2 text-green-800 font-medium mb-2">
                   <CheckCircle2 className="w-5 h-5" />
-                  Массовая вставка завершена
+                  {t('menu_translations.paste.complete', 'Bulk paste complete')}
                 </div>
                 <div className="text-sm text-green-700 space-y-1">
-                  <p>Создано: {pasteResult.created}</p>
-                  <p>Обновлено: {pasteResult.updated}</p>
-                  <p>Пропущено: {pasteResult.skipped}</p>
+                  <p>{t('menu_translations.paste.created', 'Created')}: {pasteResult.created}</p>
+                  <p>{t('menu_translations.paste.updated', 'Updated')}: {pasteResult.updated}</p>
+                  <p>{t('menu_translations.paste.skipped', 'Skipped')}: {pasteResult.skipped}</p>
                 </div>
               </div>
             )}
@@ -1122,7 +1118,7 @@ function MenuTranslationsInner() {
               }}
               disabled={isPasting}
             >
-              Отмена
+              {t('common.cancel', 'Cancel')}
             </Button>
             {!pastePreview ? (
               <Button
@@ -1131,7 +1127,7 @@ function MenuTranslationsInner() {
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 <AlertCircle className="w-4 h-4 mr-2" />
-                Предпросмотр
+                {t('menu_translations.paste.preview', 'Preview')}
               </Button>
             ) : (
               <Button
@@ -1142,12 +1138,12 @@ function MenuTranslationsInner() {
                 {isPasting ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Обработка...
+                    {t('menu_translations.paste.processing', 'Processing...')}
                   </>
                 ) : (
                   <>
                     <Upload className="w-4 h-4 mr-2" />
-                    Подтвердить и применить
+                    {t('menu_translations.paste.confirm_apply', 'Confirm and apply')}
                   </>
                 )}
               </Button>
