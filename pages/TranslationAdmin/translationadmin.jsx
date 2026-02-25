@@ -1342,6 +1342,9 @@ export default function TranslationAdmin() {
 
     let deleted = 0;
 
+    // FIX BUG-TA-003: Track errors, update state only after both API calls succeed
+    let errors = 0;
+
     try {
       for (let i = 0; i < safeToDelete.length; i++) {
         const log = safeToDelete[i];
@@ -1351,17 +1354,21 @@ export default function TranslationAdmin() {
           const translation = translations.find(t => t.key === log.translation_key);
           if (translation) {
             await InterfaceTranslation.delete(translation.id);
-            setTranslations(prev => prev.filter(t => t.id !== translation.id));
           }
           await UnusedKeyLog.delete(log.id);
+          // Only update local state after both API calls succeed
+          if (translation) setTranslations(prev => prev.filter(t => t.id !== translation.id));
           setUnusedKeyLogs(prev => prev.filter(l => l.id !== log.id));
           deleted++;
-        } catch {}
+        } catch (err) {
+          console.error(`Failed to delete key ${log.translation_key}:`, err);
+          errors++;
+        }
 
         if (i < safeToDelete.length - 1) await new Promise(r => setTimeout(r, 100));
       }
 
-      toast.success(`Deleted ${deleted} keys`, { id: 'ta1' });
+      toast.success(`Deleted ${deleted} keys${errors > 0 ? `, ${errors} failed` : ''}`, { id: 'ta1' });
       setShowDeleteUnused(false);
     } catch { toast.error('Failed', { id: 'ta1' }); }
     finally { setSaving(false); setDeleteProgress({ current: 0, total: 0, status: '' }); }
