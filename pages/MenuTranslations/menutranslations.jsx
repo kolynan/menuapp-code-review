@@ -370,15 +370,21 @@ function MenuTranslationsInner() {
         });
       }
 
-      await Promise.all(promises);
+      const results = await Promise.allSettled(promises);
+      const failed = results.filter(r => r.status === 'rejected').length;
+      const succeeded = results.filter(r => r.status === 'fulfilled').length;
 
       queryClient.invalidateQueries({ queryKey: ['categoryTranslations'] });
       queryClient.invalidateQueries({ queryKey: ['dishTranslations'] });
 
       setEditingTranslations({});
-      toast.success('Translations saved');
+
+      if (failed > 0) {
+        toast.warning(`Saved ${succeeded}, failed: ${failed}`);
+      } else {
+        toast.success('Translations saved');
+      }
     } catch (err) {
-      console.error('Save translations error:', err);
       toast.error('Failed to save translations');
     } finally {
       setIsSaving(false);
