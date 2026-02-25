@@ -11,6 +11,7 @@ import {
   Store, RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
+import { useI18n } from "@/components/i18n";
 
 const ADMIN_EMAILS = ["linkgabinfo@gmail.com"];
 
@@ -40,10 +41,14 @@ function formatDate(dateStr) {
 
 // BLOCK 02 — Main Component
 export default function AdminPartnersPage() {
+  const { t } = useI18n();
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [rateLimitHit, setRateLimitHit] = useState(false);
   const queryClient = useQueryClient();
+
+  // Admin check — computed from user state, used in query enabled flags
+  const isAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase());
 
   // Auth check
   useEffect(() => {
@@ -74,35 +79,35 @@ export default function AdminPartnersPage() {
     queryKey: ["admin-partners"],
     queryFn: () => base44.entities.Partner.list("-created_date", 100),
     retry: shouldRetry,
-    enabled: !rateLimitHit && !authLoading
+    enabled: !rateLimitHit && !authLoading && !!isAdmin
   });
 
   const { data: allDishes = [], isLoading: dishesLoading } = useQuery({
     queryKey: ["admin-all-dishes"],
     queryFn: () => base44.entities.Dish.list("-created_date", 1000),
     retry: shouldRetry,
-    enabled: !rateLimitHit && !authLoading && partners.length > 0
+    enabled: !rateLimitHit && !authLoading && !!isAdmin && partners.length > 0
   });
 
   const { data: allOrders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ["admin-all-orders"],
     queryFn: () => base44.entities.Order.list("-created_date", 1000),
     retry: shouldRetry,
-    enabled: !rateLimitHit && !authLoading && partners.length > 0
+    enabled: !rateLimitHit && !authLoading && !!isAdmin && partners.length > 0
   });
 
   const { data: allTables = [], isLoading: tablesLoading } = useQuery({
     queryKey: ["admin-all-tables"],
     queryFn: () => base44.entities.Table.list("-created_date", 500),
     retry: shouldRetry,
-    enabled: !rateLimitHit && !authLoading && partners.length > 0
+    enabled: !rateLimitHit && !authLoading && !!isAdmin && partners.length > 0
   });
 
   const { data: allStaffLinks = [], isLoading: staffLoading } = useQuery({
     queryKey: ["admin-all-staff"],
     queryFn: () => base44.entities.StaffAccessLink.list("-created_date", 500),
     retry: shouldRetry,
-    enabled: !rateLimitHit && !authLoading && partners.length > 0
+    enabled: !rateLimitHit && !authLoading && !!isAdmin && partners.length > 0
   });
 
   // Rate limit detection
@@ -112,7 +117,7 @@ export default function AdminPartnersPage() {
       queryClient.cancelQueries();
       setRateLimitHit(true);
     }
-  }, [partnersError]);
+  }, [partnersError, queryClient]);
 
   // BLOCK 04 — Mutation for status toggle
   const toggleStatusMutation = useMutation({
@@ -121,11 +126,10 @@ export default function AdminPartnersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-partners"] });
-      toast.success("Статус обновлён", { id: "mm1" });
+      toast.success(t('adminPartners.statusUpdated', 'Статус обновлён'), { id: "mm1" });
     },
-    onError: (err) => {
-      toast.error("Ошибка обновления статуса", { id: "mm1" });
-      console.error(err);
+    onError: () => {
+      toast.error(t('adminPartners.statusError', 'Ошибка обновления статуса'), { id: "mm1" });
     }
   });
 
@@ -144,11 +148,10 @@ export default function AdminPartnersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-partners"] });
-      toast.success("План обновлён", { id: "mm1" });
+      toast.success(t('adminPartners.planUpdated', 'План обновлён'), { id: "mm1" });
     },
-    onError: (err) => {
-      toast.error("Ошибка обновления плана", { id: "mm1" });
-      console.error(err);
+    onError: () => {
+      toast.error(t('adminPartners.planError', 'Ошибка обновления плана'), { id: "mm1" });
     }
   });
 
@@ -195,8 +198,6 @@ export default function AdminPartnersPage() {
       </div>
     );
   }
-
-  const isAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase());
 
   if (!isAdmin) {
     return (
@@ -313,6 +314,9 @@ export default function AdminPartnersPage() {
               {partners.map((partner) => {
                 const stats = getPartnerStats(partner.id);
                 const menuUrl = `/x?partner=${encodeURIComponent(partner.slug || partner.id)}`;
+                const isPartnerMutating =
+                  (togglePlanMutation.isPending && togglePlanMutation.variables?.partnerId === partner.id) ||
+                  (toggleStatusMutation.isPending && toggleStatusMutation.variables?.partnerId === partner.id);
                 
                 return (
                   <div 
@@ -357,7 +361,7 @@ export default function AdminPartnersPage() {
                               const newPlan = partner.plan_tier === 'paid' ? 'free' : 'paid';
                               togglePlanMutation.mutate({ partnerId: partner.id, newPlan });
                             }}
-                            disabled={togglePlanMutation.isPending}
+                            disabled={isPartnerMutating}
                           />
                         </div>
                         <div className="text-center">
@@ -370,7 +374,7 @@ export default function AdminPartnersPage() {
                                 newStatus 
                               });
                             }}
-                            disabled={toggleStatusMutation.isPending}
+                            disabled={isPartnerMutating}
                           />
                         </div>
                       </div>
@@ -404,7 +408,7 @@ export default function AdminPartnersPage() {
                             const newPlan = partner.plan_tier === 'paid' ? 'free' : 'paid';
                             togglePlanMutation.mutate({ partnerId: partner.id, newPlan });
                           }}
-                          disabled={togglePlanMutation.isPending}
+                          disabled={isPartnerMutating}
                         />
                       </div>
                       <div className="text-center text-sm text-gray-500">
@@ -419,7 +423,7 @@ export default function AdminPartnersPage() {
                               newStatus 
                             });
                           }}
-                          disabled={toggleStatusMutation.isPending}
+                          disabled={isPartnerMutating}
                         />
                       </div>
                       <div className="text-center">
