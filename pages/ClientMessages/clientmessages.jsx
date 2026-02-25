@@ -59,6 +59,7 @@ export default function ClientMessagesPage() {
   const { data: partners, error: partnersError, refetch: refetchPartners } = useQuery({
     queryKey: ["messagePartners", messages?.map(m => m.partner)],
     queryFn: async () => {
+      if (!messages || messages.length === 0) return [];
       const partnerIds = [...new Set(messages.map(m => m.partner))];
       const results = await Promise.all(
         partnerIds.map(id => base44.entities.Partner.get(id).catch(() => null))
@@ -206,7 +207,7 @@ export default function ClientMessagesPage() {
                           <Circle className="w-2 h-2 fill-blue-500 text-blue-500 flex-shrink-0" />
                         )}
                         <span className={`text-sm font-medium ${isUnread ? "text-slate-900" : "text-slate-500"}`}>
-                          {partner?.name || t('common.loading', '...')}
+                          {partner?.name || t('clientmessages.unknown_partner', '...')}
                         </span>
                       </div>
                       <span className="text-xs text-slate-400 flex-shrink-0 ml-2">
