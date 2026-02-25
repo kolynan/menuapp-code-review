@@ -30,7 +30,7 @@ export default function ClientAccount() {
   }, [email, navigate]);
 
   // 3. useClientAccounts(email)
-  const { accounts, isLoading: accountsLoading, totalBalance } = useClientAccounts(email);
+  const { accounts, isLoading: accountsLoading, totalBalance, error: accountsError, refetch: refetchAccounts } = useClientAccounts(email);
 
   // 4. useState for selectedAccountId
   const [selectedAccountId, setSelectedAccountId] = useState(null);
@@ -48,7 +48,7 @@ export default function ClientAccount() {
   }, [accounts, selectedAccountId]);
 
   // 7. useTransactions(selectedAccountId)
-  const { transactions, isLoading: txLoading } = useTransactions(selectedAccountId);
+  const { transactions, isLoading: txLoading, error: txError, refetch: refetchTransactions } = useTransactions(selectedAccountId);
 
   // 8. Derive expiryDays
   const expiryDays = selectedAccount?.partner?.loyalty_expiry_days || 365;
@@ -61,6 +61,19 @@ export default function ClientAccount() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+  // Error loading accounts
+  if (accountsError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-sm p-6 text-center max-w-md">
+          <p className="text-slate-700 mb-4">{t('client.error_loading_accounts', 'Ошибка загрузки аккаунтов')}</p>
+          <Button onClick={() => refetchAccounts?.()} className="w-full">
+            {t('common.retry', 'Повторить')}
+          </Button>
+        </div>
       </div>
     );
   }
@@ -125,6 +138,13 @@ export default function ClientAccount() {
           {txLoading ? (
             <div className="bg-white rounded-lg shadow-sm p-8 flex items-center justify-center">
               <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+            </div>
+          ) : txError ? (
+            <div className="bg-white rounded-lg shadow-sm p-6 text-center">
+              <p className="text-slate-700 mb-4">{t('client.error_loading_transactions', 'Ошибка загрузки истории')}</p>
+              <Button onClick={() => refetchTransactions?.()} className="w-full">
+                {t('common.retry', 'Повторить')}
+              </Button>
             </div>
           ) : (
             <TransactionList transactions={transactions} />

@@ -27,14 +27,17 @@ export default function ClientMessagesPage() {
   }, [navigate]);
 
   // Load loyalty accounts for this customer
-  const { data: accounts } = useQuery({
+  const { data: accounts, error: accountsError, refetch: refetchAccounts } = useQuery({
     queryKey: ["customerAccounts", customerEmail],
     queryFn: () => base44.entities.LoyaltyAccount.filter({ email: customerEmail }),
     enabled: !!customerEmail,
+    onError: () => {
+      toast.error(t('clientmessages.error_accounts', 'Ошибка загрузки аккаунтов'));
+    },
   });
 
   // Load messages for all accounts
-  const { data: messages, isLoading: loadingMessages } = useQuery({
+  const { data: messages, isLoading: loadingMessages, error: messagesError, refetch: refetchMessages } = useQuery({
     queryKey: ["customerMessages", customerEmail],
     queryFn: async () => {
       if (!accounts || accounts.length === 0) return [];
@@ -47,10 +50,13 @@ export default function ClientMessagesPage() {
       return allMessages.flat();
     },
     enabled: !!customerEmail && !!accounts && accounts.length > 0,
+    onError: () => {
+      toast.error(t('clientmessages.error_loading', 'Ошибка загрузки сообщений'));
+    },
   });
 
   // Load partners for messages
-  const { data: partners } = useQuery({
+  const { data: partners, error: partnersError, refetch: refetchPartners } = useQuery({
     queryKey: ["messagePartners", messages?.map(m => m.partner)],
     queryFn: async () => {
       const partnerIds = [...new Set(messages.map(m => m.partner))];
@@ -60,13 +66,31 @@ export default function ClientMessagesPage() {
       return results.filter(Boolean);
     },
     enabled: !!messages && messages.length > 0,
+    onError: () => {
+      toast.error(t('clientmessages.error_partners', 'Ошибка загрузки партнеров'));
+    },
   });
 
   // Mark message as read mutation
   const markReadMutation = useMutation({
     mutationFn: (messageId) => base44.entities.ClientMessage.update(messageId, { is_read: true }),
-    onError: () => {
+    onMutate: async (messageId) => {
+      await queryClient.cancelQueries(["customerMessages", customerEmail]);
+      const previous = queryClient.getQueryData(["customerMessages", customerEmail]);
+      queryClient.setQueryData(["customerMessages", customerEmail], (oldMessages) => {
+        if (!oldMessages) return oldMessages;
+        return oldMessages.map(m => m.id === messageId ? { ...m, is_read: true } : m);
+      });
+      return { previous };
+    },
+    onError: (err, messageId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["customerMessages", customerEmail], context.previous);
+      }
       toast.error(t("toast.error"), { id: "mm1" });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries(["customerMessages", customerEmail]);
     },
   });
 
@@ -77,15 +101,7 @@ export default function ClientMessagesPage() {
 
     // Mark as read if expanding and not already read
     if (!wasExpanded && !message.is_read) {
-      // Optimistic update
-      queryClient.setQueryData(["customerMessages", customerEmail], (oldMessages) => {
-        if (!oldMessages) return oldMessages;
-        return oldMessages.map(m => 
-          m.id === message.id ? { ...m, is_read: true } : m
-        );
-      });
-
-      // Save to DB (silent)
+      // Use mutation which handles optimistic update + rollback
       markReadMutation.mutate(message.id);
     }
   };
