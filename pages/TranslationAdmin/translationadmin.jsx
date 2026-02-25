@@ -266,6 +266,12 @@ function parseCSVLine(line) {
   return values;
 }
 
+// FIX BUG-TA-006: Unescape literal \n back to real newlines (round-trip with escapeCSV)
+function unescapeCSV(str) {
+  if (!str) return '';
+  return str.replace(/\\n/g, '\n');
+}
+
 function parseCSV(csvText, languages) {
   const lines = csvText.trim().split('\n');
   if (lines.length < 2) return [];
@@ -284,7 +290,7 @@ function parseCSV(csvText, languages) {
     const obj = { translations: {} };
 
     headers.forEach((header, idx) => {
-      const value = values[idx] || '';
+      const value = unescapeCSV(values[idx] || '');
 
       if (header === 'key') obj.key = value;
       else if (header === 'page') obj.page = value;
