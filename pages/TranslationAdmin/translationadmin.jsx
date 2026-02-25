@@ -1292,6 +1292,7 @@ export default function TranslationAdmin() {
     }
   };
 
+  // FIX BUG-TA-002: Re-throw error so TranslationRow.saveEdit keeps edit open on failure
   const updateTranslation = async (id, updates) => {
     setSaving(true);
     try {
@@ -1301,7 +1302,8 @@ export default function TranslationAdmin() {
       refreshTranslations().catch(() => {});
     } catch (err) {
       console.error("Failed to update translation:", err);
-      toast.error('Failed', { id: 'ta1' });
+      toast.error('Failed to save translation', { id: 'ta1' });
+      throw err; // Re-throw so caller (TranslationRow.saveEdit) can keep edit open
     } finally {
       setSaving(false);
     }
