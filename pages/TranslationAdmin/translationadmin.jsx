@@ -1419,22 +1419,26 @@ export default function TranslationAdmin() {
       return;
     }
 
+    // FIX BUG-TA-005: Deduplicate parsed rows, commit partial progress on error
     const parsed = parseCSV(importCSV, languages);
     if (parsed.length === 0) {
       toast.error('No valid data', { id: 'ta1' });
       return;
     }
 
+    // Deduplicate: last row wins (matches Excel/Sheets behavior)
+    const deduped = [...new Map(parsed.map(item => [item.key, item])).values()];
+
     setSaving(true);
-    setImportProgress({ current: 0, total: parsed.length, status: 'Starting...' });
+    setImportProgress({ current: 0, total: deduped.length, status: 'Starting...' });
 
     let created = 0, updated = 0, skipped = 0;
     let localTranslations = [...translations];
 
     try {
-      for (let i = 0; i < parsed.length; i++) {
-        const item = parsed[i];
-        setImportProgress({ current: i + 1, total: parsed.length, status: `Processing: ${item.key}` });
+      for (let i = 0; i < deduped.length; i++) {
+        const item = deduped[i];
+        setImportProgress({ current: i + 1, total: deduped.length, status: `Processing: ${item.key}` });
 
         const existingIdx = localTranslations.findIndex(t => t.key === item.key);
         const existing = existingIdx >= 0 ? localTranslations[existingIdx] : null;
@@ -1458,7 +1462,7 @@ export default function TranslationAdmin() {
           created++;
         }
 
-        if (i < parsed.length - 1) await new Promise(r => setTimeout(r, 100));
+        if (i < deduped.length - 1) await new Promise(r => setTimeout(r, 100));
       }
 
       setTranslations(localTranslations);
@@ -1471,10 +1475,14 @@ export default function TranslationAdmin() {
       try {
         await refreshTranslations();
         toast.success('Synced!', { id: 'ta2' });
-      } catch {}
+      } catch {
+        toast.error('Import saved, but live sync failed. Reload to see changes.', { id: 'ta2' });
+      }
     } catch (e) {
       console.error("Import failed:", e);
-      toast.error('Import failed', { id: 'ta1' });
+      // Commit partial progress so already-saved items reflect in UI
+      setTranslations(localTranslations);
+      toast.error(`Import failed at row ${created + updated + skipped + 1}`, { id: 'ta1' });
       setImportProgress({ current: 0, total: 0, status: '' });
     } finally { setSaving(false); }
   };
