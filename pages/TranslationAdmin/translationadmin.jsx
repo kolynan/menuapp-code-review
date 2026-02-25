@@ -858,12 +858,15 @@ export default function TranslationAdmin() {
     }
   };
 
+  // FIX BUG-TA-001: Set new default FIRST to avoid zero-default state on partial failure
   const setDefaultLanguage = async (lang) => {
     setSaving(true);
     try {
-      const currentDefault = languages.find(l => l.is_default);
-      if (currentDefault) await Language.update(currentDefault.id, { is_default: false });
+      // Set new default FIRST — failure here leaves old default intact (safe)
       await Language.update(lang.id, { is_default: true, is_active: true });
+      // Un-set old default SECOND — failure here leaves two defaults (recoverable by retry)
+      const currentDefault = languages.find(l => l.is_default && l.id !== lang.id);
+      if (currentDefault) await Language.update(currentDefault.id, { is_default: false });
       setLanguages(prev => prev.map(l => ({ ...l, is_default: l.id === lang.id, is_active: l.id === lang.id ? true : l.is_active })));
       toast.success(`${lang.name} set as default`, { id: 'ta1' });
     } catch (err) {
