@@ -160,7 +160,7 @@ export default function AdminPartnersPage() {
     const dishes = allDishes.filter(d => d.partner === partnerId && !d.is_archived);
     const dishesWithPhoto = dishes.filter(d => d.image);
     const orders = allOrders.filter(o => o.partner === partnerId);
-    const tables = allTables.filter(t => t.partner === partnerId);
+    const tables = allTables.filter(tbl => tbl.partner === partnerId);
     const staff = allStaffLinks.filter(s => s.partner === partnerId && s.is_active);
 
     const lastOrder = orders.length > 0 
