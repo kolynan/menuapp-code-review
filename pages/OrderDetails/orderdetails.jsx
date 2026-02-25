@@ -43,6 +43,25 @@ const getStatusLabel = (status, t) => {
     return labels[status] ?? status;
 };
 
+const getTypeLabel = (type, t) => {
+    const labels = {
+        hall:     t('order_details.type.hall'),
+        pickup:   t('order_details.type.pickup'),
+        delivery: t('order_details.type.delivery'),
+    };
+    return labels[type] ?? type;
+};
+
+const getPaymentStatusLabel = (status, t) => {
+    const labels = {
+        unpaid:  t('order_details.payment.unpaid'),
+        paid:    t('order_details.payment.paid'),
+        partial: t('order_details.payment.partial'),
+        refund:  t('order_details.payment.refund'),
+    };
+    return labels[status] ?? status;
+};
+
 const formatPrice = (value) => Number(value ?? 0).toFixed(2);
 
 export default function OrderDetails() {
@@ -65,12 +84,12 @@ export default function OrderDetails() {
     });
 
     if (!orderId) return <div className="p-8">{t('order_details.error.no_id')}</div>;
-    if (isLoadingOrder) return <div className="p-8 flex items-center gap-2"><Loader2 className="animate-spin" /> {t('common.loading')}</div>;
     if (isOrderError) return (
         <div className="p-8 flex items-center gap-2 text-red-600">
             <AlertCircle className="h-5 w-5" /> {t('order_details.error.load_failed')}
         </div>
     );
+    if (isLoadingOrder) return <div className="p-8 flex items-center gap-2"><Loader2 className="animate-spin" /> {t('common.loading')}</div>;
     if (!order) return <div className="p-8">{t('order_details.error.not_found')}</div>;
 
     return (
@@ -101,11 +120,11 @@ export default function OrderDetails() {
                     <CardContent className="space-y-3">
                         <div className="flex justify-between border-b pb-2">
                             <span className="text-slate-500">{t('order_details.field.order_type')}</span>
-                            <span className="font-medium capitalize">{order.order_type}</span>
+                            <span className="font-medium">{getTypeLabel(order.order_type, t)}</span>
                         </div>
                         <div className="flex justify-between border-b pb-2">
                             <span className="text-slate-500">{t('order_details.field.payment_status')}</span>
-                            <span className="font-medium capitalize">{order.payment_status}</span>
+                            <span className="font-medium">{getPaymentStatusLabel(order.payment_status, t)}</span>
                         </div>
                         <div className="flex justify-between border-b pb-2">
                             <span className="text-slate-500">{t('order_details.field.partner_id')}</span>
@@ -190,10 +209,12 @@ export default function OrderDetails() {
                             ) : (
                                 <TableRow><TableCell colSpan={5} className="text-center h-24 text-slate-500">{t('order_details.items.empty')}</TableCell></TableRow>
                             )}
-                            <TableRow className="bg-slate-50/50 font-bold border-t-2">
-                                <TableCell colSpan={4} className="text-right text-lg align-middle">{t('order_details.total_amount')}</TableCell>
-                                <TableCell className="text-right text-xl text-indigo-600">${formatPrice(order.total_amount)}</TableCell>
-                            </TableRow>
+                            {!isLoadingItems && !isItemsError && (
+                                <TableRow className="bg-slate-50/50 font-bold border-t-2">
+                                    <TableCell colSpan={4} className="text-right text-lg align-middle">{t('order_details.total_amount')}</TableCell>
+                                    <TableCell className="text-right text-xl text-indigo-600">${formatPrice(order.total_amount)}</TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </CardContent>

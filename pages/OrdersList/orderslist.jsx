@@ -81,8 +81,8 @@ export default function OrdersList() {
 
     const filteredOrders = orders.filter(order => {
         const matchesSearch = (
-            (order.order_number && order.order_number.toLowerCase().includes(search.toLowerCase())) ||
-            (order.client_name && order.client_name.toLowerCase().includes(search.toLowerCase()))
+            (order.order_number && String(order.order_number).toLowerCase().includes(search.toLowerCase())) ||
+            (order.client_name && String(order.client_name).toLowerCase().includes(search.toLowerCase()))
         );
         const matchesStatus = statusFilter === "all" || order.status === statusFilter;
         const matchesType = typeFilter === "all" || order.order_type === typeFilter;
