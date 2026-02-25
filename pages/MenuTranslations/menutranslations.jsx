@@ -150,17 +150,10 @@ function MenuTranslationsInner() {
 
   const { data: categoryTranslations, isLoading: loadingCatTrans, error: catTransError } = useQuery({
     queryKey: ['categoryTranslations', partnerId, selectedLang],
-    queryFn: async () => {
-      try {
-        return await base44.entities.CategoryTranslation.filter({
-          partner: partnerId,
-          lang: selectedLang
-        });
-      } catch (e) {
-        console.error('Failed to fetch category translations:', e);
-        return [];
-      }
-    },
+    queryFn: () => base44.entities.CategoryTranslation.filter({
+      partner: partnerId,
+      lang: selectedLang
+    }),
     enabled: !!partnerId && !!selectedLang,
     initialData: [],
     retry: 1
@@ -168,17 +161,10 @@ function MenuTranslationsInner() {
 
   const { data: dishTranslations, isLoading: loadingDishTrans, error: dishTransError } = useQuery({
     queryKey: ['dishTranslations', partnerId, selectedLang],
-    queryFn: async () => {
-      try {
-        return await base44.entities.DishTranslation.filter({
-          partner: partnerId,
-          lang: selectedLang
-        });
-      } catch (e) {
-        console.error('Failed to fetch dish translations:', e);
-        return [];
-      }
-    },
+    queryFn: () => base44.entities.DishTranslation.filter({
+      partner: partnerId,
+      lang: selectedLang
+    }),
     enabled: !!partnerId && !!selectedLang,
     initialData: [],
     retry: 1
