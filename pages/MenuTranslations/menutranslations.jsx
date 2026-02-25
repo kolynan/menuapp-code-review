@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -44,9 +44,7 @@ class ErrorBoundary extends React.Component {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error, errorInfo) {
-    console.error('MenuTranslations Error:', error, errorInfo);
-  }
+  componentDidCatch() {}
 
   render() {
     if (this.state.hasError) {
@@ -115,6 +113,7 @@ function MenuTranslationsInner() {
   // Inline editing
   const [editingTranslations, setEditingTranslations] = useState({});
   const [isSaving, setIsSaving] = useState(false);
+  const hasUnsavedChanges = Object.keys(editingTranslations).length > 0;
 
   // Recent languages (partner-specific)
   const storageKey = partnerId ? `menu_trans_langs_${partnerId}` : null;
@@ -384,7 +383,7 @@ function MenuTranslationsInner() {
       setEditingTranslations({});
 
       if (failed > 0) {
-        toast.warning(`Saved ${succeeded}, failed: ${failed}`);
+        toast.warning(`${t('menu_translations.toast.saved_count', 'Saved')}: ${succeeded}, ${t('menu_translations.toast.failed_count', 'failed')}: ${failed}`);
       } else {
         toast.success(t('menu_translations.toast.saved', 'Translations saved'));
       }
@@ -588,15 +587,12 @@ function MenuTranslationsInner() {
         setIsPasteModalOpen(false);
         setPasteResult(null);
       }, 3000);
-    } catch (err) {
-      console.error('Bulk paste error:', err);
+    } catch {
       toast.error(t('menu_translations.toast.paste_failed', 'Failed to process bulk paste'));
     } finally {
       setIsPasting(false);
     }
   };
-
-  const hasUnsavedChanges = Object.keys(editingTranslations).length > 0;
 
   // Loading state
   if (loadingUser) {
@@ -1072,8 +1068,8 @@ function MenuTranslationsInner() {
                 setPastePreview(null);
               }}
               placeholder={activeTab === 'categories'
-                ? "category_id\tOriginal Name\tTranslated Name"
-                : "dish_id\tOriginal Name\tOriginal Description\tTranslated Name\tTranslated Description"
+                ? t('menu_translations.paste.placeholder_categories', 'category_id\tOriginal Name\tTranslated Name')
+                : t('menu_translations.paste.placeholder_dishes', 'dish_id\tOriginal Name\tOriginal Description\tTranslated Name\tTranslated Description')
               }
               className="font-mono text-sm h-64"
             />
