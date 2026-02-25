@@ -113,7 +113,7 @@ export default function ClientMessagesPage() {
 
   const formatMessageDate = (dateStr) => {
     if (!dateStr) return "";
-    
+
     try {
       const date = new Date(dateStr);
       const now = new Date();
@@ -122,14 +122,14 @@ export default function ClientMessagesPage() {
       yesterday.setDate(yesterday.getDate() - 1);
       const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-      const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
       if (messageDate.getTime() === today.getTime()) {
-        return `Сегодня ${time}`;
+        return `${t('clientmessages.date_today', 'Сегодня')} ${time}`;
       } else if (messageDate.getTime() === yesterday.getTime()) {
-        return `Вчера ${time}`;
+        return `${t('clientmessages.date_yesterday', 'Вчера')} ${time}`;
       } else {
-        return date.toLocaleDateString('ru-RU');
+        return date.toLocaleDateString(undefined);
       }
     } catch {
       return "";
