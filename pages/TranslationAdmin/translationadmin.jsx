@@ -1023,8 +1023,10 @@ export default function TranslationAdmin() {
       const existingKeys = new Set(translations.map(t => t.key));
       const newKeys = foundKeys.filter(k => !existingKeys.has(k));
 
+      // FIX BUG-TA-004: Track tracker ID to avoid stale closure when tracker is newly created
       const now = new Date().toISOString();
       const existingTracker = scanTrackers.find(t => t.page_name === editingSource.page_name);
+      let trackerId = existingTracker?.id;
       const trackerData = {
         page_name: editingSource.page_name,
         last_scanned_at: now,
@@ -1039,6 +1041,7 @@ export default function TranslationAdmin() {
         setScanTrackers(prev => prev.map(t => t.id === existingTracker.id ? { ...t, ...trackerData } : t));
       } else {
         const created = await PageScanTracker.create(trackerData);
+        trackerId = created.id;
         setScanTrackers(prev => [...prev, created]);
       }
 
@@ -1066,10 +1069,11 @@ export default function TranslationAdmin() {
           if (i < newKeys.length - 1) await new Promise(r => setTimeout(r, 100));
         }
 
+        // Use trackerId (captures newly created tracker's ID too)
         const updatedTrackerData = { ...trackerData, new_keys_count: 0, scan_status: "scanned" };
-        if (existingTracker) {
-          await PageScanTracker.update(existingTracker.id, updatedTrackerData);
-          setScanTrackers(prev => prev.map(t => t.id === existingTracker.id ? { ...t, ...updatedTrackerData } : t));
+        if (trackerId) {
+          await PageScanTracker.update(trackerId, updatedTrackerData);
+          setScanTrackers(prev => prev.map(t => t.id === trackerId ? { ...t, ...updatedTrackerData } : t));
         }
 
         toast.success(`Added ${added} new keys`, { id: 'ta1' });
