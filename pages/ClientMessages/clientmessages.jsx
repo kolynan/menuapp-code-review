@@ -206,7 +206,7 @@ export default function ClientMessagesPage() {
                           <Circle className="w-2 h-2 fill-blue-500 text-blue-500 flex-shrink-0" />
                         )}
                         <span className={`text-sm font-medium ${isUnread ? "text-slate-900" : "text-slate-500"}`}>
-                          {partner?.name || "..."}
+                          {partner?.name || t('common.loading', '...')}
                         </span>
                       </div>
                       <span className="text-xs text-slate-400 flex-shrink-0 ml-2">
