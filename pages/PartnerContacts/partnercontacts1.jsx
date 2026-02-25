@@ -78,19 +78,23 @@ function getTypeBadgeColor(type) {
   return colors[type] || "bg-slate-100 text-slate-700";
 }
 
-function getTypeLabel(type) {
+function getTypeLabel(type, t) {
+  if (!t) {
+    const labels = { phone: "Phone", whatsapp: "WhatsApp", instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", website: "Website", email: "Email", map: "Map", custom: "Custom" };
+    return labels[type] || "Link";
+  }
   const labels = {
-    phone: "Phone",
-    whatsapp: "WhatsApp",
-    instagram: "Instagram",
-    facebook: "Facebook",
-    tiktok: "TikTok",
-    website: "Website",
-    email: "Email",
-    map: "Map",
-    custom: "Custom",
+    phone: t('partnercontacts.type.phone', 'Phone'),
+    whatsapp: t('partnercontacts.type.whatsapp', 'WhatsApp'),
+    instagram: t('partnercontacts.type.instagram', 'Instagram'),
+    facebook: t('partnercontacts.type.facebook', 'Facebook'),
+    tiktok: t('partnercontacts.type.tiktok', 'TikTok'),
+    website: t('partnercontacts.type.website', 'Website'),
+    email: t('partnercontacts.type.email', 'Email'),
+    map: t('partnercontacts.type.map', 'Map'),
+    custom: t('partnercontacts.type.custom', 'Custom'),
   };
-  return labels[type] || "Link";
+  return labels[type] || t('partnercontacts.type.link', 'Link');
 }
 
 function getUrlPrefix(type) {
@@ -328,7 +332,7 @@ export default function PartnerContacts1() {
 
     const payload = {
       type: linkForm.type,
-      label: normStr(linkForm.label).trim() || getTypeLabel(linkForm.type),
+      label: normStr(linkForm.label).trim() || getTypeLabel(linkForm.type, t),
       url: normStr(linkForm.url).trim(),
       is_active: linkForm.is_active !== false,
     };
@@ -343,7 +347,7 @@ export default function PartnerContacts1() {
     setLinkForm((prev) => ({
       ...prev,
       type: newType,
-      label: getTypeLabel(newType),
+      label: getTypeLabel(newType, t),
       url: getUrlPrefix(newType),
     }));
   };
@@ -513,11 +517,11 @@ export default function PartnerContacts1() {
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <Icon className="w-5 h-5 text-slate-500 shrink-0" />
                           <div className="min-w-0">
-                            <div className="font-medium text-slate-900">{link.label || getTypeLabel(link.type)}</div>
+                            <div className="font-medium text-slate-900">{link.label || getTypeLabel(link.type, t)}</div>
                             <div className="text-xs text-slate-500 truncate">{link.url}</div>
                           </div>
                           <Badge className={`${getTypeBadgeColor(link.type)} text-xs shrink-0`}>
-                            {getTypeLabel(link.type)}
+                            {getTypeLabel(link.type, t)}
                           </Badge>
                           {link.is_active === false && (
                             <Badge variant="outline" className="text-xs text-slate-500 shrink-0">
@@ -607,7 +611,7 @@ export default function PartnerContacts1() {
                           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition text-sm"
                         >
                           <Icon className="w-4 h-4 text-slate-700" />
-                          <span className="text-slate-900">{link.label || getTypeLabel(link.type)}</span>
+                          <span className="text-slate-900">{link.label || getTypeLabel(link.type, t)}</span>
                         </button>
                       );
                     })}
@@ -651,9 +655,9 @@ export default function PartnerContacts1() {
                   id="link_label"
                   value={linkForm.label}
                   onChange={(e) => setLinkForm({ ...linkForm, label: e.target.value })}
-                  placeholder={getTypeLabel(linkForm.type)}
+                  placeholder={getTypeLabel(linkForm.type, t)}
                 />
-                <div className="text-xs text-slate-500">{t('partnercontacts.dialog.auto_label','Автоматическое')}: {getTypeLabel(linkForm.type)}</div>
+                <div className="text-xs text-slate-500">{t('partnercontacts.dialog.auto_label','Автоматическое')}: {getTypeLabel(linkForm.type, t)}</div>
               </div>
 
               <div className="space-y-2">
