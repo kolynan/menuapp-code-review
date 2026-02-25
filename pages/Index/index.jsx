@@ -1,12 +1,14 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
+import { useI18n } from "@/components/i18n";
 import { Button } from "@/components/ui/button";
 import { QrCode, ClipboardList, UtensilsCrossed, ArrowRight } from "lucide-react";
 import Footer from "@/components/Footer";
 
 export default function Index() {
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   const handleLogin = async () => {
     await base44.auth.redirectToLogin("/partnerhome");
@@ -15,18 +17,18 @@ export default function Index() {
   const features = [
     {
       icon: QrCode,
-      title: "QR-меню без приложений",
-      description: "Гости сканируют QR-код и видят меню прямо в браузере",
+      title: t("index.features.qr_menu.title"),
+      description: t("index.features.qr_menu.description"),
     },
     {
       icon: ClipboardList,
-      title: "Заказы в реальном времени",
-      description: "Заказы мгновенно приходят официантам и на кухню",
+      title: t("index.features.realtime_orders.title"),
+      description: t("index.features.realtime_orders.description"),
     },
     {
       icon: UtensilsCrossed,
-      title: "Управление столами",
-      description: "Отслеживайте столы, сессии и статусы заказов",
+      title: t("index.features.table_management.title"),
+      description: t("index.features.table_management.description"),
     },
   ];
 
@@ -38,7 +40,7 @@ export default function Index() {
           <div className="flex items-center justify-between">
             <div className="text-2xl font-bold text-indigo-600">MenuApp</div>
             <Button variant="outline" size="sm" onClick={handleLogin}>
-              Войти
+              {t("index.header.login")}
             </Button>
           </div>
         </div>
@@ -48,18 +50,18 @@ export default function Index() {
       <section className="flex-1 flex items-center justify-center px-4 py-16 sm:py-24">
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-slate-900 mb-6">
-            QR-меню для вашего ресторана
+            {t("index.hero.title")}
           </h1>
           <p className="text-xl sm:text-2xl text-slate-600 mb-8">
-            Гости сканируют — заказы приходят. Бесплатно.
+            {t("index.hero.subtitle")}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8" onClick={handleLogin}>
-              Создать ресторан
+              {t("index.hero.create_restaurant")}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             <Button size="lg" variant="outline" onClick={handleLogin}>
-              Войти
+              {t("index.hero.login")}
             </Button>
           </div>
         </div>
@@ -91,13 +93,13 @@ export default function Index() {
       <section className="py-16 px-4 bg-indigo-600">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-            Создайте меню за 5 минут
+            {t("index.cta.title")}
           </h2>
           <p className="text-indigo-100 text-lg mb-8">
-            Начните принимать заказы уже сегодня
+            {t("index.cta.subtitle")}
           </p>
           <Button size="lg" className="bg-white text-indigo-600 hover:bg-slate-100" onClick={handleLogin}>
-            Начать
+            {t("index.cta.start")}
           </Button>
         </div>
       </section>
