@@ -237,9 +237,14 @@ function MenuTranslationsInner() {
       return;
     }
 
+    if (hasUnsavedChanges) {
+      if (!window.confirm('You have unsaved changes. Switch language and discard them?')) return;
+    }
+
     const updated = [...recentLangs, lang];
     setRecentLangs(updated);
     if (storageKey) localStorage.setItem(storageKey, JSON.stringify(updated));
+    setEditingTranslations({});
     setSelectedLang(lang);
     setCustomLangInput('');
     toast.success(`Language "${lang}" added`);
@@ -735,7 +740,13 @@ function MenuTranslationsInner() {
                   {allLangs.slice(0, 6).map(lang => (
                     <button
                       key={lang}
-                      onClick={() => setSelectedLang(lang)}
+                      onClick={() => {
+                        if (hasUnsavedChanges) {
+                          if (!window.confirm('You have unsaved changes. Switch language and discard them?')) return;
+                        }
+                        setEditingTranslations({});
+                        setSelectedLang(lang);
+                      }}
                       className={`px-4 py-2 rounded-lg border font-medium transition-all ${
                         selectedLang === lang
                           ? 'bg-indigo-600 text-white border-indigo-600'
