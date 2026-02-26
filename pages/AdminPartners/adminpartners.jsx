@@ -75,35 +75,35 @@ export default function AdminPartnersPage() {
   }
 
   // BLOCK 03 — Data Queries
-  const { data: partners = [], isLoading: partnersLoading, error: partnersError } = useQuery({
+  const { data: partners = [], isLoading: partnersLoading, error: partnersError, isError: isPartnersError } = useQuery({
     queryKey: ["admin-partners"],
     queryFn: () => base44.entities.Partner.list("-created_date", 100),
     retry: shouldRetry,
     enabled: !rateLimitHit && !authLoading && !!isAdmin
   });
 
-  const { data: allDishes = [], isLoading: dishesLoading } = useQuery({
+  const { data: allDishes = [], isLoading: dishesLoading, isError: isDishesError } = useQuery({
     queryKey: ["admin-all-dishes"],
     queryFn: () => base44.entities.Dish.list("-created_date", 1000),
     retry: shouldRetry,
     enabled: !rateLimitHit && !authLoading && !!isAdmin && partners.length > 0
   });
 
-  const { data: allOrders = [], isLoading: ordersLoading } = useQuery({
+  const { data: allOrders = [], isLoading: ordersLoading, isError: isOrdersError } = useQuery({
     queryKey: ["admin-all-orders"],
     queryFn: () => base44.entities.Order.list("-created_date", 1000),
     retry: shouldRetry,
     enabled: !rateLimitHit && !authLoading && !!isAdmin && partners.length > 0
   });
 
-  const { data: allTables = [], isLoading: tablesLoading } = useQuery({
+  const { data: allTables = [], isLoading: tablesLoading, isError: isTablesError } = useQuery({
     queryKey: ["admin-all-tables"],
     queryFn: () => base44.entities.Table.list("-created_date", 500),
     retry: shouldRetry,
     enabled: !rateLimitHit && !authLoading && !!isAdmin && partners.length > 0
   });
 
-  const { data: allStaffLinks = [], isLoading: staffLoading } = useQuery({
+  const { data: allStaffLinks = [], isLoading: staffLoading, isError: isStaffError } = useQuery({
     queryKey: ["admin-all-staff"],
     queryFn: () => base44.entities.StaffAccessLink.list("-created_date", 500),
     retry: shouldRetry,
@@ -114,7 +114,11 @@ export default function AdminPartnersPage() {
   useEffect(() => {
     const error = partnersError;
     if (error && isRateLimitError(error)) {
-      queryClient.cancelQueries();
+      queryClient.cancelQueries({ queryKey: ["admin-partners"] });
+      queryClient.cancelQueries({ queryKey: ["admin-all-dishes"] });
+      queryClient.cancelQueries({ queryKey: ["admin-all-orders"] });
+      queryClient.cancelQueries({ queryKey: ["admin-all-tables"] });
+      queryClient.cancelQueries({ queryKey: ["admin-all-staff"] });
       setRateLimitHit(true);
     }
   }, [partnersError, queryClient]);
@@ -240,7 +244,11 @@ export default function AdminPartnersPage() {
               variant="outline" 
               onClick={() => {
                 setRateLimitHit(false);
-                queryClient.invalidateQueries();
+                queryClient.invalidateQueries({ queryKey: ["admin-partners"] });
+                queryClient.invalidateQueries({ queryKey: ["admin-all-dishes"] });
+                queryClient.invalidateQueries({ queryKey: ["admin-all-orders"] });
+                queryClient.invalidateQueries({ queryKey: ["admin-all-tables"] });
+                queryClient.invalidateQueries({ queryKey: ["admin-all-staff"] });
               }}
             >
               <RefreshCw className="h-4 w-4 mr-2" />
@@ -253,6 +261,7 @@ export default function AdminPartnersPage() {
   }
 
   const isLoading = partnersLoading || dishesLoading || ordersLoading || tablesLoading || staffLoading;
+  const readinessError = isDishesError || isTablesError || isStaffError;
 
   // BLOCK 07 — Render UI
   return (
@@ -287,6 +296,21 @@ export default function AdminPartnersPage() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
           </div>
+        ) : isPartnersError && partners.length === 0 ? (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="py-12 text-center">
+              <AlertTriangle className="h-12 w-12 text-red-400 mx-auto mb-3" />
+              <p className="text-gray-700 font-medium mb-1">{t('adminPartners.loadError', 'Ошибка загрузки')}</p>
+              <p className="text-sm text-gray-500 mb-4">{t('adminPartners.loadErrorDesc', 'Не удалось загрузить список ресторанов')}</p>
+              <Button
+                variant="outline"
+                onClick={() => queryClient.invalidateQueries({ queryKey: ["admin-partners"] })}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                {t('common.retry', 'Повторить')}
+              </Button>
+            </CardContent>
+          </Card>
         ) : partners.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
@@ -339,19 +363,19 @@ export default function AdminPartnersPage() {
                       <div className="grid grid-cols-5 gap-2 text-sm">
                         <div className="text-center">
                           <p className="text-gray-500 text-xs">Блюд</p>
-                          <p className="font-medium">{stats.dishCount}</p>
+                          <p className="font-medium">{isDishesError ? "—" : stats.dishCount}</p>
                           <p className="text-xs text-gray-400">
                             <Image className="h-3 w-3 inline mr-1" />
-                            {stats.dishWithPhotoCount}
+                            {isDishesError ? "—" : stats.dishWithPhotoCount}
                           </p>
                         </div>
                         <div className="text-center">
                           <p className="text-gray-500 text-xs">Заказов</p>
-                          <p className="font-medium">{stats.orderCount}</p>
+                          <p className="font-medium">{isOrdersError ? "—" : stats.orderCount}</p>
                         </div>
                         <div className="text-center">
                           <p className="text-gray-500 text-xs">Готовность</p>
-                          <ReadinessBadge value={stats.readiness} />
+                          {readinessError ? <span className="text-xs text-gray-400">—</span> : <ReadinessBadge value={stats.readiness} />}
                         </div>
                         <div className="text-center">
                           <p className="text-gray-500 text-xs">План</p>
@@ -387,19 +411,19 @@ export default function AdminPartnersPage() {
                         <p className="text-xs text-gray-500">{partner.slug || "—"}</p>
                       </div>
                       <div className="text-center">
-                        <span className="font-medium">{stats.dishCount}</span>
-                        <span className="text-gray-400 text-sm ml-1">
+                        <span className="font-medium">{isDishesError ? "—" : stats.dishCount}</span>
+                        {!isDishesError && <span className="text-gray-400 text-sm ml-1">
                           (<Image className="h-3 w-3 inline" /> {stats.dishWithPhotoCount})
-                        </span>
+                        </span>}
                       </div>
                       <div className="text-center font-medium">
-                        {stats.orderCount}
+                        {isOrdersError ? "—" : stats.orderCount}
                       </div>
                       <div className="text-center text-sm text-gray-500">
-                        {formatDate(stats.lastOrderDate)}
+                        {isOrdersError ? "—" : formatDate(stats.lastOrderDate)}
                       </div>
                       <div className="text-center">
-                        <ReadinessBadge value={stats.readiness} />
+                        {readinessError ? <span className="text-xs text-gray-400">—</span> : <ReadinessBadge value={stats.readiness} />}
                       </div>
                       <div className="text-center">
                         <PlanBadge 
