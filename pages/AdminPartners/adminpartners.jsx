@@ -261,7 +261,12 @@ export default function AdminPartnersPage() {
   }
 
   const isLoading = partnersLoading || dishesLoading || ordersLoading || tablesLoading || staffLoading;
-  const readinessError = isDishesError || isTablesError || isStaffError;
+  // Show "—" only when error AND no cached data (don't hide valid stale data on background refetch failure)
+  const dishesUnavailable = isDishesError && allDishes.length === 0;
+  const ordersUnavailable = isOrdersError && allOrders.length === 0;
+  const tablesUnavailable = isTablesError && allTables.length === 0;
+  const staffUnavailable = isStaffError && allStaffLinks.length === 0;
+  const readinessUnavailable = dishesUnavailable || tablesUnavailable || staffUnavailable;
 
   // BLOCK 07 — Render UI
   return (
@@ -363,19 +368,19 @@ export default function AdminPartnersPage() {
                       <div className="grid grid-cols-5 gap-2 text-sm">
                         <div className="text-center">
                           <p className="text-gray-500 text-xs">Блюд</p>
-                          <p className="font-medium">{isDishesError ? "—" : stats.dishCount}</p>
+                          <p className="font-medium">{dishesUnavailable ? "—" : stats.dishCount}</p>
                           <p className="text-xs text-gray-400">
                             <Image className="h-3 w-3 inline mr-1" />
-                            {isDishesError ? "—" : stats.dishWithPhotoCount}
+                            {dishesUnavailable ? "—" : stats.dishWithPhotoCount}
                           </p>
                         </div>
                         <div className="text-center">
                           <p className="text-gray-500 text-xs">Заказов</p>
-                          <p className="font-medium">{isOrdersError ? "—" : stats.orderCount}</p>
+                          <p className="font-medium">{ordersUnavailable ? "—" : stats.orderCount}</p>
                         </div>
                         <div className="text-center">
                           <p className="text-gray-500 text-xs">Готовность</p>
-                          {readinessError ? <span className="text-xs text-gray-400">—</span> : <ReadinessBadge value={stats.readiness} />}
+                          {readinessUnavailable ? <span className="text-xs text-gray-400">—</span> : <ReadinessBadge value={stats.readiness} />}
                         </div>
                         <div className="text-center">
                           <p className="text-gray-500 text-xs">План</p>
@@ -411,19 +416,19 @@ export default function AdminPartnersPage() {
                         <p className="text-xs text-gray-500">{partner.slug || "—"}</p>
                       </div>
                       <div className="text-center">
-                        <span className="font-medium">{isDishesError ? "—" : stats.dishCount}</span>
-                        {!isDishesError && <span className="text-gray-400 text-sm ml-1">
+                        <span className="font-medium">{dishesUnavailable ? "—" : stats.dishCount}</span>
+                        {!dishesUnavailable && <span className="text-gray-400 text-sm ml-1">
                           (<Image className="h-3 w-3 inline" /> {stats.dishWithPhotoCount})
                         </span>}
                       </div>
                       <div className="text-center font-medium">
-                        {isOrdersError ? "—" : stats.orderCount}
+                        {ordersUnavailable ? "—" : stats.orderCount}
                       </div>
                       <div className="text-center text-sm text-gray-500">
-                        {isOrdersError ? "—" : formatDate(stats.lastOrderDate)}
+                        {ordersUnavailable ? "—" : formatDate(stats.lastOrderDate)}
                       </div>
                       <div className="text-center">
-                        {readinessError ? <span className="text-xs text-gray-400">—</span> : <ReadinessBadge value={stats.readiness} />}
+                        {readinessUnavailable ? <span className="text-xs text-gray-400">—</span> : <ReadinessBadge value={stats.readiness} />}
                       </div>
                       <div className="text-center">
                         <PlanBadge 

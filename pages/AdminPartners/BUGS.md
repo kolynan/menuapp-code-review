@@ -11,7 +11,8 @@
 ### BUG-AP-002 (P1) — Secondary query errors silently zero out statistics
 - **Source:** Codex round (S35)
 - **Problem:** Secondary queries (dishes, orders, tables, staff) fail silently. If they error out, the arrays default to `[]`, so `getPartnerStats` computes 0 for all stats. User sees fake zeros and thinks business has no revenue/dishes/etc.
-- **Fix:** Added `isError` destructuring to all 4 secondary queries (`isDishesError`, `isOrdersError`, `isTablesError`, `isStaffError`). Stats display now shows "—" instead of 0 when the corresponding query errored. Readiness badge shows "—" when any of its dependencies (dishes/tables/staff) errored.
+- **Fix:** Added `isError` destructuring to all 4 secondary queries. Stats display shows "—" instead of 0 when the corresponding query has an error AND no cached data. Uses `*Unavailable` pattern (`isError && data.length === 0`) to preserve valid stale data during background refetch failures — improved per Codex review feedback.
+- **Codex collab:** Codex IMPROVED — pointed out that bare `isError` hides valid cached stats on transient background refetch failures. Adopted `isError && data.length === 0` pattern. Both AI agree.
 - **Status:** FIXED (S35)
 
 ### BUG-AP-003 (P2) — cancelQueries/invalidateQueries without scope
@@ -75,3 +76,9 @@
 - **Problem:** Back button, ExternalLink buttons, and StatusToggle Switch lack aria-labels.
 - **Fix needed:** Add `aria-label` with i18n keys.
 - **Status:** ACTIVE
+
+### BUG-AP-013 (P3) — *Unavailable check edge case with cached empty arrays
+- **Source:** Codex collab Round 2 (S35)
+- **Problem:** `isError && data.length === 0` misclassifies valid cached empty arrays as unavailable. If a partner genuinely has 0 dishes and a background refetch errors, the UI shows "—" instead of 0. Requires raw `data === undefined` check (no destructuring defaults) to fix properly.
+- **Fix needed:** Remove `= []` destructuring defaults, use `?? []` in getPartnerStats, check `data === undefined` for unavailable state. Significant refactor.
+- **Status:** ACTIVE (accepted as known limitation — edge case is very unlikely on this admin page)
