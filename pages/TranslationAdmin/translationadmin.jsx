@@ -1059,6 +1059,7 @@ export default function TranslationAdmin() {
         setUpdateCodeProgress({ current: 3, total: 4, status: `Adding ${newKeys.length} new keys...` });
 
         let added = 0;
+        let failed = 0;
         for (let i = 0; i < newKeys.length; i++) {
           const key = newKeys[i];
           setUpdateCodeProgress({
@@ -1074,19 +1075,24 @@ export default function TranslationAdmin() {
             added++;
           } catch (err) {
             console.error(`Failed to add key ${key}:`, err);
+            failed++;
           }
 
           if (i < newKeys.length - 1) await new Promise(r => setTimeout(r, 100));
         }
 
-        // Use trackerId (captures newly created tracker's ID too)
-        const updatedTrackerData = { ...trackerData, new_keys_count: 0, scan_status: "scanned" };
+        // FIX BUG-TA-025: Only mark fully scanned if ALL keys were added successfully
+        const updatedTrackerData = {
+          ...trackerData,
+          new_keys_count: failed,
+          scan_status: failed === 0 ? "scanned" : "needs_rescan"
+        };
         if (trackerId) {
           await PageScanTracker.update(trackerId, updatedTrackerData);
           setScanTrackers(prev => prev.map(t => t.id === trackerId ? { ...t, ...updatedTrackerData } : t));
         }
 
-        toast.success(`Added ${added} new keys`, { id: 'ta1' });
+        toast.success(`Added ${added} new keys${failed > 0 ? `, ${failed} failed` : ''}`, { id: 'ta1' });
         try { await refreshTranslations(); } catch { toast.error('Live sync failed. Reload to see changes.', { id: 'ta-sync' }); }
       } else {
         toast.success('No new keys found', { id: 'ta1' });
@@ -1235,6 +1241,7 @@ export default function TranslationAdmin() {
 
     if (count === 0) {
       toast.error('No sources with code', { id: 'ta1' });
+      setIsScanning(false);
       return;
     }
 
@@ -1249,12 +1256,17 @@ export default function TranslationAdmin() {
     setScanResults({ new: newKeys, existing: existingFound, unused: unusedKeys, sourceName: `${count} sources`, isFullScan: true });
 
     setSaving(true);
-    await updateUnusedKeyLogs(foundKeysSet, existingFound);
-    setSaving(false);
+    try {
+      await updateUnusedKeyLogs(foundKeysSet, existingFound);
+    } finally {
+      setSaving(false);
+      setIsScanning(false);
+    }
 
     setShowScanResults(true);
   };
 
+  // FIX BUG-TA-026: Only remove successfully created keys from scanResults.new
   const addScannedKeys = async (keys) => {
     if (keys.length === 0) return;
 
@@ -1262,6 +1274,7 @@ export default function TranslationAdmin() {
     setAddKeysProgress({ current: 0, total: keys.length, status: 'Starting...' });
 
     let added = 0, errors = 0;
+    const addedKeys = new Set();
 
     try {
       for (let i = 0; i < keys.length; i++) {
@@ -1273,12 +1286,14 @@ export default function TranslationAdmin() {
           const created = await InterfaceTranslation.create({ key, page, translations: {}, is_active: true });
           setTranslations(prev => [...prev, created]);
           added++;
+          addedKeys.add(key);
         } catch { errors++; }
 
         if (i < keys.length - 1) await new Promise(r => setTimeout(r, 100));
       }
 
-      setScanResults(prev => ({ ...prev, new: [] }));
+      // Only remove successfully added keys; failed keys remain in the list for retry
+      setScanResults(prev => ({ ...prev, new: prev.new.filter(k => !addedKeys.has(k)) }));
       toast.success(`Added ${added} keys${errors > 0 ? `, ${errors} errors` : ''}`, { id: 'ta1' });
 
       try { await refreshTranslations(); } catch { toast.error('Live sync failed. Reload to see changes.', { id: 'ta-sync' }); }
@@ -1632,8 +1647,8 @@ export default function TranslationAdmin() {
                 <Button variant="outline" size="sm" onClick={() => setShowAddSource(true)}>
                   <Plus className="h-4 w-4 mr-1" />Add Source
                 </Button>
-                <Button variant="outline" size="sm" onClick={scanAllSources} disabled={saving}>
-                  <Search className="h-4 w-4 mr-1" />Scan All
+                <Button variant="outline" size="sm" onClick={scanAllSources} disabled={saving || isScanning}>
+                  <Search className="h-4 w-4 mr-1" />{isScanning ? 'Scanning...' : 'Scan All'}
                 </Button>
 
                 <DropdownMenu>

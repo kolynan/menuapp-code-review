@@ -145,7 +145,8 @@ export default function AdminPageHelp() {
       setLoading(false);
     }
     load();
-  }, [authLoading, isAdmin, t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps — t excluded: unstable reference causes infinite refetches
+  }, [authLoading, isAdmin]);
   
   // Filtered list
   const filteredHelps = useMemo(() => {
@@ -209,6 +210,7 @@ export default function AdminPageHelp() {
         title: formData.title.trim() || null,
         markdown: formData.markdown.trim() || null,
         isActive: formData.isActive,
+        // NOTE: client-side timestamp — Base44 doesn't expose server timestamps on update
         updatedAt: new Date().toISOString(),
       };
       

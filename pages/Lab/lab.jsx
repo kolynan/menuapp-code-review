@@ -1,10 +1,12 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FlaskConical, Utensils, Globe, CheckCircle2 } from 'lucide-react';
 
 export default function Lab() {
+  const navigate = useNavigate();
+
   const featuredLabs = [
     {
       label: 'Menu Builder (LAB)',
@@ -83,11 +85,12 @@ export default function Lab() {
                         <p className="text-sm text-slate-600">{page.description}</p>
                       </div>
                     </div>
-                    <Link to={page.path}>
-                      <Button className={`w-full ${page.color === 'indigo' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-purple-600 hover:bg-purple-700'}`}>
-                        Open Lab Page
-                      </Button>
-                    </Link>
+                    <Button
+                      className={`w-full ${page.color === 'indigo' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-purple-600 hover:bg-purple-700'}`}
+                      onClick={() => navigate(page.path)}
+                    >
+                      Open Lab Page
+                    </Button>
                   </CardContent>
                 </Card>
               );
@@ -131,11 +134,9 @@ export default function Lab() {
               <Card key={page.path} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <h3 className="font-medium text-sm text-slate-900 mb-2">{page.label}</h3>
-                  <Link to={page.path}>
-                    <Button size="sm" variant="outline" className="w-full text-xs">
-                      Open
-                    </Button>
-                  </Link>
+                  <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => navigate(page.path)}>
+                    Open
+                  </Button>
                 </CardContent>
               </Card>
             ))}
