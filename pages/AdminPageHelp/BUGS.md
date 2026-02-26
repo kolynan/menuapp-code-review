@@ -8,7 +8,7 @@
 | BUG-AH-002 | P1 | Null guard on PageHelp.create: if API returns null, a null entry was appended to state array. Added `if (created)` guard | `fdbd67a` | 260225-00 adminpagehelp RELEASE.jsx |
 | BUG-AH-003 | P2 | Removed 3 console.error calls from production code (load, save, delete handlers) | `fdbd67a` | 260225-00 adminpagehelp RELEASE.jsx |
 | BUG-AH-010 | P1 | `t` (useI18n) in useEffect dependency array caused infinite refetches — unstable reference triggers re-render loop. Removed `t` from deps | S35 Codex round | pending RELEASE |
-| BUG-AH-011 | P2 | `updatedAt` uses client-side `new Date().toISOString()` — clock skew risk. Added code comment. Base44 doesn't expose server timestamps, so this is a known platform limitation | S35 Codex round | pending RELEASE |
+| BUG-AH-011 | P2 | `updatedAt` uses client-side `new Date().toISOString()` — clock skew risk. Added code comment documenting limitation (no behavior change — Base44 has no server timestamps). Per Codex: this is documentation, not a code fix | S35 Codex round | pending RELEASE |
 
 ## Active Bugs
 
@@ -17,7 +17,7 @@
 | BUG-AH-004 | P1 | AccessDenied component has zero i18n — hardcoded English strings ("Access Denied", "You don't have permission", "Go Back") | Should add t() or useI18n() inside component |
 | BUG-AH-005 | P2 | `t` passed as prop to AdminHeader — anti-pattern. Should call useI18n() inside AdminHeader instead | Code quality |
 | BUG-AH-006 | P2 | Hardcoded fallback strings in all t() calls. Should register keys in translation file | Style concern |
-| BUG-AH-007 | P2 | Duplicate pageKey protection is client-side only — relies on server error message containing "duplicate"/"unique". Also: pageKey normalization is incomplete — trims and adds `/` prefix but doesn't lowercase or sanitize special chars, which could create near-duplicate entries | Data integrity. Expanded per Codex review |
+| BUG-AH-007 | P2 | Duplicate pageKey protection is client-side only — relies on server error message containing "duplicate"/"unique". Also: pageKey normalization is incomplete — trims and adds `/` prefix but doesn't lowercase or sanitize special chars, which could create near-duplicate entries (e.g. `/PartnerSettings` vs `/partnersettings`). Fix should: (1) `.toLowerCase()` the key, (2) strip non-route chars, (3) client-side duplicate pre-check against existing `pageHelps` array. Both Claude and Codex agree on this contract | Data integrity. Expanded per Codex review. Codex IMPROVE: add explicit normalization contract |
 | BUG-AH-008 | P3 | formatDate uses hardcoded locale 'ru-RU' — should derive from active i18n locale | Minor localization |
 | BUG-AH-009 | P3 | Icon-only Edit/Delete buttons missing aria-label | Accessibility |
 
