@@ -272,21 +272,48 @@ function unescapeCSV(str) {
   return str.replace(/\\n/g, '\n');
 }
 
-function parseCSV(csvText, languages) {
-  const lines = csvText.trim().split('\n');
-  if (lines.length < 2) return [];
+// FIX BUG-TA-028: Split CSV into logical rows respecting quoted multiline fields (RFC 4180)
+function splitCSVRows(csvText) {
+  const rows = [];
+  let current = '';
+  let inQuotes = false;
 
-  const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
+  for (let i = 0; i < csvText.length; i++) {
+    const char = csvText[i];
+
+    if (char === '"') {
+      if (inQuotes && csvText[i + 1] === '"') {
+        // Escaped quote ("") — keep both chars for parseCSVLine to process
+        current += '""';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+        current += char;
+      }
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && csvText[i + 1] === '\n') i++;
+      if (current.trim()) rows.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) rows.push(current);
+  return rows;
+}
+
+function parseCSV(csvText, languages) {
+  const rows = splitCSVRows(csvText.trim());
+  if (rows.length < 2) return [];
+
+  const headers = parseCSVLine(rows[0]).map(h => h.trim().toLowerCase());
   const langCodeMap = {};
   languages.forEach(l => { langCodeMap[l.code.toLowerCase()] = l.code; });
 
   const results = [];
 
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    const values = parseCSVLine(line);
+  for (let i = 1; i < rows.length; i++) {
+    const values = parseCSVLine(rows[i]);
     const obj = { translations: {} };
 
     headers.forEach((header, idx) => {
@@ -830,12 +857,18 @@ export default function TranslationAdmin() {
 
   // === LANGUAGE OPERATIONS ===
 
+  // FIX BUG-TA-027: Guard against duplicate language codes
   const addLanguage = async () => {
     if (!newLang.code || !newLang.name) return;
+    const normalizedCode = newLang.code.toLowerCase().trim();
+    if (languages.some(l => l.code.toLowerCase() === normalizedCode)) {
+      toast.error(`Language "${normalizedCode}" already exists`, { id: 'ta1' });
+      return;
+    }
     setSaving(true);
     try {
-      const maxOrder = Math.max(0, ...languages.map(l => l.sort_order || 0));
-      const created = await Language.create({ code: newLang.code.toLowerCase(), name: newLang.name, sort_order: maxOrder + 1, is_active: true, is_default: false });
+      const maxOrder = languages.reduce((max, l) => Math.max(max, l.sort_order || 0), 0);
+      const created = await Language.create({ code: normalizedCode, name: newLang.name.trim(), sort_order: maxOrder + 1, is_active: true, is_default: false });
       setLanguages(prev => [...prev, created]);
       setNewLang({ code: '', name: '' });
       setShowAddLang(false);
@@ -1082,10 +1115,11 @@ export default function TranslationAdmin() {
         }
 
         // FIX BUG-TA-025: Only mark fully scanned if ALL keys were added successfully
+        const remaining = newKeys.length - added;
         const updatedTrackerData = {
           ...trackerData,
-          new_keys_count: failed,
-          scan_status: failed === 0 ? "scanned" : "needs_rescan"
+          new_keys_count: remaining,
+          scan_status: remaining === 0 ? "scanned" : "needs_rescan"
         };
         if (trackerId) {
           await PageScanTracker.update(trackerId, updatedTrackerData);
@@ -1168,20 +1202,23 @@ export default function TranslationAdmin() {
     setShowScanResults(true);
   };
 
+  // FIX BUG-TA-029: Track changes in local array, batch state updates after each loop
   const updateUnusedKeyLogs = async (foundKeysSet, existingFound) => {
     const now = new Date().toISOString();
-    let logsUpdated = [...unusedKeyLogs];
+    const unusedKeys = translations.filter(t => !foundKeysSet.has(t.key));
+    let errors = 0;
 
-    try {
-      const unusedKeys = translations.filter(t => !foundKeysSet.has(t.key));
+    // Local mirror for reads within the loop (avoids stale React state between awaits)
+    let currentLogs = [...unusedKeyLogs];
 
-      for (const t of unusedKeys) {
-        const existingLog = logsUpdated.find(l => l.translation_key === t.key);
+    for (const t of unusedKeys) {
+      try {
+        const existingLog = currentLogs.find(l => l.translation_key === t.key);
 
         if (existingLog) {
           const updated = { scan_count: existingLog.scan_count + 1, last_detected_at: now };
           await UnusedKeyLog.update(existingLog.id, updated);
-          logsUpdated = logsUpdated.map(l => l.id === existingLog.id ? { ...l, ...updated } : l);
+          currentLogs = currentLogs.map(l => l.id === existingLog.id ? { ...existingLog, ...updated } : l);
         } else {
           const created = await UnusedKeyLog.create({
             translation_key: t.key,
@@ -1190,21 +1227,33 @@ export default function TranslationAdmin() {
             last_detected_at: now,
             scan_count: 1,
           });
-          logsUpdated.push(created);
+          currentLogs = [...currentLogs, created];
         }
+      } catch (e) {
+        console.error(`Failed to update unused log for ${t.key}:`, e);
+        errors++;
       }
+    }
+    // Batch update after processing all unused keys
+    setUnusedKeyLogs([...currentLogs]);
 
-      for (const key of existingFound) {
-        const existingLog = logsUpdated.find(l => l.translation_key === key);
+    for (const key of existingFound) {
+      try {
+        const existingLog = currentLogs.find(l => l.translation_key === key);
         if (existingLog) {
           await UnusedKeyLog.delete(existingLog.id);
-          logsUpdated = logsUpdated.filter(l => l.id !== existingLog.id);
+          currentLogs = currentLogs.filter(l => l.id !== existingLog.id);
         }
+      } catch (e) {
+        console.error(`Failed to delete unused log for ${key}:`, e);
+        errors++;
       }
+    }
+    // Batch update after processing all re-found keys
+    setUnusedKeyLogs([...currentLogs]);
 
-      setUnusedKeyLogs(logsUpdated);
-    } catch (e) {
-      console.error("Failed to update UnusedKeyLog:", e);
+    if (errors > 0) {
+      toast.error(`${errors} unused key log operations failed`, { id: 'ta-unused' });
     }
   };
 
@@ -1221,49 +1270,55 @@ export default function TranslationAdmin() {
     if (isScanning) return;
     setIsScanning(true);
 
-    let allCode = '';
-    let count = 0;
-
-    setScanProgress({ current: 0, total: pageSources.length, status: 'Preparing...' });
-
-    for (let i = 0; i < pageSources.length; i++) {
-      const source = pageSources[i];
-      setScanProgress({ current: i + 1, total: pageSources.length, status: `Scanning: ${source.display_name || source.page_name}` });
-
-      if (source.source_code && source.source_code !== "// Paste code here") {
-        allCode += `\n// --- ${source.page_name} ---\n${source.source_code}\n`;
-        count++;
-      }
-      await new Promise(r => setTimeout(r, 50));
-    }
-
-    setScanProgress({ current: 0, total: 0, status: '' });
-
-    if (count === 0) {
-      toast.error('No sources with code', { id: 'ta1' });
-      setIsScanning(false);
-      return;
-    }
-
-    const foundKeys = extractKeysFromCode(allCode);
-    const existingKeys = new Set(translations.map(t => t.key));
-    const foundKeysSet = new Set(foundKeys);
-
-    const newKeys = foundKeys.filter(k => !existingKeys.has(k));
-    const existingFound = foundKeys.filter(k => existingKeys.has(k));
-    const unusedKeys = translations.filter(t => !foundKeysSet.has(t.key)).map(t => t.key);
-
-    setScanResults({ new: newKeys, existing: existingFound, unused: unusedKeys, sourceName: `${count} sources`, isFullScan: true });
-
-    setSaving(true);
     try {
-      await updateUnusedKeyLogs(foundKeysSet, existingFound);
-    } finally {
-      setSaving(false);
-      setIsScanning(false);
-    }
+      let allCode = '';
+      let count = 0;
 
-    setShowScanResults(true);
+      setScanProgress({ current: 0, total: pageSources.length, status: 'Preparing...' });
+
+      for (let i = 0; i < pageSources.length; i++) {
+        const source = pageSources[i];
+        setScanProgress({ current: i + 1, total: pageSources.length, status: `Scanning: ${source.display_name || source.page_name}` });
+
+        if (source.source_code && source.source_code !== "// Paste code here") {
+          allCode += `\n// --- ${source.page_name} ---\n${source.source_code}\n`;
+          count++;
+        }
+        await new Promise(r => setTimeout(r, 50));
+      }
+
+      setScanProgress({ current: 0, total: 0, status: '' });
+
+      if (count === 0) {
+        toast.error('No sources with code', { id: 'ta1' });
+        return;
+      }
+
+      const foundKeys = extractKeysFromCode(allCode);
+      const existingKeys = new Set(translations.map(t => t.key));
+      const foundKeysSet = new Set(foundKeys);
+
+      const newKeys = foundKeys.filter(k => !existingKeys.has(k));
+      const existingFound = foundKeys.filter(k => existingKeys.has(k));
+      const unusedKeys = translations.filter(t => !foundKeysSet.has(t.key)).map(t => t.key);
+
+      setScanResults({ new: newKeys, existing: existingFound, unused: unusedKeys, sourceName: `${count} sources`, isFullScan: true });
+
+      setSaving(true);
+      try {
+        await updateUnusedKeyLogs(foundKeysSet, existingFound);
+      } finally {
+        setSaving(false);
+      }
+
+      setShowScanResults(true);
+    } catch (err) {
+      console.error("scanAllSources failed:", err);
+      toast.error('Scan failed', { id: 'ta1' });
+    } finally {
+      setIsScanning(false);
+      setScanProgress({ current: 0, total: 0, status: '' });
+    }
   };
 
   // FIX BUG-TA-026: Only remove successfully created keys from scanResults.new
