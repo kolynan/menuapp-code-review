@@ -721,6 +721,9 @@ export default function TranslationAdmin() {
   // FIX 260119: Add progress for Update Code dialog operations
   const [updateCodeProgress, setUpdateCodeProgress] = useState({ current: 0, total: 0, status: '' });
 
+  // Scanning guard
+  const [isScanning, setIsScanning] = useState(false);
+
   // FIX: Copy feedback state
   const [copied, setCopied] = useState(false);
 
@@ -1207,7 +1210,11 @@ export default function TranslationAdmin() {
     performScan(source.page_name, source.source_code, false);
   };
 
+  // FIX BUG-TA-024: Guard against re-entrant scanAllSources
   const scanAllSources = async () => {
+    if (isScanning) return;
+    setIsScanning(true);
+
     let allCode = '';
     let count = 0;
 
