@@ -859,8 +859,9 @@ export default function TranslationAdmin() {
 
   // FIX BUG-TA-027: Guard against duplicate language codes
   const addLanguage = async () => {
-    if (!newLang.code || !newLang.name) return;
-    const normalizedCode = newLang.code.toLowerCase().trim();
+    const normalizedCode = newLang.code?.toLowerCase().trim();
+    const trimmedName = newLang.name?.trim();
+    if (!normalizedCode || !trimmedName) return;
     if (languages.some(l => l.code.toLowerCase() === normalizedCode)) {
       toast.error(`Language "${normalizedCode}" already exists`, { id: 'ta1' });
       return;
@@ -868,7 +869,7 @@ export default function TranslationAdmin() {
     setSaving(true);
     try {
       const maxOrder = languages.reduce((max, l) => Math.max(max, l.sort_order || 0), 0);
-      const created = await Language.create({ code: normalizedCode, name: newLang.name.trim(), sort_order: maxOrder + 1, is_active: true, is_default: false });
+      const created = await Language.create({ code: normalizedCode, name: trimmedName, sort_order: maxOrder + 1, is_active: true, is_default: false });
       setLanguages(prev => [...prev, created]);
       setNewLang({ code: '', name: '' });
       setShowAddLang(false);

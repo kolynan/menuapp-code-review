@@ -55,6 +55,7 @@
 | BUG-TA-021 | P3 | `PREDEFINED_SOURCES` hints hardcoded English | Active |
 | BUG-TA-022 | P3 | `copyToClipboard` no fallback for older browsers | Active |
 | BUG-TA-023 | ~~P3~~ | `isAdmin` not memoized (trivial) | Codex dispute: AGREE — closed. `useState` preserves tab state across re-renders. Only lost on full reload, which is expected. |
+| BUG-TA-030 | P3 | Per-source Scan button active during Scan All — interleaving tracker/log updates | Found by Codex verification. Admin-only, single user — low risk. |
 
 ## Dispute Summary
 
@@ -72,7 +73,8 @@
 
 ## Statistics
 
-- **Total issues found:** 29 (R1: 23, R2: 6 new)
+- **Total issues found:** 30 (R1: 23, R2: 6 new, Codex verification: 1 new)
 - **Fixed:** 13 (R1: 7 P1, R2: 4 P1 + 2 P2)
-- **Active:** 12 (P2: 2, P3: 10)
+- **Active:** 13 (P2: 2, P3: 11)
 - **Closed (not bugs):** 4 (TA-014, TA-016, TA-023, TA-012-reset)
+- **Codex verification:** 6/6 APPROVED (2 new edge cases found, 1 fixed inline, 1 logged as P3)
