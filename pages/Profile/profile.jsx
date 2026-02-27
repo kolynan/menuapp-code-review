@@ -2,10 +2,11 @@
 // BLOCK 00 — IMPORTS & CONSTANTS
 // ============================================================
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useI18n } from "@/components/i18n";
+import { PartnerShell } from "@/components/PartnerShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,10 +23,10 @@ const ROLE_BADGE_CLASSES = {
 };
 
 // ============================================================
-// BLOCK 01 — MAIN COMPONENT
+// BLOCK 01 — CONTENT COMPONENT
 // ============================================================
 
-export default function Profile() {
+function ProfileContent() {
   const navigate = useNavigate();
   const { t } = useI18n();
 
@@ -36,40 +37,60 @@ export default function Profile() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | success
+  const saveTimerRef = useRef(null);
+
+  // Cleanup save timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, []);
 
   // ============================================================
   // BLOCK 02 — DATA LOADING
   // ============================================================
 
   useEffect(() => {
+    let isMounted = true;
+
     const loadUser = async () => {
       try {
         const userData = await base44.auth.me();
+        if (!isMounted) return;
         setUser(userData);
-        setFullName(userData.full_name || "");
-        setInitialFullName(userData.full_name || "");
+        setFullName((userData.full_name || "").trim());
+        setInitialFullName((userData.full_name || "").trim());
 
         // Load partner name if exists
         if (userData.partner && userData.partner !== "global_admin") {
           try {
             const partner = await base44.entities.Partner.get(userData.partner);
+            if (!isMounted) return;
             if (partner) {
               setPartnerName(partner.name);
             }
           } catch (err) {
-            console.error("Failed to load partner:", err);
+            // Partner load failure handled in P2 fix below
           }
         }
       } catch (error) {
-        console.error("Failed to load user:", error);
+        if (!isMounted) return;
         setLoadError(true);
         toast.error(t("toast.error"), { id: "mm1" });
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadUser();
+
+    return () => {
+      isMounted = false;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -90,7 +111,7 @@ export default function Profile() {
       setSaveStatus("success");
       toast.success(t("toast.saved"), { id: "mm1" });
 
-      setTimeout(() => setSaveStatus("idle"), 2000);
+      saveTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (error) {
       console.error("Failed to save:", error);
       toast.error(t("toast.error"), { id: "mm1" });
@@ -240,5 +261,17 @@ export default function Profile() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// ============================================================
+// BLOCK 07 — DEFAULT EXPORT (PartnerShell wrapper)
+// ============================================================
+
+export default function Profile() {
+  return (
+    <PartnerShell activeTab="profile">
+      <ProfileContent />
+    </PartnerShell>
   );
 }
