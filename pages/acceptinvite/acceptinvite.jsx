@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Loader2, CheckCircle, XCircle, AlertCircle, Mail, AlertTriangle, RefreshCcw } from 'lucide-react';
@@ -27,7 +27,7 @@ function mapStaffRoleToUserRole(staffRole) {
         'partner_staff': 'partner_staff',
         'kitchen': 'kitchen'
     };
-    return mapping[staffRole] || 'partner_staff';
+    return mapping[staffRole] || null;
 }
 
 // LOCKED DM-027: Roles with cabinet access
@@ -63,21 +63,22 @@ export default function AcceptInvitePage() {
     const [error, setError] = useState(null);
     const [linkData, setLinkData] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
-
-    useEffect(() => {
-        if (!token) {
-            setStatus('no_token');
-            return;
-        }
-        processInvite();
-    }, [token]);
+    const processingRef = useRef(false);
+    const timeoutRef = useRef(null);
 
     // Get redirect URL based on role (LOCKED DM-027)
     function getRedirectUrl(link) {
         if (hasCabinetAccess(link.staff_role)) {
             return '/partnerhome';  // Cabinet access - no token needed
         }
-        return `/staffordersmobile?token=${token}`;  // Staff - token access
+        return `/staffordersmobile?token=${encodeURIComponent(token)}`;
+    }
+
+    function scheduleRedirect(url, delayMs) {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => {
+            window.location.href = url;
+        }, delayMs);
     }
 
     async function processInvite() {
@@ -103,7 +104,7 @@ export default function AcceptInvitePage() {
             // BRANCH: No email required (link-only access)
             // ============================================================
             if (!link.invite_email) {
-                // P0 SEC: Д/УД БЕЗ email = ошибка (нужен email для доступа к кабинету)
+                // P0 SEC: No-email links with cabinet roles are rejected
                 if (hasCabinetAccess(link.staff_role)) {
                     setStatus('error');
                     setError(t('acceptinvite.error.email_required_for_cabinet'));
@@ -111,27 +112,12 @@ export default function AcceptInvitePage() {
                 }
 
                 setStatus('no_email_required');
-                const redirectUrl = getRedirectUrl(link);
-                setTimeout(() => {
-                    window.location.href = redirectUrl;
-                }, 1500);
+                scheduleRedirect(getRedirectUrl(link), 1500);
                 return;
             }
 
             // ============================================================
-            // BRANCH: Already accepted
-            // ============================================================
-            if (link.invite_accepted_at && link.invited_user) {
-                setStatus('already_accepted');
-                const redirectUrl = getRedirectUrl(link);
-                setTimeout(() => {
-                    window.location.href = redirectUrl;
-                }, 2000);
-                return;
-            }
-
-            // ============================================================
-            // Check auth
+            // Check auth (moved BEFORE already_accepted — SEC fix)
             // ============================================================
             setStatus('checking');
             const isAuthenticated = await base44.auth.isAuthenticated();
@@ -146,6 +132,19 @@ export default function AcceptInvitePage() {
             setCurrentUser(user);
 
             // ============================================================
+            // BRANCH: Already accepted (with user identity verification)
+            // ============================================================
+            if (link.invite_accepted_at && link.invited_user) {
+                if (link.invited_user !== user.id) {
+                    setStatus('email_mismatch');
+                    return;
+                }
+                setStatus('already_accepted');
+                scheduleRedirect(getRedirectUrl(link), 2000);
+                return;
+            }
+
+            // ============================================================
             // Verify email match
             // ============================================================
             const userEmail = (user.email || '').toLowerCase().trim();
@@ -157,19 +156,20 @@ export default function AcceptInvitePage() {
             }
 
             // ============================================================
-            // Accept invitation
+            // Validate role mapping
             // ============================================================
-            await base44.entities.StaffAccessLink.update(link.id, {
-                invited_user: user.id,
-                invite_accepted_at: new Date().toISOString()
-            });
-
-            // Set user role and partner (with retry for cabinet roles)
             const userRole = mapStaffRoleToUserRole(link.staff_role);
-            const isCabinetRole = hasCabinetAccess(link.staff_role);
+            if (!userRole) {
+                setStatus('error');
+                setError(t('acceptinvite.error.invalid_role'));
+                return;
+            }
 
+            // ============================================================
+            // Accept invitation: updateMe FIRST, then mark link accepted
+            // (prevents partial state if updateMe fails — link stays reusable)
+            // ============================================================
             try {
-                // SEC-020: Retry updateMe for reliability
                 await retryAsync(async () => {
                     await base44.auth.updateMe({
                         user_role: userRole,
@@ -177,43 +177,57 @@ export default function AcceptInvitePage() {
                     });
                 }, 2, 500);
             } catch (updateErr) {
-                console.error('Failed to update user role:', updateErr);
-
-                // SEC-020: For cabinet roles, updateMe failure is critical
-                if (isCabinetRole) {
-                    setStatus('error');
-                    setError(t('acceptinvite.error.cabinet_setup_failed'));
-                    return;  // Do NOT redirect
-                }
-                // For staff roles, continue with token access as fallback
+                setStatus('error');
+                setError(t('acceptinvite.error.cabinet_setup_failed'));
+                return;
             }
+
+            await base44.entities.StaffAccessLink.update(link.id, {
+                invited_user: user.id,
+                invite_accepted_at: new Date().toISOString()
+            });
 
             // ============================================================
             // Success - redirect
             // ============================================================
             setStatus('success');
-            const redirectUrl = getRedirectUrl(link);
-
-            setTimeout(() => {
-                window.location.href = redirectUrl;
-            }, 2000);
+            scheduleRedirect(getRedirectUrl(link), 2000);
 
         } catch (err) {
-            console.error('Accept invite error:', err);
             if (isRateLimitError(err)) {
                 setStatus('rate_limit');
                 return;
             }
             setStatus('error');
-            setError(err.message || t('acceptinvite.error.generic'));
+            setError(t('acceptinvite.error.generic'));
         }
+    }
+
+    useEffect(() => {
+        if (!token) {
+            setStatus('no_token');
+            return;
+        }
+        if (processingRef.current) return;
+        processingRef.current = true;
+        processInvite().finally(() => { processingRef.current = false; });
+
+        return () => {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        };
+    }, [token]);
+
+    function handleRetry() {
+        if (processingRef.current) return;
+        processingRef.current = true;
+        setStatus('loading');
+        processInvite().finally(() => { processingRef.current = false; });
     }
 
     function handleLogoutAndRetry() {
         base44.auth.logout();
-        // After logout, redirect back to this page
         setTimeout(() => {
-            window.location.href = window.location.href;
+            window.location.reload();
         }, 500);
     }
 
@@ -335,7 +349,7 @@ export default function AcceptInvitePage() {
                                 {t('acceptinvite.rate_limit.message')}
                             </p>
                             <Button
-                                onClick={() => { setStatus('loading'); setTimeout(processInvite, 100); }}
+                                onClick={handleRetry}
                                 className="w-full bg-amber-600 hover:bg-amber-700"
                             >
                                 <RefreshCcw className="w-4 h-4 mr-2" />
