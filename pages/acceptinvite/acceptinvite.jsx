@@ -134,8 +134,8 @@ export default function AcceptInvitePage() {
             // ============================================================
             // BRANCH: Already accepted (with user identity verification)
             // ============================================================
-            if (link.invite_accepted_at && link.invited_user) {
-                if (link.invited_user !== user.id) {
+            if (link.invite_accepted_at) {
+                if (link.invited_user && link.invited_user !== user.id) {
                     setStatus('email_mismatch');
                     return;
                 }
@@ -182,10 +182,15 @@ export default function AcceptInvitePage() {
                 return;
             }
 
-            await base44.entities.StaffAccessLink.update(link.id, {
-                invited_user: user.id,
-                invite_accepted_at: new Date().toISOString()
-            });
+            try {
+                await base44.entities.StaffAccessLink.update(link.id, {
+                    invited_user: user.id,
+                    invite_accepted_at: new Date().toISOString()
+                });
+            } catch (linkUpdateErr) {
+                // updateMe already succeeded — user is onboarded.
+                // Link stays re-usable but user can access their page.
+            }
 
             // ============================================================
             // Success - redirect
@@ -219,6 +224,7 @@ export default function AcceptInvitePage() {
 
     function handleRetry() {
         if (processingRef.current) return;
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
         processingRef.current = true;
         setStatus('loading');
         processInvite().finally(() => { processingRef.current = false; });
