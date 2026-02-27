@@ -3,6 +3,7 @@ name: code-fixer
 description: Phase 2 — Fix confirmed bugs from code-reviewer analysis. Read+Write. Commits each fix separately. Use after code-reviewer has identified issues.
 tools: Read, Edit, Write, Bash, Glob, Grep
 model: opus
+isolation: worktree
 ---
 
 # Code Fixer — MenuApp (Phase 2)

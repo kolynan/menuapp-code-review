@@ -3,6 +3,7 @@ name: code-reviewer
 description: Phase 1 — Analyze code, find bugs, propose solutions. Read-only. Delegates to correctness-reviewer and style-reviewer, then compares with Codex. Use for initial code analysis before fixes.
 tools: Read, Glob, Grep, Bash
 model: opus
+isolation: worktree
 ---
 
 # Code Reviewer — MenuApp (Phase 1)
