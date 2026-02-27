@@ -14,6 +14,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Loader2, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
+const BACK_ROUTE = "/partnerhome";
+const GLOBAL_ADMIN_PARTNER = "global_admin";
+
 const ROLE_BADGE_CLASSES = {
   admin: "bg-red-100 text-red-800",
   partner_owner: "bg-purple-100 text-purple-800",
@@ -35,7 +38,8 @@ function ProfileContent() {
   const [fullName, setFullName] = useState("");
   const [initialFullName, setInitialFullName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [isLoadError, setIsLoadError] = useState(false);
+  const [isPartnerLoadFailed, setIsPartnerLoadFailed] = useState(false);
   const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | success
   const saveTimerRef = useRef(null);
 
@@ -64,7 +68,7 @@ function ProfileContent() {
         setInitialFullName((userData.full_name || "").trim());
 
         // Load partner name if exists
-        if (userData.partner && userData.partner !== "global_admin") {
+        if (userData.partner && userData.partner !== GLOBAL_ADMIN_PARTNER) {
           try {
             const partner = await base44.entities.Partner.get(userData.partner);
             if (!isMounted) return;
@@ -72,12 +76,12 @@ function ProfileContent() {
               setPartnerName(partner.name);
             }
           } catch (err) {
-            // Partner load failure handled in P2 fix below
+            if (isMounted) setIsPartnerLoadFailed(true);
           }
         }
       } catch (error) {
         if (!isMounted) return;
-        setLoadError(true);
+        setIsLoadError(true);
         toast.error(t("toast.error"), { id: "mm1" });
       } finally {
         if (isMounted) {
@@ -113,7 +117,6 @@ function ProfileContent() {
 
       saveTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (error) {
-      console.error("Failed to save:", error);
       toast.error(t("toast.error"), { id: "mm1" });
       setSaveStatus("idle");
     }
@@ -143,13 +146,13 @@ function ProfileContent() {
     );
   }
 
-  if (loadError) {
+  if (isLoadError) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-gray-500">
           <AlertCircle className="w-8 h-8 text-red-400" />
           <p className="text-sm">{t("profile.load_error")}</p>
-          <Button variant="outline" size="sm" onClick={() => navigate("/partnerhome")}>
+          <Button variant="outline" size="sm" onClick={() => navigate(BACK_ROUTE)}>
             {t("common.back")}
           </Button>
         </div>
@@ -185,7 +188,8 @@ function ProfileContent() {
   // BLOCK 06 — RENDER
   // ============================================================
 
-  const restaurantDisplay = partnerName || t("profile.no_restaurant");
+  const restaurantDisplay = partnerName
+    || (isPartnerLoadFailed ? t("profile.restaurant_load_error") : t("profile.no_restaurant"));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -194,7 +198,7 @@ function ProfileContent() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate("/partnerhome")}
+          onClick={() => navigate(BACK_ROUTE)}
           className="flex items-center gap-1 -ml-2"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -211,7 +215,7 @@ function ProfileContent() {
           <CardContent className="space-y-4">
             {/* Full Name - editable */}
             <div className="space-y-2">
-              <Label htmlFor="fullName">{t("profile.fullName")}</Label>
+              <Label htmlFor="fullName">{t("profile.full_name")}</Label>
               <Input
                 id="fullName"
                 value={fullName}
