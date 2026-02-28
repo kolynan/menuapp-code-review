@@ -176,7 +176,7 @@ function PartnerLoyaltyContent() {
                   max="100"
                   value={formData.loyalty_order_percent}
                   onChange={(e) => setFormData(prev => ({ ...prev, loyalty_order_percent: Number(e.target.value) }))}
-                  className="w-32"
+                  className="w-32 min-h-[44px]"
                 />
                 <span className="text-slate-500">%</span>
               </div>
@@ -204,7 +204,7 @@ function PartnerLoyaltyContent() {
                 min="0"
                 value={formData.loyalty_review_points}
                 onChange={(e) => setFormData(prev => ({ ...prev, loyalty_review_points: Number(e.target.value) }))}
-                className="w-32"
+                className="w-32 min-h-[44px]"
               />
             </div>
           )}
@@ -227,7 +227,7 @@ function PartnerLoyaltyContent() {
                 step="0.1"
                 value={formData.loyalty_redeem_rate}
                 onChange={(e) => setFormData(prev => ({ ...prev, loyalty_redeem_rate: Number(e.target.value) }))}
-                className="w-32"
+                className="w-32 min-h-[44px]"
               />
               <span className="text-slate-500">₸</span>
             </div>
@@ -244,7 +244,7 @@ function PartnerLoyaltyContent() {
                 max="100"
                 value={formData.loyalty_max_redeem_percent}
                 onChange={(e) => setFormData(prev => ({ ...prev, loyalty_max_redeem_percent: Number(e.target.value) }))}
-                className="w-32"
+                className="w-32 min-h-[44px]"
               />
               <span className="text-slate-500">%</span>
             </div>
@@ -268,7 +268,7 @@ function PartnerLoyaltyContent() {
                 min="1"
                 value={formData.loyalty_expiry_days}
                 onChange={(e) => setFormData(prev => ({ ...prev, loyalty_expiry_days: Number(e.target.value) }))}
-                className="w-32"
+                className="w-32 min-h-[44px]"
               />
               <span className="text-slate-500">{t("loyalty.expiry.days_suffix")}</span>
             </div>
@@ -306,7 +306,7 @@ function PartnerLoyaltyContent() {
                     max="100"
                     value={formData.discount_percent}
                     onChange={(e) => setFormData(prev => ({ ...prev, discount_percent: Number(e.target.value) }))}
-                    className="w-32"
+                    className="w-32 min-h-[44px]"
                   />
                   <span className="text-slate-500">%</span>
                 </div>
@@ -361,8 +361,8 @@ function PartnerLoyaltyContent() {
         </CardContent>
       </Card>
 
-      {/* Save button — sticky at bottom for mobile */}
-      <div className="sticky bottom-0 z-10 bg-white border-t border-slate-200 py-3">
+      {/* Save button — sticky at bottom for mobile, visual active state when changes exist */}
+      <div className={`sticky bottom-0 z-10 border-t px-4 py-3 ${hasChanges ? "bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.1)]" : "bg-white/80 border-slate-200"}`}>
         <Button
           onClick={handleSave}
           disabled={!hasChanges || saveStatus === "saving"}

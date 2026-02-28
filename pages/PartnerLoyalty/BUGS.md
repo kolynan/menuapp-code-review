@@ -1,8 +1,16 @@
 # PartnerLoyalty — Bug Tracker
 
-**Last updated:** 2026-02-28
+**Last updated:** 2026-03-01
 
 ---
+
+## Fixed (in RELEASE 260301-00)
+
+| ID | Priority | Description | Commit |
+|----|----------|-------------|--------|
+| BUG-PL-011 | P2 | Sticky save bar lacks visual "active" state — no shadow/color when unsaved changes exist | Phase1v2 fix |
+| BUG-PL-012 | P2 | Sticky save bar missing horizontal padding — content touches screen edges on mobile | Phase1v2 fix |
+| BUG-PL-013 | P2 | Input fields below 44px touch target — 6 number inputs at default 40px height | Phase1v2 fix |
 
 ## Fixed (in RELEASE 260228-00)
 
