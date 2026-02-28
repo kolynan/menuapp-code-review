@@ -33,6 +33,14 @@ function ProfileContent() {
   const navigate = useNavigate();
   const { t } = useI18n();
 
+  // Smart fallback: show human-readable text instead of raw i18n key
+  const tr = (key) => {
+    const val = t(key);
+    if (val !== key) return val;
+    const last = key.split('.').pop();
+    return last.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
   const [user, setUser] = useState(null);
   const [partnerName, setPartnerName] = useState(null);
   const [fullName, setFullName] = useState("");
@@ -82,7 +90,7 @@ function ProfileContent() {
       } catch (error) {
         if (!isMounted) return;
         setIsLoadError(true);
-        toast.error(t("toast.error"), { id: "mm1" });
+        toast.error(tr("toast.error"), { id: "mm1" });
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -113,18 +121,18 @@ function ProfileContent() {
       await base44.auth.updateMe({ full_name: fullName.trim() });
       setInitialFullName(fullName.trim());
       setSaveStatus("success");
-      toast.success(t("toast.saved"), { id: "mm1" });
+      toast.success(tr("toast.saved"), { id: "mm1" });
 
       saveTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (error) {
-      toast.error(t("toast.error"), { id: "mm1" });
+      toast.error(tr("toast.error"), { id: "mm1" });
       setSaveStatus("idle");
     }
   };
 
   const getRoleLabel = (userRole) => {
-    if (!userRole) return t("profile.role.unknown");
-    return t(`profile.role.${userRole}`);
+    if (!userRole) return tr("profile.role.unknown");
+    return tr(`profile.role.${userRole}`);
   };
 
   const getRoleBadgeClass = (userRole) => {
@@ -140,7 +148,7 @@ function ProfileContent() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="flex items-center gap-2 text-gray-500">
           <Loader2 className="w-5 h-5 animate-spin" />
-          <span>{t("common.loading")}</span>
+          <span>{tr("common.loading")}</span>
         </div>
       </div>
     );
@@ -151,9 +159,9 @@ function ProfileContent() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-gray-500">
           <AlertCircle className="w-8 h-8 text-red-400" />
-          <p className="text-sm">{t("profile.load_error")}</p>
+          <p className="text-sm">{tr("profile.load_error")}</p>
           <Button variant="outline" size="sm" onClick={() => navigate(BACK_ROUTE)}>
-            {t("common.back")}
+            {tr("common.back")}
           </Button>
         </div>
       </div>
@@ -169,7 +177,7 @@ function ProfileContent() {
       return (
         <>
           <Loader2 className="w-4 h-4 animate-spin mr-2" />
-          {t("common.saving")}
+          {tr("common.saving")}
         </>
       );
     }
@@ -177,11 +185,11 @@ function ProfileContent() {
       return (
         <>
           <Check className="w-4 h-4 mr-2" />
-          {t("common.saved")}
+          {tr("common.saved")}
         </>
       );
     }
-    return t("common.save");
+    return tr("common.save");
   };
 
   // ============================================================
@@ -189,33 +197,33 @@ function ProfileContent() {
   // ============================================================
 
   const restaurantDisplay = partnerName
-    || (isPartnerLoadFailed ? t("profile.restaurant_load_error") : t("profile.no_restaurant"));
+    || (isPartnerLoadFailed ? tr("profile.restaurant_load_error") : tr("profile.no_restaurant"));
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b px-4 py-3">
+      <div className="bg-white border-b px-4 py-3 shrink-0">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => navigate(BACK_ROUTE)}
-          className="flex items-center gap-1 -ml-2"
+          className="flex items-center gap-1 -ml-2 min-h-[44px]"
         >
           <ArrowLeft className="w-4 h-4" />
-          {t("common.back")}
+          {tr("common.back")}
         </Button>
       </div>
 
       {/* Content */}
-      <div className="p-4 max-w-lg mx-auto">
+      <div className="flex-1 p-4 max-w-lg mx-auto w-full">
         <Card>
           <CardHeader>
-            <CardTitle>{t("profile.title")}</CardTitle>
+            <CardTitle>{tr("profile.title")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Full Name - editable */}
             <div className="space-y-2">
-              <Label htmlFor="fullName">{t("profile.full_name")}</Label>
+              <Label htmlFor="fullName">{tr("profile.full_name")}</Label>
               <Input
                 id="fullName"
                 value={fullName}
@@ -226,7 +234,7 @@ function ProfileContent() {
 
             {/* Email - readonly */}
             <div className="space-y-2">
-              <Label htmlFor="email">{t("profile.email")}</Label>
+              <Label htmlFor="email">{tr("profile.email")}</Label>
               <Input
                 id="email"
                 value={user?.email || ""}
@@ -237,7 +245,7 @@ function ProfileContent() {
 
             {/* Role - badge */}
             <div className="space-y-2">
-              <Label>{t("profile.role")}</Label>
+              <Label>{tr("profile.role")}</Label>
               <div>
                 <span
                   className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeClass(user?.user_role)}`}
@@ -249,20 +257,25 @@ function ProfileContent() {
 
             {/* Restaurant - text */}
             <div className="space-y-2">
-              <Label>{t("profile.restaurant")}</Label>
+              <Label>{tr("profile.restaurant")}</Label>
               <p className="text-sm text-gray-700">{restaurantDisplay}</p>
             </div>
 
-            {/* Save Button */}
-            <Button
-              onClick={handleSave}
-              disabled={!canSave || saveStatus !== "idle"}
-              className="w-full"
-            >
-              {getSaveButtonContent()}
-            </Button>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Sticky Save Footer */}
+      <div className="sticky bottom-0 bg-white border-t p-4 shadow-[0_-2px_8px_rgba(0,0,0,0.08)] shrink-0">
+        <div className="max-w-lg mx-auto">
+          <Button
+            onClick={handleSave}
+            disabled={!canSave || saveStatus !== "idle"}
+            className="w-full min-h-[44px]"
+          >
+            {getSaveButtonContent()}
+          </Button>
+        </div>
       </div>
     </div>
   );
