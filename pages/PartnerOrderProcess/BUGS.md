@@ -1,6 +1,14 @@
 # PartnerOrderProcess — Bug Tracker
 
-**Last updated:** 2026-02-28
+**Last updated:** 2026-03-01
+
+---
+
+## Fixed (in RELEASE 260228-01)
+
+| ID | Priority | Description | Commit |
+|----|----------|-------------|--------|
+| BUG-OP-016 | P2 | Mobile reorder up/down buttons only 24px tall (h-6), below 44px minimum. Moved to overflow menu with min-h-[44px] items. Codex confirmed fix. | Phase1v2 CC+Codex |
 
 ---
 

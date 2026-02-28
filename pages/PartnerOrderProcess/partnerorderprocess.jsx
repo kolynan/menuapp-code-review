@@ -258,34 +258,12 @@ function StageRow({
         {index + 1}
       </div>
 
-      {/* Move buttons / Grip — 48px wide reorder area */}
-      <div className="flex items-center w-12 justify-center">
+      {/* Grip — desktop only drag handle */}
+      <div className="hidden sm:flex items-center w-12 justify-center">
         {middle ? (
-          <>
-            {/* Mobile: up/down buttons — 48x24 each, stacked to 48x48 */}
-            <div className="flex flex-col sm:hidden">
-              <button
-                onClick={() => canMoveUp && !moveBusy && onMoveUp(stage)}
-                disabled={!canMoveUp || moveBusy}
-                className={`flex items-center justify-center h-6 w-12 ${canMoveUp && !moveBusy ? "text-slate-500 hover:text-slate-700 active:bg-slate-100" : "text-slate-200 cursor-not-allowed"}`}
-                aria-label={t("orderprocess.aria.move_up")}
-              >
-                <ChevronUp className="h-5 w-5" />
-              </button>
-              <button
-                onClick={() => canMoveDown && !moveBusy && onMoveDown(stage)}
-                disabled={!canMoveDown || moveBusy}
-                className={`flex items-center justify-center h-6 w-12 ${canMoveDown && !moveBusy ? "text-slate-500 hover:text-slate-700 active:bg-slate-100" : "text-slate-200 cursor-not-allowed"}`}
-                aria-label={t("orderprocess.aria.move_down")}
-              >
-                <ChevronDown className="h-5 w-5" />
-              </button>
-            </div>
-            {/* Desktop: grip */}
-            <div className={`hidden sm:flex ${moveBusy ? "cursor-not-allowed text-slate-200" : "cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600"}`}>
-              <GripVertical className="h-5 w-5" />
-            </div>
-          </>
+          <div className={`${moveBusy ? "cursor-not-allowed text-slate-200" : "cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600"}`}>
+            <GripVertical className="h-5 w-5" />
+          </div>
         ) : (
           <div className="w-5 h-5" />
         )}
@@ -360,7 +338,7 @@ function StageRow({
             >
               <Trash2 className="h-4 w-4" />
             </Button>
-            {/* Mobile: overflow menu for secondary actions */}
+            {/* Mobile: overflow menu with move + delete (all 44px+ touch targets) */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -374,7 +352,23 @@ function StageRow({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
-                  className="text-red-600 focus:text-red-600"
+                  className="min-h-[44px]"
+                  disabled={!canMoveUp || moveBusy}
+                  onClick={() => canMoveUp && !moveBusy && onMoveUp(stage)}
+                >
+                  <ChevronUp className="h-4 w-4 mr-2" />
+                  {t("orderprocess.action.move_up")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="min-h-[44px]"
+                  disabled={!canMoveDown || moveBusy}
+                  onClick={() => canMoveDown && !moveBusy && onMoveDown(stage)}
+                >
+                  <ChevronDown className="h-4 w-4 mr-2" />
+                  {t("orderprocess.action.move_down")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="min-h-[44px] text-red-600 focus:text-red-600"
                   onClick={() => onDelete(stage)}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
