@@ -31,14 +31,17 @@ export default function ClientMessagesPage() {
     queryKey: ["customerAccounts", customerEmail],
     queryFn: () => base44.entities.LoyaltyAccount.filter({ email: customerEmail }),
     enabled: !!customerEmail,
+    onError: () => {
+      toast.error(t('clientmessages.error_accounts', 'Ошибка загрузки аккаунтов'));
+    },
   });
 
   // Load messages for all accounts
   const { data: messages, isLoading: loadingMessages, error: messagesError, refetch: refetchMessages } = useQuery({
-    queryKey: ["customerMessages", customerEmail, accounts?.map(a => a.id)],
+    queryKey: ["customerMessages", customerEmail],
     queryFn: async () => {
       if (!accounts || accounts.length === 0) return [];
-
+      
       const accountIds = accounts.map(a => a.id);
       const allMessages = await Promise.all(
         accountIds.map(id => base44.entities.ClientMessage.filter({ account: id }))
@@ -47,32 +50,27 @@ export default function ClientMessagesPage() {
       return allMessages.flat();
     },
     enabled: !!customerEmail && !!accounts && accounts.length > 0,
+    onError: () => {
+      toast.error(t('clientmessages.error_loading', 'Ошибка загрузки сообщений'));
+    },
   });
-
-  const partnerIds = useMemo(() => {
-    if (!messages || messages.length === 0) return [];
-    return [...new Set(messages.map(m => m.partner))];
-  }, [messages]);
 
   // Load partners for messages
   const { data: partners, error: partnersError, refetch: refetchPartners } = useQuery({
-    queryKey: ["messagePartners", partnerIds],
+    queryKey: ["messagePartners", messages?.map(m => m.partner)],
     queryFn: async () => {
-      if (partnerIds.length === 0) return [];
+      if (!messages || messages.length === 0) return [];
+      const partnerIds = [...new Set(messages.map(m => m.partner))];
       const results = await Promise.all(
         partnerIds.map(id => base44.entities.Partner.get(id).catch(() => null))
       );
       return results.filter(Boolean);
     },
-    enabled: partnerIds.length > 0,
+    enabled: !!messages && messages.length > 0,
+    onError: () => {
+      toast.error(t('clientmessages.error_partners', 'Ошибка загрузки партнеров'));
+    },
   });
-
-  // Show error toasts for query failures
-  useEffect(() => {
-    if (accountsError) toast.error(t('clientmessages.error_accounts', 'Ошибка загрузки аккаунтов'));
-    if (messagesError) toast.error(t('clientmessages.error_loading', 'Ошибка загрузки сообщений'));
-    if (partnersError) toast.error(t('clientmessages.error_partners', 'Ошибка загрузки партнеров'));
-  }, [accountsError, messagesError, partnersError, t]);
 
   // Mark message as read mutation
   const markReadMutation = useMutation({
@@ -165,8 +163,7 @@ export default function ClientMessagesPage() {
         <div className="h-14 max-w-2xl mx-auto px-4 flex items-center gap-3">
           <button
             onClick={() => navigate("/clientaccount")}
-            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-slate-100 rounded transition-colors"
-            aria-label={t('common.back')}
+            className="p-2 hover:bg-slate-100 rounded transition-colors"
           >
             <ArrowLeft className="h-5 w-5 text-slate-600" />
           </button>
@@ -178,7 +175,7 @@ export default function ClientMessagesPage() {
 
       {/* Content */}
       <main className="max-w-2xl mx-auto px-4 py-6">
-        {sortedMessages.length === 0 ? (
+        {!sortedMessages || sortedMessages.length === 0 ? (
           <Card className="mt-12">
             <CardContent className="py-12 text-center">
               <Mail className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -195,27 +192,19 @@ export default function ClientMessagesPage() {
               return (
                 <Card
                   key={message.id}
-                  role="button"
-                  tabIndex={0}
                   className={`cursor-pointer transition-all ${
-                    isUnread
-                      ? "shadow-sm hover:shadow-md"
+                    isUnread 
+                      ? "shadow-sm hover:shadow-md" 
                       : "shadow-sm hover:shadow-md opacity-75"
                   }`}
                   onClick={() => handleMessageClick(message)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      handleMessageClick(message);
-                    }
-                  }}
                 >
                   <CardContent className="p-4">
                     {/* Header */}
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2 flex-1">
                         {isUnread && (
-                          <Circle className="w-2 h-2 fill-blue-500 text-blue-500 flex-shrink-0" aria-label={t('clientmessages.unread', 'Непрочитано')} />
+                          <Circle className="w-2 h-2 fill-blue-500 text-blue-500 flex-shrink-0" />
                         )}
                         <span className={`text-sm font-medium ${isUnread ? "text-slate-900" : "text-slate-500"}`}>
                           {partner?.name || t('clientmessages.unknown_partner', '...')}

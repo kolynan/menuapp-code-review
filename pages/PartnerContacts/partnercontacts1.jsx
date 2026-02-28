@@ -134,7 +134,7 @@ class PageErrorBoundaryInner extends React.Component {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-slate-600">{t('partnercontacts.error.instruction','Откройте DevTools → Console и пришлите верхнюю ошибку.')}</p>
-            <Button variant="outline" className="min-h-[44px]" onClick={() => window.location.reload()}>
+            <Button variant="outline" onClick={() => window.location.reload()}>
               {t('common.reload','Перезагрузить')}
             </Button>
             <p className="text-xs text-slate-500 break-words">{normStr(this.state.error?.message || this.state.error)}</p>
@@ -146,14 +146,7 @@ class PageErrorBoundaryInner extends React.Component {
 }
 
 function PageErrorBoundary({ children }) {
-  const { t: _t } = useI18n();
-  const t = (key, fallback) => {
-    const val = typeof _t === "function" ? _t(key) : "";
-    if (!val || typeof val !== "string") return fallback;
-    const norm = val.trim();
-    if (norm === key || norm.startsWith(key + ":")) return fallback;
-    return norm;
-  };
+  const { t } = useI18n();
   return <PageErrorBoundaryInner t={t}>{children}</PageErrorBoundaryInner>;
 }
 
@@ -162,14 +155,7 @@ function PageErrorBoundary({ children }) {
 // ================================
 export default function PartnerContacts1() {
   const queryClient = useQueryClient();
-  const { t: _t } = useI18n();
-  const t = (key, fallback) => {
-    const val = typeof _t === "function" ? _t(key) : "";
-    if (!val || typeof val !== "string") return fallback;
-    const norm = val.trim();
-    if (norm === key || norm.startsWith(key + ":")) return fallback;
-    return norm;
-  };
+  const { t } = useI18n();
 
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState("icons");
@@ -385,7 +371,7 @@ export default function PartnerContacts1() {
               <span className="text-sm font-medium text-yellow-800">{t('partnercontacts.lab_version', 'LAB VERSION — Partner Contacts')}</span>
             </div>
             <Link to="/lab">
-              <Button size="sm" variant="outline" className="min-h-[44px]">{t('common.back_to_lab', 'Back to Lab hub')}</Button>
+              <Button size="sm" variant="outline">{t('common.back_to_lab', 'Back to Lab hub')}</Button>
             </Link>
           </div>
         </div>
@@ -408,10 +394,10 @@ export default function PartnerContacts1() {
             </div>
             <div className="flex gap-2">
               <Link to="/menumanage1">
-                <Button size="sm" variant="outline" className="min-h-[44px]">{t('partnercontacts.header.settings','Settings / Tables')}</Button>
+                <Button size="sm" variant="outline">{t('partnercontacts.header.settings','Settings / Tables')}</Button>
               </Link>
               <Link to="/lab">
-                <Button size="sm" variant="outline" className="min-h-[44px]">
+                <Button size="sm" variant="outline">
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   {t('common.back_to_lab','Back to Lab hub')}
                 </Button>
@@ -446,7 +432,7 @@ export default function PartnerContacts1() {
                     setViewMode("icons");
                     setViewModeDirty(true);
                   }}
-                  className={`flex-1 px-4 min-h-[44px] text-sm font-medium rounded-md transition-all ${
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
                     viewMode === "icons" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
@@ -457,7 +443,7 @@ export default function PartnerContacts1() {
                     setViewMode("full");
                     setViewModeDirty(true);
                   }}
-                  className={`flex-1 px-4 min-h-[44px] text-sm font-medium rounded-md transition-all ${
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
                     viewMode === "full" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
@@ -470,7 +456,7 @@ export default function PartnerContacts1() {
                   <Button
                     onClick={saveViewMode}
                     disabled={updateViewModeMutation.isPending || createPartnerContactsMutation.isPending}
-                    className="bg-indigo-600 hover:bg-indigo-700 min-h-[44px]"
+                    className="bg-indigo-600 hover:bg-indigo-700"
                   >
                     {(updateViewModeMutation.isPending || createPartnerContactsMutation.isPending) && (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -480,7 +466,6 @@ export default function PartnerContacts1() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="min-h-[44px]"
                     onClick={() => {
                       setViewMode(partnerContactsRecord?.view_mode || "icons");
                       setViewModeDirty(false);
@@ -509,9 +494,9 @@ export default function PartnerContacts1() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder={t('partnercontacts.links.search_placeholder','Поиск по названию/url...')}
-                    className="w-56 min-h-[44px]"
+                    className="w-56"
                   />
-                  <Button onClick={openCreateLink} className="bg-indigo-600 hover:bg-indigo-700 gap-2 min-h-[44px]">
+                  <Button onClick={openCreateLink} className="bg-indigo-600 hover:bg-indigo-700 gap-2">
                     <Plus className="w-4 h-4" />
                     {t('partnercontacts.links.add','Добавить ссылку')}
                   </Button>
@@ -554,14 +539,13 @@ export default function PartnerContacts1() {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Button size="sm" variant="ghost" className="min-h-[44px] min-w-[44px]" onClick={() => openEditLink(link)} title={t('common.edit','Изменить')}>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button size="sm" variant="ghost" onClick={() => openEditLink(link)} title={t('common.edit','Изменить')}>
                             <Edit2 className="w-4 h-4" />
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="min-h-[44px] min-w-[44px]"
                             onClick={() =>
                               toggleLinkActiveMutation.mutate({
                                 id: link.id,
@@ -582,7 +566,7 @@ export default function PartnerContacts1() {
                             variant="ghost"
                             onClick={() => setDeleteConfirmId(link.id)}
                             title={t('common.delete','Удалить')}
-                            className="min-h-[44px] min-w-[44px] text-red-600"
+                            className="text-red-600"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -713,12 +697,12 @@ export default function PartnerContacts1() {
                 <div className="text-xs text-slate-500">{t('partnercontacts.dialog.sort_hint','Меньше число = левее в списке')}</div>
               </div>
 
-              <label className="flex items-center gap-2 text-sm text-slate-700 min-h-[44px] cursor-pointer">
+              <label className="flex items-center gap-2 text-sm text-slate-700">
                 <input
                   type="checkbox"
                   checked={linkForm.is_active !== false}
                   onChange={(e) => setLinkForm({ ...linkForm, is_active: e.target.checked })}
-                  className="w-5 h-5"
+                  className="w-4 h-4"
                 />
                 {t('partnercontacts.dialog.active_label','Активна (показывать гостям)')}
               </label>
