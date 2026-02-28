@@ -38,10 +38,10 @@ export default function ClientMessagesPage() {
 
   // Load messages for all accounts
   const { data: messages, isLoading: loadingMessages, error: messagesError, refetch: refetchMessages } = useQuery({
-    queryKey: ["customerMessages", customerEmail],
+    queryKey: ["customerMessages", customerEmail, accounts?.map(a => a.id)],
     queryFn: async () => {
       if (!accounts || accounts.length === 0) return [];
-      
+
       const accountIds = accounts.map(a => a.id);
       const allMessages = await Promise.all(
         accountIds.map(id => base44.entities.ClientMessage.filter({ account: id }))
