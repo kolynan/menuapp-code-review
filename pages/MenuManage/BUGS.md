@@ -1,7 +1,7 @@
 # MenuManage Bug Tracker
 
 **Page:** `pages/MenuManage/menumanage.jsx`
-**Last updated:** 2026-02-24
+**Last updated:** 2026-02-28
 
 ---
 
@@ -29,6 +29,12 @@
 - **Functions:** reorderCats, moveDish
 - **Fix:** Added snapshot save before optimistic update; restore on error in catch block
 - **Commit:** `fbe924a`
+- **Status:** FIXED
+
+### BUG-MM-008 (P1) -- Touch targets too small for mobile
+- **Lines:** ~890-960 (category buttons), ~1000-1060 (dish buttons), ~1100-1170 (header/toolbar)
+- **Fix:** All icon buttons increased to 44x44px minimum, reorder arrows to 48x48px, gaps to 8px
+- **RELEASE:** 260228-00
 - **Status:** FIXED
 
 ---
