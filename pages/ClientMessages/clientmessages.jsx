@@ -55,18 +55,22 @@ export default function ClientMessagesPage() {
     },
   });
 
+  const partnerIds = useMemo(() => {
+    if (!messages || messages.length === 0) return [];
+    return [...new Set(messages.map(m => m.partner))];
+  }, [messages]);
+
   // Load partners for messages
   const { data: partners, error: partnersError, refetch: refetchPartners } = useQuery({
-    queryKey: ["messagePartners", messages?.map(m => m.partner)],
+    queryKey: ["messagePartners", partnerIds],
     queryFn: async () => {
-      if (!messages || messages.length === 0) return [];
-      const partnerIds = [...new Set(messages.map(m => m.partner))];
+      if (partnerIds.length === 0) return [];
       const results = await Promise.all(
         partnerIds.map(id => base44.entities.Partner.get(id).catch(() => null))
       );
       return results.filter(Boolean);
     },
-    enabled: !!messages && messages.length > 0,
+    enabled: partnerIds.length > 0,
     onError: () => {
       toast.error(t('clientmessages.error_partners', 'Ошибка загрузки партнеров'));
     },
