@@ -362,7 +362,7 @@ function PartnerLoyaltyContent() {
       </Card>
 
       {/* Save button — sticky at bottom for mobile, visual active state when changes exist */}
-      <div className={`sticky bottom-0 z-10 border-t px-4 py-3 ${hasChanges ? "bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.1)]" : "bg-white/80 border-slate-200"}`}>
+      <div className={`sticky bottom-0 z-10 border-t px-4 py-3 ${hasChanges ? "bg-white border-slate-200 shadow-[0_-2px_10px_rgba(0,0,0,0.1)]" : "bg-white/80 border-slate-200"}`}>
         <Button
           onClick={handleSave}
           disabled={!hasChanges || saveStatus === "saving"}
