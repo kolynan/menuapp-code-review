@@ -178,7 +178,7 @@ export default function ClientMessagesPage() {
 
       {/* Content */}
       <main className="max-w-2xl mx-auto px-4 py-6">
-        {!sortedMessages || sortedMessages.length === 0 ? (
+        {sortedMessages.length === 0 ? (
           <Card className="mt-12">
             <CardContent className="py-12 text-center">
               <Mail className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -215,7 +215,7 @@ export default function ClientMessagesPage() {
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2 flex-1">
                         {isUnread && (
-                          <Circle className="w-2 h-2 fill-blue-500 text-blue-500 flex-shrink-0" />
+                          <Circle className="w-2 h-2 fill-blue-500 text-blue-500 flex-shrink-0" aria-label={t('clientmessages.unread', 'Непрочитано')} />
                         )}
                         <span className={`text-sm font-medium ${isUnread ? "text-slate-900" : "text-slate-500"}`}>
                           {partner?.name || t('clientmessages.unknown_partner', '...')}
