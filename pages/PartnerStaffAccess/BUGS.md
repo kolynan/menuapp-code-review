@@ -1,7 +1,7 @@
 # PartnerStaffAccess Bug Tracker
 
 **Page:** `pages/PartnerStaffAccess/partnerstaffaccess.jsx`
-**Last updated:** 2026-02-28
+**Last updated:** 2026-03-01
 
 ---
 
@@ -35,6 +35,21 @@
 - **Lines:** StaffCard quick actions, overflow menu trigger, send invitation button, bulk checkbox
 - **Fix:** All icon buttons → h-11 w-11 (44px), gap-1 → gap-2 (8px spacing), send button h-7 → h-11, checkbox min-h/w-[44px]. Send invitation button now visible on ALL pending cards (email + link).
 - **Commit:** Phase1 partnerstaffaccess
+- **Verified:** Phase1v2 (2026-03-01) — CC re-verified all 6 touch points. Codex timed out (OneDrive filesystem issue).
+- **Status:** FIXED
+
+### BUG-SA-008 (P2) -- Hardcoded 'Email' string (i18n violation)
+- **Line:** 1169
+- **Fix:** Changed `'Email'` to `t('partnerstaffaccess.card.method_email')`
+- **Found by:** Codex (Phase1v2 review)
+- **Commit:** Phase1v2 partnerstaffaccess
+- **Status:** FIXED
+
+### BUG-SA-009 (P3) -- Native buttons missing type="button"
+- **Lines:** 1015 (checkbox), 1049 (role info popover trigger)
+- **Fix:** Added `type="button"` to prevent accidental form submission
+- **Found by:** Codex (Phase1v2 review)
+- **Commit:** Phase1v2 partnerstaffaccess
 - **Status:** FIXED
 
 ---

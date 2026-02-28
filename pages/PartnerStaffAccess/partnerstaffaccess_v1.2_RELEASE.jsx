@@ -1013,6 +1013,7 @@ function StaffCard({ link, onCopy, onQR, onToggle, onDelete, onEdit, onResetToke
                     {/* #3: Checkbox for bulk selection */}
                     {selectionMode && (
                         <button
+                            type="button"
                             onClick={() => onSelect(link.id)}
                             className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center -ml-1"
                             aria-label={isSelected ? t('partnerstaffaccess.bulk.deselect') : t('partnerstaffaccess.bulk.select')}
@@ -1046,7 +1047,8 @@ function StaffCard({ link, onCopy, onQR, onToggle, onDelete, onEdit, onResetToke
                         {/* Role badge - clickable */}
                         <Popover>
                             <PopoverTrigger asChild>
-                                <button 
+                                <button
+                                    type="button"
                                     className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1 mt-0.5"
                                     aria-label={t('partnerstaffaccess.card.role_info', { role: roleConfig.label })}
                                 >
@@ -1166,7 +1168,7 @@ function StaffCard({ link, onCopy, onQR, onToggle, onDelete, onEdit, onResetToke
                     {/* Invite method */}
                     <span className="inline-flex items-center gap-1">
                         {hasEmail ? <Mail className="w-3 h-3" aria-hidden="true" /> : <Link2 className="w-3 h-3" aria-hidden="true" />}
-                        {hasEmail ? 'Email' : t('partnerstaffaccess.card.method_link')}
+                        {hasEmail ? t('partnerstaffaccess.card.method_email') : t('partnerstaffaccess.card.method_link')}
                     </span>
                     
                     {/* #5: Last active - if field exists */}
