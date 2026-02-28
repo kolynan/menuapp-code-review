@@ -1,7 +1,7 @@
 # PartnerStaffAccess Bug Tracker
 
 **Page:** `pages/PartnerStaffAccess/partnerstaffaccess.jsx`
-**Last updated:** 2026-02-24
+**Last updated:** 2026-02-28
 
 ---
 
@@ -29,6 +29,12 @@
 - **Function:** copyToClipboard
 - **Fix:** Return `document.execCommand('copy')` result instead of hardcoded `true`
 - **Commit:** `53c960e`
+- **Status:** FIXED
+
+### BUG-SA-007 (P2) -- Touch targets too small for mobile (40px / 28px)
+- **Lines:** StaffCard quick actions, overflow menu trigger, send invitation button, bulk checkbox
+- **Fix:** All icon buttons → h-11 w-11 (44px), gap-1 → gap-2 (8px spacing), send button h-7 → h-11, checkbox min-h/w-[44px]. Send invitation button now visible on ALL pending cards (email + link).
+- **Commit:** Phase1 partnerstaffaccess
 - **Status:** FIXED
 
 ---
