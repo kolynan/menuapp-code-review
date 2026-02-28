@@ -31,9 +31,6 @@ export default function ClientMessagesPage() {
     queryKey: ["customerAccounts", customerEmail],
     queryFn: () => base44.entities.LoyaltyAccount.filter({ email: customerEmail }),
     enabled: !!customerEmail,
-    onError: () => {
-      toast.error(t('clientmessages.error_accounts', 'Ошибка загрузки аккаунтов'));
-    },
   });
 
   // Load messages for all accounts
@@ -50,9 +47,6 @@ export default function ClientMessagesPage() {
       return allMessages.flat();
     },
     enabled: !!customerEmail && !!accounts && accounts.length > 0,
-    onError: () => {
-      toast.error(t('clientmessages.error_loading', 'Ошибка загрузки сообщений'));
-    },
   });
 
   const partnerIds = useMemo(() => {
@@ -71,10 +65,14 @@ export default function ClientMessagesPage() {
       return results.filter(Boolean);
     },
     enabled: partnerIds.length > 0,
-    onError: () => {
-      toast.error(t('clientmessages.error_partners', 'Ошибка загрузки партнеров'));
-    },
   });
+
+  // Show error toasts for query failures
+  useEffect(() => {
+    if (accountsError) toast.error(t('clientmessages.error_accounts', 'Ошибка загрузки аккаунтов'));
+    if (messagesError) toast.error(t('clientmessages.error_loading', 'Ошибка загрузки сообщений'));
+    if (partnersError) toast.error(t('clientmessages.error_partners', 'Ошибка загрузки партнеров'));
+  }, [accountsError, messagesError, partnersError, t]);
 
   // Mark message as read mutation
   const markReadMutation = useMutation({
