@@ -51,6 +51,20 @@
 
 ---
 
+### BUG-PS-016 (P2) -- Profile save button not sticky (scroll to find)
+- **Line:** ~436-458
+- **Fix:** Moved save button to sticky bottom bar with unsaved-changes detection (savedProfileRef + hasProfileChanges). Bar shows Save/Discard when profile fields differ from last-saved values.
+- **Commit:** Phase 1 UX fix
+- **Status:** FIXED
+
+### BUG-PS-017 (P2) -- Touch targets below 44px minimum
+- **Lines:** time inputs (h-8), hall inputs (h-9), contact buttons (h-8 w-8), currency delete (p-1), wifi eye button, nav arrows (w-9 h-9)
+- **Fix:** Increased all interactive elements to min 44px: time inputs h-11, hall inputs h-11, contact buttons h-11 w-11, currency delete min-w/h-[44px], wifi eye button min-w/h-[44px], nav arrows w-11 h-11, language/currency/contact-mode buttons min-h-[44px]
+- **Commit:** Phase 1 UX fix
+- **Status:** FIXED
+
+---
+
 ## Active Bugs
 
 ### BUG-PS-009 (P2) -- address_map_url accepts arbitrary URLs
