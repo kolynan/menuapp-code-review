@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useI18n } from "@/components/i18n";
-import { PartnerShell } from "@/components/PartnerShell";
+import PartnerShell from "@/components/PartnerShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
