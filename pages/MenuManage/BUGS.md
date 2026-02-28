@@ -1,7 +1,7 @@
 # MenuManage Bug Tracker
 
 **Page:** `pages/MenuManage/menumanage.jsx`
-**Last updated:** 2026-02-28
+**Last updated:** 2026-03-01
 
 ---
 
@@ -35,6 +35,12 @@
 - **Lines:** ~890-960 (category buttons), ~1000-1060 (dish buttons), ~1100-1170 (header/toolbar)
 - **Fix:** All icon buttons increased to 44x44px minimum, reorder arrows to 48x48px, gaps to 8px
 - **RELEASE:** 260228-00
+- **Status:** FIXED
+
+### BUG-MM-009 (P2) -- Too many visible action buttons on mobile
+- **Lines:** ~960-975 (category overflow), ~1070-1085 (dish overflow)
+- **Fix:** Category Delete and Dish Archive moved into DropdownMenu overflow (three-dot menu). Keeps Edit + Add Dish visible as primary actions. Follows UX consensus pattern: max 1-2 visible action buttons per row.
+- **RELEASE:** 260301-00
 - **Status:** FIXED
 
 ---
