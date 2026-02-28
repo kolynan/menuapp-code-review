@@ -18,6 +18,7 @@ Partner contacts management page (LAB version). Allows restaurant owners to conf
 
 | RELEASE | Date | Changes |
 |---------|------|---------|
+| 260301-00 | 2026-03-01 | Phase 1v2: CC+Codex verified, 8 more touch targets fixed |
 | 260228-00 | 2026-02-28 | Phase 1: i18n fallback wrapper + touch targets |
 | 260225 | 2026-02-25 | Initial review: 7 bugs fixed (P0: 1, P1: 6) |
 
@@ -25,6 +26,7 @@ Partner contacts management page (LAB version). Allows restaurant owners to conf
 
 | Date | Change |
 |------|--------|
+| 2026-03-01 | Touch targets: все оставшиеся кнопки и поля ввода увеличены до 44px (навигация, сохранение, поиск, добавление). CC+Codex верификация. |
 | 2026-02-28 | i18n: все ключи теперь показывают читаемый текст вместо "partnercontacts.page_title". Кнопки действий увеличены до 44px для мобильных. |
 | 2026-02-25 | Начальный ревью: починена ошибка error boundary, добавлен i18n во все строки, валидация sort_order, защита viewMode от сброса. |
 

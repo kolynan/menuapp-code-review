@@ -134,7 +134,7 @@ class PageErrorBoundaryInner extends React.Component {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-slate-600">{t('partnercontacts.error.instruction','Откройте DevTools → Console и пришлите верхнюю ошибку.')}</p>
-            <Button variant="outline" onClick={() => window.location.reload()}>
+            <Button variant="outline" className="min-h-[44px]" onClick={() => window.location.reload()}>
               {t('common.reload','Перезагрузить')}
             </Button>
             <p className="text-xs text-slate-500 break-words">{normStr(this.state.error?.message || this.state.error)}</p>
@@ -385,7 +385,7 @@ export default function PartnerContacts1() {
               <span className="text-sm font-medium text-yellow-800">{t('partnercontacts.lab_version', 'LAB VERSION — Partner Contacts')}</span>
             </div>
             <Link to="/lab">
-              <Button size="sm" variant="outline">{t('common.back_to_lab', 'Back to Lab hub')}</Button>
+              <Button size="sm" variant="outline" className="min-h-[44px]">{t('common.back_to_lab', 'Back to Lab hub')}</Button>
             </Link>
           </div>
         </div>
@@ -408,10 +408,10 @@ export default function PartnerContacts1() {
             </div>
             <div className="flex gap-2">
               <Link to="/menumanage1">
-                <Button size="sm" variant="outline">{t('partnercontacts.header.settings','Settings / Tables')}</Button>
+                <Button size="sm" variant="outline" className="min-h-[44px]">{t('partnercontacts.header.settings','Settings / Tables')}</Button>
               </Link>
               <Link to="/lab">
-                <Button size="sm" variant="outline">
+                <Button size="sm" variant="outline" className="min-h-[44px]">
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   {t('common.back_to_lab','Back to Lab hub')}
                 </Button>
@@ -470,7 +470,7 @@ export default function PartnerContacts1() {
                   <Button
                     onClick={saveViewMode}
                     disabled={updateViewModeMutation.isPending || createPartnerContactsMutation.isPending}
-                    className="bg-indigo-600 hover:bg-indigo-700"
+                    className="bg-indigo-600 hover:bg-indigo-700 min-h-[44px]"
                   >
                     {(updateViewModeMutation.isPending || createPartnerContactsMutation.isPending) && (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -480,6 +480,7 @@ export default function PartnerContacts1() {
                   </Button>
                   <Button
                     variant="outline"
+                    className="min-h-[44px]"
                     onClick={() => {
                       setViewMode(partnerContactsRecord?.view_mode || "icons");
                       setViewModeDirty(false);
@@ -508,9 +509,9 @@ export default function PartnerContacts1() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder={t('partnercontacts.links.search_placeholder','Поиск по названию/url...')}
-                    className="w-56"
+                    className="w-56 min-h-[44px]"
                   />
-                  <Button onClick={openCreateLink} className="bg-indigo-600 hover:bg-indigo-700 gap-2">
+                  <Button onClick={openCreateLink} className="bg-indigo-600 hover:bg-indigo-700 gap-2 min-h-[44px]">
                     <Plus className="w-4 h-4" />
                     {t('partnercontacts.links.add','Добавить ссылку')}
                   </Button>

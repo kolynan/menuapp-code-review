@@ -2,6 +2,16 @@
 
 ## Fixed Bugs
 
+### RELEASE 260301-00 (Phase 1v2 — CC+Codex verified touch targets)
+
+| ID | Priority | Description | Fix |
+|----|----------|-------------|-----|
+| BUG-PC-021 | P2 | Error boundary reload button under 44px | `min-h-[44px]` on reload Button |
+| BUG-PC-022 | P2 | Header nav buttons `size="sm"` (~32px) | `min-h-[44px]` on 3 header Buttons (lines 388, 411, 414) |
+| BUG-PC-023 | P2 | Save/Cancel viewMode buttons under 44px | `min-h-[44px]` on both buttons |
+| BUG-PC-024 | P2 | Search Input default height (40px) | `min-h-[44px]` on search Input |
+| BUG-PC-025 | P2 | "Add link" button under 44px | `min-h-[44px]` on Add button |
+
 ### RELEASE 260228-00 (Phase 1 — i18n + touch targets)
 
 | ID | Priority | Description | Fix |
