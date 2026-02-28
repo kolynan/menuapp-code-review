@@ -224,7 +224,7 @@ function ProfileContent() {
           <CardContent className="space-y-4">
             {/* Full Name - editable */}
             <div className="space-y-2">
-              <Label htmlFor="fullName">{tr("profile.full_name")}</Label>
+              <Label htmlFor="fullName">{t("profile.full_name", "Полное имя")}</Label>
               <Input
                 id="fullName"
                 value={fullName}
@@ -236,7 +236,7 @@ function ProfileContent() {
 
             {/* Email - readonly */}
             <div className="space-y-2">
-              <Label htmlFor="email">{tr("profile.email")}</Label>
+              <Label htmlFor="email">{t("profile.email", "Электронная почта")}</Label>
               <Input
                 id="email"
                 value={user?.email || ""}
