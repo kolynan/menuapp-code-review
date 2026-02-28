@@ -1,4 +1,4 @@
-// Version: 1.5 (2026-02-28) — Phase 1 touch targets: all interactive elements >= 44x44px
+// Version: 1.6 (2026-03-01) — Phase 1v2: zone overflow menu, 8px button spacing, CC+Codex verified
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
@@ -748,8 +748,8 @@ function AreaSection({
           <span className="text-sm text-slate-400">({count})</span>
         </div>
 
-        {/* Row 2: Actions */}
-        <div className="flex items-center gap-1 mt-1.5 ml-6 flex-wrap">
+        {/* Row 2: Actions — primary + overflow menu */}
+        <div className="flex items-center gap-2 mt-1.5 ml-6 flex-wrap">
           <Button
             variant="outline"
             size="sm"
@@ -762,40 +762,45 @@ function AreaSection({
             <Plus className="h-3.5 w-3.5 mr-1" />
             {t('partnertables.table')}
           </Button>
-          
-          {count > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-11 w-11 p-0 text-slate-500 hover:text-indigo-600"
-              onClick={(e) => onOpenQrForArea(areaId, e)}
-              aria-label={t('partnertables.qr_area')}
-            >
-              <QrCode className="h-4 w-4" />
-            </Button>
-          )}
-          
-          {!isNone && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-11 w-11 p-0"
-                onClick={(e) => onOpenEditArea(area, e)}
-                aria-label={t('common.edit')}
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-11 w-11 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                onClick={(e) => onDeleteArea(area, e)}
-                aria-label={t('common.delete')}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </>
+
+          {(!isNone || count > 0) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-11 w-11 p-0"
+                  aria-label={t('common.actions')}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreVertical className="h-4 w-4 text-slate-400" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {count > 0 && (
+                  <DropdownMenuItem onClick={(e) => onOpenQrForArea(areaId, e)}>
+                    <QrCode className="h-4 w-4 mr-2" />
+                    {t('partnertables.qr_area')}
+                  </DropdownMenuItem>
+                )}
+                {!isNone && (
+                  <>
+                    {count > 0 && <DropdownMenuSeparator />}
+                    <DropdownMenuItem onClick={(e) => onOpenEditArea(area, e)}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      {t('common.edit')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => onDeleteArea(area, e)}
+                      className="text-red-600 focus:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {t('common.delete')}
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </div>
@@ -844,7 +849,7 @@ function AreaSection({
                       </div>
                       
                       {/* Mobile: Up/Down buttons — 44x44px touch targets */}
-                      <div className="flex flex-col gap-1 sm:hidden">
+                      <div className="flex flex-col gap-2 sm:hidden">
                         <Button
                           variant="ghost"
                           size="sm"
