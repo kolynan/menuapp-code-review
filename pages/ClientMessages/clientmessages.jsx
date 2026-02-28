@@ -167,7 +167,8 @@ export default function ClientMessagesPage() {
         <div className="h-14 max-w-2xl mx-auto px-4 flex items-center gap-3">
           <button
             onClick={() => navigate("/clientaccount")}
-            className="p-2 hover:bg-slate-100 rounded transition-colors"
+            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-slate-100 rounded transition-colors"
+            aria-label={t('common.back')}
           >
             <ArrowLeft className="h-5 w-5 text-slate-600" />
           </button>
