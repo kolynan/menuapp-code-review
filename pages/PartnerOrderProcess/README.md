@@ -25,6 +25,8 @@ Order processing pipeline configuration. CRUD for OrderStage entities with drag-
 | Version | Date | Changes |
 |---------|------|---------|
 | 260224-00 | 2026-02-24 | Initial review. Fixed BUG-OP-001 thru OP-005: rebalance error handling (P0), orphan check, double invalidation, double-click race, silent error swallow. |
+| 260228-00 | 2026-02-28 | Phase 1 mobile UX: touch targets fix (BUG-OP-015). Action buttons 44px, reorder area 48px, overflow menu on mobile, channel filter/color picker enlarged. |
 
 ## UX Changelog
+- **260228:** Кнопки редактирования/удаления этапов увеличены до 44px. Элементы перетаскивания расширены до 48px. На мобильном кнопка удаления скрыта в overflow-меню (три точки). Кнопки фильтра каналов и палитра цветов увеличены до 44px.
 - **260224:** Deleting a stage now checks for active orders first and shows error if any exist. Fixed rare crash when stage create/delete was followed by rebalance failure. Prevented duplicate default stages from double-click.

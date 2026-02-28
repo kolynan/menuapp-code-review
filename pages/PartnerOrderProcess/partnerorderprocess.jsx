@@ -7,11 +7,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { 
+import {
   Plus, Pencil, Trash2, Lock, Loader2, AlertTriangle, RefreshCcw,
   ChevronUp, ChevronDown, GripVertical, ArrowRight,
-  Utensils, Package, Truck
+  Utensils, Package, Truck, MoreVertical
 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import PartnerShell, { usePartnerAccess } from "@/components/PartnerShell";
 import { useI18n } from "@/components/i18n";
 
@@ -184,9 +185,9 @@ function ChannelFilter({ value, onChange, t }) {
               key={filter.key}
               onClick={() => onChange(filter.key)}
               className={`
-                flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-all
-                ${isActive 
-                  ? "bg-white text-slate-900 shadow-sm" 
+                flex items-center gap-1.5 px-3 min-h-[44px] text-sm font-medium rounded-md transition-all
+                ${isActive
+                  ? "bg-white text-slate-900 shadow-sm"
                   : "text-slate-600 hover:text-slate-900"
                 }
               `}
@@ -257,27 +258,27 @@ function StageRow({
         {index + 1}
       </div>
 
-      {/* Move buttons / Grip */}
-      <div className="flex items-center w-10 justify-center">
+      {/* Move buttons / Grip — 48px wide reorder area */}
+      <div className="flex items-center w-12 justify-center">
         {middle ? (
           <>
-            {/* Mobile: up/down buttons */}
+            {/* Mobile: up/down buttons — 48x24 each, stacked to 48x48 */}
             <div className="flex flex-col sm:hidden">
               <button
                 onClick={() => canMoveUp && !moveBusy && onMoveUp(stage)}
                 disabled={!canMoveUp || moveBusy}
-                className={`p-0.5 ${canMoveUp && !moveBusy ? "text-slate-500 hover:text-slate-700" : "text-slate-200 cursor-not-allowed"}`}
+                className={`flex items-center justify-center h-6 w-12 ${canMoveUp && !moveBusy ? "text-slate-500 hover:text-slate-700 active:bg-slate-100" : "text-slate-200 cursor-not-allowed"}`}
                 aria-label={t("orderprocess.aria.move_up")}
               >
-                <ChevronUp className="h-4 w-4" />
+                <ChevronUp className="h-5 w-5" />
               </button>
               <button
                 onClick={() => canMoveDown && !moveBusy && onMoveDown(stage)}
                 disabled={!canMoveDown || moveBusy}
-                className={`p-0.5 ${canMoveDown && !moveBusy ? "text-slate-500 hover:text-slate-700" : "text-slate-200 cursor-not-allowed"}`}
+                className={`flex items-center justify-center h-6 w-12 ${canMoveDown && !moveBusy ? "text-slate-500 hover:text-slate-700 active:bg-slate-100" : "text-slate-200 cursor-not-allowed"}`}
                 aria-label={t("orderprocess.aria.move_down")}
               >
-                <ChevronDown className="h-4 w-4" />
+                <ChevronDown className="h-5 w-5" />
               </button>
             </div>
             {/* Desktop: grip */}
@@ -335,28 +336,53 @@ function StageRow({
         ))}
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-1 flex-shrink-0">
+      {/* Actions — 44x44px touch targets, 8px gap */}
+      <div className="flex items-center gap-2 flex-shrink-0">
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9"
+          className="h-11 w-11"
           onClick={() => onEdit(stage)}
           aria-label={t("orderprocess.aria.edit")}
         >
           <Pencil className="h-4 w-4 text-slate-500" />
         </Button>
-        
+
         {middle && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 text-red-500 hover:text-red-600 hover:bg-red-50"
-            onClick={() => onDelete(stage)}
-            aria-label={t("orderprocess.aria.delete")}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <>
+            {/* Desktop: direct delete button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hidden sm:flex h-11 w-11 text-red-500 hover:text-red-600 hover:bg-red-50"
+              onClick={() => onDelete(stage)}
+              aria-label={t("orderprocess.aria.delete")}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            {/* Mobile: overflow menu for secondary actions */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="sm:hidden h-11 w-11"
+                  aria-label={t("orderprocess.aria.more_actions")}
+                >
+                  <MoreVertical className="h-4 w-4 text-slate-500" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="text-red-600 focus:text-red-600"
+                  onClick={() => onDelete(stage)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {t("common.delete")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         )}
       </div>
     </div>
@@ -500,7 +526,7 @@ function EditStageDialog({ open, stage, onClose, onSave, saving, t }) {
                   key={c.value}
                   type="button"
                   onClick={() => setColor(c.value)}
-                  className={`w-10 h-10 rounded-lg border-2 transition-all ${
+                  className={`w-11 h-11 rounded-lg border-2 transition-all ${
                     color === c.value
                       ? "ring-2 ring-offset-2 ring-indigo-500 scale-110"
                       : "hover:scale-105"
@@ -1100,7 +1126,7 @@ function OrderProcessContent() {
             {t("orderprocess.subtitle")}
           </p>
         </div>
-        <Button onClick={handleAddStage} className="h-10 shrink-0">
+        <Button onClick={handleAddStage} className="h-11 shrink-0">
           <Plus className="h-4 w-4 sm:mr-2" />
           <span className="hidden sm:inline">
             {t("orderprocess.add_stage")}

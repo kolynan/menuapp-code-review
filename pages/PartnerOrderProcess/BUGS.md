@@ -1,6 +1,14 @@
 # PartnerOrderProcess — Bug Tracker
 
-**Last updated:** 2026-02-24
+**Last updated:** 2026-02-28
+
+---
+
+## Fixed (in RELEASE 260228-00)
+
+| ID | Priority | Description | Commit |
+|----|----------|-------------|--------|
+| BUG-OP-015 | P2 | Touch targets: action buttons 36px (h-9), move buttons ~17px, channel filter/color picker below 44px minimum | Phase1 touch targets |
 
 ---
 
