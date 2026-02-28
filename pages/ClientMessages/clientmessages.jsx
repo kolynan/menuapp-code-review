@@ -197,12 +197,20 @@ export default function ClientMessagesPage() {
               return (
                 <Card
                   key={message.id}
+                  role="button"
+                  tabIndex={0}
                   className={`cursor-pointer transition-all ${
-                    isUnread 
-                      ? "shadow-sm hover:shadow-md" 
+                    isUnread
+                      ? "shadow-sm hover:shadow-md"
                       : "shadow-sm hover:shadow-md opacity-75"
                   }`}
                   onClick={() => handleMessageClick(message)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleMessageClick(message);
+                    }
+                  }}
                 >
                   <CardContent className="p-4">
                     {/* Header */}
