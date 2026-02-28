@@ -25,6 +25,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -44,6 +50,7 @@ import {
   Info,
   Languages,
   Loader2,
+  MoreVertical,
   Pencil,
   Plus,
   Search,
@@ -948,16 +955,24 @@ export default function MenuManage() {
             
             {/* Spacer */}
             <div className="flex-1" />
-            
-            {/* Delete */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-11 w-11 text-red-600 hover:text-red-700 hover:bg-red-50"
-              onClick={() => deleteCat(cat)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+
+            {/* Overflow menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-11 w-11">
+                  <MoreVertical className="h-4 w-4 text-slate-400" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                  onClick={() => deleteCat(cat)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {t('common.delete')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -1052,9 +1067,22 @@ export default function MenuManage() {
                           <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => openEditDish(dish)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-11 w-11 text-amber-600 hover:text-amber-700 hover:bg-amber-50" onClick={() => archiveDish(dish)}>
-                            <Archive className="h-4 w-4" />
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-11 w-11">
+                                <MoreVertical className="h-4 w-4 text-slate-400" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                className="text-amber-600 focus:text-amber-700 focus:bg-amber-50"
+                                onClick={() => archiveDish(dish)}
+                              >
+                                <Archive className="h-4 w-4 mr-2" />
+                                {t('menumanage.to_archive')}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                       {/* Line 2: Description + Price */}
