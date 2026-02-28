@@ -848,27 +848,27 @@ function AreaSection({
                         />
                       </div>
                       
-                      {/* Mobile: Up/Down buttons — 44x44px touch targets */}
+                      {/* Mobile: Up/Down buttons — 48x48px touch targets (UX consensus) */}
                       <div className="flex flex-col gap-2 sm:hidden">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-11 w-11 p-0"
+                          className="h-12 w-12 p-0"
                           disabled={!canReorder || index === 0}
                           onClick={() => onMoveTableUp(tbl, areaId, index)}
                           aria-label={t('partnertables.move_up')}
                         >
-                          <ChevronUp className="h-4 w-4" />
+                          <ChevronUp className="h-5 w-5" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-11 w-11 p-0"
+                          className="h-12 w-12 p-0"
                           disabled={!canReorder || index === tables.length - 1}
                           onClick={() => onMoveTableDown(tbl, areaId, index)}
                           aria-label={t('partnertables.move_down')}
                         >
-                          <ChevronDown className="h-4 w-4" />
+                          <ChevronDown className="h-5 w-5" />
                         </Button>
                       </div>
 
