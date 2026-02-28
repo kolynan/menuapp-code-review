@@ -1168,7 +1168,7 @@ function StaffCard({ link, onCopy, onQR, onToggle, onDelete, onEdit, onResetToke
                     {/* Invite method */}
                     <span className="inline-flex items-center gap-1">
                         {hasEmail ? <Mail className="w-3 h-3" aria-hidden="true" /> : <Link2 className="w-3 h-3" aria-hidden="true" />}
-                        {hasEmail ? t('partnerstaffaccess.card.method_email') : t('partnerstaffaccess.card.method_link')}
+                        {hasEmail ? t('partnerstaffaccess.card.method_email', 'Email') : t('partnerstaffaccess.card.method_link', 'Ссылка')}
                     </span>
                     
                     {/* #5: Last active - if field exists */}
@@ -1226,7 +1226,7 @@ function StaffCard({ link, onCopy, onQR, onToggle, onDelete, onEdit, onResetToke
                             <Send className="w-4 h-4 mr-1.5" aria-hidden="true" />
                             {hasEmail
                                 ? t('partnerstaffaccess.card.send_invite_now')
-                                : t('partnerstaffaccess.card.share_link')}
+                                : t('partnerstaffaccess.card.share_link', 'Поделиться ссылкой')}
                         </Button>
                     </div>
                 )}
