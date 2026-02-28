@@ -393,3 +393,479 @@ error: Unicode property not found
 rg: className|floating|fixed: Синтаксическая ошибка в имени файла, имени папки или метке тома. (os error 123)
 rg: bottom|add_staff pages\PartnerStaffAccess\partnerstaffaccess.jsx -A 45 -B 10: Синтаксическая ошибка в имени файла, имени папки или метке тома. (os error 123)
 
+thinking
+**Refining search commands with proper quoting**
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n 'function SearchFilterBar|filteredLinks.map|PartnerShell activeTab=\"staff\"|partnerstaffaccess.add_staff|fixed bottom|sticky' pages\\PartnerStaffAccess\\partnerstaffaccess.jsx -A 40 -B 12" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n 'PartnerShell activeTab=\"home\"|empty|partnerhome.empty|metrics|orders|setup|checklist|hint' pages\\PartnerHome\\partnerhome.jsx -A 35 -B 10" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-review succeeded in 8.02s:
+51-
+52-  const partner = partnerQ.data || null;
+53-
+54-  // Load active table sessions (status = open)
+55-  const sessionsQ = useQuery({
+56-    queryKey: ["TableSession", "byPartner", partnerId],
+57-    enabled: !!partnerId,
+58-    queryFn: () => base44.entities.TableSession.filter({ partner: partnerId }),
+59-  });
+60-
+61:  // Load today's orders
+62:  const ordersQ = useQuery({
+63-    queryKey: ["Order", "byPartner", partnerId],
+64-    enabled: !!partnerId,
+65-    queryFn: () => base44.entities.Order.filter({ partner: partnerId }),
+66-  });
+67-
+68-  // Calculate statistics
+69-  const stats = useMemo(() => {
+70-    const sessions = sessionsQ.data || [];
+ succeeded in 8.13s:
+1370-                    <div className="flex items-start gap-2">
+1371-                        <Check className="w-4 h-4 text-green-500 mt-0.5 shrink-0" aria-hidden="true" />
+1372-                        <span>{t('partnerstaffaccess.empty.benefit_2')}</span>
+1373-                    </div>
+1374-                    <div className="flex items-start gap-2">
+1375-                        <Check className="w-4 h-4 text-green-500 mt-0.5 shrink-0" aria-hidden="true" />
+1376-                        <span>{t('partnerstaffaccess.empty.benefit_3')}</span>
+1377-                    </div>
+1378-                </div>
+1379-                
+1380-                <Button onClick={onAdd} className="bg-indigo-600 hover:bg-indigo-700">
+1381-                    <Plus className="w-4 h-4 mr-2" aria-hidden="true" />
+1382:                    {t('partnerstaffaccess.add_staff')}
+1383-                </Button>
+1384-            </CardContent>
+1385-        </Card>
+1386-    );
+1387-}
+1388-
+1389-// ============================================================
+
+thinking
+**Inspecting UI components for responsiveness**
+codex
+I now have enough baseline for Home and Process. I’m pulling targeted snippets for Tables/Staff/Menu rows to validate each of your C1–C3 proposals against what the code already does versus what still needs design changes.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n 'function AreaSection|isExpanded|ChevronRight|table-item|onOpenQrArea|onOpenQrSingle|moveTableUp|moveTableDown|openNewArea|create_area|create_table' pages\\partnertables\\partnertables_v1.4_RELEASE.js -A 55 -B 18" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n 'function StaffCard|Card className|invite_accepted_at|pending|onQR|onCopy|onDelete|Button variant=\"ghost\" size=\"icon\"|status' pages\\PartnerStaffAccess\\partnerstaffaccess.jsx -A 70 -B 18" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n 'function renderCategory|bg-slate-100 border-b-2|visibleDishes.map|moveDishInCategory|ArrowUp|ArrowDown|Search|create_category|Button size=\"sm\"|sticky|accordion|expandedCats' pages\\MenuManage\\menumanage.jsx -A 70 -B 20" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-review succeeded in 9.68s:
+22-} from "@/components/ui/dropdown-menu";
+23-import { Input } from "@/components/ui/input";
+24-import { Label } from "@/components/ui/label";
+25-import {
+26-  Select,
+27-  SelectContent,
+28-  SelectItem,
+29-  SelectTrigger,
+30-  SelectValue,
+31-} from "@/components/ui/select";
+32-import {
+33-  Tooltip,
+34-  TooltipContent,
+35-  TooltipProvider,
+36-  TooltipTrigger,
+37-} from "@/components/ui/tooltip";
+38-import { toast } from "sonner";
+39-import {
+40:  ChevronRight,
+41-  ChevronUp,
+ succeeded in 9.64s:
+13-import { Input } from "@/components/ui/input";
+14-import { Label } from "@/components/ui/label";
+15-import {
+16-  Select,
+17-  SelectContent,
+18-  SelectItem,
+19-  SelectTrigger,
+20-  SelectValue,
+21-} from "@/components/ui/select";
+22-import {
+23-  Tooltip,
+24-  TooltipContent,
+25-  TooltipProvider,
+26-  TooltipTrigger,
+27-} from "@/components/ui/tooltip";
+28-import { toast } from "sonner";
+29-import {
+30-  AlertTriangle,
+31-  Archive,
+32-  ArchiveRestore,
+ succeeded in 9.75s:
+56-    },
+57-    partner_manager: { 
+58-        label: t('partnerstaffaccess.role.partner_manager'), 
+59-        icon: Briefcase, 
+60-        color: 'text-purple-600', 
+61-        bg: 'bg-purple-50',
+62-        description: t('partnerstaffaccess.role.partner_manager_desc')
+63-    }
+64-});
+65-
+66-const INVITE_METHOD = {
+67-    LINK: 'link',
+68-    EMAIL: 'email'
+69-};
+70-
+71-const FILTER_STATUS = {
+72-    ALL: 'all',
+73-    ACTIVE: 'active',
+74:    PENDING: 'pending',
+75-    DISABLED: 'disabled'
+
+thinking
+**Checking stage row layout**
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"function StageRow|className=\\"'`flex items-center gap-2|w-6 text-center|allowed_roles|enabled_hall|Pencil|Trash2|onMoveUp|onMoveDown" pages'"\\PartnerOrderProcess\\partnerorderprocess.jsx -A 120 -B 20" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-review succeeded in 3.47s:
+1-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+2-import { base44 } from "@/api/base44Client";
+3-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+4-import { Button } from "@/components/ui/button";
+5-import { Checkbox } from "@/components/ui/checkbox";
+6-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+7-import { Input } from "@/components/ui/input";
+8-import { Label } from "@/components/ui/label";
+9-import { toast } from "sonner";
+10-import { 
+11:  Plus, Pencil, Trash2, Lock, Loader2, AlertTriangle, RefreshCcw,
+12-  ChevronUp, ChevronDown, GripVertical, ArrowRight,
+13-  Utensils, Package, Truck
+14-} from "lucide-react";
+15-import PartnerShell, { usePartnerAccess } from "@/components/PartnerShell";
+16-import { useI18n } from "@/components/i18n";
+17-
+18-// ============================================================
+19-// CONSTANTS
+20-// ============================================================
+
+thinking
+**Investigating tab filtering by role**
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"function getTabs|const tabs =|tabs.filter|role|userRole|canAccess|id: \\\"home\\\"|id: \\\"staff\\\"|id: \\\"process\\\"|id: \\\"settings\\\"\" pages\\PartnerShell\\PartnerShell_v1.1_RELEASE.jsx -A 80 -B 20" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-review exited 1 in 2.71s:
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-9-import { Home, Utensils, Table2, Users, GitBranch, Settings, Menu, LogOut, User, Loader2, AlertTriangle, RefreshCcw, Gift } from "lucide-react";
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-10-import { Button } from "@/components/ui/button";
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-11-import {
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-12-  DropdownMenu,
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-13-  DropdownMenuContent,
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-14-  DropdownMenuItem,
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-15-  DropdownMenuSeparator,
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-16-  DropdownMenuTrigger,
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-17-} from "@/components/ui/dropdown-menu";
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-18-import { Card, CardContent } from "@/components/ui/card";
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-19-import { useI18n } from "@/components/i18n";
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-20-import { cn } from "@/lib/utils"; // P8: cn() utility for safe Tailwind classes
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-21-
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-22-/**
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-23- * PartnerShell - Shared layout for partner cabinet pages
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-24- *
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-25- * Tabs: home | menu | tables | staff | process | settings (LOCKED NAV-006, NAV-009)
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-26- *
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-27- * Access Control (LOCKED STAFF-015..020):
+pages\PartnerShell\PartnerShell_v1.1_RELEASE.jsx-28- * - owner: User.partner === partnerId (full access)
+
+thinking
+**Reviewing prior analysis documentation**
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content pages\\codex-round3-home.md -TotalCount 280" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content pages\\codex-round2-home.md -TotalCount 260" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content pages\\partner-cabinet-ux\\round1.md -TotalCount 300" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-review succeeded in 12.98s:
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-review
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: xhigh
+reasoning summaries: auto
+session id: 019ca1af-fc14-72b0-9ec1-4f597dd4c4a2
+--------
+user
+Round 3 â€” Final convergence on the ONE remaining disagreement about the MenuApp client home screen.
+
+THE DISAGREEMENT: Where should the Hall table verification appear?
+
+YOUR POSITION (Codex): Hall verification should be visible as a banner/status OUTSIDE the cart drawer, near the top of the page (between mode tabs and category chips). Reason: it is a critical gate and should not be hidden inside the cart.
+
+MY POSITION (Claude/CC): Hall verification should stay INSIDE the cart drawer, specifically in the 'New Order' section (section 4 of the drawer). Reasons:
+1. The guest does NOT need to verify until they are ready to ORDER. Browsing the menu should be friction-free.
+ succeeded in 13.06s:
+# Round 1: Codex Analysis + Claude's Initial Position
+
+## Codex's Analysis (GPT-5.3-codex)
+
+**Priority Verdict:**
+- P0: fix i18n key rendering immediately
+- P1: redesign global mobile navigation and long-page structure
+- P1: re-prioritize dashboard for live operations
+
+### 1. Mobile Navigation
+- Fixed bottom nav with 5 items: Home, Orders, Tables, Menu, More
+- Move Process under Orders > Workflow
+- Put Staff, Clients, Loyalty, Settings, Contacts, Profile inside More
+- Badges on Orders and More for pending items
+
+### 2. Pages Needing Most Rework
+- Priority order: PartnerSettings, MenuManage, PartnerTables, PartnerStaffAccess, PartnerLoyalty
+- Replace desktop tables with card lists
+- Default collapsed sections
+- Sticky search/filter, sticky primary CTA at bottom
+ succeeded in 13.15s:
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-review
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: xhigh
+reasoning summaries: auto
+session id: 019ca1af-3caa-7b53-8a40-0be2d0dcbf99
+--------
+user
+We are continuing the discussion about the MenuApp client home screen. Here was your previous analysis (Round 1):
+
+You recommended: Context strip (logo, name, table, mode, open/closed, prep time, language), search bar, mode tabs, sticky categories, Popular now section, single-column menu cards, sticky cart bar, footer with contacts/loyalty.
+
+MY PERSPECTIVE (Claude/CC) - I agree with many points but have specific pushback:
+
+1. SEARCH BAR IS PREMATURE: For most restaurants with 30-80 menu items, a search bar is unnecessary clutter. Nobody searches a restaurant menu the way they search Amazon. Category chips plus scroll is faster and more natural for food browsing. Search is a desktop/large-catalog pattern. Mr Yum only added search after reaching 200+ item menus. For MenuApp's typical restaurant, this adds complexity without value.
+
+
+thinking
+**Planning combined discussion review**
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content codex-round2.md -TotalCount 360' in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content discussion-result.md -TotalCount 380' in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content pages\\partner-cabinet-ux\\round2-codex-raw.md -TotalCount 320" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-review succeeded in 9.23s:
+---
+topic: Client Home Screen UX for MenuApp
+date: 2026-02-28
+rounds: 3
+status: completed
+participants: Claude (CC, claude-opus-4-6), Codex (GPT, gpt-5.3-codex)
+---
+
+# Discussion: Client Home Screen UX for MenuApp
+
+## Summary
+
+Both AI converged on a clear content hierarchy for the most important screen in MenuApp -- the screen guests see after scanning a QR code at their table. The key principles: keep the header compact (logo + name + table in one row), let guests browse the menu with zero friction before asking for any verification, use a 2-column tile grid as default with a list toggle option, and push contact/social/loyalty content below the menu. The only initial disagreement (where to place Hall table verification) was resolved with a middle-ground approach: keep verification inside the cart drawer, but add a subtle hint in the sticky cart bar so guests are not surprised at checkout.
+
+## Agreed (both AI)
+
+1. **Compact restaurant header** -- logo + restaurant name + table number in one compact row. No oversized hero/banner that pushes the menu below the fold.
+
+2. **Language switch visible** -- small but accessible in the top-right corner. Not buried in settings. Important for Kazakhstan market (Russian, Kazakh, English).
+
+ succeeded in 9.34s:
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-review
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: xhigh
+reasoning summaries: auto
+session id: 019ca49b-4817-7a62-9f50-71fee18b54f8
+--------
+user
+We are continuing the Partner Cabinet Mobile UX discussion for MenuApp.
+
+YOUR PREVIOUS ANALYSIS (Round 1):
+You recommended: bottom nav (Home, Orders, Tables, Menu, More), card-based layouts, collapsed sections, sticky CTAs, onboarding checklist for empty dashboard, 44-48px touch targets, overflow menus for secondary actions, P0 for i18n.
+
+MY COUNTER-POINTS AND QUESTIONS (Claude/CC):
+
+1. BOTTOM NAV -- 'Orders' PROBLEM:
+ exited 1 in 9.53s:
+Get-Content : Cannot find path 'C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-review\codex-round2.md' 
+because it does not exist.
+At line:2 char:1
++ Get-Content codex-round2.md -TotalCount 360
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (C:\Users\ASUS\O...codex-round2.md:String) [Get-Content], ItemNotFoundEx 
+   ception
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+thinking
+**Checking agent instructions file**
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "if (Test-Path AGENTS.md) { Get-Content AGENTS.md -TotalCount 260 } else { Write-Output 'NO_AGENTS_FILE' }" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-review exited -1 in 0ms:
+`"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "if (Test-Path AGENTS.md) { Get-Content AGENTS.md -TotalCount 260 } else { Write-Output 'NO_AGENTS_FILE' }"` rejected: blocked by policy
+
+thinking
+**Simplifying file existence check**
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content AGENTS.md -TotalCount 260' in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-review exited 1 in 2.95s:
+Get-Content : Cannot find path 'C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-review\AGENTS.md' 
+because it does not exist.
+At line:2 char:1
++ Get-Content AGENTS.md -TotalCount 260
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (C:\Users\ASUS\O...eview\AGENTS.md:String) [Get-Content], ItemNotFoundEx 
+   ception
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+thinking
+**Scoping detailed UX counter-argument and checklist revisions**
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"base44\\.entities\\.[A-Za-z_]+\" pages\\PartnerStaffAccess\\partnerstaffaccess.jsx" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"base44\\.entities\\.[A-Za-z_]+\" pages\\PartnerHome\\partnerhome.jsx" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"base44\\.entities\\.[A-Za-z_]+\" pages\\partnertables\\partnertables_v1.4_RELEASE.js" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"base44\\.entities\\.[A-Za-z_]+\" pages\\MenuManage\\menumanage.jsx" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-review succeeded in 6.11s:
+48:    queryFn: () => base44.entities.Partner.get(partnerId),
+58:    queryFn: () => base44.entities.TableSession.filter({ partner: partnerId }),
+65:    queryFn: () => base44.entities.Order.filter({ partner: partnerId }),
+ succeeded in 6.16s:
+419:    const direct = await base44.entities.Partner.get(pid);
+424:    const res = await base44.entities.Partner.filter({ id: pid });
+1272:      const sessions = await base44.entities.TableSession.filter({
+ succeeded in 6.16s:
+1544:        queryFn: () => base44.entities.Partner.get(partnerId),
+1557:        queryFn: () => base44.entities.StaffAccessLink.filter({ partner: partnerId }),
+1680:            const record = await base44.entities.StaffAccessLink.create(payload);
+1714:            return base44.entities.StaffAccessLink.update(id, data);
+1769:            return base44.entities.StaffAccessLink.delete(id);
+1914:                base44.entities.StaffAccessLink.update(id, { is_active: true })
+1933:                base44.entities.StaffAccessLink.update(id, { is_active: false })
+1967:                base44.entities.StaffAccessLink.delete(id)
+ succeeded in 6.21s:
+211:      const all = await base44.entities.Partner.list();
+217:      const res = await base44.entities.Partner.filter({ [key]: pid });
+796:      const orderItems = await base44.entities.OrderItem.filter({ dish: d.id });
+
+thinking
+**Investigating entity creation helpers**
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"createWithPartner\\(|updateRec\\(|base44\\.entities\\.[A-Za-z_]+\\.filter\\(|base44\\.entities\\.[A-Za-z_]+\\.list\\(\" pages\\MenuManage\\menumanage.jsx" in C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork\menuapp-code-review succeeded in 2.16s:
+211:      const all = await base44.entities.Partner.list();
+217:      const res = await base44.entities.Partner.filter({ [key]: pid });
+228:async function updateRec(entity, id, data) {
+469:      await Promise.all(chunk.map(it => updateRec(entity, it.id, { sort_order: it.sort_order })));
+571:          await updateRec("Dish", dishId, { sort_order: newOrder });
+609:        await updateRec("Dish", dishId, {
+624:        await updateRec("Dish", dishId, {
+657:        await updateRec("Category", catForm.id, { name });
+758:        await updateRec("Dish", dishForm.id, payload);
+776:          await updateRec("DishTranslation", tr.id, { name: trName, description: trDesc });
+796:      const orderItems = await base44.entities.OrderItem.filter({ dish: d.id });
+824:      await updateRec("Dish", d.id, { is_archived: true });
+834:      await updateRec("Dish", d.id, { is_archived: false });
+
+thinking
+**Planning detailed checklist and tabs**
+codex
+No listed skill applies here; this is a UX/product review.
+
+**A. 4 vs 5 Tabs**
+Counter-argument for keeping `4` is still valid:
+1. `Staff` is usually a launch-phase spike, then drops; permanent primary-tab space is expensive.
+2. A 5th tab reduces label clarity on small screens/localized strings.
+3. You likely want a future slot for `Orders` if partner live queue ships.
+
+That said, with your real onboarding pattern (`15 staff`, `6 waiting`), I would switch to `5` now:
+`Home | Menu | Tables | Staff | More`
+
+Best compromise: make it phase-aware.
+1. Keep `Staff` in primary nav while onboarding is incomplete or pending invites > 0.
+2. Re-evaluate after onboarding completion; move to `More` later only if usage drops.
+
+**B. Onboarding Checklist**
+Your list is strong. I’d change 3 things:
+1. Make `Invite your staff` conditional required (required only if they selected multi-staff operation).
+2. Add `Run first test order` as required (prevents “configured but unverified” launch risk).
+3. Define strict completion rules per step (not just page visit), e.g. menu requires active categories+dishes, tables requires at least one hall+table, process requires valid stages/channels/roles.
+
+Keep `Loyalty` as optional bonus.  
+Progress denominator should be required steps only (`3/5`, `4/6`, etc. depending on conditional steps).
+
+**C1. PartnerTables Mobile**
+Agree with almost all. I’d adjust:
+1. Keep `+ Table` visible in zone header (high-frequency action).
+2. Move zone secondary actions (`QR batch`, `edit`, `delete`) to overflow.
+3. Keep `+ Hall` as FAB only if it won’t clash with bottom nav/safe area; otherwise sticky header action.
+4. Increase reorder controls touch size to true mobile target size.
+
+**C2. PartnerStaffAccess Mobile**
+Agree except swipe:
+1. Avoid swipe-to-reveal for core actions in this app (discoverability + web gesture reliability + accessibility).
+2. Keep visible quick actions (`QR`, `copy`) plus overflow menu.
+3. Pending group at top with yellow treatment is good.
+4. Sticky search/filter is good.
+5. Primary `Invite` CTA should be persistent (FAB or sticky bottom button; I prefer sticky bottom button for clarity).
+
+**C3. MenuManage Mobile**
+Agree, with one safety tweak:
+1. Row-level destructive action should be `Archive`, not immediate hard delete.
+2. Keep collapsible categories and per-category `+ Dish`.
+3. Keep up/down reorder buttons on mobile, no drag handles.
+4. Sticky search is correct.
+5. `+ Category` can be FAB or top action; choose one global pattern and keep consistent across partner pages.
+
+**D. PartnerOrderProcess Mobile**
+Strongly agree. Current table-like row model should become mobile cards.
+1. Card: stage name + color dot, channels row, role badges row, overflow actions.
+2. Keep pipeline preview as horizontal scroll strip.
+3. Keep desktop table header only on larger breakpoints.
+4. Keep reorder on mobile via up/down, not drag.
+
+If you want, I can turn this into exact implementation acceptance criteria page-by-page (ready for build tickets).
+tokens used
+107 085
+No listed skill applies here; this is a UX/product review.
+
+**A. 4 vs 5 Tabs**
+Counter-argument for keeping `4` is still valid:
+1. `Staff` is usually a launch-phase spike, then drops; permanent primary-tab space is expensive.
+2. A 5th tab reduces label clarity on small screens/localized strings.
+3. You likely want a future slot for `Orders` if partner live queue ships.
+
+That said, with your real onboarding pattern (`15 staff`, `6 waiting`), I would switch to `5` now:
+`Home | Menu | Tables | Staff | More`
+
+Best compromise: make it phase-aware.
+1. Keep `Staff` in primary nav while onboarding is incomplete or pending invites > 0.
+2. Re-evaluate after onboarding completion; move to `More` later only if usage drops.
+
+**B. Onboarding Checklist**
+Your list is strong. I’d change 3 things:
+1. Make `Invite your staff` conditional required (required only if they selected multi-staff operation).
+2. Add `Run first test order` as required (prevents “configured but unverified” launch risk).
+3. Define strict completion rules per step (not just page visit), e.g. menu requires active categories+dishes, tables requires at least one hall+table, process requires valid stages/channels/roles.
+
+Keep `Loyalty` as optional bonus.  
+Progress denominator should be required steps only (`3/5`, `4/6`, etc. depending on conditional steps).
+
+**C1. PartnerTables Mobile**
+Agree with almost all. I’d adjust:
+1. Keep `+ Table` visible in zone header (high-frequency action).
+2. Move zone secondary actions (`QR batch`, `edit`, `delete`) to overflow.
+3. Keep `+ Hall` as FAB only if it won’t clash with bottom nav/safe area; otherwise sticky header action.
+4. Increase reorder controls touch size to true mobile target size.
+
+**C2. PartnerStaffAccess Mobile**
+Agree except swipe:
+1. Avoid swipe-to-reveal for core actions in this app (discoverability + web gesture reliability + accessibility).
+2. Keep visible quick actions (`QR`, `copy`) plus overflow menu.
+3. Pending group at top with yellow treatment is good.
+4. Sticky search/filter is good.
+5. Primary `Invite` CTA should be persistent (FAB or sticky bottom button; I prefer sticky bottom button for clarity).
+
+**C3. MenuManage Mobile**
+Agree, with one safety tweak:
+1. Row-level destructive action should be `Archive`, not immediate hard delete.
+2. Keep collapsible categories and per-category `+ Dish`.
+3. Keep up/down reorder buttons on mobile, no drag handles.
+4. Sticky search is correct.
+5. `+ Category` can be FAB or top action; choose one global pattern and keep consistent across partner pages.
+
+**D. PartnerOrderProcess Mobile**
+Strongly agree. Current table-like row model should become mobile cards.
+1. Card: stage name + color dot, channels row, role badges row, overflow actions.
+2. Keep pipeline preview as horizontal scroll strip.
+3. Keep desktop table header only on larger breakpoints.
+4. Keep reorder on mobile via up/down, not drag.
+
+If you want, I can turn this into exact implementation acceptance criteria page-by-page (ready for build tickets).

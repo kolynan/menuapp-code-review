@@ -1,165 +1,300 @@
 ---
-topic: Partner Cabinet Mobile-First UX Review
+topic: Partner Cabinet UX -- Mobile-First Review
 date: 2026-02-28
 rounds: 3
 status: completed
-participants: Claude (CC), Codex (GPT)
+participants: Claude Opus 4.6 (CC), Codex GPT-5.3 (GPT)
 ---
 
-# Discussion: Partner Cabinet Mobile-First UX Review
+# Discussion: Partner Cabinet UX -- Mobile-First Review
 
 ## Summary
 
-After 3 rounds of discussion with full analysis of 10 partner cabinet screenshots, Claude and Codex reached strong convergence on all major points. The partner cabinet needs a mobile-first overhaul focused on three pillars: (1) replacing the overflowing 8-tab top navigation with a 5-item bottom nav bar, (2) fixing touch target sizes and drag-and-drop interactions across data-heavy pages, and (3) restructuring long-form pages (settings, loyalty, menu) with sticky save bars and better section navigation. Two critical bugs (i18n key exposure on partnercontacts and profile) must be fixed immediately.
+Both AI reviewed all 10 partner cabinet screenshots and reached full consensus after 3 rounds. The partner cabinet currently works on desktop but has significant mobile usability issues: the 8-tab horizontal navigation will not fit on a phone, data-heavy pages (tables, staff, menu) use wide layouts that break on small screens, touch targets for action icons are too small, and two pages (partnercontacts, profile) show raw i18n keys instead of translated text. The recommended approach: redesign navigation as a 5-item bottom bar, convert all list pages to card-based mobile layouts, establish consistent shared patterns (sticky CTAs, collapsible sections, overflow menus), and fix i18n immediately as a P0 blocker.
+
+---
 
 ## Agreed (both AI)
 
-### P0 -- Must Fix (Breaks on Mobile)
+### P0 -- Fix Immediately
 
-1. **i18n key exposure** -- partnercontacts shows ALL text as raw keys (partnercontacts.page_title, etc). profile shows "profile.full_name" as label. Fix: add missing translation entries, implement fallback text rendering. *Quick win -- code fix.*
+1. **i18n key rendering bug is a release blocker.** Pages partnercontacts and profile show raw keys like "partnercontacts.page_title" and "profile.full_name" instead of real text. This makes pages completely unusable. Fix: add all missing translation strings to the locale files. Add a fallback that shows the last part of the key as human-readable text (e.g., "page_title" becomes "Page Title") rather than the full dot-path key.
 
-2. **Navigation inconsistency** -- partnercontacts uses a completely different nav (lab version header) vs all other pages which use the standard PartnerShell tab bar. Must be aligned to the same shell. *Phase 2 -- structural.*
+### P1 -- Redesign for Mobile
 
-3. **8-tab horizontal nav overflow** -- The current 8-tab bar (Glavnaya, Menu, Stoly, Personal, Process, Loyalnost, Klienty) overflows on mobile screens. It truncates labels and requires horizontal scrolling, which most users never discover. *Phase 2 -- PartnerShell redesign.*
+2. **Bottom navigation with 5 items: Home | Menu | Tables | Staff | More.** The current horizontal tab bar with 8 items does not fit on a 375px phone screen. The bottom nav should contain only pages used multiple times per day. "More" opens a full-screen list with: Process, Loyalty, Clients, Settings, Profile, and Contacts. Badges on "More" for pending items (unaccepted invites, incomplete setup).
 
-4. **Touch targets below 44px** -- Affected pages: partnertables (drag handles ~16px, QR icons, 3-dot menus clustered), menumanage (up/down arrows, drag grips, edit/delete icons), partnerstaffaccess (QR/copy/kebab icons side by side), partnerorderprocess (edit/delete per row). All interactive elements must be minimum 44x44px with adequate spacing. *Quick win -- CSS adjustments.*
+3. **Phase-aware Staff tab.** Staff stays in the primary bottom nav while the restaurant is onboarding (pending invites > 0 or setup incomplete). Can be reevaluated later based on usage data.
 
-### P1 -- Should Fix (Bad Experience)
+4. **No "Orders" tab without a live orders page.** The current "Process" page is for configuring workflow stages, not viewing live orders. If a partner-side live order view is built later, it gets the bottom nav slot.
 
-5. **Bottom navigation bar** -- Replace the 8-tab top bar on mobile (below md breakpoint) with a fixed bottom nav containing 5 items: Glavnaya (home), Menu, Stoly (tables), Personal (staff), Eshcho (more). The "Eshcho" tab opens a shadcn Sheet (bottom drawer) listing: Process, Loyalty, Clients, Settings, Profile, Contacts. Desktop keeps the existing top bar. *Phase 2 -- PartnerShell component.*
+5. **Unify contacts.** Deprecate the separate partnercontacts page (marked as lab/experimental). Keep contacts management only within partnersettings > Contacts tab. Add redirect from old URL to settings.
 
-6. **Sticky save bar** -- On partnerloyalty, partnersettings, and profile, the Save button is at the very bottom of a long page. On mobile, users may not scroll to find it. Add a sticky bottom bar that appears when form data is modified, showing "Unsaved changes" + Save button. Must account for stacking with the bottom nav bar (save bar sits above the nav). *Quick win -- CSS + minor state logic.*
+### P1 -- Page-by-Page Mobile Layouts
 
-7. **Drag-and-drop on mobile** -- Both partnertables and menumanage have 6-dot drag handles for reordering. On mobile: (a) drag gestures conflict with scroll, (b) handles are ~16px and impossible to grab. Solution: hide drag handles on mobile by default, show Up/Down arrow buttons as primary reorder method (menumanage already has these), add an explicit "Edit/Reorder" mode toggle for bulk reorganization. *Phase 2 -- component changes.*
+6. **PartnerHome (dashboard):**
+   - First block: live operational status (new orders, delayed, needs attention) -- if no orders, show onboarding checklist
+   - Second block: today KPIs (orders count, revenue in tenge)
+   - Third block: channel breakdown (in-hall, pickup, delivery) as tappable rows
+   - Fourth block: quick actions (edit menu, manage tables, invite staff)
+   - Empty state: replace "nothing here yet" banner with actionable onboarding checklist with progress bar
 
-8. **Menu management single-page accordion** -- menumanage currently shows all 8 categories expanded with 20+ dishes in one long scroll. On mobile: default all categories to collapsed state, add sticky category jump chips at the top (horizontal scrollable pills acting as anchor links), keep collapsible accordion pattern. Do NOT implement drill-down navigation (too complex for Base44). *Phase 2 -- component changes.*
+7. **Onboarding Checklist (for new partners):**
+   - "Add your restaurant info" -- opens Settings > Profile (completed when name + address filled)
+   - "Set up your menu" -- opens Menu Management (completed when at least 1 category + 1 dish exist)
+   - "Create halls and tables" -- opens Tables (completed when at least 1 hall + 1 table exist)
+   - "Invite your staff" -- opens Staff Access (conditionally required; completed when at least 1 staff accepted)
+   - "Configure order workflow" -- opens Process (completed when valid stages with channels and roles exist)
+   - "Run first test order" -- verify the full flow works end-to-end (required)
+   - "Set up loyalty program" -- opens Loyalty (optional bonus, not counted in progress)
+   - Progress bar: "3/5 setup steps complete" (denominator = required steps only)
 
-9. **Settings tab bar improvements** -- partnersettings already has a secondary tab bar (Profile, Hours, Channels, Hall, Wi-Fi, Languages, Currencies). On mobile: make it sticky at top, ensure horizontal scrolling with visual scroll indicator, add per-tab Save button, reduce section lengths within each tab. Do NOT split into separate routes. *Quick win (sticky/scroll) + Phase 2 (per-tab save).*
+8. **PartnerTables mobile:**
+   - Zones as collapsible cards (tap zone name to expand/collapse, default: collapsed)
+   - Zone header: zone name + table count + "+ Table" button (visible, not in overflow) + overflow menu (QR batch, edit zone, delete zone)
+   - Each table row: table number + code + status dot + QR icon + overflow (three-dot) menu
+   - "+ Hall" button: sticky at bottom or FAB (must not overlap bottom nav safe area)
+   - Reorder: up/down arrow buttons (48px touch targets), no drag handles on mobile
 
-10. **Working hours grid layout** -- The 7-day time grid in partnersettings (Mon-Sun, each with open time, close time, "working day" checkbox) is extremely cramped on mobile with ~5 elements per row. Restructure to vertical stacking: day name on one line, time pickers on the next line, with a "Copy to all days" button prominently placed to reduce repetitive input. *Phase 2 -- component layout.*
+9. **PartnerStaffAccess mobile:**
+   - Sticky top: search + filter dropdowns (role, status)
+   - Pending invites grouped at top with yellow/orange background
+   - Each staff card: name + role as title, status badge (Accepted/Waiting), date, visible QR + copy buttons + overflow menu
+   - No swipe-to-reveal gestures (poor discoverability on web, accessibility issues)
+   - Primary CTA: sticky bottom button "Invite Staff" (preferred over FAB for label clarity)
+   - "Send invitation" button: should appear consistently on all pending cards, not just some
 
-11. **Staff access list grouping** -- partnerstaffaccess shows 15+ staff cards in a flat list. Group by status with sticky section headers: "Active (9)" and "Waiting (6)". Within each card on mobile, show only the kebab menu (3 dots) as the single visible action button. QR and Copy actions move into the bottom sheet that opens from the kebab. Put Copy first, then QR in the sheet (most frequent actions at top). *Phase 2 -- component changes.*
+10. **MenuManage mobile:**
+    - Categories as collapsible accordion (default: collapsed except first)
+    - Each dish: image thumbnail (left) + name + price (right) + edit button + archive button (not hard delete)
+    - Reorder: up/down arrow buttons (48px), no drag handles on mobile
+    - For long jumps: add "Move to top" / "Move to bottom" in overflow menu
+    - "+ Category" as FAB or top button (choose one pattern globally)
+    - Per-category "+ Dish" button in each category header
+    - Sticky search at top
 
-12. **Order process table to cards** -- partnerorderprocess shows a table with columns (Number, Stage, Channels, Roles, Actions). On mobile, convert each row to a stacked card. Keep the pipeline visualization (4 circles with arrows) as a horizontally scrollable stepper. *Phase 2 -- component changes.*
+11. **PartnerOrderProcess mobile:**
+    - Pipeline visualization: horizontal scrollable strip with numbered circles (same as desktop but scrollable)
+    - Stage rows become cards: stage name + color dot, channel icons row below, role badges row below, edit/delete in overflow
+    - No table header on mobile (desktop-only)
+    - Reorder via up/down buttons, not drag
 
-13. **Statistics cards responsive layout** -- partnerloyalty has 5 stat cards in a 3+2 grid that will overflow on mobile. partnerhome has 2 stat cards side by side. On mobile: use 2-column grid for stat cards (loyalty), full-width stacked for dashboard stats (home). *Quick win -- CSS grid/flex adjustments.*
+12. **PartnerLoyalty mobile:**
+    - Form sections in collapsible cards (already close to correct)
+    - Sticky "Save" button at bottom of screen (not at bottom of the page content)
+    - Save button should look active/enabled when changes are made (current gray/disabled look is confusing)
 
-14. **Actionable empty states** -- partnerhome shows a generic yellow "Poka zdes pusto" (nothing here yet) banner. Replace with specific onboarding hints: "Add your first menu item" (links to Menu), "Set up your first table" (links to Tables), "Invite your staff" (links to Staff). Each hint is a card with icon + action button. *Phase 2 -- content + component.*
+13. **PartnerSettings mobile:**
+    - Keep existing horizontal sub-tabs (Profile, Hours, Channels, Hall, Wi-Fi, Languages, Currencies) -- this is a good pattern
+    - Each tab shows only its section content (no infinite scroll)
+    - Within dense tabs, use small collapsible groups
+    - Sticky Save/Discard bar per tab with unsaved-changes indicator
+    - Working hours: switch from grid to per-day cards -- each day shows "Open/Closed" toggle + time summary, tap to edit in bottom sheet, add "Copy Monday to all" and "Weekdays/Weekend" presets
 
-### P2 -- Nice Improvement
+14. **Profile page:**
+    - Simple form, works on mobile already
+    - Fix i18n key for "profile.full_name" label
+    - Save button should be sticky at bottom
 
-15. **FAB for create actions** -- On long list pages (Tables, Menu, Staff, Clients), use a floating action button for the primary "create" action (+Hall, +Category, +Invite, etc). Keep inline buttons for form/settings pages. *Phase 2 -- component.*
+### P2 -- Shared Mobile Patterns
 
-16. **Standardized loading skeletons** -- All pages should use consistent loading skeleton patterns in the same style, with Russian text for any loading messages. *Phase 2 -- component library.*
+15. **Touch targets:** minimum 44x44px, prefer 48x48px for primary actions. At least 8px spacing between adjacent targets. Max 1-2 visible action buttons per list row + overflow menu for rest.
+
+16. **Consistent app shell:** top title bar (page name + primary action) + bottom nav (5 items) + consistent layout. All pages follow same visual hierarchy.
+
+17. **List item anatomy (all list pages):** primary info (name/number) + status chip + 1-2 primary action buttons + overflow (three-dot) menu. Consistent across tables, staff, menu, clients.
+
+18. **Sticky action bars:** all forms (loyalty, settings, profile) have sticky Save at bottom of viewport. Never make user scroll to find Save.
+
+19. **Empty states:** every page should have a clear empty state with an actionable next step. Example: "No tables yet. Create your first hall to get started." with a prominent button.
+
+20. **Destructive actions:** always require confirmation (bottom sheet or dialog). For dishes, prefer "Archive" over immediate hard delete.
+
+21. **Status indication:** always use label + color, not color-only (accessibility). Example: green dot + "Free" text for tables, not just green dot.
+
+22. **Dish editing on mobile:** full-screen editor for complete edits (name, description, price, image, categories). Quick-edit bottom sheet for 1-2 fields (price, availability) directly from the list.
+
+---
 
 ## Claude's Unique Contributions
 
-- Identified the drag-and-drop conflict with scrolling as a P0/P1 issue (Codex missed this in Round 1)
-- Recognized that partnerorderprocess is a configuration page, not a live orders queue -- so it should not be in the primary bottom nav
-- Identified the working hours grid (7-day time picker matrix) as a specific mobile pain point
-- Argued for accordion + jump chips over drill-down navigation for menumanage, based on Base44 platform constraints
-- Argued for improving existing settings tabs rather than splitting into separate routes, based on Base44 constraints
+- Identified the PartnerContacts vs PartnerSettings Contacts duplication and proposed unification
+- Pointed out that "Orders" in the bottom nav had no corresponding page (Process is configuration, not live orders)
+- Noted that partnersettings already has good sub-navigation tabs and should keep them
+- Flagged working hours grid as a specific mobile pain point (14 time inputs)
+- Proposed the specific onboarding checklist items
+- Called out Base44 platform constraints that made some suggestions impractical
 
 ## Codex's Unique Contributions
 
-- Proposed the 5-item bottom nav pattern with "Eshcho" sheet (adopted with tab modifications)
-- Suggested "default all categories collapsed" rule for menumanage accordion
-- Raised the importance of bottom safe-area handling (env(safe-area-inset-bottom)) for iPhone notch/gesture bar
-- Noted the need for stacking order logic between sticky save bars, bottom nav, and sheets
-- Suggested focus trap and accessibility requirements for the Sheet component
-- Recommended i18n fixes as a rolling track (fix as you touch each screen) rather than batched at the end
-- Noted that if a live orders page is ever added, it should compete for a bottom nav slot (future-proofing)
+- "Phase-aware" navigation: adjust bottom tabs based on onboarding state
+- "Run first test order" as a required onboarding step (prevents untested launches)
+- Strict completion rules for checklist (not just page visit, but real data creation)
+- Rejected swipe-to-reveal gestures on web (discoverability + accessibility arguments)
+- Suggested Archive instead of hard delete for menu dishes
+- "Move to top / Move to bottom" for menu reorder long jumps
+- Proposed "Copy Monday to all" preset for working hours
+- Recommended explicit Refresh button + timestamp instead of pull-to-refresh (Base44 constraint)
+
+---
 
 ## Disagreements
 
-None remaining after Round 3. All initial disagreements were resolved:
+Only one minor disagreement arose and was resolved:
 
 | Topic | Claude's Position | Codex's Position | Resolution |
-|-------|------------------|------------------|------------|
-| Bottom nav tabs | Glavnaya, Menu, Stoly, Personal, Eshcho | Originally had Zakazy (Process) | Codex agreed -- Process is config, not live operations |
-| Menu management | Accordion + jump chips (single page) | Originally two-step drill-down | Codex agreed -- Base44 constraints make drill-down impractical |
-| Settings structure | Improve existing tabs (sticky, scrollable) | Originally separate screens | Codex agreed -- tabs already exist, improve them |
-| Drag-and-drop | Edit mode + Up/Down buttons | Not mentioned in Round 1 | Codex strongly agreed this is P0/P1 |
+|-------|------------------|-----------------|------------|
+| Swipe gestures on staff cards | Swipe left to reveal QR/copy/delete actions | No swipe -- keep visible buttons + overflow menu | Codex wins. Web swipe gestures have poor discoverability and accessibility. Visible buttons are safer. |
+
+---
 
 ## Recommendation for Arman
 
-The partner cabinet works on desktop but has serious usability problems on mobile phones. Restaurant owners who open the cabinet on their phone will struggle with: (a) a navigation bar that does not fit on the screen, (b) buttons and controls that are too small to tap accurately, (c) long pages where the Save button is hidden at the very bottom.
+The partner cabinet needs mobile optimization in this priority order:
 
-We recommend implementing changes in 3 phases:
+**Phase 1 (do first, small effort):**
+- Fix i18n keys on partnercontacts and profile pages -- add missing translation strings
+- Make Save buttons sticky at bottom on all form pages (loyalty, settings, profile)
+- Increase all icon button touch targets to 44px minimum
 
-### Phase 1: Quick Wins (CSS/layout only, no component restructuring)
+**Phase 2 (medium effort, high impact):**
+- Replace the 8-tab horizontal bar with a 5-item bottom navigation: Home | Menu | Tables | Staff | More
+- Add "More" screen listing: Process, Loyalty, Clients, Settings
+- Deprecate separate partnercontacts page, redirect to Settings > Contacts
 
-These can be done within existing page code with Tailwind responsive classes:
+**Phase 3 (larger effort, per-page redesign):**
+- PartnerHome: add onboarding checklist for new restaurants, improve dashboard for active ones
+- PartnerTables: collapsible zones, mobile-friendly table rows, bigger touch targets
+- PartnerStaffAccess: consistent card layout, pending group at top, sticky Invite button
+- MenuManage: collapsible categories, archive instead of delete, bigger reorder arrows
+- PartnerOrderProcess: cards instead of table rows, scrollable pipeline strip
+- PartnerSettings Working Hours: per-day cards with presets
 
-| Change | Pages | What to do |
-|--------|-------|------------|
-| Sticky save bar | partnerloyalty, partnersettings, profile | Add `sticky bottom-0` bar with Save button, show when form is dirty |
-| 44px touch targets | partnertables, menumanage, partnerstaffaccess, partnerorderprocess | Add `min-h-[44px] min-w-[44px]` to all icon buttons, increase gap between action icons |
-| Hide drag handles on mobile | partnertables, menumanage | Add `hidden md:flex` to drag handle elements |
-| Stat cards responsive | partnerloyalty, partnerhome | Use `grid-cols-2` on mobile instead of `grid-cols-3` or `grid-cols-5` |
-| Scrollable settings tabs | partnersettings | Add `overflow-x-auto sticky top-0 z-10` to secondary tab bar |
+Each phase can be implemented independently. Phase 1 is pure bug fixing and can ship immediately. Phase 2 is the single highest-impact change (navigation affects every page). Phase 3 improves individual pages one by one.
 
-### Phase 2: Component Changes (React + Tailwind)
-
-Do in this order -- PartnerShell nav first, then page-level fixes:
-
-| Priority | Change | Page |
-|----------|--------|------|
-| 2a | Bottom nav bar + Eshcho sheet | PartnerShell (affects all pages) |
-| 2b | Align partnercontacts to standard shell | partnercontacts |
-| 2c | Accordion categories + jump chips | menumanage |
-| 2d | Working hours vertical layout | partnersettings |
-| 2e | Staff grouping by status + single action button | partnerstaffaccess |
-| 2f | Table-to-card responsive conversion | partnerorderprocess |
-| 2g | Edit/Reorder mode for ordering | partnertables, menumanage |
-
-### Phase 3: Content and Polish
-
-| Change | Page |
-|--------|------|
-| i18n fixes (rolling -- start with touched pages) | partnercontacts, profile, all pages as touched |
-| Actionable empty states | partnerhome |
-| Loading skeletons | all pages |
-| FAB for create actions | partnertables, menumanage, partnerstaffaccess |
-
-### Technical Notes for Implementation
-
-- Bottom nav must include `padding-bottom: env(safe-area-inset-bottom)` for iPhones with gesture bar
-- When both sticky save bar and bottom nav are visible, save bar sits ABOVE the nav bar (z-index stacking)
-- The "Eshcho" Sheet needs: focus trap, close-on-navigate, keyboard-safe positioning
-- Active tab highlighting in bottom nav must work for pages opened from the "Eshcho" sheet (highlight the "Eshcho" icon when on Process/Loyalty/Clients/Settings/Profile/Contacts)
-- i18n fixes should be applied as each page is touched for mobile work, not saved for a separate phase
-
-## Mobile Bottom Nav -- Visual Layout
-
-```
-+--------------------------------------------------+
-|  [ Home ]  [ Menu ]  [ Tables ]  [ Staff ]  [...]|
-|    icon      icon      icon       icon      icon  |
-|  Glavnaya   Menu     Stoly     Personal   Eshcho  |
-+--------------------------------------------------+
-   active = blue underline/fill
-   Eshcho opens Sheet with remaining 6 pages
-```
-
-The "Eshcho" Sheet contents:
-```
-+--------------------------------------------------+
-|  Eshcho                                     [X]   |
-|                                                   |
-|  [ icon ]  Process zakazov                        |
-|  [ icon ]  Loyalnost                              |
-|  [ icon ]  Klienty                                |
-|  [ icon ]  Nastroyki                              |
-|  [ icon ]  Profil                                 |
-|  [ icon ]  Kontakty                               |
-+--------------------------------------------------+
-```
+---
 
 ## Next Steps
 
-1. **Arman reviews this document** and confirms the 3-phase approach
-2. **Phase 1 implementation** starts immediately -- these are CSS-only changes, can be done page by page through the existing code review pipeline
-3. **Phase 2 starts with PartnerShell** -- this is the foundation; once the bottom nav works, all subsequent page changes will be tested against the correct mobile layout
-4. **Create a BACKLOG entry** for each Phase 2 and Phase 3 item with estimated effort
-5. **i18n fixes for partnercontacts and profile** should be treated as a separate bug-fix task (not UX) and can be done in parallel with Phase 1
+If Arman agrees with this plan:
+
+1. Create implementation tickets for each phase
+2. Phase 1: assign to next code review cycle (fix i18n, sticky save, touch targets)
+3. Phase 2: design the bottom nav in PartnerShell.jsx -- this is the central component that wraps all partner pages (the code already has `getTabs(t)` with all 8 tabs defined at lines 86-93)
+4. Phase 3: tackle pages one at a time in order of most-used (Menu and Tables first)
+5. Test each change on a real phone (Chrome DevTools mobile simulation is not enough for touch targets)
+
+---
+
+## ASCII Wireframes
+
+### Proposed Mobile Bottom Nav
+
+```
++------------------------------------------+
+|  Manhatten Restaurant            [=]     |  <- top bar (name + hamburger for profile/logout)
++------------------------------------------+
+|                                          |
+|  [Page Content Area]                     |
+|                                          |
+|                                          |
++------------------------------------------+
+|  [Sticky Save / Action Bar]             |  <- appears on form pages only
++------------------------------------------+
+| [Home] [Menu] [Tables] [Staff] [More]   |  <- fixed bottom nav, icons + labels
++------------------------------------------+
+```
+
+### "More" Screen
+
+```
++------------------------------------------+
+|  <- Back                                 |
++------------------------------------------+
+|                                          |
+|  [Process]     Configure order workflow  |
+|  [Loyalty]     Loyalty program setup     |
+|  [Clients]     Client database      [1] |  <- badge if new clients
+|  [Settings]    Restaurant settings       |
+|                                          |
++------------------------------------------+
+| [Home] [Menu] [Tables] [Staff] [More]   |
++------------------------------------------+
+```
+
+### PartnerHome with Onboarding
+
+```
++------------------------------------------+
+|  Manhatten Restaurant            [=]     |
++------------------------------------------+
+|                                          |
+|  Setup your restaurant     3/5 complete  |
+|  [===============-------]                |
+|                                          |
+|  [x] Add restaurant info                 |
+|  [x] Set up your menu                    |
+|  [x] Create halls and tables             |
+|  [ ] Invite your staff          ->       |
+|  [ ] Run first test order       ->       |
+|  ....................................    |
+|  [*] Set up loyalty (bonus)     ->       |
+|                                          |
++------------------------------------------+
+| [Home] [Menu] [Tables] [Staff] [More]   |
++------------------------------------------+
+```
+
+### PartnerTables Mobile
+
+```
++------------------------------------------+
+|  Tables         3 Halls, 11 Tables  [i] |
++------------------------------------------+
+|  [Search...]           [QR] [Settings]  |
++------------------------------------------+
+|                                          |
+|  v Veranda VIP (5)   [+ Table]  [...]   |
+|    #1  753-01  Free  [green]  [QR] [..] |
+|    #4  753-04  Free  [green]  [QR] [..] |
+|    #11 753-11  Free  [green]  [QR] [..] |
+|                                          |
+|  > Winter Garden (4)                     |  <- collapsed
+|  > Terrace (2)                           |  <- collapsed
+|                                          |
++------------------------------------------+
+|           [+ Hall]                       |  <- sticky button
++------------------------------------------+
+| [Home] [Menu] [Tables] [Staff] [More]   |
++------------------------------------------+
+```
+
+### Staff Access Mobile
+
+```
++------------------------------------------+
+|  Staff Access        Active 9  Wait 6   |
++------------------------------------------+
+|  [Search...]    [Filter v]  [Role v]    |
++------------------------------------------+
+|                                          |
+|  -- Pending Invitations --     [yellow] |
+|  [person] Anton                          |
+|     Staff  |  Link  |  14 Jan  | Wait   |
+|     [QR] [Copy] [...]                    |
+|                                          |
+|  [person] Lena                           |
+|     Staff  |  Link  |  19 Jan  | Wait   |
+|     [QR] [Copy] [...]                    |
+|                                          |
+|  -- Active Staff --                      |
+|  [person] Mishel                         |
+|     Staff  |  Email  |  15 Jan  | OK    |
+|     [QR] [Copy] [...]                    |
+|                                          |
++------------------------------------------+
+|        [+ Invite Staff]                  |  <- sticky bottom
++------------------------------------------+
+| [Home] [Menu] [Tables] [Staff] [More]   |
++------------------------------------------+
+```
