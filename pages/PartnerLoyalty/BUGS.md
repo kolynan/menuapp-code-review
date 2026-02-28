@@ -1,8 +1,16 @@
 # PartnerLoyalty — Bug Tracker
 
-**Last updated:** 2026-02-24
+**Last updated:** 2026-02-28
 
 ---
+
+## Fixed (in RELEASE 260228-00)
+
+| ID | Priority | Description | Commit |
+|----|----------|-------------|--------|
+| BUG-PL-008 | P2 | Save button not visible on mobile — requires full scroll to bottom of long form | Phase1 fix |
+| BUG-PL-009 | P2 | Checkbox touch targets below 44px minimum — hard to tap on mobile | Phase1 fix |
+| BUG-PL-010 | P2 | Save button too small on mobile — below 44px touch target minimum | Phase1 fix |
 
 ## Fixed (in RELEASE 260224-00)
 

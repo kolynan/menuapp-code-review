@@ -154,7 +154,7 @@ function PartnerLoyaltyContent() {
           <CardDescription>{t("loyalty.bonus.description")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-h-[44px]">
             <Checkbox
               id="loyalty_enabled"
               checked={formData.loyalty_enabled}
@@ -184,7 +184,7 @@ function PartnerLoyaltyContent() {
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-h-[44px]">
             <Checkbox
               id="loyalty_review_enabled"
               checked={formData.loyalty_review_enabled}
@@ -283,7 +283,7 @@ function PartnerLoyaltyContent() {
           <CardDescription>{t("loyalty.discount.description")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-h-[44px]">
             <Checkbox
               id="discount_enabled"
               checked={formData.discount_enabled}
@@ -313,7 +313,7 @@ function PartnerLoyaltyContent() {
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-h-[44px]">
                   <Checkbox
                     id="discount_allow_anonymous"
                     checked={formData.discount_allow_anonymous}
@@ -361,12 +361,12 @@ function PartnerLoyaltyContent() {
         </CardContent>
       </Card>
 
-      {/* Save button */}
-      <div className="flex justify-end">
+      {/* Save button — sticky at bottom for mobile */}
+      <div className="sticky bottom-0 z-10 bg-white border-t border-slate-200 py-3">
         <Button
           onClick={handleSave}
           disabled={!hasChanges || saveStatus === "saving"}
-          className="min-w-[120px]"
+          className="w-full sm:w-auto min-w-[120px] min-h-[44px]"
         >
           {saveStatus === "saving" ? (
             <>
