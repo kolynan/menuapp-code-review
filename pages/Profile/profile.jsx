@@ -35,10 +35,11 @@ function ProfileContent() {
 
   // Smart fallback: show human-readable text instead of raw i18n key
   const tr = (key) => {
+    if (typeof key !== "string" || !key) return "";
     const val = t(key);
-    if (val !== key) return val;
-    const last = key.split('.').pop();
-    return last.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    if (typeof val === "string" && val && val !== key) return val;
+    const last = key.split(".").pop();
+    return last.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
   const [user, setUser] = useState(null);
@@ -160,7 +161,7 @@ function ProfileContent() {
         <div className="flex flex-col items-center gap-3 text-gray-500">
           <AlertCircle className="w-8 h-8 text-red-400" />
           <p className="text-sm">{tr("profile.load_error")}</p>
-          <Button variant="outline" size="sm" onClick={() => navigate(BACK_ROUTE)}>
+          <Button variant="outline" size="sm" onClick={() => navigate(BACK_ROUTE)} className="min-h-[44px] min-w-[44px]">
             {tr("common.back")}
           </Button>
         </div>
@@ -229,6 +230,7 @@ function ProfileContent() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 autoFocus
+                className="min-h-[44px]"
               />
             </div>
 
@@ -239,7 +241,7 @@ function ProfileContent() {
                 id="email"
                 value={user?.email || ""}
                 readOnly
-                className="bg-gray-50 text-gray-600"
+                className="min-h-[44px] bg-gray-50 text-gray-600"
               />
             </div>
 
@@ -265,8 +267,11 @@ function ProfileContent() {
         </Card>
       </div>
 
-      {/* Sticky Save Footer */}
-      <div className="sticky bottom-0 bg-white border-t p-4 shadow-[0_-2px_8px_rgba(0,0,0,0.08)] shrink-0">
+      {/* Spacer for fixed footer */}
+      <div className="h-20 shrink-0" />
+
+      {/* Fixed Save Footer — fixed for iOS Safari reliability */}
+      <div className="fixed inset-x-0 bottom-0 z-20 bg-white border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-2px_8px_rgba(0,0,0,0.08)]">
         <div className="max-w-lg mx-auto">
           <Button
             onClick={handleSave}
