@@ -508,7 +508,7 @@ function WorkingHoursSection({ partner, onSave, saving, t }) {
           variant="outline" 
           onClick={copyToAll}
           disabled={isSaving}
-          className="hidden sm:flex"
+          className="hidden sm:flex min-h-[44px]"
         >
           <Copy className="mr-1 h-4 w-4" />
           {t("settings.hours.copyToAll")}
@@ -520,7 +520,7 @@ function WorkingHoursSection({ partner, onSave, saving, t }) {
         variant="outline" 
         onClick={copyToAll}
         disabled={isSaving}
-        className="w-full sm:hidden"
+        className="w-full sm:hidden min-h-[44px]"
       >
         <Copy className="mr-1 h-4 w-4" />
         {t("settings.hours.copyMonToAll")}
@@ -803,7 +803,7 @@ function HallOrderingSection({ partner, onSave, saving, t }) {
             size="sm"
             onClick={handleCodeSave}
             disabled={isSaving}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto min-h-[44px]"
           >
             {isSaving ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t("common.saving")}</>
@@ -1018,7 +1018,7 @@ function WifiSection({ partner, wifiConfig, onSave, saving, t }) {
                 <Button
                   onClick={handleSave}
                   disabled={isSaving || !hasChanges}
-                  className="w-full sm:w-auto"
+                  className="w-full sm:w-auto min-h-[44px]"
                 >
                   {isSaving ? (
                     <>
@@ -1273,7 +1273,7 @@ function CurrenciesSection({ partner, onSave, saving, t }) {
                     value={rateValue || ""} 
                     onChange={(e) => handleRateChange(code, e.target.value)} 
                     onBlur={saveRate} 
-                    className={`w-24 h-8 text-sm ${!hasValidRate ? "border-amber-400" : ""}`} 
+                    className={`w-24 h-11 text-sm ${!hasValidRate ? "border-amber-400" : ""}`}
                     placeholder={t("settings.currencies.ratePlaceholder")}
                   />
                   <span className="text-sm text-slate-500">{defaultSymbol}</span>
@@ -1307,7 +1307,7 @@ function CurrenciesSection({ partner, onSave, saving, t }) {
                 value={customCurrency} 
                 onChange={(e) => setCustomCurrency(e.target.value.toUpperCase())} 
                 placeholder={t("settings.currencies.code")} 
-                className="w-16 h-8 text-sm text-center" 
+                className="w-16 h-11 text-sm text-center"
                 maxLength={4} 
               />
               <Button 
@@ -1315,7 +1315,7 @@ function CurrenciesSection({ partner, onSave, saving, t }) {
                 variant="outline" 
                 onClick={addCustomCurrency} 
                 disabled={isSaving || customCurrency.length < 2} 
-                className="h-8"
+                className="min-h-[44px] px-3"
               >
                 <Plus className="h-3 w-3" />
               </Button>
@@ -1353,7 +1353,7 @@ function ContactsSection({
             <p className="text-sm text-slate-500">{t("settings.contacts.subtitle")}</p>
           </div>
         </div>
-        <Button size="sm" variant="outline" onClick={onAdd} disabled={!apiReady || saving}>
+        <Button size="sm" variant="outline" onClick={onAdd} disabled={!apiReady || saving} className="min-h-[44px]">
           <Plus className="mr-1 h-4 w-4" />{t("settings.common.add")}
         </Button>
       </div>
@@ -1548,7 +1548,7 @@ function SectionNav({ activeSection, t }) {
                 type="button"
                 onClick={() => scrollToSection(id)}
                 title={label}
-                className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all min-h-[44px] ${
                   activeSection === id
                     ? "bg-indigo-100 text-indigo-700 shadow-sm"
                     : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm"

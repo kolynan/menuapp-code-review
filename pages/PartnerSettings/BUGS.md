@@ -1,7 +1,7 @@
 # PartnerSettings Bug Tracker
 
 **Page:** `pages/PartnerSettings/partnersettings.jsx`
-**Last updated:** 2026-02-24
+**Last updated:** 2026-03-01
 
 ---
 
@@ -59,8 +59,14 @@
 
 ### BUG-PS-017 (P2) -- Touch targets below 44px minimum
 - **Lines:** time inputs (h-8), hall inputs (h-9), contact buttons (h-8 w-8), currency delete (p-1), wifi eye button, nav arrows (w-9 h-9)
-- **Fix:** Increased all interactive elements to min 44px: time inputs h-11, hall inputs h-11, contact buttons h-11 w-11, currency delete min-w/h-[44px], wifi eye button min-w/h-[44px], nav arrows w-11 h-11, language/currency/contact-mode buttons min-h-[44px]
+- **Fix:** Phase 1: time inputs h-11, hall inputs h-11, contact buttons h-11 w-11, currency delete min-w/h-[44px], wifi eye button min-w/h-[44px], nav arrows w-11 h-11, language/currency/contact-mode buttons min-h-[44px]
 - **Commit:** Phase 1 UX fix
+- **Status:** FIXED
+
+### BUG-PS-018 (P2) -- Remaining touch targets below 44px (Phase 1v2)
+- **Lines:** currency rate input (h-8), custom currency input (h-8), custom currency add button (h-8), section nav tabs (~40px), copy-to-all buttons (size=sm), contact add button (size=sm), hall code save button (size=sm), wifi save button
+- **Fix:** Currency rate input h-8->h-11, custom currency input h-8->h-11, custom currency add button h-8->min-h-[44px], section nav tabs +min-h-[44px], copy-to-all buttons +min-h-[44px], contact add button +min-h-[44px], hall code save +min-h-[44px], wifi save +min-h-[44px]
+- **Commit:** Phase 1v2 CC+Codex fix (`c286a70`)
 - **Status:** FIXED
 
 ---
