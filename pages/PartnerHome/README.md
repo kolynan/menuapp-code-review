@@ -17,6 +17,8 @@ Dashboard page showing today's KPIs: open tables, order count, revenue by channe
 | Version | Date | Changes |
 |---------|------|---------|
 | 260224-00 | 2026-02-24 | Initial review. Fixed BUG-PH-001 (usePartnerAccess pattern) + BUG-PH-002 (session double-count). |
+| 260301-02 | 2026-03-01 | BUG-6: Fixed tables banner routing (/staffordersmobile -> /partnertables). |
 
 ## UX Changelog
+- **260301:** Кнопка "Нет открытых столов" теперь ведёт на управление столами, а не на мобильный вид официанта.
 - **260224:** Fixed "open tables" counter that was inflated by counting expired sessions as open.

@@ -1,6 +1,6 @@
 # PartnerHome — Bug Tracker
 
-**Last updated:** 2026-02-24
+**Last updated:** 2026-03-01
 
 ---
 
@@ -10,6 +10,7 @@
 |----|----------|-------------|--------|
 | BUG-PH-001 | P1 | Partner.list()[0] instead of usePartnerAccess() — wrong tenant, bypasses access control | `6825d1c` |
 | BUG-PH-002 | P1 | openSessions double-counts locally-expired sessions — inflated "open tables" counter | `6825d1c` |
+| BUG-6 | P1 | Tables banner navigates to /staffordersmobile instead of /partnertables | `c3e9b1a` |
 
 ---
 
