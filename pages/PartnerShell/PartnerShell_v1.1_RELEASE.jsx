@@ -1,4 +1,4 @@
-// Version: 1.1 | Updated: 2026-02-22 | Session: 23 | Source: v1.0 BASE + 14 review patches
+// Version: 1.2 | Updated: 2026-03-01 | Session: 59 | Source: v1.1 RELEASE + hamburger Settings item
 // Review: pages/PartnerShell/review_2026-02-22.md
 // Patches applied: P1-P5, P7-P15, N1 (P6 conceded, N2/N3 rejected)
 
@@ -404,6 +404,10 @@ export default function PartnerShell({ activeTab, children }) {
                   <DropdownMenuItem onClick={() => navigate("/profile")} className="gap-2">
                     <User className="h-4 w-4" aria-hidden="true" />
                     {t("nav.profile")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/partnersettings")} className="gap-2">
+                    <Settings className="h-4 w-4" aria-hidden="true" />
+                    {t("nav.settings")}
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
