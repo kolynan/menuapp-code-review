@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -18,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -27,25 +30,27 @@ import {
   Clock,
   Coins,
   Copy,
+  Edit2,
   Eye,
+  ExternalLink,
   Languages,
   Loader2,
-  Pencil,
   Plus,
+  Power,
   Store,
   Package,
+  Save,
+  Send,
   Truck,
   Trash2,
   Phone,
   Mail,
   Instagram,
   Facebook,
-  MessageCircle,
   Link as LinkIcon,
   Globe,
   Building2,
   MapPin,
-  Type,
   RefreshCw,
   Utensils,
   Wifi,
@@ -102,19 +107,6 @@ function getChannels(t) {
   ];
 }
 
-function getContactTypes(t) {
-  return [
-    { value: "phone", label: t("settings.contacts.types.phone"), Icon: Phone },
-    { value: "email", label: t("settings.contacts.types.email"), Icon: Mail },
-    { value: "instagram", label: "Instagram", Icon: Instagram },
-    { value: "facebook", label: "Facebook", Icon: Facebook },
-    { value: "whatsapp", label: "WhatsApp", Icon: MessageCircle },
-    { value: "telegram", label: "Telegram", Icon: MessageCircle },
-    { value: "website", label: t("settings.contacts.types.website"), Icon: Globe },
-    { value: "other", label: t("settings.contacts.types.other"), Icon: LinkIcon },
-  ];
-}
-
 function getWeekdays(t) {
   return [
     { key: "mon", label: t("settings.hours.weekdays.monShort"), full: t("settings.hours.weekdays.mon") },
@@ -127,13 +119,6 @@ function getWeekdays(t) {
   ];
 }
 
-function getContactViewModes(t) {
-  return [
-    { value: "icons", label: t("settings.contacts.viewMode.iconsOnly"), Icon: Eye },
-    { value: "full", label: t("settings.contacts.viewMode.iconText"), Icon: Type },
-  ];
-}
-
 function getSectionTabs(t) {
   return [
     { id: "profile", label: t("settings.tabs.profile"), Icon: Building2 },
@@ -143,7 +128,6 @@ function getSectionTabs(t) {
     { id: "wifi", label: t("settings.tabs.wifi"), Icon: Wifi },
     { id: "languages", label: t("settings.tabs.languages"), Icon: Languages },
     { id: "currencies", label: t("settings.tabs.currencies"), Icon: Coins },
-    { id: "contacts", label: t("settings.tabs.contacts"), Icon: Phone },
   ];
 }
 
@@ -155,19 +139,68 @@ function normStr(s) {
   return (s ?? "").toString().trim();
 }
 
-function sortByOrder(arr) {
-  return [...(arr || [])].sort((a, b) => {
-    const ao = Number.isFinite(+a?.sort_order) ? +a.sort_order : 1e9;
-    const bo = Number.isFinite(+b?.sort_order) ? +b.sort_order : 1e9;
-    if (ao !== bo) return ao - bo;
-    return normStr(a?.name || a?.label).localeCompare(normStr(b?.name || b?.label), "ru");
-  });
+/* ============================================================
+   CONTACTS TAB HELPERS (from PartnerContacts)
+   ============================================================ */
+
+function getContactTypeIcon(type) {
+  const map = {
+    phone: Phone,
+    whatsapp: Send,
+    instagram: Instagram,
+    facebook: Facebook,
+    tiktok: Send,
+    website: Globe,
+    email: Mail,
+    map: MapPin,
+    custom: ExternalLink,
+  };
+  return map[type] || ExternalLink;
 }
 
-function getContactIcon(type, t) {
-  const CONTACT_TYPES = getContactTypes(t);
-  const found = CONTACT_TYPES.find((ct) => ct.value === type);
-  return found ? found.Icon : LinkIcon;
+function getContactTypeBadgeColor(type) {
+  const colors = {
+    phone: "bg-blue-100 text-blue-800",
+    whatsapp: "bg-green-100 text-green-800",
+    instagram: "bg-pink-100 text-pink-800",
+    facebook: "bg-indigo-100 text-indigo-800",
+    tiktok: "bg-slate-100 text-slate-800",
+    website: "bg-purple-100 text-purple-800",
+    email: "bg-amber-100 text-amber-800",
+    map: "bg-teal-100 text-teal-800",
+    custom: "bg-slate-100 text-slate-700",
+  };
+  return colors[type] || "bg-slate-100 text-slate-700";
+}
+
+function getContactTypeLabel(type, t) {
+  const labels = {
+    phone: t('partnercontacts.type.phone', 'Phone'),
+    whatsapp: t('partnercontacts.type.whatsapp', 'WhatsApp'),
+    instagram: t('partnercontacts.type.instagram', 'Instagram'),
+    facebook: t('partnercontacts.type.facebook', 'Facebook'),
+    tiktok: t('partnercontacts.type.tiktok', 'TikTok'),
+    website: t('partnercontacts.type.website', 'Website'),
+    email: t('partnercontacts.type.email', 'Email'),
+    map: t('partnercontacts.type.map', 'Map'),
+    custom: t('partnercontacts.type.custom', 'Custom'),
+  };
+  return labels[type] || t('partnercontacts.type.link', 'Link');
+}
+
+function getContactUrlPrefix(type) {
+  const prefixes = {
+    phone: "tel:",
+    email: "mailto:",
+    whatsapp: "https://wa.me/",
+    instagram: "https://instagram.com/",
+    facebook: "https://facebook.com/",
+    tiktok: "https://tiktok.com/@",
+    website: "https://",
+    map: "https://maps.google.com/?q=",
+    custom: "https://",
+  };
+  return prefixes[type] || "";
 }
 
 function parseWorkingHours(raw) {
@@ -259,18 +292,6 @@ async function loadPartner(pid) {
   try {
     const res = await base44.entities.Partner.get(pid);
     return res || null;
-  } catch (e) {
-    // P1-1: Пробрасываем rate limit ошибки
-    if (isRateLimitError(e)) throw e;
-    return null;
-  }
-}
-
-async function loadPartnerContacts(pid) {
-  if (!pid) return null;
-  try {
-    const list = await listFor("PartnerContacts", pid);
-    return list?.[0] || null;
   } catch (e) {
     // P1-1: Пробрасываем rate limit ошибки
     if (isRateLimitError(e)) throw e;
@@ -1327,127 +1348,531 @@ function CurrenciesSection({ partner, onSave, saving, t }) {
   );
 }
 
-function ContactsSection({ 
-  contacts, 
-  contactSettings, 
-  onAdd, 
-  onEdit, 
-  onDelete, 
-  onViewModeChange,
-  saving, 
-  apiReady,
-  t
-}) {
-  const CONTACT_VIEW_MODES = useMemo(() => getContactViewModes(t), [t]);
-  const viewMode = contactSettings?.view_mode || "full";
+/* ============================================================
+   CONTACTS FULL TAB (merged from PartnerContacts page)
+   ============================================================ */
+
+function ContactsFullTab({ partnerId, t }) {
+  const queryClient = useQueryClient();
+
+  const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState("icons");
+  const [viewModeDirty, setViewModeDirty] = useState(false);
+
+  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  const [editingLink, setEditingLink] = useState(null);
+  const [linkForm, setLinkForm] = useState({
+    type: "phone",
+    label: "",
+    url: "",
+    sort_order: "",
+    is_active: true,
+  });
+
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+
+  const { data: partnerContactsRaw = [], isLoading: loadingContacts } = useQuery({
+    queryKey: ["partnerContacts", partnerId],
+    enabled: !!partnerId,
+    queryFn: () => base44.entities.PartnerContacts.filter({ partner: partnerId }),
+    placeholderData: [],
+  });
+
+  const { data: links = [], isLoading: loadingLinks } = useQuery({
+    queryKey: ["partnerContactLinks", partnerId],
+    enabled: !!partnerId,
+    queryFn: () => base44.entities.PartnerContactLink.filter({ partner: partnerId }),
+    placeholderData: [],
+  });
+
+  const partnerContactsRecord = partnerContactsRaw?.[0] || null;
+  const recordId = partnerContactsRecord?.id;
+  const recordViewMode = partnerContactsRecord?.view_mode;
+
+  useEffect(() => {
+    if (recordId) {
+      setViewMode(recordViewMode || "icons");
+      setViewModeDirty(false);
+    }
+  }, [recordId, recordViewMode]);
+
+  const sortedLinks = useMemo(() => {
+    return [...links].sort((a, b) => {
+      const oa = a?.sort_order;
+      const ob = b?.sort_order;
+      if (oa == null && ob == null) {
+        const ta = normStr(a?.type);
+        const tb = normStr(b?.type);
+        if (ta !== tb) return ta.localeCompare(tb);
+        return normStr(a?.label).localeCompare(normStr(b?.label));
+      }
+      if (oa == null) return 1;
+      if (ob == null) return -1;
+      if (oa !== ob) return oa - ob;
+      return normStr(a?.label).localeCompare(normStr(b?.label));
+    });
+  }, [links]);
+
+  const filteredLinks = useMemo(() => {
+    const s = normStr(search).toLowerCase();
+    if (!s) return sortedLinks;
+    return sortedLinks.filter(
+      (link) =>
+        normStr(link?.label).toLowerCase().includes(s) ||
+        normStr(link?.url).toLowerCase().includes(s) ||
+        normStr(link?.type).toLowerCase().includes(s)
+    );
+  }, [sortedLinks, search]);
+
+  const createPartnerContactsMutation = useMutation({
+    mutationFn: () =>
+      base44.entities.PartnerContacts.create({
+        partner: partnerId,
+        view_mode: viewMode,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["partnerContacts", partnerId] });
+      setViewModeDirty(false);
+      toast.success(t('partnercontacts.toast.created', 'Запись контактов создана'));
+    },
+    onError: () => toast.error(t('partnercontacts.toast.create_failed', 'Не удалось создать запись контактов')),
+  });
+
+  const updateViewModeMutation = useMutation({
+    mutationFn: (vm) =>
+      base44.entities.PartnerContacts.update(partnerContactsRecord?.id, { view_mode: vm }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["partnerContacts", partnerId] });
+      setViewModeDirty(false);
+      toast.success(t('partnercontacts.toast.viewmode_saved', 'Режим отображения сохранён'));
+    },
+    onError: () => toast.error(t('partnercontacts.toast.viewmode_update_failed', 'Не удалось обновить режим отображения')),
+  });
+
+  const saveLinkMutation = useMutation({
+    mutationFn: (payload) => {
+      if (editingLink) return base44.entities.PartnerContactLink.update(editingLink.id, payload);
+      return base44.entities.PartnerContactLink.create({ ...payload, partner: partnerId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["partnerContactLinks", partnerId] });
+      setIsLinkDialogOpen(false);
+      setEditingLink(null);
+      toast.success(editingLink ? t('partnercontacts.toast.link_updated', 'Ссылка обновлена') : t('partnercontacts.toast.link_created', 'Ссылка добавлена'));
+    },
+    onError: () => toast.error(t('partnercontacts.toast.link_save_failed', 'Не удалось сохранить ссылку')),
+  });
+
+  const toggleLinkActiveMutation = useMutation({
+    mutationFn: ({ id, is_active }) => base44.entities.PartnerContactLink.update(id, { is_active }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["partnerContactLinks", partnerId] });
+      toast.success(t('partnercontacts.toast.link_status_updated', 'Статус ссылки обновлён'));
+    },
+    onError: () => toast.error(t('partnercontacts.toast.link_status_failed', 'Не удалось обновить статус ссылки')),
+  });
+
+  const deleteLinkMutation = useMutation({
+    mutationFn: (id) => base44.entities.PartnerContactLink.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["partnerContactLinks", partnerId] });
+      setDeleteConfirmId(null);
+      toast.success(t('partnercontacts.toast.link_deleted', 'Ссылка удалена'));
+    },
+    onError: () => toast.error(t('partnercontacts.toast.link_delete_failed', 'Не удалось удалить ссылку')),
+  });
+
+  const saveViewMode = () => {
+    if (!partnerContactsRecord) {
+      createPartnerContactsMutation.mutate();
+    } else {
+      updateViewModeMutation.mutate(viewMode);
+    }
+  };
+
+  const openCreateLink = () => {
+    setEditingLink(null);
+    setLinkForm({
+      type: "phone",
+      label: getContactTypeLabel("phone", t),
+      url: "tel:",
+      sort_order: "",
+      is_active: true,
+    });
+    setIsLinkDialogOpen(true);
+  };
+
+  const openEditLink = (link) => {
+    setEditingLink(link);
+    setLinkForm({
+      type: link?.type || "phone",
+      label: link?.label || "",
+      url: link?.url || "",
+      sort_order: link?.sort_order == null ? "" : String(link.sort_order),
+      is_active: link?.is_active !== false,
+    });
+    setIsLinkDialogOpen(true);
+  };
+
+  const saveLink = () => {
+    if (!normStr(linkForm.url)) {
+      toast.error(t('partnercontacts.toast.url_required', 'URL обязателен'));
+      return;
+    }
+
+    const payload = {
+      type: linkForm.type,
+      label: normStr(linkForm.label) || getContactTypeLabel(linkForm.type, t),
+      url: normStr(linkForm.url),
+      is_active: linkForm.is_active !== false,
+    };
+
+    const so = normStr(linkForm.sort_order);
+    if (so) {
+      const soNum = Number.parseInt(so, 10);
+      if (Number.isNaN(soNum)) {
+        toast.error(t('partnercontacts.toast.sort_invalid', 'Порядок должен быть числом'));
+        return;
+      }
+      payload.sort_order = soNum;
+    }
+
+    saveLinkMutation.mutate(payload);
+  };
+
+  const handleTypeChange = (newType) => {
+    setLinkForm((prev) => ({
+      ...prev,
+      type: newType,
+      label: getContactTypeLabel(newType, t),
+      url: getContactUrlPrefix(newType),
+    }));
+  };
 
   return (
-    <div id="section-contacts" className="rounded-xl border bg-white p-4 sm:p-6 space-y-4 scroll-mt-20">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-50 text-purple-600">
-            <Phone className="h-5 w-5" />
+    <>
+      <div className="space-y-4">
+        {/* VIEW MODE */}
+        <div className="rounded-xl border bg-white p-4 sm:p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-50 text-purple-600">
+              <Eye className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-lg">{t('partnercontacts.view_mode.title', 'Режим отображения контактов')}</h2>
+              <p className="text-sm text-slate-500">{t('partnercontacts.view_mode.description', 'Выберите, как показывать контакты гостю в шапке меню.')}</p>
+            </div>
           </div>
-          <div>
-            <h2 className="font-semibold text-lg">{t("settings.contacts.title")}{contacts.length > 0 && ` (${contacts.length})`}</h2>
-            <p className="text-sm text-slate-500">{t("settings.contacts.subtitle")}</p>
-          </div>
-        </div>
-        <Button size="sm" variant="outline" onClick={onAdd} disabled={!apiReady || saving} className="min-h-[44px]">
-          <Plus className="mr-1 h-4 w-4" />{t("settings.common.add")}
-        </Button>
-      </div>
 
-      {/* View Mode Toggle */}
-      <div className="space-y-2">
-        <Label className="text-sm">{t("settings.contacts.displayInMenu")}</Label>
-        <div className="flex gap-2">
-          {CONTACT_VIEW_MODES.map(({ value, label, Icon }) => (
+          <div className="flex bg-slate-100 border border-slate-200 rounded-lg p-0.5 max-w-sm">
             <button
-              key={value}
-              type="button"
-              onClick={() => onViewModeChange(value)}
-              disabled={saving}
-              className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition flex items-center justify-center gap-2 min-h-[44px] ${
-                viewMode === value 
-                  ? "bg-indigo-50 border-indigo-300 text-indigo-700" 
-                  : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
-              } ${saving ? "opacity-50" : ""}`}
+              onClick={() => { setViewMode("icons"); setViewModeDirty(true); }}
+              className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all min-h-[44px] ${
+                viewMode === "icons" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
             >
-              <Icon className="h-4 w-4" />
-              {label}
+              {t('partnercontacts.view_mode.icons', 'Только иконки')}
             </button>
-          ))}
+            <button
+              onClick={() => { setViewMode("full"); setViewModeDirty(true); }}
+              className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all min-h-[44px] ${
+                viewMode === "full" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {t('partnercontacts.view_mode.full', 'Иконка + текст')}
+            </button>
+          </div>
+
+          {viewModeDirty && (
+            <div className="flex gap-2">
+              <Button
+                onClick={saveViewMode}
+                disabled={updateViewModeMutation.isPending || createPartnerContactsMutation.isPending}
+                className="bg-indigo-600 hover:bg-indigo-700 min-h-[44px]"
+              >
+                {(updateViewModeMutation.isPending || createPartnerContactsMutation.isPending) && (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                )}
+                <Save className="w-4 h-4 mr-2" />
+                {t('partnercontacts.view_mode.save', 'Сохранить режим')}
+              </Button>
+              <Button
+                variant="outline"
+                className="min-h-[44px]"
+                onClick={() => {
+                  setViewMode(partnerContactsRecord?.view_mode || "icons");
+                  setViewModeDirty(false);
+                }}
+              >
+                {t('common.cancel', 'Отмена')}
+              </Button>
+            </div>
+          )}
+
+          {!partnerContactsRecord && !loadingContacts && (
+            <div className="text-xs text-amber-600">
+              {t('partnercontacts.view_mode.no_record', 'Запись PartnerContacts отсутствует. Будет создана при сохранении.')}
+            </div>
+          )}
         </div>
-        <p className="text-xs text-slate-500">
-          {viewMode === "icons" 
-            ? t("settings.contacts.viewMode.iconsOnlyHint") 
-            : t("settings.contacts.viewMode.iconTextHint")}
-        </p>
+
+        {/* LINKS */}
+        <div className="rounded-xl border bg-white p-4 sm:p-6 space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h2 className="font-semibold text-lg">{t('partnercontacts.links.title', 'Контактные ссылки')}</h2>
+            <div className="flex items-center gap-2">
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('partnercontacts.links.search_placeholder', 'Поиск по названию/url...')}
+                className="w-56"
+              />
+              <Button onClick={openCreateLink} className="bg-indigo-600 hover:bg-indigo-700 gap-2 min-h-[44px]">
+                <Plus className="w-4 h-4" />
+                {t('partnercontacts.links.add', 'Добавить ссылку')}
+              </Button>
+            </div>
+          </div>
+
+          {loadingLinks ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="animate-spin" />
+            </div>
+          ) : filteredLinks.length === 0 ? (
+            <div className="p-8 text-center text-slate-500">
+              {search ? t('partnercontacts.links.not_found', 'Ссылок не найдено') : t('partnercontacts.links.empty', 'Нет ссылок. Добавьте первую контактную ссылку.')}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredLinks.map((link) => {
+                const Icon = getContactTypeIcon(link.type);
+                return (
+                  <div
+                    key={link.id}
+                    className={`flex items-center justify-between gap-4 p-3 border rounded-lg ${
+                      link.is_active === false ? "opacity-60 bg-slate-50" : "bg-white"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <Icon className="w-5 h-5 text-slate-500 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-medium text-slate-900">{link.label || getContactTypeLabel(link.type, t)}</div>
+                        <div className="text-xs text-slate-500 truncate">{link.url}</div>
+                      </div>
+                      <Badge className={`${getContactTypeBadgeColor(link.type)} text-xs shrink-0`}>
+                        {getContactTypeLabel(link.type, t)}
+                      </Badge>
+                      {link.is_active === false && (
+                        <Badge variant="outline" className="text-xs text-slate-500 shrink-0">
+                          {t('partnercontacts.links.disabled', 'Отключена')}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button size="sm" variant="ghost" onClick={() => openEditLink(link)} title={t('common.edit', 'Изменить')} className="min-h-[44px] min-w-[44px]">
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          toggleLinkActiveMutation.mutate({
+                            id: link.id,
+                            is_active: !(link.is_active !== false),
+                          })
+                        }
+                        disabled={toggleLinkActiveMutation.isPending}
+                        title={link.is_active !== false ? t('partnercontacts.links.disable', 'Отключить') : t('partnercontacts.links.enable', 'Включить')}
+                        className="min-h-[44px] min-w-[44px]"
+                      >
+                        <Power
+                          className={`w-4 h-4 ${
+                            link.is_active !== false ? "text-slate-500" : "text-green-700"
+                          }`}
+                        />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleteConfirmId(link.id)}
+                        title={t('common.delete', 'Удалить')}
+                        className="text-red-600 min-h-[44px] min-w-[44px]"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* PREVIEW */}
+        <div className="rounded-xl border bg-white p-4 sm:p-6 space-y-4">
+          <h3 className="text-sm font-medium">{t('partnercontacts.preview.title', 'Превью: как будет выглядеть в шапке')}</h3>
+          <div className="text-xs text-slate-500 mb-3">
+            {t('partnercontacts.preview.mode_label', 'Режим')}: <strong>{viewMode === "icons" ? t('partnercontacts.view_mode.icons', 'Только иконки') : t('partnercontacts.view_mode.full', 'Иконка + текст')}</strong>
+          </div>
+
+          {filteredLinks.filter((l) => l.is_active !== false).length === 0 ? (
+            <div className="text-sm text-slate-400">{t('partnercontacts.preview.no_active', 'Нет активных ссылок для превью')}</div>
+          ) : viewMode === "icons" ? (
+            <div className="flex gap-2 flex-wrap">
+              {filteredLinks
+                .filter((l) => l.is_active !== false)
+                .map((link) => {
+                  const Icon = getContactTypeIcon(link.type);
+                  return (
+                    <button
+                      key={link.id}
+                      className="h-11 w-11 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition"
+                      title={link.label || link.url}
+                    >
+                      <Icon className="w-4 h-4 text-slate-700" />
+                    </button>
+                  );
+                })}
+            </div>
+          ) : (
+            <div className="flex gap-3 flex-wrap">
+              {filteredLinks
+                .filter((l) => l.is_active !== false)
+                .map((link) => {
+                  const Icon = getContactTypeIcon(link.type);
+                  return (
+                    <button
+                      key={link.id}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition text-sm min-h-[44px]"
+                    >
+                      <Icon className="w-4 h-4 text-slate-700" />
+                      <span className="text-slate-900">{link.label || getContactTypeLabel(link.type, t)}</span>
+                    </button>
+                  );
+                })}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Preview */}
-      {contacts.length > 0 && (
-        <div className="space-y-1">
-          <Label className="text-xs text-slate-400">{t("settings.contacts.preview")}</Label>
-          <div className="flex flex-wrap gap-2 p-3 rounded-lg bg-slate-100">
-            {contacts.map((c) => {
-              const Icon = getContactIcon(c.type, t);
-              const displayText = c.url?.replace(/^(https?:\/\/)?(www\.)?/, "").split("/")[0] || c.label;
-              return (
-                <div 
-                  key={c.id} 
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white border text-sm"
-                >
-                  <Icon className="h-4 w-4 text-slate-600" />
-                  {viewMode === "full" && (
-                    <span className="text-slate-700 truncate max-w-[120px]">{displayText}</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* LINK DIALOG */}
+      <Dialog open={isLinkDialogOpen} onOpenChange={setIsLinkDialogOpen}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingLink ? t('partnercontacts.dialog.edit_title', 'Изменить ссылку') : t('partnercontacts.dialog.add_title', 'Добавить ссылку')}</DialogTitle>
+          </DialogHeader>
 
-      {/* Contact List */}
-      {contacts.length === 0 ? (
-        <div className="rounded-lg border-2 border-dashed bg-slate-50 p-6 text-center">
-          <Phone className="h-8 w-8 mx-auto text-slate-300 mb-2" />
-          <div className="text-sm text-slate-500">{t("settings.contacts.noContacts")}</div>
-          <Button variant="link" size="sm" className="mt-2" onClick={onAdd}>
-            {t("settings.contacts.addFirst")}
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {contacts.map((c) => {
-            const CONTACT_TYPES = getContactTypes(t);
-            const Icon = getContactIcon(c.type, t);
-            const typeLabel = CONTACT_TYPES.find(ct => ct.value === c.type)?.label || c.type;
-            return (
-              <div key={c.id} className="flex items-center gap-3 p-3 rounded-lg border bg-slate-50 hover:bg-slate-100 transition">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white border">
-                  <Icon className="h-5 w-5 text-slate-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{c.label || typeLabel}</div>
-                  <div className="text-sm text-slate-500 truncate">{c.url}</div>
-                </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => onEdit(c)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-11 w-11 text-red-600 hover:bg-red-50" onClick={() => onDelete(c)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="link_type">{t('partnercontacts.dialog.type_label', 'Тип *')}</Label>
+              <Select value={linkForm.type} onValueChange={handleTypeChange}>
+                <SelectTrigger id="link_type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="phone">{t('partnercontacts.type.phone', 'Phone')}</SelectItem>
+                  <SelectItem value="whatsapp">{t('partnercontacts.type.whatsapp', 'WhatsApp')}</SelectItem>
+                  <SelectItem value="instagram">{t('partnercontacts.type.instagram', 'Instagram')}</SelectItem>
+                  <SelectItem value="facebook">{t('partnercontacts.type.facebook', 'Facebook')}</SelectItem>
+                  <SelectItem value="tiktok">{t('partnercontacts.type.tiktok', 'TikTok')}</SelectItem>
+                  <SelectItem value="website">{t('partnercontacts.type.website', 'Website')}</SelectItem>
+                  <SelectItem value="email">{t('partnercontacts.type.email', 'Email')}</SelectItem>
+                  <SelectItem value="map">{t('partnercontacts.type.map', 'Map')}</SelectItem>
+                  <SelectItem value="custom">{t('partnercontacts.type.custom', 'Custom')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="link_label">{t('partnercontacts.dialog.label', 'Название')}</Label>
+              <Input
+                id="link_label"
+                value={linkForm.label}
+                onChange={(e) => setLinkForm({ ...linkForm, label: e.target.value })}
+                placeholder={getContactTypeLabel(linkForm.type, t)}
+              />
+              <div className="text-xs text-slate-500">{t('partnercontacts.dialog.auto_label', 'Автоматическое')}: {getContactTypeLabel(linkForm.type, t)}</div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="link_url">{t('partnercontacts.dialog.url_label', 'URL *')}</Label>
+              <Input
+                id="link_url"
+                value={linkForm.url}
+                onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })}
+                placeholder={getContactUrlPrefix(linkForm.type)}
+              />
+              {linkForm.type === "phone" && !normStr(linkForm.url).startsWith("tel:") && linkForm.url && (
+                <div className="text-xs text-amber-600">{t('partnercontacts.dialog.hint_phone', 'Подсказка: телефон обычно начинается с "tel:"')}</div>
+              )}
+              {linkForm.type === "email" && !normStr(linkForm.url).startsWith("mailto:") && linkForm.url && (
+                <div className="text-xs text-amber-600">{t('partnercontacts.dialog.hint_email', 'Подсказка: email обычно начинается с "mailto:"')}</div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="link_sort">{t('partnercontacts.dialog.sort_label', 'Порядок отображения')}</Label>
+              <Input
+                id="link_sort"
+                type="number"
+                value={linkForm.sort_order}
+                onChange={(e) => setLinkForm({ ...linkForm, sort_order: e.target.value })}
+                placeholder="1, 2, 3..."
+              />
+              <div className="text-xs text-slate-500">{t('partnercontacts.dialog.sort_hint', 'Меньше число = левее в списке')}</div>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm text-slate-700 min-h-[44px]">
+              <input
+                type="checkbox"
+                checked={linkForm.is_active !== false}
+                onChange={(e) => setLinkForm({ ...linkForm, is_active: e.target.checked })}
+                className="w-4 h-4"
+              />
+              {t('partnercontacts.dialog.active_label', 'Активна (показывать гостям)')}
+            </label>
+          </div>
+
+          <div className="sticky bottom-0 bg-white pt-3 border-t">
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsLinkDialogOpen(false)} className="min-h-[44px]">
+                {t('common.cancel', 'Отмена')}
+              </Button>
+              <Button onClick={saveLink} disabled={saveLinkMutation.isPending} className="bg-indigo-600 hover:bg-indigo-700 min-h-[44px]">
+                {saveLinkMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {t('common.save', 'Сохранить')}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* DELETE CONFIRM DIALOG */}
+      <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('partnercontacts.dialog.delete_title', 'Удалить ссылку?')}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-sm text-slate-600">
+            {t('partnercontacts.dialog.delete_hint', 'Это действие нельзя отменить. Ссылка будет удалена навсегда.')}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)} className="min-h-[44px]">
+              {t('common.cancel', 'Отмена')}
+            </Button>
+            <Button
+              onClick={() => deleteLinkMutation.mutate(deleteConfirmId)}
+              disabled={deleteLinkMutation.isPending}
+              className="bg-red-600 hover:bg-red-700 min-h-[44px]"
+            >
+              {deleteLinkMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {t('common.delete', 'Удалить')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -1602,11 +2027,10 @@ export default function PartnerSettings() {
   const [loadError, setLoadError] = useState(null);
   const [user, setUser] = useState(null);
   const [partner, setPartner] = useState(null);
-  const [contactsRaw, setContactsRaw] = useState([]);
-  const [contactSettings, setContactSettings] = useState(null);
   const [wifiConfig, setWifiConfig] = useState(null);
   const [activeSection, setActiveSection] = useState("profile");
-  
+  const [pageTab, setPageTab] = useState("settings");
+
   // Logo save state
   const [logoSaved, setLogoSaved] = useState(true);
   const [initialLogo, setInitialLogo] = useState(null);
@@ -1614,21 +2038,15 @@ export default function PartnerSettings() {
   // Sticky save bar: track last-saved profile values for dirty detection
   const savedProfileRef = useRef(null);
 
-  // Dialog state
-  const [contactDialog, setContactDialog] = useState(false);
-  const [contactForm, setContactForm] = useState({ id: null, type: "phone", label: "", url: "" });
-
   // P0-1: Только canonical partner key, без fallback chain
   const pid = user?.partner || "";
   const apiReady = !!base44?.entities && !!pid;
-  const contacts = useMemo(() => sortByOrder(contactsRaw), [contactsRaw]);
 
   // P1-12: Sequence counters для защиты от out-of-order ответов в debounced секциях
   const saveSeq = useRef({ hours: 0, languages: 0, currencies: 0 });
 
   // P1-3: useMemo для стабильного массива
   const SECTION_TABS = useMemo(() => getSectionTabs(t), [t]);
-  const CONTACT_TYPES = useMemo(() => getContactTypes(t), [t]);
 
   // Scroll spy for active section
   useEffect(() => {
@@ -1661,18 +2079,14 @@ export default function PartnerSettings() {
       setUser(u);
       // P0-1: Только canonical partner key
       const pId = u?.partner || "";
-      const [p, contactsList, contactsSettingsData, wifiData] = await Promise.all([
+      const [p, wifiData] = await Promise.all([
         loadPartner(pId),
-        listFor("PartnerContactLink", pId).catch((e) => { if (isRateLimitError(e)) throw e; return []; }),
-        loadPartnerContacts(pId).catch((e) => { if (isRateLimitError(e)) throw e; return null; }),
         loadWifiConfig(pId).catch((e) => { if (isRateLimitError(e)) throw e; return null; }),
       ]);
       setPartner(p);
       setInitialLogo(p?.logo || null);
       setLogoSaved(true);
       savedProfileRef.current = { name: p?.name || "", address: p?.address || "", logo: p?.logo || "", address_map_url: p?.address_map_url || "" };
-      setContactsRaw(contactsList || []);
-      setContactSettings(contactsSettingsData);
       setWifiConfig(wifiData);
       setRateLimitHit(false);
     } catch (e) {
@@ -1828,26 +2242,6 @@ export default function PartnerSettings() {
     }
   }
 
-  // BUG-PS-004 FIX: Add pid guard to prevent creating orphaned records
-  async function saveContactViewMode(viewMode) {
-    if (!pid) return;
-    setSavingCount(c => c + 1);
-    try {
-      if (contactSettings?.id) {
-        await updateRec("PartnerContacts", contactSettings.id, { view_mode: viewMode });
-        setContactSettings(prev => ({ ...prev, view_mode: viewMode }));
-      } else {
-        const created = await createWithPartner("PartnerContacts", { view_mode: viewMode }, pid);
-        setContactSettings(created);
-      }
-      showToast(t("settings.toasts.viewModeSaved"));
-    } catch (e) {
-      showError(t("settings.errors.error"), String(e?.message || e));
-    } finally {
-      setSavingCount(c => c - 1);
-    }
-  }
-
   // WiFi Config Save
   async function saveWifiConfig(data) {
     if (!partner?.id) return;
@@ -1866,70 +2260,6 @@ export default function PartnerSettings() {
       throw e;
     } finally {
       setSavingCount(c => c - 1);
-    }
-  }
-
-  // Contact CRUD
-  function openNewContact() { 
-    setContactForm({ id: null, type: "phone", label: "", url: "" }); 
-    setContactDialog(true); 
-  }
-
-  function openEditContact(c) { 
-    setContactForm({ id: c.id, type: c.type || "phone", label: c.label || "", url: c.url || "" }); 
-    setContactDialog(true); 
-  }
-
-  async function saveContact() {
-    const url = normStr(contactForm.url);
-    if (!url) { showError(t("settings.errors.error"), t("settings.contacts.enterValue")); return; }
-    
-    // Fix: при редактировании сохраняем текущий sort_order
-    const existing = contactForm.id ? contactsRaw.find(c => c.id === contactForm.id) : null;
-    const sort_order = contactForm.id
-      ? (existing?.sort_order ?? 0)
-      : Math.max(0, ...contactsRaw.map(c => c.sort_order || 0)) + 10;
-    
-    const payload = { 
-      type: contactForm.type, 
-      label: normStr(contactForm.label), 
-      url, 
-      is_active: true, 
-      sort_order
-    };
-    setSavingCount(c => c + 1);
-    try {
-      if (contactForm.id) {
-        await updateRec("PartnerContactLink", contactForm.id, payload);
-        setContactsRaw(old => old.map(c => c.id === contactForm.id ? { ...c, ...payload } : c));
-        showToast(t("settings.toasts.contactSaved"));
-      } else {
-        const created = await createWithPartner("PartnerContactLink", payload, pid);
-        setContactsRaw(old => sortByOrder([...old, created]));
-        showToast(t("settings.toasts.contactAdded"));
-      }
-      setContactDialog(false);
-    } catch (e) {
-      showError(t("settings.errors.error"), String(e?.message || e));
-    } finally {
-      setSavingCount(c => c - 1);
-    }
-  }
-
-  // BUG-PS-003 FIX: Add optimistic rollback on error + saving guard
-  async function deleteContact(c) {
-    if (!window.confirm(t("settings.contacts.deleteConfirm"))) return;
-    setSavingCount(cnt => cnt + 1);
-    const snapshot = [...contactsRaw];
-    setContactsRaw(old => old.filter(x => x.id !== c.id));
-    try {
-      await deleteRec("PartnerContactLink", c.id);
-      showToast(t("settings.toasts.contactDeleted"));
-    } catch (e) {
-      setContactsRaw(snapshot);
-      showError(t("settings.errors.error"), String(e?.message || e));
-    } finally {
-      setSavingCount(cnt => cnt - 1);
     }
   }
 
@@ -1967,13 +2297,35 @@ export default function PartnerSettings() {
           </div>
           <PageHelpButton pageKey="/partnersettings" />
         </div>
+
+        {/* Page-level tabs: Settings | Contacts */}
+        {!loading && (
+          <div className="flex bg-slate-100 border border-slate-200 rounded-lg p-0.5 max-w-xs mb-4">
+            <button
+              onClick={() => setPageTab("settings")}
+              className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all min-h-[44px] ${
+                pageTab === "settings" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {t("settings.pageTab.settings", "Настройки")}
+            </button>
+            <button
+              onClick={() => setPageTab("contacts")}
+              className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all min-h-[44px] ${
+                pageTab === "contacts" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {t("settings.pageTab.contacts", "Контакты")}
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Section Navigation */}
-      {!loading && <SectionNav activeSection={activeSection} t={t} />}
+      {/* Section Navigation (only for settings tab) */}
+      {!loading && pageTab === "settings" && <SectionNav activeSection={activeSection} t={t} />}
 
       {/* Content */}
-      <div className={`mx-auto max-w-2xl px-3 md:px-6 ${hasProfileChanges ? "pb-24" : "pb-4 md:pb-6"}`}>
+      <div className={`mx-auto max-w-2xl px-3 md:px-6 ${hasProfileChanges && pageTab === "settings" ? "pb-24" : "pb-4 md:pb-6"}`}>
         {!loading && !apiReady && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 mb-4">
             {t("settings.errors.connectionFailed")}
@@ -1984,6 +2336,8 @@ export default function PartnerSettings() {
           <div className="py-12 flex justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
           </div>
+        ) : pageTab === "contacts" ? (
+          <ContactsFullTab partnerId={pid} t={t} />
         ) : (
           <div className="space-y-4">
             <ProfileSection
@@ -2001,23 +2355,23 @@ export default function PartnerSettings() {
               t={t}
             />
 
-            <ChannelsSection 
-              partner={partner} 
-              onSave={saveChannels} 
+            <ChannelsSection
+              partner={partner}
+              onSave={saveChannels}
               saving={saving}
               t={t}
             />
 
             {/* Hall variant C (HALL-017) */}
-            <HallOrderingSection 
+            <HallOrderingSection
               partner={partner}
               onSave={saveHallOrdering}
               saving={saving}
-              t={t} 
+              t={t}
             />
 
             {/* WiFi and Plan Section */}
-            <WifiSection 
+            <WifiSection
               partner={partner}
               wifiConfig={wifiConfig}
               onSave={saveWifiConfig}
@@ -2025,37 +2379,25 @@ export default function PartnerSettings() {
               t={t}
             />
 
-            <LanguagesSection 
-              partner={partner} 
-              onSave={saveLanguages} 
+            <LanguagesSection
+              partner={partner}
+              onSave={saveLanguages}
               saving={saving}
               t={t}
             />
 
-            <CurrenciesSection 
-              partner={partner} 
-              onSave={saveCurrencies} 
+            <CurrenciesSection
+              partner={partner}
+              onSave={saveCurrencies}
               saving={saving}
-              t={t}
-            />
-
-            <ContactsSection 
-              contacts={contacts}
-              contactSettings={contactSettings}
-              onAdd={openNewContact}
-              onEdit={openEditContact}
-              onDelete={deleteContact}
-              onViewModeChange={saveContactViewMode}
-              saving={saving}
-              apiReady={apiReady}
               t={t}
             />
           </div>
         )}
       </div>
 
-      {/* Sticky Save/Discard bar for unsaved profile changes */}
-      {hasProfileChanges && (
+      {/* Sticky Save/Discard bar for unsaved profile changes (settings tab only) */}
+      {pageTab === "settings" && hasProfileChanges && (
         <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white/95 backdrop-blur-sm shadow-[0_-2px_10px_rgba(0,0,0,0.1)]">
           <div className="mx-auto max-w-2xl flex items-center justify-between gap-3 px-4 py-3">
             <div className="flex items-center gap-2 text-sm font-medium text-amber-600">
@@ -2077,61 +2419,6 @@ export default function PartnerSettings() {
           </div>
         </div>
       )}
-
-      {/* P1-4: DIALOG Contact — sticky footer pattern */}
-      <Dialog open={contactDialog} onOpenChange={setContactDialog}>
-        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{contactForm.id ? t("settings.contacts.dialog.editTitle") : t("settings.contacts.dialog.newTitle")}</DialogTitle>
-            <DialogDescription>{t("settings.contacts.dialog.description")}</DialogDescription>
-          </DialogHeader>
-          
-          {/* Scrollable content */}
-          <div className="flex-1 overflow-y-auto space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>{t("settings.contacts.dialog.type")}</Label>
-              <Select value={contactForm.type} onValueChange={(v) => setContactForm(f => ({ ...f, type: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {CONTACT_TYPES.map((ct) => (
-                    <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>{t("settings.contacts.dialog.value")} *</Label>
-              <Input
-                value={contactForm.url}
-                onChange={(e) => setContactForm(f => ({ ...f, url: e.target.value }))}
-                placeholder={
-                  contactForm.type === "phone" ? t("settings.contacts.placeholder.phone") : 
-                  contactForm.type === "email" ? t("settings.contacts.placeholder.email") : 
-                  t("settings.contacts.placeholder.url")
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t("settings.contacts.dialog.label")}</Label>
-              <Input 
-                value={contactForm.label} 
-                onChange={(e) => setContactForm(f => ({ ...f, label: e.target.value }))} 
-                placeholder={t("settings.contacts.dialog.labelPlaceholder")} 
-              />
-            </div>
-          </div>
-          
-          {/* Sticky footer */}
-          <div className="flex gap-2 pt-4 border-t mt-auto flex-col-reverse sm:flex-row sm:justify-end">
-            <Button variant="outline" onClick={() => setContactDialog(false)} disabled={saving}>
-              {t("settings.common.cancel")}
-            </Button>
-            <Button onClick={saveContact} disabled={!apiReady || saving}>
-              {saving ? t("settings.common.saving") : t("settings.common.save")}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </PartnerShell>
   );
 }
