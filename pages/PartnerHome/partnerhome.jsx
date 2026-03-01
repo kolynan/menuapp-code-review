@@ -178,7 +178,7 @@ function PartnerHomeContent() {
         <div className="space-y-4">
           {/* NOW BLOCK — Active tables */}
           <button
-            onClick={() => navigate("/staffordersmobile")}
+            onClick={() => navigate("/partnertables")}
             className="w-full bg-white border border-slate-200 rounded-xl p-4 sm:p-5 hover:border-indigo-300 hover:shadow-md transition-all text-left group"
           >
             <div className="flex items-center justify-between">
