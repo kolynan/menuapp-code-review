@@ -1752,7 +1752,7 @@ function TableDetailScreen({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-slate-100 flex flex-col"
+      className="fixed inset-0 z-40 bg-slate-100 flex flex-col"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
