@@ -185,7 +185,7 @@ const closeExpiredSessionInDB = async (sessionId) => {
       }
     }
   } catch (err) {
-    // Best effort — don't block session restore flow
+    console.warn(`[P0-cleanup] Failed to close expired session ${sessionId}:`, err?.message);
   }
 };
 
@@ -321,7 +321,7 @@ export function useTableSession({
             // P0-1: Close all expired sessions, use the first non-expired one
             for (const s of sortedSessions) {
               if (isSessionExpired(s)) {
-                closeExpiredSessionInDB(s.id);
+                await closeExpiredSessionInDB(s.id);
               } else if (!session) {
                 session = s;
               }
