@@ -1,7 +1,7 @@
 # StaffOrdersMobile Bug Tracker
 
-**Page:** `pages/StaffOrdersMobile/260302-01 StaffOrdersMobile RELEASE.jsx`
-**Last updated:** 2026-03-02 (Sprint B v3.1.0)
+**Page:** `pages/StaffOrdersMobile/260302-03 StaffOrdersMobile RELEASE.jsx`
+**Last updated:** 2026-03-02 (Sprint D v3.2.0)
 
 ---
 
@@ -68,6 +68,29 @@
 
 ---
 
+## Sprint D Notes (v3.2.0, 2026-03-02)
+
+**Changes implemented:**
+- V2-09: BannerNotification — in-app banner overlay for new order events
+- Fixed position at top of viewport, z-60 (above header z-20, detail z-30, modals z-40)
+- Content: "Стол N: Новый заказ" with table name + event type
+- Auto-hide after 5 seconds, swipe-up to dismiss early
+- Tap banner → scroll to relevant table card with brief highlight (indigo ring, 1.5s)
+- De-duplication: multiple events in same poll cycle → "3 новых заказа"
+- Works on all screens (Mine, Free, Others, Detail view — closes detail on navigate)
+- Non-blocking: pointer-events only on banner itself
+
+**Review findings fixed:**
+- P0: Nested setTimeout cleanup in BannerNotification — tracked via separate refs
+- P1: CSS.escape() for querySelector to prevent selector injection
+- P1: Proper timer cleanup in all dismiss/tap paths
+
+**Known limitations:**
+- i18n still fully deferred (BUG-SM-001)
+- Preparing-to-Ready animation (Sprint C scope)
+
+---
+
 ## Sprint B Notes (v3.1.0, 2026-03-02)
 
 **Changes implemented:**
@@ -79,10 +102,9 @@
 - Swipe-right back gesture on TableDetailScreen (dx>80, dy<60)
 - liveDetailGroup: detail view auto-updates via polling using `detailGroupId`
 
-**Known limitations (Sprint C/D scope):**
+**Known limitations (Sprint C scope):**
 - No Preparing-to-Ready animation (Sprint C)
 - No static urgency sort on Mine tab with animation (Sprint C)
-- No banner notifications (Sprint D)
 - i18n still fully deferred (BUG-SM-001)
 
 ---

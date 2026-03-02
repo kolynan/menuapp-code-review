@@ -1,15 +1,15 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   STAFFORDERSMOBILE — v3.2.0 (2026-03-02) Sprint D: Banner Notifications
+   STAFFORDERSMOBILE — v3.2.0 (2026-03-02) Sprint C: Static Urgency Sort + Transition Animations
 
-   CHANGES in v3.2.0 (Sprint D — Waiter Screen V2):
-   - V2-09: BannerNotification — in-app banner overlay for new order events
-   - Fixed position at top of viewport, z-60 (above everything)
-   - Content: "Стол N: Новый заказ" with table name + event type
-   - Auto-hide after 5 seconds, swipe-up to dismiss early
-   - Tap banner → scroll to relevant table card with brief highlight
-   - De-duplication: multiple events in same cycle → "3 новых заказа"
-   - Works on all screens (Mine, Free, Others, Detail view)
-   - Non-blocking: content below remains interactive
+   CHANGES in v3.2.0 (Sprint C — Waiter Screen V2):
+   - V2-04: Mine tab static urgency sort with position stability during transitions
+   - V2-07: Preparing→Ready transition animation:
+     * Left border animates gray→amber (300ms ease via CSS transition-colors)
+     * CTA button fades in with opacity transition (300ms)
+     * Card position locked during transition (stays at PREPARING sort position for 600ms)
+     * Brief amber ring flash (200ms) for peripheral attention
+   - Position stability: cards do not reorder during status transitions
+   - CSS transition-colors on all card borders for smooth color changes
 
    CHANGES in v3.1.0 (Sprint B — Waiter Screen V2):
    - V2-02: TableDetailScreen — full-screen detail view, slide-in from right
@@ -1258,7 +1258,6 @@ function OrderCard({
 function OrderGroupCard({
   group,
   onCardBodyTap,   // V2-03: Sprint B — tap anywhere on card body to open detail view
-  isHighlighted,   // V2-09: Sprint D — brief highlight after banner navigate
   isFavorite,
   onToggleFavorite,
   getStatusConfig,
@@ -1279,6 +1278,22 @@ function OrderGroupCard({
   const tableStatus = computeTableStatus(group, activeRequests, getStatusConfig);
   const style = TABLE_STATUS_STYLES[tableStatus] || TABLE_STATUS_STYLES.PREPARING;
   const isPreparing = tableStatus === 'PREPARING';
+
+  // V2-07: Sprint C — Preparing→Ready transition animation
+  const prevStatusRef = useRef(tableStatus);
+  const [showFlash, setShowFlash] = useState(false);
+
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = tableStatus;
+
+    if (prev === 'PREPARING' && tableStatus === 'READY') {
+      // Brief amber ring flash (200ms) for peripheral attention
+      setShowFlash(true);
+      const flashTimer = setTimeout(() => setShowFlash(false), 200);
+      return () => clearTimeout(flashTimer);
+    }
+  }, [tableStatus]);
 
   // Table name + zone display (V2-01)
   const tableId = group.type === 'table' ? group.id : null;
@@ -1378,14 +1393,11 @@ function OrderGroupCard({
     return `${orderCount} заказов`;
   })();
 
-  // V2-09: Highlight ring class for banner-navigate
-  const highlightRing = isHighlighted ? 'ring-2 ring-indigo-400 ring-offset-1' : '';
+  // V2-07: Compose transition classes for card wrapper
+  const flashRingClass = showFlash ? 'ring-2 ring-amber-300' : '';
 
   return (
-    <div
-      data-group-id={group.id}
-      className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-shadow duration-300 ${style.bgClass} ${style.borderClass} ${highlightRing}`}
-    >
+    <div className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-colors duration-300 ease-in-out ${style.bgClass} ${style.borderClass} ${flashRingClass}`}>
       {/* V2-03: Card body area — tap opens detail view */}
       <div
         className={`px-4 pt-3 pb-3 ${onCardBodyTap ? 'cursor-pointer active:opacity-80' : ''}`}
@@ -1395,22 +1407,22 @@ function OrderGroupCard({
       >
         {/* Row 1: Table title + elapsed time + status badge (V2-01, V2-05) */}
         <div className="flex items-start justify-between gap-2 mb-1">
-          <span className={`font-bold text-base leading-tight flex-1 min-w-0 ${isPreparing ? 'text-slate-500' : 'text-slate-900'}`}>
+          <span className={`font-bold text-base leading-tight flex-1 min-w-0 transition-colors duration-300 ${isPreparing ? 'text-slate-500' : 'text-slate-900'}`}>
             {displayTitle}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className={`text-xs font-medium ${isPreparing ? 'text-slate-400' : 'text-slate-600'}`}>
+            <span className={`text-xs font-medium transition-colors duration-300 ${isPreparing ? 'text-slate-400' : 'text-slate-600'}`}>
               {elapsedLabel}
             </span>
             {/* V2-05: Status badge chip */}
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${style.badgeClass}`}>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap transition-colors duration-300 ${style.badgeClass}`}>
               {style.label}
             </span>
           </div>
         </div>
 
         {/* Row 2: Guest count + order count (V2-01) */}
-        <p className={`text-sm ${isPreparing ? 'text-slate-400' : 'text-slate-600'}`}>
+        <p className={`text-sm transition-colors duration-300 ${isPreparing ? 'text-slate-400' : 'text-slate-600'}`}>
           {guestCountLabel}, {orderCountLabel}
         </p>
 
@@ -1425,19 +1437,22 @@ function OrderGroupCard({
       </div>
 
       {/* V2-10: Primary CTA — full width, min 52px — hidden for PREPARING (V2-06) */}
-      {!isPreparing && cta && (
-        <button
-          type="button"
-          onClick={handleCTA}
-          disabled={advanceMutation.isPending}
-          className={`w-full min-h-[52px] flex items-center justify-center font-semibold text-sm transition-all active:scale-[0.99] disabled:opacity-60 ${style.ctaBgClass}`}
-        >
-          {advanceMutation.isPending
-            ? <Loader2 className="w-4 h-4 animate-spin" />
-            : cta.label
-          }
-        </button>
-      )}
+      {/* V2-07: CTA wrapper always in DOM for smooth fade-in transition on Preparing→Ready */}
+      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isPreparing || !cta ? 'max-h-0 opacity-0' : 'max-h-16 opacity-100'}`}>
+        {cta && (
+          <button
+            type="button"
+            onClick={handleCTA}
+            disabled={advanceMutation.isPending}
+            className={`w-full min-h-[52px] flex items-center justify-center font-semibold text-sm transition-colors duration-300 active:scale-[0.99] disabled:opacity-60 ${style.ctaBgClass}`}
+          >
+            {advanceMutation.isPending
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : cta.label
+            }
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -2198,117 +2213,6 @@ function SettingsPanel({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SPRINT D: V2-09 Banner Notification Component
-═══════════════════════════════════════════════════════════════════════════ */
-
-/**
- * BannerNotification — in-app overlay banner for new order events.
- * Fixed at top of viewport, z-60 (above sticky header z-20, detail view z-30, modals z-40).
- * Auto-hides after 5s. Swipe-up or tap X to dismiss. Tap body → navigate to relevant group.
- * Non-blocking: pointer-events only on the banner itself, not full-screen overlay.
- *
- * Props:
- *   banner: { id, text, groupId, count } | null
- *   onDismiss: () => void
- *   onNavigate: (groupId) => void
- */
-function BannerNotification({ banner, onDismiss, onNavigate }) {
-  const [visible, setVisible] = useState(false);
-  const [dismissing, setDismissing] = useState(false);
-  const touchStartY = useRef(null);
-  const autoHideTimer = useRef(null);
-  const dismissAnimTimer = useRef(null);
-
-  // Clear all pending timers
-  const clearTimers = useCallback(() => {
-    if (autoHideTimer.current) { clearTimeout(autoHideTimer.current); autoHideTimer.current = null; }
-    if (dismissAnimTimer.current) { clearTimeout(dismissAnimTimer.current); dismissAnimTimer.current = null; }
-  }, []);
-
-  // Animate in on mount / new banner
-  useEffect(() => {
-    if (!banner) {
-      setVisible(false);
-      setDismissing(false);
-      return;
-    }
-    setDismissing(false);
-    // Small delay to trigger CSS transition
-    const raf = requestAnimationFrame(() => setVisible(true));
-    // Auto-hide after 5s
-    autoHideTimer.current = setTimeout(() => {
-      setDismissing(true);
-      dismissAnimTimer.current = setTimeout(() => onDismiss(), 300);
-    }, 5000);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimers();
-    };
-  }, [banner?.id]);
-
-  const handleDismiss = useCallback(() => {
-    clearTimers();
-    setDismissing(true);
-    dismissAnimTimer.current = setTimeout(() => onDismiss(), 300);
-  }, [onDismiss, clearTimers]);
-
-  const handleTap = useCallback(() => {
-    clearTimers();
-    if (banner?.groupId) {
-      onNavigate(banner.groupId);
-    }
-    setDismissing(true);
-    dismissAnimTimer.current = setTimeout(() => onDismiss(), 200);
-  }, [banner, onNavigate, onDismiss, clearTimers]);
-
-  const handleTouchStart = useCallback((e) => {
-    touchStartY.current = e.touches[0].clientY;
-  }, []);
-
-  const handleTouchEnd = useCallback((e) => {
-    if (touchStartY.current === null) return;
-    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
-    touchStartY.current = null;
-    // Swipe up to dismiss (threshold: 30px)
-    if (deltaY < -30) handleDismiss();
-  }, [handleDismiss]);
-
-  if (!banner) return null;
-
-  const translateClass = visible && !dismissing
-    ? 'translate-y-0 opacity-100'
-    : '-translate-y-full opacity-0';
-
-  return (
-    <div
-      className={`fixed top-0 left-0 right-0 z-[60] flex justify-center px-3 pt-2 transition-all duration-300 ease-out ${translateClass}`}
-      style={{ pointerEvents: 'none' }}
-    >
-      <div
-        className="w-full max-w-md bg-indigo-600 text-white rounded-xl shadow-lg px-4 py-3 flex items-center gap-3"
-        style={{ pointerEvents: 'auto' }}
-        onClick={handleTap}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        role="alert"
-        aria-live="assertive"
-      >
-        <Bell className="w-5 h-5 shrink-0" />
-        <span className="flex-1 text-sm font-medium leading-tight">{banner.text}</span>
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); handleDismiss(); }}
-          className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-white/20 active:bg-white/30"
-          aria-label="Закрыть"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -2380,10 +2284,6 @@ export default function StaffOrdersMobile() {
   const [notifOpen, setNotifOpen] = useState(false);
   
   const [notifiedOrderIds, setNotifiedOrderIds] = useState(() => new Set());
-
-  // V2-09: Sprint D — Banner notification state
-  const [bannerData, setBannerData] = useState(null);
-  const bannerIdCounter = useRef(0);
 
   const updateNotifPrefs = (patch) => {
     setNotifPrefs((prev) => {
@@ -2479,6 +2379,11 @@ export default function StaffOrdersMobile() {
   const [detailGroupId, setDetailGroupId] = useState(null); // ID of group open in detail view
   const listScrollRef = useRef(0); // Saved scroll position for returning from detail
   const lastDetailGroupRef = useRef(null); // Last known group — prevents flash-unmount during polling
+
+  // V2-04/V2-07: Sprint C — Position stability during status transitions
+  const prevGroupStatusesRef = useRef({}); // { [groupId]: status } — last known status per group
+  const transitionLocksRef = useRef(new Map()); // groupId → timeoutId — groups locked at old sort position
+  const [sortTrigger, setSortTrigger] = useState(0); // bumped to re-sort after lock expires
 
   useEffect(() => {
     if (favoritesInitializedRef.current) return;
@@ -3255,21 +3160,53 @@ export default function StaffOrdersMobile() {
     );
   }, [activeRequests, showOnlyFavorites, favorites]);
 
-  // V2: Sort groups by table status priority (Mine tab sort order spec)
+  // V2-04/V2-07: Sprint C — Sort groups by table status priority with position stability
+  // When a card transitions (e.g. PREPARING→READY), its sort position is locked for 600ms
+  // so the card does not jump to a new position during the visual transition animation.
   const v2SortedGroups = useMemo(() => {
     if (!finalGroups.length) return finalGroups;
+
+    const prev = prevGroupStatusesRef.current;
+    const locks = transitionLocksRef.current;
+    const currentStatuses = {};
+
+    // Detect PREPARING→READY transitions and lock position
+    finalGroups.forEach(g => {
+      const status = computeTableStatus(g, activeRequests, getStatusConfig);
+      currentStatuses[g.id] = status;
+
+      if (prev[g.id] === 'PREPARING' && status === 'READY' && !locks.has(g.id)) {
+        // Lock this group at PREPARING sort priority for 600ms
+        locks.set(g.id, setTimeout(() => {
+          locks.delete(g.id);
+          setSortTrigger(v => v + 1); // trigger re-sort after lock expires
+        }, 600));
+      }
+    });
+    prevGroupStatusesRef.current = currentStatuses;
+
     return [...finalGroups].sort((a, b) => {
-      const statusA = computeTableStatus(a, activeRequests, getStatusConfig);
-      const statusB = computeTableStatus(b, activeRequests, getStatusConfig);
-      const pa = TABLE_STATUS_SORT_PRIORITY[statusA] ?? 5;
-      const pb = TABLE_STATUS_SORT_PRIORITY[statusB] ?? 5;
+      const statusA = currentStatuses[a.id] || 'PREPARING';
+      const statusB = currentStatuses[b.id] || 'PREPARING';
+      // Use PREPARING priority for position-locked groups
+      const pa = locks.has(a.id) ? TABLE_STATUS_SORT_PRIORITY['PREPARING'] : (TABLE_STATUS_SORT_PRIORITY[statusA] ?? 5);
+      const pb = locks.has(b.id) ? TABLE_STATUS_SORT_PRIORITY['PREPARING'] : (TABLE_STATUS_SORT_PRIORITY[statusB] ?? 5);
       if (pa !== pb) return pa - pb;
       // Within same status group: oldest order first
       const ta = Math.min(...a.orders.map(o => safeParseDate(o.created_date).getTime()));
       const tb = Math.min(...b.orders.map(o => safeParseDate(o.created_date).getTime()));
       return ta - tb;
     });
-  }, [finalGroups, activeRequests, getStatusConfig]);
+  }, [finalGroups, activeRequests, getStatusConfig, sortTrigger]);
+
+  // V2-07: Clean up position lock timers on unmount
+  useEffect(() => {
+    const locks = transitionLocksRef.current;
+    return () => {
+      locks.forEach(timerId => clearTimeout(timerId));
+      locks.clear();
+    };
+  }, []);
 
   // V2-02: Sprint B — Live detail group (auto-updates via polling)
   // Uses detailGroupId to find the live version from all current groups
@@ -3290,10 +3227,10 @@ export default function StaffOrdersMobile() {
   const prevDigestRef = useRef(null);
   const prevStatusMapRef = useRef({});
 
-  const pushNotify = (title, newOrderIds = [], bannerInfo = null) => {
+  const pushNotify = (title, newOrderIds = []) => {
     if (!notifPrefs?.enabled) return;
     setNotifDot(true);
-
+    
     if (newOrderIds.length > 0) {
       setNotifiedOrderIds((prev) => {
         const next = new Set(prev);
@@ -3301,23 +3238,12 @@ export default function StaffOrdersMobile() {
         return next;
       });
     }
-
+    
     if (notifPrefs.sound && audioUnlockedRef.current && audioRef.current?.play) {
       try { audioRef.current.play(); } catch { /* ignore */ }
     }
     tryVibrate(notifPrefs.vibrate);
-    // V2-09: Show banner instead of toast for richer notification
-    if (bannerInfo) {
-      bannerIdCounter.current += 1;
-      setBannerData({
-        id: bannerIdCounter.current,
-        text: bannerInfo.text || title,
-        groupId: bannerInfo.groupId || null,
-        count: bannerInfo.count || 1,
-      });
-    } else {
-      showToast(title);
-    }
+    showToast(title);
     if (notifPrefs.system && canUseNotifications() && Notification.permission === "granted") {
       try { new Notification(title); } catch { /* ignore */ }
     }
@@ -3377,71 +3303,30 @@ export default function StaffOrdersMobile() {
 
     let becameReady = 0;
     const newOrderIds = [];
-    const readyOrderIds = [];
-
+    
     eligibleOrders.forEach((o) => {
       if (ownRecent && own.orderId === o.id) return;
       const pst = prevMap[o.id];
-      if (!pst) {
+      if (!pst) { 
         newOrderIds.push(o.id);
-        return;
+        return; 
       }
       // Check if became ready (either by status or by stage) - P0-1: use normalized ids
       const pstStageId = pst.stage_id; // already normalized in prevMap
       const currStageId = getLinkId(o.stage_id);
       const wasReady = pst.status === 'ready' || (pstStageId && stagesMap[pstStageId]?.internal_code === 'finish');
       const isReady = o.status === 'ready' || (currStageId && stagesMap[currStageId]?.internal_code === 'finish');
-      if (!wasReady && isReady) { becameReady++; readyOrderIds.push(o.id); }
+      if (!wasReady && isReady) becameReady++;
     });
 
-    // V2-09: Build banner info with table context
-    const buildBannerInfo = (orderIds, eventType) => {
-      if (!orderIds.length) return null;
-      // Find which table(s) these orders belong to
-      const orderMap = {};
-      eligibleOrders.forEach(o => { orderMap[o.id] = o; });
-      const tableIds = new Set();
-      orderIds.forEach(id => {
-        const o = orderMap[id];
-        if (o) {
-          const tId = getLinkId(o.table);
-          if (tId) tableIds.add(tId);
-        }
-      });
-      const tableNames = [...tableIds].map(tId => {
-        const t = tableMap[tId];
-        return t?.name ? `${t.name}` : null;
-      }).filter(Boolean);
-
-      // Single table: "Стол 5: Новый заказ"
-      if (tableNames.length === 1 && orderIds.length === 1) {
-        const label = eventType === 'ready' ? 'Заказ готов' : 'Новый заказ';
-        return {
-          text: `Стол ${tableNames[0]}: ${label}`,
-          groupId: [...tableIds][0],
-          count: 1,
-        };
-      }
-      // Multiple: "3 новых заказа" or "2 заказа готовы"
-      const count = orderIds.length;
-      if (eventType === 'ready') {
-        const word = count === 1 ? 'заказ готов' : count < 5 ? 'заказа готовы' : 'заказов готовы';
-        return { text: `${count} ${word}`, groupId: tableIds.size === 1 ? [...tableIds][0] : null, count };
-      }
-      const word = count === 1 ? 'новый заказ' : count < 5 ? 'новых заказа' : 'новых заказов';
-      return { text: `${count} ${word}`, groupId: tableIds.size === 1 ? [...tableIds][0] : null, count };
-    };
-
-    if (becameReady > 0) {
-      const banner = buildBannerInfo(readyOrderIds, 'ready');
-      pushNotify(`Готово: +${becameReady}`, [], banner);
-      return;
+    if (becameReady > 0) { 
+      pushNotify(`Готово: +${becameReady}`); 
+      return; 
     }
-    if (newOrderIds.length > 0) {
-      const banner = buildBannerInfo(newOrderIds, 'new');
-      pushNotify(`Новые: +${newOrderIds.length}`, newOrderIds, banner);
+    if (newOrderIds.length > 0) { 
+      pushNotify(`Новые: +${newOrderIds.length}`, newOrderIds); 
     }
-  }, [roleFilteredOrders, assignFilters, selectedTypes, canFetch, notifPrefs, effectiveUserId, stagesMap, tableMap]);
+  }, [roleFilteredOrders, assignFilters, selectedTypes, canFetch, notifPrefs, effectiveUserId, stagesMap]);
 
   const toggleChannel = (type) => {
     const on = selectedTypes.includes(type);
@@ -3488,42 +3373,6 @@ export default function StaffOrdersMobile() {
         }
       });
     });
-  }, []);
-
-  // V2-09: Sprint D — Highlight state for banner-navigate
-  const [highlightGroupId, setHighlightGroupId] = useState(null);
-  const highlightTimerRef = useRef(null);
-
-  // V2-09: Banner tap → close detail if open, scroll to group card, highlight briefly
-  const handleBannerNavigate = useCallback((groupId) => {
-    if (!groupId) return;
-    // Close detail view if open (return to list)
-    if (detailGroupId) {
-      setDetailGroupId(null);
-    }
-    // Wait for React to render list, then scroll to card
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const el = document.querySelector(`[data-group-id="${CSS.escape(String(groupId))}"]`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          // Brief highlight
-          setHighlightGroupId(groupId);
-          if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
-          highlightTimerRef.current = setTimeout(() => setHighlightGroupId(null), 1500);
-        }
-      });
-    });
-  }, [detailGroupId]);
-
-  // Cleanup highlight timer
-  useEffect(() => () => {
-    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
-  }, []);
-
-  // V2-09: Banner dismiss handler
-  const handleBannerDismiss = useCallback(() => {
-    setBannerData(null);
   }, []);
 
   const handleRefresh = () => {
@@ -3815,7 +3664,6 @@ export default function StaffOrdersMobile() {
                   key={group.id}
                   group={group}
                   onCardBodyTap={() => handleOpenDetail(group)}
-                  isHighlighted={highlightGroupId === group.id}
                   isFavorite={isFavorite(group.type === 'table' ? 'table' : 'order', group.id)}
                   onToggleFavorite={toggleFavorite}
                   getStatusConfig={getStatusConfig}
@@ -3937,13 +3785,6 @@ export default function StaffOrdersMobile() {
           <div className="bg-slate-900 text-white text-sm px-4 py-2 rounded-full shadow-lg">{toastMsg}</div>
         </div>
       )}
-
-      {/* V2-09: Sprint D — Banner notification overlay */}
-      <BannerNotification
-        banner={bannerData}
-        onDismiss={handleBannerDismiss}
-        onNavigate={handleBannerNavigate}
-      />
     </div>
   );
 }
