@@ -1,7 +1,7 @@
 ---
-version: "6.0"
-updated: "2026-02-24"
-session: 30
+version: "7.0"
+updated: "2026-03-02"
+session: 66
 ---
 
 # PublicMenu — Bug Registry
@@ -18,6 +18,22 @@ session: 30
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-009: Expired sessions reused — old orders leak into new visits (P0-1)
+- **Приоритет:** P0
+- **Когда:** Session 65 (найден Arman), Session 66 (исправлен)
+- **Root cause:** `useTableSession.restoreSession()` called `isSessionExpired()` to skip expired sessions, but never closed them in DB. Old sessions stayed `status: 'open'` forever. When a new guest scanned QR, `getOrCreateSession` found the old open session and reused it — new guest saw all historical orders.
+- **Фикс:** Added `closeExpiredSessionInDB()` helper: closes session (`status: expired`) + cancels unprocessed orders (`new` → `cancelled`). Called in STEP 1 (saved session) and STEP 2 (DB query) of `restoreSession()`.
+- **Файл:** `useTableSession.jsx`
+- **RELEASE:** `260302-00 useTableSession RELEASE.jsx`
+
+### BUG-PM-010: Order created without valid table_session (P0-2)
+- **Приоритет:** P0
+- **Когда:** Session 65 (диагноз), Session 66 (исправлен)
+- **Root cause:** `processHallOrder()` used `tableSession?.id || null` for `table_session` field. If session was expired or missing, order was created with `table_session: null`. This broke session-based filtering — the order was invisible to the current session or leaked into all views.
+- **Фикс:** `handleSubmitOrder` now validates session before proceeding: if expired → close in DB + create new. Hard guard rejects if no valid session. `processHallOrder` receives `validatedSession` parameter (no stale closure).
+- **Файл:** `x.jsx` (PublicMenu main page)
+- **RELEASE:** `260302-00 x RELEASE.txt`
 
 ### BUG-PM-006: Drawer после подтверждения стола открывается проскроллленным вниз
 - **Приоритет:** P1

@@ -1,7 +1,7 @@
 ---
-version: "1.0"
-updated: "2026-02-24"
-session: 30
+version: "2.0"
+updated: "2026-03-02"
+session: 66
 ---
 
 # PublicMenu — README
@@ -27,8 +27,8 @@ session: 30
 
 | Файл | RELEASE | Дата |
 |---|---|---|
-| x.jsx | `260224-00 x RELEASE.txt` | 24 фев 2026 |
-| useTableSession.jsx | `260224-00 useTableSession RELEASE.jsx` | 24 фев 2026 |
+| x.jsx | `260302-00 x RELEASE.txt` | 2 мар 2026 |
+| useTableSession.jsx | `260302-00 useTableSession RELEASE.jsx` | 2 мар 2026 |
 | CartView.jsx | `260224-01 CartView RELEASE.jsx` | 24 фев 2026 |
 | MenuView.jsx | `260223-01 MenuView RELEASE.jsx` | 23 фев 2026 |
 | CheckoutView.jsx | `260222-00 CheckoutView RELEASE.jsx` | 22 фев 2026 |
@@ -44,6 +44,13 @@ session: 30
 ---
 
 ## Changelog (UX/UI решения)
+
+### Session 66 — 2 мар 2026
+
+- **P0 Session Logic Fix:** Устранена утечка исторических заказов в новые сессии.
+  - P0-1: `useTableSession` теперь закрывает просроченные сессии в БД при загрузке (cleanup-before-show). Ранее сессии оставались `open` навечно.
+  - P0-2: Заказ в зале не создастся без валидной сессии. Если сессия истекла — закрывается, создаётся новая. Защита от `table_session: null`.
+  - Гарантированы 4 инварианта: (1) макс. 1 open сессия на стол, (2) каждый заказ привязан к сессии, (3) гость видит только свои заказы, (4) суммы по текущей сессии.
 
 ### Session 29 — 24 фев 2026
 

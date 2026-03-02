@@ -1,11 +1,19 @@
 # StaffOrdersMobile Bug Tracker
 
-**Page:** `pages/StaffOrdersMobile/260302-03 StaffOrdersMobile RELEASE.jsx`
-**Last updated:** 2026-03-02 (Sprint D v3.2.0)
+**Page:** `pages/StaffOrdersMobile/260302-04 StaffOrdersMobile RELEASE.jsx`
+**Last updated:** 2026-03-02 (Session 66 — P0 session logic fix)
 
 ---
 
 ## Fixed Bugs
+
+### BUG-SM-011 (P0) -- Hall orders without table_session shown in active view
+- **Function:** activeOrders (useMemo filter)
+- **Root cause:** Hall orders with `table_session: null` (legacy/orphan data from before session logic was implemented, or orders created when session expired) passed through the filter and appeared in the waiter's active orders list. Combined with BUG-PM-009 (sessions never expired), this caused historical orders to appear mixed with current ones.
+- **Fix:** Added filter: `if (o.order_type === 'hall' && !getLinkId(o.table_session)) return false` in `activeOrders` computation. Hall orders without a valid `table_session` link are now excluded from the active view.
+- **Commit:** `9dae0cc`
+- **RELEASE:** `260302-04 StaffOrdersMobile RELEASE.jsx`
+- **Status:** FIXED
 
 ### BUG-SM-002 (P1) -- handleCloseAllOrders silent error swallowing
 - **Function:** handleCloseAllOrders
