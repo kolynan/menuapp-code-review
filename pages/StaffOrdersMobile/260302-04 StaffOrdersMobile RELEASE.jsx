@@ -273,7 +273,7 @@ const TABLE_STATUS_STYLES = {
     bgClass: 'bg-slate-50',
     badgeClass: 'bg-slate-400 text-white',
     textClass: 'text-slate-500',
-    ctaBgClass: '',
+    ctaBgClass: 'bg-slate-600 hover:bg-slate-700 text-white',
     label: 'ГОТОВИТСЯ',
   },
   STALE: {
@@ -709,7 +709,25 @@ function computeTableStatus(group, activeRequests, getStatusConfig) {
 function computeGroupCTA(group, tableStatus, getStatusConfig, guestsMap) {
   const orders = group.orders.filter(o => o.status !== 'cancelled');
 
-  if (tableStatus === 'PREPARING') return null;
+  // BUG-S66-02 fix: PREPARING cards show CTA for orders that can be advanced
+  if (tableStatus === 'PREPARING') {
+    const advanceable = orders.filter(o => {
+      const config = getStatusConfig(o);
+      return !config.isFirstStage && !config.isFinishStage && (config.nextStageId || config.nextStatus);
+    });
+    if (!advanceable.length) return null;
+    advanceable.sort(
+      (a, b) => safeParseDate(a.created_date).getTime() - safeParseDate(b.created_date).getTime()
+    );
+    const target = advanceable[0];
+    const config = getStatusConfig(target);
+    const guestId = getLinkId(target.guest);
+    const guest = guestId && guestsMap ? guestsMap[guestId] : null;
+    const guestLabel = guest ? getGuestDisplayName(guest) : null;
+    const actionText = config.actionLabel || 'Готово';
+    const label = guestLabel ? `${actionText} (${guestLabel})` : actionText;
+    return { type: 'advance_order', orderId: target.id, config, label };
+  }
 
   if (tableStatus === 'ALL_SERVED' || tableStatus === 'BILL_REQUESTED') {
     return { type: 'close_table', label: 'Закрыть стол' };
@@ -1424,8 +1442,8 @@ function OrderGroupCard({
         )}
       </div>
 
-      {/* V2-10: Primary CTA — full width, min 52px — hidden for PREPARING (V2-06) */}
-      {!isPreparing && cta && (
+      {/* V2-10: Primary CTA — full width, min 52px (BUG-S66-02: show for PREPARING too) */}
+      {cta && (
         <button
           type="button"
           onClick={handleCTA}
