@@ -691,8 +691,15 @@ function computeGroupCTA(group, tableStatus, getStatusConfig, guestsMap) {
 
   if (tableStatus === 'PREPARING') return null;
 
-  if (tableStatus === 'ALL_SERVED' || tableStatus === 'BILL_REQUESTED' || tableStatus === 'STALE') {
+  if (tableStatus === 'ALL_SERVED' || tableStatus === 'BILL_REQUESTED') {
     return { type: 'close_table', label: 'Закрыть стол' };
+  }
+  // STALE: close table only for table groups (not pickup/delivery)
+  if (tableStatus === 'STALE') {
+    if (group.type === 'table') {
+      return { type: 'close_table', label: 'Закрыть стол' };
+    }
+    return null;
   }
 
   let targetOrders;
