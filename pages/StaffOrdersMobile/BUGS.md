@@ -87,7 +87,24 @@
 
 **Known limitations:**
 - i18n still fully deferred (BUG-SM-001)
-- Preparing-to-Ready animation (Sprint C scope)
+
+---
+
+## Sprint C Notes (v3.2.0, 2026-03-02)
+
+**Changes implemented:**
+- V2-04: Mine tab static urgency sort with position stability during transitions
+- V2-07: Preparing→Ready transition animation:
+  - Left border animates gray→amber (300ms ease via CSS transition-colors)
+  - CTA button fades in with max-h/opacity wrapper transition (300ms)
+  - Card position locked during transition (stays at PREPARING sort position for 600ms)
+  - Brief amber ring flash (200ms) for peripheral attention
+- CSS transition-colors on all card elements (borders, badges, text) for smooth status changes
+- Timer cleanup on unmount for position lock timeouts
+
+**Known limitations:**
+- Side effects inside useMemo (setTimeout for position locks) — pragmatic trade-off for synchronous detection
+- i18n still fully deferred (BUG-SM-001)
 
 ---
 
@@ -102,10 +119,10 @@
 - Swipe-right back gesture on TableDetailScreen (dx>80, dy<60)
 - liveDetailGroup: detail view auto-updates via polling using `detailGroupId`
 
-**Known limitations (Sprint C scope):**
-- No Preparing-to-Ready animation (Sprint C)
-- No static urgency sort on Mine tab with animation (Sprint C)
+**Known limitations:**
 - i18n still fully deferred (BUG-SM-001)
+- Preparing-to-Ready animation → implemented in Sprint C (v3.2.0)
+- Static urgency sort with position stability → implemented in Sprint C (v3.2.0)
 
 ---
 
