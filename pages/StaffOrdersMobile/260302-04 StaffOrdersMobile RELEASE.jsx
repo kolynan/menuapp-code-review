@@ -1639,8 +1639,9 @@ function GuestOrderSection({ guestLabel, orders, getStatusConfig, effectiveUserI
   );
 }
 
-// V2-02: Full-screen table detail view — slide-in from right
+// V2-02: Full-screen table detail view
 // V2-03: Split-tap destination — CTA stays in list, card body opens this
+// BUG-S66-01 fix: removed translate-x animation (caused rendering issues in Base44 platform)
 function TableDetailScreen({
   group,
   tableStatus,
@@ -1655,12 +1656,6 @@ function TableDetailScreen({
   onCloseAllOrders,
   activeRequests,
 }) {
-  // Slide-in animation: mount at translate-x-full, transition to translate-x-0
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    const raf = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(raf);
-  }, []);
 
   // Swipe-right to close (back gesture)
   const touchStartRef = useRef(null);
@@ -1748,9 +1743,7 @@ function TableDetailScreen({
 
   return (
     <div
-      className={`fixed inset-0 z-30 bg-slate-100 flex flex-col transition-transform duration-300 ease-out ${
-        mounted ? 'translate-x-0' : 'translate-x-full'
-      }`}
+      className="fixed inset-0 z-50 bg-slate-100 flex flex-col"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
