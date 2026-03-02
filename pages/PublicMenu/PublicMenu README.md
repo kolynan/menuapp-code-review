@@ -1,7 +1,7 @@
 ---
-version: "2.0"
+version: "2.1"
 updated: "2026-03-02"
-session: 66
+session: 69
 ---
 
 # PublicMenu — README
@@ -28,7 +28,7 @@ session: 66
 | Файл | RELEASE | Дата |
 |---|---|---|
 | x.jsx | `260302-00 x RELEASE.txt` | 2 мар 2026 |
-| useTableSession.jsx | `260302-00 useTableSession RELEASE.jsx` | 2 мар 2026 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 2 мар 2026 |
 | CartView.jsx | `260224-01 CartView RELEASE.jsx` | 24 фев 2026 |
 | MenuView.jsx | `260223-01 MenuView RELEASE.jsx` | 23 фев 2026 |
 | CheckoutView.jsx | `260222-00 CheckoutView RELEASE.jsx` | 22 фев 2026 |
@@ -44,6 +44,10 @@ session: 66
 ---
 
 ## Changelog (UX/UI решения)
+
+### Session 68 — 2 мар 2026 ✅ задеплоен S69
+
+- **BUG-PM-011 fix:** `hasRecentActivity()` guard в `useTableSession`. Сессия закрывается только если `isSessionExpired() && !hasRecentActivity()`. Защита от закрытия активных столов при длинных сменах (>8ч с момента открытия). Fallback: `last_activity_at || updated_at || opened_at`.
 
 ### Session 66 — 2 мар 2026
 
