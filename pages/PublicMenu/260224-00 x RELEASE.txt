@@ -1516,8 +1516,8 @@ export default function X() {
 
 
   // Submit order
-  // Process hall order
-  const processHallOrder = async (guestToUse) => {
+  // Process hall order (P0-2: accepts validatedSession to avoid stale closure)
+  const processHallOrder = async (guestToUse, validatedSession) => {
     try {
       // Handle loyalty account (find or create if email provided)
       let loyaltyAccountToUse = loyaltyAccount;
@@ -1584,7 +1584,7 @@ export default function X() {
         client_email: customerEmail && customerEmail.trim() ? customerEmail.trim().toLowerCase() : undefined,
         public_token: Math.random().toString(36).substring(7),
         table: currentTableId,
-        table_session: tableSession?.id || null,
+        table_session: validatedSession?.id || tableSession?.id || null,
         guest: guestToUse?.id || null,
         order_number: orderNumber,
         loyalty_account: loyaltyAccountToUse?.id || null,
@@ -1720,12 +1720,32 @@ export default function X() {
     try {
       // Hall mode: handle session and guest
       if (orderMode === "hall" && isTableVerified) {
-        // Ensure we have a session
+        // P0-2: Validate existing session is still valid
         let session = tableSession;
+        if (session && isSessionExpired(session)) {
+          // Session expired — close it in DB and force new one
+          try {
+            await base44.entities.TableSession.update(session.id, {
+              status: 'expired',
+              closed_at: new Date().toISOString(),
+            });
+          } catch (e) { /* best effort */ }
+          session = null;
+        }
+
+        // Ensure we have a valid session
         if (!session) {
           session = await getOrCreateSession(partner.id, currentTableId);
           setTableSession(session);
           sessionIdRef.current = session?.id;
+        }
+
+        // P0-2: Hard guard — reject order if no valid session
+        if (!session?.id) {
+          toast.error(t('error.session_expired'), { id: 'session-err' });
+          submitLockRef.current = false;
+          setIsSubmitting(false);
+          return;
         }
 
         // ============================================================
@@ -1840,8 +1860,8 @@ export default function X() {
         // END FIX-260131-07 FINAL
         // ============================================================
 
-        // Process the order
-        const success = await processHallOrder(guest);
+        // Process the order (pass validated session to avoid stale closure)
+        const success = await processHallOrder(guest, session);
         if (!success) {
           submitLockRef.current = false;
           setIsSubmitting(false);
