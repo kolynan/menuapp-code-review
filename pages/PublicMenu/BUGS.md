@@ -1,7 +1,7 @@
 ---
-version: "7.0"
+version: "8.0"
 updated: "2026-03-02"
-session: 66
+session: 68
 ---
 
 # PublicMenu — Bug Registry
@@ -18,6 +18,14 @@ session: 66
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-011: Active tables expired based on opened_at alone — activity guard missing (P0)
+- **Приоритет:** P0
+- **Когда:** Session 68 (найден при анализе P0-1 перед деплоем)
+- **Root cause:** `isSessionExpired()` in `sessionHelpers.js` checks only `opened_at`. A table open 8+ hours with recent orders (e.g., `last_activity_at` updated 1 hour ago) would be incorrectly expired. The cleanup logic in STEP 1 and STEP 2 of `restoreSession()` would close an active table and cancel orders.
+- **Фикс:** Added `hasRecentActivity(session)` helper that checks `last_activity_at || updated_at || opened_at`. Both `isSessionExpired` call sites now use combined condition: `isSessionExpired(s) && !hasRecentActivity(s)` — session is expired only if BOTH old `opened_at` AND no recent activity.
+- **Файл:** `useTableSession.jsx` (lines 11-18, 293, 332)
+- **RELEASE:** `260302-06 useTableSession RELEASE.jsx`
 
 ### BUG-PM-009: Expired sessions reused — old orders leak into new visits (P0-1)
 - **Приоритет:** P0
