@@ -2966,10 +2966,13 @@ export default function StaffOrdersMobile() {
     const shiftCutoff = shiftStartTime.getTime();
     
     return orders.filter((o) => {
+      // P0-3: For hall orders, require table_session (filter out legacy/orphan orders)
+      if (o.order_type === 'hall' && !getLinkId(o.table_session)) return false;
+
       // SHIFT FILTER: only orders created after shift start
       const createdAt = safeParseDate(o.created_date).getTime();
       if (createdAt < shiftCutoff) return false;
-      
+
       // Existing status filter (unchanged)
       const stageId = getLinkId(o.stage_id);
       if (stageId && stagesMap[stageId]) {
