@@ -1,11 +1,43 @@
 # StaffOrdersMobile Bug Tracker
 
-**Page:** `pages/StaffOrdersMobile/260302-04 StaffOrdersMobile RELEASE.jsx`
-**Last updated:** 2026-03-02 (Session 66 — P0 session logic fix)
+**Page:** `pages/StaffOrdersMobile/260302-05 StaffOrdersMobile RELEASE.jsx`
+**Last updated:** 2026-03-02 (Session 66 — UI bug fixes)
 
 ---
 
 ## Fixed Bugs
+
+### BUG-S66-01 (P1) -- Detail view doesn't open on card tap (Sprint B broken)
+- **Function:** TableDetailScreen render / CSS animation
+- **Root cause:** CSS `translate-x-full` → `translate-x-0` transition with `requestAnimationFrame` timing was unreliable in Base44 platform container. Detail screen mounted but stayed off-screen.
+- **Fix:** Removed slide-in animation entirely. Detail view now shows instantly with `z-50` (above all other content). Swipe-right to close gesture retained.
+- **Commit:** `9b27dfd`
+- **RELEASE:** `260302-05 StaffOrdersMobile RELEASE.jsx`
+- **Status:** FIXED
+
+### BUG-S66-02 (P1) -- No CTA button on PREPARING card
+- **Function:** computeGroupCTA
+- **Root cause:** `computeGroupCTA` returned `null` for all PREPARING status cards (by Sprint A design V2-06). Orders in middle stages (kitchen working) had no action button, preventing waiter from advancing them.
+- **Fix:** For PREPARING status, find orders with `nextStageId`/`nextStatus` that are advanceable (not first-stage, not finish-stage). Show CTA with appropriate action label. Added `ctaBgClass` for PREPARING style.
+- **Commit:** `aba6513`
+- **RELEASE:** `260302-05 StaffOrdersMobile RELEASE.jsx`
+- **Status:** FIXED
+
+### BUG-S65-04 (P1) -- Waiter accepts order blind (no content visible)
+- **Function:** computeGroupCTA / handleCTA
+- **Root cause:** CTA on collapsed card for NEW orders directly advanced the order status (accepting it) without showing the order content (dishes, quantities). Waiter had no idea what they were accepting.
+- **Fix:** First-stage CTA now opens the detail view (calls `onCardBodyTap`) instead of advancing directly. Label changed from "Принять" to "Открыть заказ". Accept button remains in the detail view (GuestOrderSection) where order content is visible.
+- **Commit:** `4f2fa26`
+- **RELEASE:** `260302-05 StaffOrdersMobile RELEASE.jsx`
+- **Status:** FIXED
+
+### BUG-S65-05 (P2) -- Double "Стол" prefix ("Стол Стол 22")
+- **Function:** orderGroups computation / banner text
+- **Root cause:** `displayName` was constructed as `` `Стол ${tableName}` `` where `tableName` comes from `tableMap[tableId].name` which already contains "Стол" prefix (DB stores "Стол 22"). Same issue in banner notification text.
+- **Fix:** Removed hardcoded "Стол " prefix from `displayName` in orderGroups computation and from single-table banner text. Table name used as-is from DB.
+- **Commit:** `5200dc7`
+- **RELEASE:** `260302-05 StaffOrdersMobile RELEASE.jsx`
+- **Status:** FIXED
 
 ### BUG-SM-011 (P0) -- Hall orders without table_session shown in active view
 - **Function:** activeOrders (useMemo filter)
