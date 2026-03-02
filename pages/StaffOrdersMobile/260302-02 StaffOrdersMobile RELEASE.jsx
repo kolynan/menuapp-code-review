@@ -1397,7 +1397,7 @@ function OrderGroupCard({
   const flashRingClass = showFlash ? 'ring-2 ring-amber-300' : '';
 
   return (
-    <div className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-colors duration-300 ease-in-out ${style.bgClass} ${style.borderClass} ${flashRingClass}`}>
+    <div className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-all duration-300 ease-in-out ${style.bgClass} ${style.borderClass} ${flashRingClass}`}>
       {/* V2-03: Card body area — tap opens detail view */}
       <div
         className={`px-4 pt-3 pb-3 ${onCardBodyTap ? 'cursor-pointer active:opacity-80' : ''}`}
@@ -1438,7 +1438,7 @@ function OrderGroupCard({
 
       {/* V2-10: Primary CTA — full width, min 52px — hidden for PREPARING (V2-06) */}
       {/* V2-07: CTA wrapper always in DOM for smooth fade-in transition on Preparing→Ready */}
-      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isPreparing || !cta ? 'max-h-0 opacity-0' : 'max-h-16 opacity-100'}`}>
+      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isPreparing || !cta ? 'max-h-0 opacity-0' : 'max-h-20 opacity-100'}`}>
         {cta && (
           <button
             type="button"
@@ -3163,6 +3163,11 @@ export default function StaffOrdersMobile() {
   // V2-04/V2-07: Sprint C — Sort groups by table status priority with position stability
   // When a card transitions (e.g. PREPARING→READY), its sort position is locked for 600ms
   // so the card does not jump to a new position during the visual transition animation.
+  //
+  // NOTE: setTimeout inside useMemo is a deliberate trade-off. Moving detection to useEffect
+  // would cause a 1-frame visual jump (useEffect fires AFTER paint, so the first render
+  // would sort the card at its new position before the lock takes effect).
+  // The `!locks.has(g.id)` guard prevents duplicate timers in React StrictMode.
   const v2SortedGroups = useMemo(() => {
     if (!finalGroups.length) return finalGroups;
 
