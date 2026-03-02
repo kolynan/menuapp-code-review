@@ -1,7 +1,7 @@
 # StaffOrdersMobile Bug Tracker
 
 **Page:** `pages/StaffOrdersMobile/staffordersmobile.jsx`
-**Last updated:** 2026-02-24
+**Last updated:** 2026-03-02 (Sprint A v3.0.0)
 
 ---
 
@@ -65,3 +65,22 @@
 - **Lines:** 1-87
 - **Impact:** Changelog in code header; better suited for CHANGELOG.md
 - **Recommendation:** Move to separate file
+
+---
+
+## Sprint A Notes (v3.0.0, 2026-03-02)
+
+**Changes implemented:**
+- V2-01: Compact card (table name + zone, status badge, guest/order count, elapsed time, 1 CTA)
+- V2-05: Color-coded left borders via `TABLE_STATUS_STYLES` mapping (Tailwind classes, no inline styles)
+- V2-06: Muted Preparing cards (gray bg, 2px border, no CTA button)
+- V2-08: Guest-labeled CTA button ("Принять (Гость 1)")
+- V2-10: 52px min-height primary CTA, full-width
+- Sort: BILL_REQUESTED > NEW > READY > ALL_SERVED > PREPARING (oldest first)
+
+**Known limitations (Sprint B scope):**
+- No detail view (tap card body = no action in Sprint A)
+- No favorites star on compact card (Sprint B will add)
+- Item count shown as order count (lazy-loaded items not available without API call)
+- No Preparing-to-Ready animation (Sprint C)
+- No banner notifications (Sprint D)
