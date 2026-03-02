@@ -3150,7 +3150,7 @@ export default function StaffOrdersMobile() {
           tableGroups[tableId] = {
             type: 'table',
             id: tableId,
-            displayName: `Стол ${tableName}`,
+            displayName: tableName,
             orders: [],
           };
           groups.push(tableGroups[tableId]);
@@ -3420,7 +3420,7 @@ export default function StaffOrdersMobile() {
       if (tableNames.length === 1 && orderIds.length === 1) {
         const label = eventType === 'ready' ? 'Заказ готов' : 'Новый заказ';
         return {
-          text: `Стол ${tableNames[0]}: ${label}`,
+          text: `${tableNames[0]}: ${label}`,
           groupId: [...tableIds][0],
           count: 1,
         };
