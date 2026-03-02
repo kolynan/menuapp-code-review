@@ -765,7 +765,10 @@ function computeGroupCTA(group, tableStatus, getStatusConfig, guestsMap) {
   const guest = guestId && guestsMap ? guestsMap[guestId] : null;
   const guestLabel = guest ? getGuestDisplayName(guest) : null;
 
-  const actionText = config.actionLabel || (tableStatus === 'NEW' ? 'Принять' : 'Выдать');
+  // BUG-S65-04: first-stage CTA opens detail view (shows content before accept)
+  const actionText = tableStatus === 'NEW'
+    ? 'Открыть заказ'
+    : (config.actionLabel || 'Выдать');
   const label = guestLabel ? `${actionText} (${guestLabel})` : actionText;
 
   return { type: 'advance_order', orderId: targetOrder.id, config, label };
@@ -1351,6 +1354,12 @@ function OrderGroupCard({
   const handleCTA = (e) => {
     e.stopPropagation();
     if (!cta || advanceMutation.isPending) return;
+
+    // BUG-S65-04 fix: first-stage orders open detail view instead of blind accept
+    if (cta.type === 'advance_order' && cta.config?.isFirstStage && onCardBodyTap) {
+      onCardBodyTap();
+      return;
+    }
 
     if (cta.type === 'close_table') {
       // Prefer session-close (onCloseTable) over finish-stage-only (onCloseAllOrders)
