@@ -164,6 +164,31 @@ const getAllDeviceIds = () => {
   return Array.from(ids);
 };
 
+// P0-1: Close an expired session in DB (cleanup-before-show)
+// Closes session status to 'expired' and cancels unprocessed (new) orders
+const closeExpiredSessionInDB = async (sessionId) => {
+  try {
+    await base44.entities.TableSession.update(sessionId, {
+      status: 'expired',
+      closed_at: new Date().toISOString(),
+    });
+    // Cancel unprocessed orders (new status only — accepted+ are already in kitchen)
+    const orders = await getSessionOrders(sessionId);
+    if (orders?.length) {
+      const unprocessed = orders.filter(o => o.status === 'new');
+      if (unprocessed.length > 0) {
+        await Promise.allSettled(
+          unprocessed.map(o =>
+            base44.entities.Order.update(o.id, { status: 'cancelled' })
+          )
+        );
+      }
+    }
+  } catch (err) {
+    // Best effort — don't block session restore flow
+  }
+};
+
 export function useTableSession({
   partner,
   isHallMode,
@@ -256,18 +281,23 @@ export function useTableSession({
             const savedSession = savedSessions?.[0];
             
             if (savedSession) {
-              const isActive = savedSession.status === 'open' && 
-                               !savedSession.closed_at && 
+              const isExpired = isSessionExpired(savedSession);
+              const isActive = savedSession.status === 'open' &&
+                               !savedSession.closed_at &&
                                !savedSession.ended_at &&
-                               !isSessionExpired(savedSession);
-              
+                               !isExpired;
+
               const savedTableId = getLinkId(savedSession.table);
               const savedPartnerId = getLinkId(savedSession.partner);
               const matchesTable = String(savedTableId) === String(currentTableId);
               const matchesPartner = String(savedPartnerId) === String(partner.id);
-              
+
               if (isActive && matchesTable && matchesPartner) {
                 session = savedSession;
+              } else if (savedSession.status === 'open' && isExpired) {
+                // P0-1: Close expired session in DB — don't leave stale open sessions
+                closeExpiredSessionInDB(savedSession.id);
+                clearSessionId(partner.id, currentTableId);
               }
             }
           } catch (err) {
@@ -282,15 +312,19 @@ export function useTableSession({
             table: currentTableId,
             status: 'open'
           });
-          
+
           if (sessions?.length) {
-            const sortedSessions = [...sessions].sort((a, b) => 
+            const sortedSessions = [...sessions].sort((a, b) =>
               new Date(b.opened_at || b.created_at) - new Date(a.opened_at || a.created_at)
             );
-            const freshSession = sortedSessions[0];
-            
-            if (!isSessionExpired(freshSession)) {
-              session = freshSession;
+
+            // P0-1: Close all expired sessions, use the first non-expired one
+            for (const s of sortedSessions) {
+              if (isSessionExpired(s)) {
+                closeExpiredSessionInDB(s.id);
+              } else if (!session) {
+                session = s;
+              }
             }
           }
         }
