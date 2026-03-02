@@ -1,7 +1,7 @@
 # StaffOrdersMobile Bug Tracker
 
-**Page:** `pages/StaffOrdersMobile/staffordersmobile.jsx`
-**Last updated:** 2026-03-02 (Sprint A v3.0.0)
+**Page:** `pages/StaffOrdersMobile/260302-01 StaffOrdersMobile RELEASE.jsx`
+**Last updated:** 2026-03-02 (Sprint B v3.1.0)
 
 ---
 
@@ -68,6 +68,25 @@
 
 ---
 
+## Sprint B Notes (v3.1.0, 2026-03-02)
+
+**Changes implemented:**
+- V2-02: TableDetailScreen — full-screen detail view, slide-in from right (300ms ease-out)
+- V2-03: Split-tap — CTA executes action inline; card body opens TableDetailScreen
+- DetailOrderRow — auto-fetches items in detail view (no lazy loading guard)
+- GuestOrderSection — per-guest sections with 48px full-width action buttons
+- Scroll position preserved via `listScrollRef` + `requestAnimationFrame`
+- Swipe-right back gesture on TableDetailScreen (dx>80, dy<60)
+- liveDetailGroup: detail view auto-updates via polling using `detailGroupId`
+
+**Known limitations (Sprint C/D scope):**
+- No Preparing-to-Ready animation (Sprint C)
+- No static urgency sort on Mine tab with animation (Sprint C)
+- No banner notifications (Sprint D)
+- i18n still fully deferred (BUG-SM-001)
+
+---
+
 ## Sprint A Notes (v3.0.0, 2026-03-02)
 
 **Changes implemented:**
@@ -77,10 +96,3 @@
 - V2-08: Guest-labeled CTA button ("Принять (Гость 1)")
 - V2-10: 52px min-height primary CTA, full-width
 - Sort: BILL_REQUESTED > NEW > READY > ALL_SERVED > PREPARING (oldest first)
-
-**Known limitations (Sprint B scope):**
-- No detail view (tap card body = no action in Sprint A)
-- No favorites star on compact card (Sprint B will add)
-- Item count shown as order count (lazy-loaded items not available without API call)
-- No Preparing-to-Ready animation (Sprint C)
-- No banner notifications (Sprint D)

@@ -1691,7 +1691,8 @@ function TableDetailScreen({
   }, [group.orders]);
 
   // Close table handler — same logic as list CTA
-  const canCloseTable = (tableStatus === 'ALL_SERVED' || tableStatus === 'BILL_REQUESTED') && onCloseTable;
+  // Note: named isTableClosable (not canCloseTable) to distinguish from the role-check in parent component
+  const isTableClosable = (tableStatus === 'ALL_SERVED' || tableStatus === 'BILL_REQUESTED') && onCloseTable;
   const handleCloseTableClick = () => {
     if (onCloseTable && group.type === 'table') {
       const sessionId = group.orders.length > 0 ? getLinkId(group.orders[0].table_session) : null;
@@ -1727,7 +1728,7 @@ function TableDetailScreen({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex items-center justify-center w-10 h-10 rounded-lg border border-slate-200 bg-white active:scale-95 shrink-0"
+                className="flex items-center justify-center w-11 h-11 rounded-lg border border-slate-200 bg-white active:scale-95 shrink-0"
                 aria-label="Назад"
               >
                 <ChevronLeft className="w-5 h-5 text-slate-600" />
@@ -1777,6 +1778,7 @@ function TableDetailScreen({
         {/* Orders without guest assignment */}
         {ordersByGuest.noGuest.length > 0 && (
           <GuestOrderSection
+            key="__no_guest__"
             guestLabel="Заказ (гость не определён)"
             orders={ordersByGuest.noGuest}
             getStatusConfig={getStatusConfig}
@@ -1797,15 +1799,15 @@ function TableDetailScreen({
           <button
             type="button"
             onClick={handleCloseTableClick}
-            disabled={!canCloseTable}
+            disabled={!isTableClosable}
             className={`w-full min-h-[48px] flex items-center justify-center gap-2 font-semibold text-sm rounded-lg border transition-all active:scale-[0.99] ${
-              canCloseTable
+              isTableClosable
                 ? 'bg-red-600 text-white border-red-600'
                 : 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
             }`}
           >
             <X className="w-4 h-4" />
-            {canCloseTable ? 'Закрыть стол' : 'Закрыть стол (не все готово)'}
+            {isTableClosable ? 'Закрыть стол' : 'Закрыть стол (не все готово)'}
           </button>
         </div>
 
@@ -2344,6 +2346,7 @@ export default function StaffOrdersMobile() {
   // V2-02: Sprint B — Table detail view state
   const [detailGroupId, setDetailGroupId] = useState(null); // ID of group open in detail view
   const listScrollRef = useRef(0); // Saved scroll position for returning from detail
+  const lastDetailGroupRef = useRef(null); // Last known group — prevents flash-unmount during polling
 
   useEffect(() => {
     if (favoritesInitializedRef.current) return;
@@ -3138,11 +3141,17 @@ export default function StaffOrdersMobile() {
 
   // V2-02: Sprint B — Live detail group (auto-updates via polling)
   // Uses detailGroupId to find the live version from all current groups
+  // lastDetailGroupRef prevents flash-unmount when group briefly disappears during polling
   const liveDetailGroup = useMemo(() => {
     if (!detailGroupId || !orderGroups) return null;
     // Search across all groups (not just filtered view) so detail stays open during filter changes
-    return orderGroups.find(g => g.id === detailGroupId) || null;
+    const found = orderGroups.find(g => g.id === detailGroupId) || null;
+    if (found) lastDetailGroupRef.current = found; // Keep last known version
+    return found;
   }, [detailGroupId, orderGroups]);
+
+  // The group used to render detail screen — last known version if live group disappears temporarily
+  const stableDetailGroup = liveDetailGroup || (detailGroupId ? lastDetailGroupRef.current : null);
 
   // v2.7.0: Removed favoriteOrders/otherOrders (replaced by orderGroups)
 
@@ -3284,9 +3293,16 @@ export default function StaffOrdersMobile() {
 
   const handleCloseDetail = useCallback(() => {
     setDetailGroupId(null);
-    // Restore scroll position after DOM repaints
+    // Double-rAF: first frame React re-renders list, second frame scroll is applied
+    // Also scrolls document.documentElement.scrollTop as fallback for Base44 shell
     requestAnimationFrame(() => {
-      window.scrollTo({ top: listScrollRef.current, behavior: 'instant' });
+      requestAnimationFrame(() => {
+        const top = listScrollRef.current;
+        window.scrollTo({ top, behavior: 'instant' });
+        if (document.documentElement.scrollTop !== top) {
+          document.documentElement.scrollTop = top;
+        }
+      });
     });
   }, []);
 
@@ -3600,10 +3616,10 @@ export default function StaffOrdersMobile() {
       </div>
 
       {/* V2-02: Sprint B — Table detail view overlay (full-screen, slide-in from right) */}
-      {liveDetailGroup && (
+      {stableDetailGroup && (
         <TableDetailScreen
-          group={liveDetailGroup}
-          tableStatus={computeTableStatus(liveDetailGroup, activeRequests, getStatusConfig)}
+          group={stableDetailGroup}
+          tableStatus={computeTableStatus(stableDetailGroup, activeRequests, getStatusConfig)}
           onClose={handleCloseDetail}
           getStatusConfig={getStatusConfig}
           guestsMap={guestsMap}
