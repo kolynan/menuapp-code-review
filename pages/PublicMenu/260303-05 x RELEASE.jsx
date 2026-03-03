@@ -388,6 +388,14 @@ function OrderConfirmationScreen({
   onTrackOrder,
   t,
 }) {
+  // Safe translation with fallback (same pattern as CartView)
+  const tr = (key, fallback) => {
+    const val = typeof t === "function" ? t(key) : "";
+    if (!val || typeof val !== "string") return fallback;
+    const norm = val.trim();
+    if (norm === key || norm.startsWith(key + ":")) return fallback;
+    return norm;
+  };
   return (
     <div className="fixed inset-0 z-[60] bg-white overflow-y-auto">
     <div className="px-4 py-8 max-w-md mx-auto animate-[fadeInUp_0.3s_ease-out]">
@@ -451,10 +459,17 @@ function OrderConfirmationScreen({
         </div>
       </div>
 
-      {/* Title */}
-      <h2 className="text-xl font-semibold text-center text-slate-800 mb-6">
-        {t("confirmation.title")}
+      {/* Title — FIX-S74-01: "Отправлен", not "Принят" (order is not yet accepted by waiter) */}
+      <h2 className="text-xl font-semibold text-center text-slate-800 mb-1">
+        {orderMode === "hall"
+          ? tr("confirmation.sent_to_waiter", "Заказ отправлен официанту")
+          : tr("confirmation.order_sent", "Заказ отправлен")}
       </h2>
+      <p className="text-sm text-center text-slate-500 mb-6">
+        {orderMode === "hall"
+          ? tr("confirmation.status_hint_hall", "Статус обновится, когда официант примет заказ")
+          : tr("confirmation.status_hint", "Мы начнём готовить ваш заказ")}
+      </p>
 
       {/* Order summary card */}
       <Card className="mb-6">
@@ -3032,11 +3047,13 @@ export default function X() {
       )}
 
       {/* TASK-260203-01: Cart as Bottom Drawer */}
-      <Drawer 
-        open={drawerMode === 'cart'} 
+      {/* FIX-S74-05: snapPoints forces drawer to open at 85% height */}
+      <Drawer
+        open={drawerMode === 'cart'}
         onOpenChange={(open) => !open && setDrawerMode(null)}
+        snapPoints={[0.85]}
       >
-        <DrawerContent className="max-h-[85vh] overflow-hidden">
+        <DrawerContent className="max-h-[85vh] overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           <DrawerHeader className="sr-only">
             <DrawerTitle>Корзина</DrawerTitle>
           </DrawerHeader>
