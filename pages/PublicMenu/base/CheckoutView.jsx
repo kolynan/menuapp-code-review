@@ -148,16 +148,21 @@ export default function CheckoutView({
 
       {submitError && <div className="text-sm text-red-600 text-center bg-red-50 p-2 rounded">{submitError}</div>}
 
-      {/* Submit button - TASK-260127-01: renamed to "Отправить заказ" */}
+      {/* Spacer so sticky button doesn't overlap last content */}
+      {(orderMode !== "hall" || isTableVerified) && <div className="h-20" />}
+
+      {/* Submit button - sticky at bottom of viewport */}
       {(orderMode !== "hall" || isTableVerified) && (
-        <Button
-          size="lg"
-          className="w-full bg-green-600 hover:bg-green-700 text-lg h-12"
-          onClick={handleSubmitOrder}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (t('cart.submitting')) : (orderMode === 'hall' ? t('cart.send_to_waiter') : t('cart.send_order'))}
-        </Button>
+        <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 -mx-4">
+          <Button
+            size="lg"
+            className="w-full bg-green-600 hover:bg-green-700 text-lg h-12"
+            onClick={handleSubmitOrder}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (t('cart.submitting')) : (orderMode === 'hall' ? t('cart.send_to_waiter') : t('cart.send_order'))}
+          </Button>
+        </div>
       )}
     </div>
   );

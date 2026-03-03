@@ -1188,20 +1188,29 @@ export default function CartView({
               )}
 
 
-              <Button
-                size="lg"
-                className="w-full bg-green-600 hover:bg-green-700 mt-3"
-                onClick={handleSubmitOrder}
-                disabled={isSubmitting || isTableVerified === false}
-              >
-                {isSubmitting ? tr('cart.submitting', 'Отправка...') : tr('cart.send_to_waiter', 'Отправить заказ официанту')}
-              </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* Add more link - removed, use ✕ to close */}
+
+      {/* Spacer so sticky button doesn't overlap last content */}
+      {cart.length > 0 && <div className="h-20" />}
+
+      {/* Submit button - sticky at bottom of drawer scroll area */}
+      {cart.length > 0 && (
+        <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 -mx-4">
+          <Button
+            size="lg"
+            className="w-full bg-green-600 hover:bg-green-700"
+            onClick={handleSubmitOrder}
+            disabled={isSubmitting || isTableVerified === false}
+          >
+            {isSubmitting ? tr('cart.submitting', 'Отправка...') : tr('cart.send_to_waiter', 'Отправить заказ официанту')}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
