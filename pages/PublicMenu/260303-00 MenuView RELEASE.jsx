@@ -167,6 +167,7 @@ export default function MenuView({
               <div className="h-11 px-1.5 flex items-center gap-1 bg-white rounded-full shadow-md whitespace-nowrap">
                 <button
                   onClick={() => updateQuantity(dish.id, -1)}
+                  aria-label={t('menu.remove') || 'Remove'}
                   className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
                 >
                   <Minus className="w-4 h-4 text-slate-700" />
@@ -176,6 +177,7 @@ export default function MenuView({
                 </span>
                 <button
                   onClick={() => updateQuantity(dish.id, 1)}
+                  aria-label={t('menu.add')}
                   className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
                 >
                   <Plus className="w-4 h-4 text-slate-700" />
