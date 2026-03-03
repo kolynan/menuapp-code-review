@@ -1,5 +1,12 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   STAFFORDERSMOBILE — v3.5.0 (2026-03-03) Session Cleanup Integration S73
+   STAFFORDERSMOBILE — v3.6.0 (2026-03-04) Stale Data + Close Table Confirm S74
+
+   CHANGES in v3.6.0 (P0 Stale Data + Close Table Confirm — S74):
+   - P0: Detail view forces refetch on open (prevents stale order list)
+   - P0: Notification effect invalidates orders query when new orders detected
+   - P0: computeTableStatus reordered — NEW before STALE (new orders clear ПРОСРОЧЕН)
+   - P0: "Закрыть стол" replaced browser confirm() with React confirmation dialog
+   - Dialog: table name in title, destructive red button, 44px touch targets, mobile 320px safe
 
    CHANGES in v3.5.0 (SESS-016 — Session Cleanup Integration):
    - Added runSessionCleanup() import from @/components/sessionCleanupJob
@@ -699,15 +706,16 @@ function computeTableStatus(group, activeRequests, getStatusConfig) {
 
   if (orders.length === 0) return 'ALL_SERVED';
 
-  // 2. STALE: all orders have no assignee and oldest is >3 min (Free tab signal)
+  // 2. Any order needs accepting (first stage)? — takes priority over STALE
+  // v3.6.0: Moved before STALE so new orders clear ПРОСРОЧЕН label
+  if (orders.some(o => getStatusConfig(o).isFirstStage)) return 'NEW';
+
+  // 3. STALE: all orders have no assignee and oldest is >3 min (Free tab signal)
   const allFree = orders.every(o => !getLinkId(o.assignee));
   if (allFree) {
     const oldest = Math.min(...orders.map(o => safeParseDate(o.created_date).getTime()));
     if (Date.now() - oldest > 3 * 60 * 1000) return 'STALE';
   }
-
-  // 3. Any order needs accepting (first stage)?
-  if (orders.some(o => getStatusConfig(o).isFirstStage)) return 'NEW';
 
   // 4. All orders at finish stage → waiter should close the table
   if (orders.every(o => getStatusConfig(o).isFinishStage)) return 'ALL_SERVED';
@@ -1259,7 +1267,7 @@ function OrderCard({
                 size="sm"
                 onClick={(e) => {
                   e.stopPropagation(); // P0-3: prevent card toggle
-                  onCloseTable(tableSessionId);
+                  onCloseTable(tableSessionId, tableData?.name || 'стол');
                 }}
                 className="h-8 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
               >
@@ -1380,7 +1388,7 @@ function OrderGroupCard({
       if (onCloseTable && group.type === 'table') {
         const sessionId = group.orders.length > 0 ? getLinkId(group.orders[0].table_session) : null;
         if (sessionId) {
-          onCloseTable(sessionId);
+          onCloseTable(sessionId, group.displayName);
           return;
         }
       }
@@ -1750,7 +1758,7 @@ function TableDetailScreen({
     if (onCloseTable && group.type === 'table') {
       const sessionId = group.orders.length > 0 ? getLinkId(group.orders[0].table_session) : null;
       if (sessionId) {
-        onCloseTable(sessionId);
+        onCloseTable(sessionId, group.displayName);
         return;
       }
     }
@@ -2418,6 +2426,9 @@ export default function StaffOrdersMobile() {
   // V2-09: Sprint D — Banner notification state
   const [bannerData, setBannerData] = useState(null);
   const bannerIdCounter = useRef(0);
+
+  // v3.6.0: Close table confirmation dialog state
+  const [closeTableConfirm, setCloseTableConfirm] = useState(null); // { sessionId, tableName } | null
 
   const updateNotifPrefs = (patch) => {
     setNotifPrefs((prev) => {
@@ -3494,8 +3505,10 @@ export default function StaffOrdersMobile() {
     if (newOrderIds.length > 0) {
       const banner = buildBannerInfo(newOrderIds, 'new');
       pushNotify(`Новые: +${newOrderIds.length}`, newOrderIds, banner);
+      // v3.6.0: Force refetch to ensure detail view gets fresh data immediately
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
     }
-  }, [roleFilteredOrders, assignFilters, selectedTypes, canFetch, notifPrefs, effectiveUserId, stagesMap, tableMap]);
+  }, [roleFilteredOrders, assignFilters, selectedTypes, canFetch, notifPrefs, effectiveUserId, stagesMap, tableMap, queryClient]);
 
   const toggleChannel = (type) => {
     const on = selectedTypes.includes(type);
@@ -3524,10 +3537,12 @@ export default function StaffOrdersMobile() {
   };
 
   // V2-02/03: Sprint B — Open/close detail view, preserve scroll position
+  // v3.6.0: Force refetch on open to prevent stale order list in detail view
   const handleOpenDetail = useCallback((group) => {
     listScrollRef.current = window.scrollY;
     setDetailGroupId(group.id);
-  }, []);
+    refetchOrders();
+  }, [refetchOrders]);
 
   const handleCloseDetail = useCallback(() => {
     setDetailGroupId(null);
@@ -3587,18 +3602,24 @@ export default function StaffOrdersMobile() {
   };
 
   // D1-007, D1-008, D1-009: Close table handler
-  const handleCloseTable = async (tableSessionField) => {
+  // v3.6.0: Shows confirmation dialog instead of browser confirm()
+  const handleCloseTable = (tableSessionField, tableName) => {
     const sessionId = getLinkId(tableSessionField);
     if (!sessionId) return;
-    
-    if (!confirm("Закрыть стол? Сессия будет завершена.")) return;
-    
+    setCloseTableConfirm({ sessionId, tableName: tableName || 'стол' });
+  };
+
+  // v3.6.0: Confirmation dialog — executes close after user confirms
+  const confirmCloseTable = async () => {
+    if (!closeTableConfirm) return;
+    const { sessionId } = closeTableConfirm;
+    setCloseTableConfirm(null);
     try {
       await closeSession(sessionId);
       showToast("Стол закрыт");
+      setDetailGroupId(null); // Close detail view — table no longer active
       refetchOrders();
     } catch (err) {
-      console.error("Error closing table:", err);
       showToast("Ошибка при закрытии");
     }
   };
@@ -3981,6 +4002,36 @@ export default function StaffOrdersMobile() {
                 </div>
                 <div className="mt-3 text-[11px] text-slate-500 bg-slate-50 p-2 rounded-lg">Уведомления приходят по активным фильтрам.</div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* v3.6.0: Close table confirmation dialog */}
+      {closeTableConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">
+              {`Закрыть ${closeTableConfirm.tableName}?`}
+            </h3>
+            <p className="text-sm text-slate-600 mb-6">
+              Гости больше не смогут отправлять заказы.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setCloseTableConfirm(null)}
+                className="flex-1 min-h-[44px] rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 active:scale-[0.98]"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={confirmCloseTable}
+                className="flex-1 min-h-[44px] rounded-lg bg-red-600 text-white text-sm font-semibold active:scale-[0.98]"
+              >
+                Закрыть
+              </button>
             </div>
           </div>
         </div>

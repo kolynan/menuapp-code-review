@@ -1,7 +1,7 @@
 # StaffOrdersMobile Bug Tracker
 
-**Page:** `pages/StaffOrdersMobile/260303-06 StaffOrdersMobile RELEASE.jsx`
-**Last updated:** 2026-03-03 (Session 73 — SESS-016 integration + P1 payment_status fix)
+**Page:** `pages/StaffOrdersMobile/260304-00 StaffOrdersMobile RELEASE.jsx`
+**Last updated:** 2026-03-04 (Session 74 — P0 stale data + close table confirm)
 
 ---
 
@@ -79,6 +79,20 @@
 
 ---
 
+### BUG-SM-014 (P0) -- Detail view shows stale orders (new orders not visible)
+- **Function:** handleOpenDetail / notification effect / computeTableStatus
+- **Root cause:** Detail view relied solely on polling for updates. When opened, it showed cached data without forcing a fresh fetch. Additionally, computeTableStatus checked STALE before NEW, so tables with new first-stage orders could show "ПРОСРОЧЕН" instead of "НОВЫЙ".
+- **Fix:** (1) `handleOpenDetail` now calls `refetchOrders()` on open. (2) Notification effect invalidates orders query when new orders detected. (3) Reordered `computeTableStatus` — NEW check before STALE, so new orders clear ПРОСРОЧЕН. (4) Detail view closes after table close to prevent zombie view.
+- **RELEASE:** `260304-00 StaffOrdersMobile RELEASE.jsx`
+- **Status:** FIXED
+
+### BUG-SM-007 (P0 — upgraded from P2) -- Close table without confirmation dialog
+- **Function:** handleCloseTable
+- **Root cause:** Used browser `confirm()` — ugly, not mobile-friendly, easy to accidentally confirm. Single tap closes table, guests lose ability to order.
+- **Fix:** Replaced with React state-driven confirmation dialog: title with table name ("Закрыть Стол 5?"), descriptive text, destructive red button, 44px touch targets, mobile 320px safe. Callers now pass table name as second argument.
+- **RELEASE:** `260304-00 StaffOrdersMobile RELEASE.jsx`
+- **Status:** FIXED
+
 ### BUG-SM-012 (P0) -- No scheduled session cleanup (SESS-016)
 - **Function:** (missing — no cleanup job existed)
 - **Root cause:** Base44 has no built-in scheduler. Expired sessions (>8h) with no problem orders stayed `open` forever, causing stale data accumulation and historical orders appearing to new guests.
@@ -103,11 +117,6 @@
 - **Impact:** 100+ hardcoded Russian strings: buttons, toasts, status text, help text, errors
 - **Recommendation:** Dedicated i18n pass; estimated 100-120 translation keys needed
 - **Status:** Deferred — too large for this review cycle
-
-### BUG-SM-007 (P2) -- window.confirm in handleCloseTable
-- **Function:** handleCloseTable
-- **Impact:** Blocked in iframes, not keyboard accessible
-- **Recommendation:** Replace with custom Dialog confirmation
 
 ### BUG-SM-008 (P2) -- No error toast in handleAction
 - **Function:** handleAction
