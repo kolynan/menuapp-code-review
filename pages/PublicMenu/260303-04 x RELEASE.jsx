@@ -1200,8 +1200,6 @@ export default function X() {
     setConfirmationData(data);
     setView("confirmation");
     setDrawerMode(null);
-    // Change 2c: Scroll to top so confirmation screen is visible
-    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
   }, []);
 
   // GAP-02: Navigate from confirmation to order status tracking
@@ -1213,8 +1211,6 @@ export default function X() {
     const url = new URL(window.location.href);
     url.searchParams.set("track", token);
     window.history.replaceState({}, "", url.toString());
-    // Scroll to top so status screen is visible
-    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
   }, []);
 
   // GAP-02: Dismiss order status and return to menu
@@ -1226,6 +1222,13 @@ export default function X() {
     url.searchParams.delete("track");
     window.history.replaceState({}, "", url.toString());
   }, []);
+
+  // Change 2a/2c: Scroll to top when switching to checkout, confirmation, or orderstatus
+  useEffect(() => {
+    if (view === "checkout" || view === "confirmation" || view === "orderstatus") {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [view]);
 
   // Language change handler (updates URL)
   const handleLangChange = (newLang) => {
@@ -2124,12 +2127,13 @@ export default function X() {
     setErrors(newErrors);
     // Change 2b: Scroll to first error field on validation failure
     if (Object.keys(newErrors).length > 0) {
-      setTimeout(() => {
-        const errorInput = document.querySelector('.border-red-300');
-        if (errorInput) {
-          errorInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const firstKey = Object.keys(newErrors)[0];
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-field="${firstKey}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-      }, 50);
+      });
     }
     return Object.keys(newErrors).length === 0;
   };
@@ -2714,8 +2718,6 @@ export default function X() {
   // Request bill (ServiceRequest)
   const handleCheckoutClick = () => {
     setView("checkout");
-    // Change 2a: Scroll to top so checkout form is visible
-    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
   };
 
   const handleRequestBill = async () => {

@@ -98,6 +98,7 @@ export default function CheckoutView({
                   {t('form.name')} <span className="text-red-500">{t('form.required')}</span>
                 </label>
                 <Input
+                  data-field="clientName"
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
                   placeholder={t('form.name')}
@@ -111,6 +112,7 @@ export default function CheckoutView({
                   {t('form.phone')} <span className="text-red-500">{t('form.required')}</span>
                 </label>
                 <Input
+                  data-field="clientPhone"
                   type="tel"
                   inputMode="tel"
                   value={clientPhone}
@@ -130,6 +132,7 @@ export default function CheckoutView({
                 {t('form.address')} <span className="text-red-500">{t('form.required')}</span>
               </label>
               <Input
+                data-field="deliveryAddress"
                 value={deliveryAddress}
                 onChange={(e) => setDeliveryAddress(e.target.value)}
                 placeholder={t('form.address')}
