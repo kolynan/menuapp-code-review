@@ -88,6 +88,9 @@ function isProblemOrder(order, stageMap, ignorePaymentStatus) {
   if (!isFinishOrder(order, stageMap)) {
     return true;
   }
+  // Intentionally broad: only 'paid' is safe. undefined/null/unpaid/failed/refunded all block.
+  // This is a conservative safety guard — Codex suggested explicit checks but for session
+  // closure we want to err on the side of caution (block unless confirmed paid).
   if (!ignorePaymentStatus && order.payment_status !== 'paid') {
     return true;
   }
