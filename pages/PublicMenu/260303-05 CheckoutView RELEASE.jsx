@@ -89,7 +89,7 @@ export default function CheckoutView({
               )}
               {pointsDiscountAmount > 0 && (
                 <div className="flex justify-between text-sm text-green-600">
-                  <span>{t('checkout.earned_bonus')}</span>
+                  <span>{t('checkout.points_discount')}</span>
                   <span>−{formatPrice(pointsDiscountAmount)}</span>
                 </div>
               )}
