@@ -1,7 +1,7 @@
 ---
-version: "2.3"
+version: "2.4"
 updated: "2026-03-03"
-session: 72
+session: 73
 ---
 
 # PublicMenu — README
@@ -44,6 +44,12 @@ session: 72
 ---
 
 ## Changelog (UX/UI решения)
+
+### Session 73 — 3 мар 2026
+
+- **Discount Breakdown в CheckoutView (pickup/delivery):** В режимах самовывоз и доставка скидка за онлайн-заказ теперь отображается отдельной строкой между подытогом и итого. Ранее пользователь видел разницу в цене без объяснения (например, блюдо 56 ₸, а итого 54 ₸). Теперь показываются: подытог, скидка за онлайн (зелёный, с минусом), списание баллов (если есть), итого. В режиме "зал" без изменений — скидка уже отображалась в жёлтом блоке корзины.
+  - i18n: `checkout.subtotal`, `checkout.qr_discount`, `checkout.points_discount`
+  - Codex review: 0 P0, 0 P1 (в scope изменения), 1 P3 fix (семантика ключа earned_bonus → points_discount)
 
 ### Session 72 — 3 мар 2026
 
