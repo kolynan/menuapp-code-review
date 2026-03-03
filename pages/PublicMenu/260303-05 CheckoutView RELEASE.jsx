@@ -10,6 +10,9 @@ export default function CheckoutView({
   cart,
   updateQuantity,
   formatPrice,
+  cartTotalAmount,
+  discountAmount,
+  pointsDiscountAmount,
   finalTotal,
   activeCurrency,
   defaultCurrency,
@@ -70,7 +73,29 @@ export default function CheckoutView({
       </Card>
 
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-2">
+          {/* Discount breakdown for pickup/delivery (hall shows it in CartView yellow block) */}
+          {orderMode !== "hall" && (discountAmount > 0 || pointsDiscountAmount > 0) && (
+            <>
+              <div className="flex justify-between items-center text-sm text-slate-500">
+                <span>{t('checkout.subtotal')}</span>
+                <span>{formatPrice(cartTotalAmount)}</span>
+              </div>
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span>{t('checkout.qr_discount')}</span>
+                  <span>−{formatPrice(discountAmount)}</span>
+                </div>
+              )}
+              {pointsDiscountAmount > 0 && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span>{t('checkout.earned_bonus')}</span>
+                  <span>−{formatPrice(pointsDiscountAmount)}</span>
+                </div>
+              )}
+              <div className="border-t border-slate-200" />
+            </>
+          )}
           <div className="flex justify-between items-center">
             <span className="font-semibold text-slate-900">{t('cart.total')}:</span>
             <span className="text-xl font-bold text-indigo-600">{formatPrice(finalTotal)}</span>
