@@ -1,7 +1,7 @@
 # StaffOrdersMobile Bug Tracker
 
 **Page:** `pages/StaffOrdersMobile/260302-05 StaffOrdersMobile RELEASE.jsx`
-**Last updated:** 2026-03-02 (Session 66 — UI bug fixes)
+**Last updated:** 2026-03-03 (Session 72 — SESS-016 scheduled cleanup job)
 
 ---
 
@@ -78,6 +78,14 @@
 - **Status:** FIXED
 
 ---
+
+### BUG-SM-012 (P0) -- No scheduled session cleanup (SESS-016)
+- **Function:** (missing — no cleanup job existed)
+- **Root cause:** Base44 has no built-in scheduler. Expired sessions (>8h) with no problem orders stayed `open` forever, causing stale data accumulation and historical orders appearing to new guests.
+- **Fix:** Created `components/sessionCleanupJob.js` — `runSessionCleanup()` function that: (1) queries all open sessions, (2) checks 8h hard-expire via `isSessionExpired()`, (3) skips sessions with problem orders (non-finish or unpaid), (4) expires safe sessions. Includes `dryRun` mode for testing.
+- **Integration:** Recommended as `useEffect + setInterval(5min)` in StaffOrdersMobile (see file header comment).
+- **RELEASE:** `260303-01 sessionCleanupJob RELEASE.js`
+- **Status:** FIXED (code ready, pending integration into StaffOrdersMobile page)
 
 ## Active Bugs
 
