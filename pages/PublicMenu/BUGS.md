@@ -1,5 +1,5 @@
 ---
-version: "9.0"
+version: "10.0"
 updated: "2026-03-03"
 session: 71
 ---
@@ -18,6 +18,15 @@ session: 71
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-013: track_order button shows dish popup instead of OrderStatusScreen (GAP-02) (P1)
+- **Приоритет:** P1
+- **Когда:** Session 71 (найден Arman при тестировании 260303-03)
+- **Симптом:** Clicking "Track Order" on OrderConfirmationScreen briefly shows a "Стейк" product popup, then returns to menu. OrderStatusScreen never appears.
+- **Root cause:** `CONFIRMATION_AUTO_DISMISS_MS = 10000` (10s timer). The auto-dismiss fires `setView("menu")` + `setConfirmationData(null)`, removing the full-screen confirmation overlay. A pending touch/click event from the user then falls through to the menu grid underneath, hitting a dish card (Стейк) which opens `DishReviewsModal`. This is a ghost-click race condition on mobile.
+- **Фикс:** Removed auto-dismiss timer entirely. The confirmation screen has 3 explicit navigation buttons (back to menu, my orders, track order) — auto-dismiss is unnecessary and harmful. Removed `CONFIRMATION_AUTO_DISMISS_MS` constant, `confirmationTimerRef` ref, all timer setup/cleanup code.
+- **Файл:** `x.jsx` (PublicMenu main page)
+- **RELEASE:** `260303-04 x RELEASE.jsx`
 
 ### BUG-PM-012: /orderstatus returns 404 — B44 routing doesn't register page (GAP-02) (P1)
 - **Приоритет:** P1
