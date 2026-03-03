@@ -1,5 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   STAFFORDERSMOBILE — v3.4.0 (2026-03-02) UI Bug Fixes S66
+   STAFFORDERSMOBILE — v3.5.0 (2026-03-03) Session Cleanup Integration S73
+
+   CHANGES in v3.5.0 (SESS-016 — Session Cleanup Integration):
+   - Added runSessionCleanup() import from @/components/sessionCleanupJob
+   - Added useEffect + setInterval(5min) to auto-expire stale sessions
+   - Silent background job: logs only when actions taken or errors occur
+   - Idempotent: safe to run on each mount + every 5 minutes
 
    CHANGES in v3.4.0 (UI Bug Fixes — 4 bugs from Deep Test S66):
    - BUG-S66-01: Detail view now opens reliably (removed translate-x animation, z-40)
@@ -161,6 +167,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 // D1: Import session helpers
 import { getGuestDisplayName, closeSession } from "@/components/sessionHelpers";
+// SESS-016: Import session cleanup job (auto-expire stale sessions)
+import { runSessionCleanup } from "@/components/sessionCleanupJob";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CONSTANTS
@@ -2436,6 +2444,23 @@ export default function StaffOrdersMobile() {
     };
     window.addEventListener("pointerdown", h, { passive: true });
     return () => window.removeEventListener("pointerdown", h);
+  }, []);
+
+  // SESS-016: Auto-expire stale sessions (runs every 5 min while page is open)
+  useEffect(() => {
+    const cleanup = async () => {
+      try {
+        const result = await runSessionCleanup({ dryRun: false });
+        if (result.expired > 0 || result.skipped_stale > 0 || result.errors.length > 0) {
+          console.log('[SessionCleanup]', result);
+        }
+      } catch (err) {
+        console.log('[SessionCleanup] error:', err.message);
+      }
+    };
+    cleanup();
+    const interval = setInterval(cleanup, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const ownMutationRef = useRef(null);
