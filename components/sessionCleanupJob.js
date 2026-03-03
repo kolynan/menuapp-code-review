@@ -1,4 +1,4 @@
-// Version: 1.1 (S72, 2026-03-03)
+// Version: 1.2 (S73, 2026-03-03)
 // SESS-016 — Scheduled Job: Expire Safe Sessions
 // Spec: SessionLogic_Consensus_S67.md (LOCKED — do not change semantics)
 //
@@ -33,13 +33,19 @@
 //
 // IDEMPOTENT: Safe to run multiple times. Already-expired sessions are skipped.
 //
-// NOTE ON PAYMENT STATUS (v1.1):
+// NOTE ON PAYMENT STATUS (v1.2 — P1 fix):
 //   Per SESS-016 spec, "problem order" = non-finish OR unpaid.
 //   However, payment tracking is NOT yet implemented in MenuApp —
-//   all orders are created with payment_status="unpaid" and there is
-//   no UI to mark them as "paid" (see DeepAnalysis_S70.md).
+//   pickup/delivery orders are created with payment_status="unpaid",
+//   but hall orders are created WITHOUT payment_status (undefined).
+//   There is no UI to mark orders as "paid" (see DeepAnalysis_S70.md).
 //   Therefore, ignorePaymentStatus defaults to TRUE for now.
 //   When payment tracking is implemented, change default to FALSE.
+//
+//   P1 FIX (S73): Changed check from === 'unpaid' to !== 'paid'.
+//   This correctly treats undefined/null/unpaid as "not paid" — preventing
+//   false negatives where hall orders (payment_status=undefined) would
+//   slip through and allow sessions to close with unverified payments.
 
 import { base44 } from '@/api/base44Client';
 import { isSessionExpired } from '@/components/sessionHelpers';
@@ -71,7 +77,7 @@ function isFinishOrder(order, stageMap) {
 
 /**
  * Check if an order is a "problem order".
- * Per SESS-016: "Problem order" = non-finish OR unpaid.
+ * Per SESS-016: "Problem order" = non-finish OR not-paid (undefined/null/unpaid).
  *
  * @param {Object} order - Order entity
  * @param {Object} stageMap - { stageId: { internal_code, name } }
@@ -82,7 +88,7 @@ function isProblemOrder(order, stageMap, ignorePaymentStatus) {
   if (!isFinishOrder(order, stageMap)) {
     return true;
   }
-  if (!ignorePaymentStatus && order.payment_status === 'unpaid') {
+  if (!ignorePaymentStatus && order.payment_status !== 'paid') {
     return true;
   }
   return false;
