@@ -1,7 +1,7 @@
 ---
-version: "8.0"
-updated: "2026-03-02"
-session: 68
+version: "9.0"
+updated: "2026-03-03"
+session: 71
 ---
 
 # PublicMenu — Bug Registry
@@ -18,6 +18,15 @@ session: 68
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-012: /orderstatus returns 404 — B44 routing doesn't register page (GAP-02) (P1)
+- **Приоритет:** P1
+- **Когда:** Session 71 (найден при деплое GAP-02)
+- **Root cause:** B44 platform routing is managed internally — simply adding a `pages/orderstatus.jsx` file and updating `PUBLIC_ROUTES` in Layout.js does not register a route. The SPA route `/orderstatus` returned "Page Not Found". The `track_order` button in `OrderConfirmationScreen` used `window.location.href = '/orderstatus?token=...'` which triggered a full page navigation to a non-existent route.
+- **Фикс:** Embedded `OrderStatusScreen` as a view state inside `x.jsx` (like `OrderConfirmationScreen`). View state expanded to `menu|checkout|confirmation|orderstatus`. Button now sets `setView("orderstatus")` instead of navigating. Sub-reviewer fixes: P0 timer leak after terminal, P1 token regex widened, P1 token generator fixed (substring(2,10)), P1 staleTime added, P1 pollTimerRef→closure, P1 orderStatusToken cleared in dismissConfirmation.
+- **Файл:** `x.jsx` (PublicMenu main page)
+- **Коммит:** `f080b62`
+- **RELEASE:** `260303-03 x RELEASE.jsx`
 
 ### BUG-PM-011: Active tables expired based on opened_at alone — activity guard missing (P0)
 - **Приоритет:** P0

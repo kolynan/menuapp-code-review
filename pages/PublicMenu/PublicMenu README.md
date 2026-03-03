@@ -1,7 +1,7 @@
 ---
-version: "2.1"
-updated: "2026-03-02"
-session: 69
+version: "2.2"
+updated: "2026-03-03"
+session: 71
 ---
 
 # PublicMenu — README
@@ -27,7 +27,7 @@ session: 69
 
 | Файл | RELEASE | Дата |
 |---|---|---|
-| x.jsx | `260302-00 x RELEASE.txt` | 2 мар 2026 |
+| x.jsx | `260303-03 x RELEASE.jsx` | 3 мар 2026 |
 | useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 2 мар 2026 |
 | CartView.jsx | `260224-01 CartView RELEASE.jsx` | 24 фев 2026 |
 | MenuView.jsx | `260223-01 MenuView RELEASE.jsx` | 23 фев 2026 |
@@ -44,6 +44,11 @@ session: 69
 ---
 
 ## Changelog (UX/UI решения)
+
+### Session 71 — 3 мар 2026
+
+- **GAP-02 fix:** Встроенный экран статуса заказа для самовывоза/доставки. `/orderstatus` 404 — B44 не регистрировал страницу. Решение: `OrderStatusScreen` как view state внутри x.jsx. Прогресс-бар (принят / готовится / готов), polling каждые 10с, список блюд, итого, телефон ресторана, кнопка "Назад в меню". Исправлен генератор токенов (substring(2,10) для надёжных 8 символов).
+- **GAP-01 fix (S71 ранее):** Экран подтверждения заказа как full-screen overlay (z-60).
 
 ### Session 68 — 2 мар 2026 ✅ задеплоен S69
 
