@@ -1006,14 +1006,20 @@ export default function X() {
     return normalizeMode(modeParam);
   });
 
-  const [view, setView] = useState("menu"); /* menu | checkout | confirmation | orderstatus */
+  // GAP-02: Restore order status view from URL param (?track=<token>)
+  const initialTrackToken = useMemo(() => {
+    const p = new URLSearchParams(location.search).get("track");
+    return p && /^[a-z0-9]{2,20}$/.test(p) ? p : null;
+  }, []);
+
+  const [view, setView] = useState(initialTrackToken ? "orderstatus" : "menu"); /* menu | checkout | confirmation | orderstatus */
 
   // GAP-01: Order Confirmation Screen state
   const [confirmationData, setConfirmationData] = useState(null);
   const confirmationTimerRef = useRef(null);
 
-  // GAP-02: Order Status tracking token
-  const [orderStatusToken, setOrderStatusToken] = useState(null);
+  // GAP-02: Order Status tracking token (refresh-safe via ?track= URL param)
+  const [orderStatusToken, setOrderStatusToken] = useState(initialTrackToken);
   
   // TASK-260203-01: Drawer state
   const [drawerMode, setDrawerMode] = useState(null); // 'cart' | null
@@ -1210,12 +1216,20 @@ export default function X() {
     setConfirmationData(null);
     setOrderStatusToken(token);
     setView("orderstatus");
+    // Mirror token into URL for refresh resilience
+    const url = new URL(window.location.href);
+    url.searchParams.set("track", token);
+    window.history.replaceState({}, "", url.toString());
   }, []);
 
   // GAP-02: Dismiss order status and return to menu
   const dismissOrderStatus = useCallback(() => {
     setOrderStatusToken(null);
     setView("menu");
+    // Remove track param from URL
+    const url = new URL(window.location.href);
+    url.searchParams.delete("track");
+    window.history.replaceState({}, "", url.toString());
   }, []);
 
   // Language change handler (updates URL)
