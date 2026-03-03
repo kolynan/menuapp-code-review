@@ -1,7 +1,7 @@
 # StaffOrdersMobile Bug Tracker
 
-**Page:** `pages/StaffOrdersMobile/260302-05 StaffOrdersMobile RELEASE.jsx`
-**Last updated:** 2026-03-03 (Session 72 — SESS-016 scheduled cleanup job)
+**Page:** `pages/StaffOrdersMobile/260303-06 StaffOrdersMobile RELEASE.jsx`
+**Last updated:** 2026-03-03 (Session 73 — SESS-016 integration + P1 payment_status fix)
 
 ---
 
@@ -83,9 +83,18 @@
 - **Function:** (missing — no cleanup job existed)
 - **Root cause:** Base44 has no built-in scheduler. Expired sessions (>8h) with no problem orders stayed `open` forever, causing stale data accumulation and historical orders appearing to new guests.
 - **Fix:** Created `components/sessionCleanupJob.js` — `runSessionCleanup()` function that: (1) queries all open sessions, (2) checks 8h hard-expire via `isSessionExpired()`, (3) skips sessions with problem orders (non-finish or unpaid), (4) expires safe sessions. Includes `dryRun` mode for testing.
-- **Integration:** Recommended as `useEffect + setInterval(5min)` in StaffOrdersMobile (see file header comment).
-- **RELEASE:** `260303-01 sessionCleanupJob RELEASE.js`
-- **Status:** FIXED (code ready, pending integration into StaffOrdersMobile page)
+- **Integration:** Wired into StaffOrdersMobile via `useEffect + setInterval(5min)` — runs on mount then every 300s.
+- **RELEASE:** `260303-02 sessionCleanupJob RELEASE.js` + `260303-06 StaffOrdersMobile RELEASE.jsx`
+- **Commit:** `c30f1a9` (P1 fix) + `f2d6f41` (integration)
+- **Status:** FIXED
+
+### BUG-SM-013 (P1) -- payment_status always undefined for hall orders
+- **Function:** isProblemOrder in sessionCleanupJob.js
+- **Root cause:** Hall orders are created without `payment_status` field (undefined), while pickup/delivery orders set it to `"unpaid"`. The check `order.payment_status === 'unpaid'` missed undefined values, treating hall orders as "paid" — a false negative that would wrongly allow sessions to close when payment tracking is enabled.
+- **Fix:** Changed check from `=== 'unpaid'` to `!== 'paid'`. Now undefined/null/unpaid all correctly flag as problem orders.
+- **RELEASE:** `260303-02 sessionCleanupJob RELEASE.js`
+- **Commit:** `c30f1a9`
+- **Status:** FIXED
 
 ## Active Bugs
 
