@@ -1,7 +1,7 @@
 ---
-version: "10.0"
-updated: "2026-03-03"
-session: 71
+version: "11.0"
+updated: "2026-03-04"
+session: 74
 ---
 
 # PublicMenu — Bug Registry
@@ -18,6 +18,46 @@ session: 71
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-018: Confirmation screen shows "Заказ принят!" before waiter accepts (P0)
+- **Приоритет:** P0 (wrong semantics breaks user trust)
+- **Когда:** Session 74 (CC+GPT UX analysis)
+- **Симптом:** After tapping "Отправить официанту", guest sees "Заказ принят!" — implies the waiter already accepted, which is false. The order was only sent.
+- **Фикс:** Confirmation title now uses mode-dependent text: hall → "Заказ отправлен официанту", pickup/delivery → "Заказ отправлен". Added subtext: "Статус обновится, когда официант примет заказ". New `tr()` helper added to `OrderConfirmationScreen` for safe fallbacks.
+- **Файл:** `x.jsx` (OrderConfirmationScreen)
+- **RELEASE:** `260304-00 x RELEASE.jsx`
+
+### BUG-PM-019: No visual status differentiation in guest "Мои заказы" (P1)
+- **Приоритет:** P1
+- **Когда:** Session 74
+- **Симптом:** All orders showed generic blue badge without icon. Guest couldn't distinguish sent/accepted/cooking/ready status.
+- **Фикс:** Enhanced `getSafeStatus()` with full STATUS_MAP: 🟡 Отправлен (new), 🟢 Принят (accepted), 🔵 Готовится (cooking), ✅ Готов (ready). Badge now shows `{icon} {label}` instead of just `{label}`.
+- **Файл:** `CartView.jsx`
+- **RELEASE:** `260304-00 CartView RELEASE.jsx`
+
+### BUG-PM-020: Session ID "#1313" shown to guest in drawer header (P2)
+- **Приоритет:** P2
+- **Когда:** Session 74
+- **Симптом:** Guest sees "Вы: Гость 2 #1313" — the `#1313` is a meaningless session code from localStorage.
+- **Фикс:** `guestDisplay` now uses only `guestBaseName` (name or "Гость N"). Session code logged to `console.debug` for debugging only.
+- **Файл:** `CartView.jsx`
+- **RELEASE:** `260304-00 CartView RELEASE.jsx`
+
+### BUG-PM-021: Rating banner shows before any order is ready (P1)
+- **Приоритет:** P1
+- **Когда:** Session 74
+- **Симптом:** "За отзыв +10 баллов" banner appears immediately when drawer opens, even if no order has been delivered. Premature and confusing.
+- **Фикс:** `shouldShowReviewRewardHint` now checks `hasReadyOrders` (at least one order with finish/ready/done/served status) AND `reviewableItems.length > 0`. Inline confirmation "Спасибо! +NБ" next to stars replaces generic "✓" checkmark when loyalty is active.
+- **Файл:** `CartView.jsx`
+- **RELEASE:** `260304-00 CartView RELEASE.jsx`
+
+### BUG-PM-022: Drawer opens at wrong height — header not visible (P0)
+- **Приоритет:** P0
+- **Когда:** Session 74
+- **Симптом:** Cart drawer opens at wrong snap position — only bottom portion visible, header "Стол / Гость / ✕" is offscreen.
+- **Фикс:** Added `snapPoints={[0.85]}` to Drawer component to force 85% viewport height. Added `paddingBottom: env(safe-area-inset-bottom)` for mobile safe area support.
+- **Файл:** `x.jsx`
+- **RELEASE:** `260304-00 x RELEASE.jsx`
 
 ### BUG-PM-013: track_order button shows dish popup instead of OrderStatusScreen (GAP-02) (P1)
 - **Приоритет:** P1
