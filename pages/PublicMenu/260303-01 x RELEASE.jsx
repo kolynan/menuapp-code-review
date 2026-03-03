@@ -382,18 +382,36 @@ function OrderConfirmationScreen({
   onOpenOrders,
   t,
 }) {
-  const [fadeOut, setFadeOut] = useState(false);
-
   return (
-    <div
-      className={`px-4 py-8 max-w-md mx-auto transition-opacity duration-500 ${
-        fadeOut ? "opacity-0" : "opacity-100"
-      }`}
-    >
+    <div className="px-4 py-8 max-w-md mx-auto animate-[fadeInUp_0.3s_ease-out]">
+      {/* CSS-only animations — respects prefers-reduced-motion */}
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes confirmCircle {
+          to { stroke-dashoffset: 0; }
+        }
+        @keyframes confirmCheck {
+          from { opacity: 0; transform: scale(0.5); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          [style*="confirmCircle"],
+          [style*="confirmCheck"],
+          .animate-\\[fadeInUp_0\\.3s_ease-out\\] {
+            animation: none !important;
+            opacity: 1 !important;
+            transform: none !important;
+            stroke-dashoffset: 0 !important;
+          }
+        }
+      `}</style>
+
       {/* Animated checkmark */}
       <div className="flex justify-center mb-6">
         <div className="relative w-20 h-20">
-          {/* Circle background */}
           <svg
             className="w-20 h-20"
             viewBox="0 0 80 80"
@@ -407,7 +425,6 @@ function OrderConfirmationScreen({
               stroke="#22c55e"
               strokeWidth="4"
               fill="#f0fdf4"
-              className="animate-[confirmCircle_0.4s_ease-out_forwards]"
               style={{
                 strokeDasharray: 226,
                 strokeDashoffset: 226,
@@ -415,7 +432,6 @@ function OrderConfirmationScreen({
               }}
             />
           </svg>
-          {/* Check icon */}
           <div
             className="absolute inset-0 flex items-center justify-center"
             style={{
@@ -427,27 +443,6 @@ function OrderConfirmationScreen({
           </div>
         </div>
       </div>
-
-      {/* Inline keyframes — CSS-only, respects prefers-reduced-motion */}
-      <style>{`
-        @keyframes confirmCircle {
-          to { stroke-dashoffset: 0; }
-        }
-        @keyframes confirmCheck {
-          from { opacity: 0; transform: scale(0.5); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .animate-\\[confirmCircle_0\\.4s_ease-out_forwards\\] {
-            stroke-dashoffset: 0 !important;
-            animation: none !important;
-          }
-          [style*="confirmCheck"] {
-            opacity: 1 !important;
-            animation: none !important;
-          }
-        }
-      `}</style>
 
       {/* Title */}
       <h2 className="text-xl font-semibold text-center text-slate-800 mb-6">
