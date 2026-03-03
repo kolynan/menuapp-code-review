@@ -27,10 +27,10 @@ session: 71
 
 | Файл | RELEASE | Дата |
 |---|---|---|
-| x.jsx | `260303-03 x RELEASE.jsx` | 3 мар 2026 |
+| x.jsx | `260303-04 x RELEASE.jsx` | 3 мар 2026 |
 | useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 2 мар 2026 |
 | CartView.jsx | `260224-01 CartView RELEASE.jsx` | 24 фев 2026 |
-| MenuView.jsx | `260223-01 MenuView RELEASE.jsx` | 23 фев 2026 |
+| MenuView.jsx | `260303-00 MenuView RELEASE.jsx` | 3 мар 2026 |
 | CheckoutView.jsx | `260222-00 CheckoutView RELEASE.jsx` | 22 фев 2026 |
 | ModeTabs.jsx | `260223-00 ModeTabs RELEASE.jsx` | 23 фев 2026 |
 | StickyCartBar.jsx | `260222-00 StickyCartBar RELEASE.jsx` | 22 фев 2026 |
@@ -44,6 +44,16 @@ session: 71
 ---
 
 ## Changelog (UX/UI решения)
+
+### Session 72 — 3 мар 2026
+
+- **Dish Card Redesign (tile view):** 4 изменения по дизайн-спеку CC+Codex (Design_DishCards_S72.md):
+  - Выравнивание карточек: flex-col + mt-auto — цена и рейтинг теперь на одном уровне в ряду
+  - Кнопка "+" на фото: круглая индиго кнопка (44x44) поверх фото вместо текстовой "Добавить". При добавлении → pill-степпер (− N +)
+  - Фото-заглушка: убран текст "Фото скоро будет", осталась только иконка (opacity 30%)
+  - Высота фото: h-36 на мобильном (144px), h-48 на десктопе (192px)
+  - Название: line-clamp-2, описание: line-clamp-1
+- **Default view mode:** мобильный вид по умолчанию — список (был "плитка"). Сохранение выбора в localStorage работает как прежде.
 
 ### Session 71 — 3 мар 2026
 
