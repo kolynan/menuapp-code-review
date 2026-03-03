@@ -10,6 +10,7 @@
 // FIXED: 2026-03-03 - GAP-01 fix - Confirmation as full-screen overlay (z-60)
 // FIXED: 2026-03-03 - GAP-02 fix - Embed OrderStatusScreen inside x.jsx (no /orderstatus route)
 // FIXED: 2026-03-03 - GAP-02 fix - Remove auto-dismiss timer (race condition: ghost click on menu)
+// PATCHED: 2026-03-04 - Cart Drawer v2: two-mode design (Заказ/Чеки), toast after submit
 // ======================================================
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -388,6 +389,14 @@ function OrderConfirmationScreen({
   onTrackOrder,
   t,
 }) {
+  // Safe translation with fallback (same pattern as CartView)
+  const tr = (key, fallback) => {
+    const val = typeof t === "function" ? t(key) : "";
+    if (!val || typeof val !== "string") return fallback;
+    const norm = val.trim();
+    if (norm === key || norm.startsWith(key + ":")) return fallback;
+    return norm;
+  };
   return (
     <div className="fixed inset-0 z-[60] bg-white overflow-y-auto">
     <div className="px-4 py-8 max-w-md mx-auto animate-[fadeInUp_0.3s_ease-out]">
@@ -451,10 +460,17 @@ function OrderConfirmationScreen({
         </div>
       </div>
 
-      {/* Title */}
-      <h2 className="text-xl font-semibold text-center text-slate-800 mb-6">
-        {t("confirmation.title")}
+      {/* Title — FIX-S74-01: "Отправлен", not "Принят" (order is not yet accepted by waiter) */}
+      <h2 className="text-xl font-semibold text-center text-slate-800 mb-1">
+        {orderMode === "hall"
+          ? tr("confirmation.sent_to_waiter", "Заказ отправлен официанту")
+          : tr("confirmation.order_sent", "Заказ отправлен")}
       </h2>
+      <p className="text-sm text-center text-slate-500 mb-6">
+        {orderMode === "hall"
+          ? tr("confirmation.status_hint_hall", "Статус обновится, когда официант примет заказ")
+          : tr("confirmation.status_hint", "Мы начнём готовить ваш заказ")}
+      </p>
 
       {/* Order summary card */}
       <Card className="mb-6">
@@ -1127,8 +1143,7 @@ export default function X() {
         setMobileLayout(saved);
       } else {
         // Default based on partner setting — S72: default list unless partner set 2-col grid
-        const mobileGrid = Number(partner.menu_grid_mobile ?? 1);
-        const defaultLayout = mobileGrid === 2 ? 'tile' : 'list';
+        const defaultLayout = (partner.menu_grid_mobile ?? 1) === 2 ? 'tile' : 'list';
         setMobileLayout(defaultLayout);
       }
     } catch (e) {
@@ -2328,14 +2343,7 @@ export default function X() {
       
       setSessionItems(prev => [...prev, ...itemsWithLinks]);
 
-      // GAP-01: Save cart snapshot for confirmation screen BEFORE clearing
-      const confirmedItems = [...cart];
-      const confirmedTotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
-      const guestLabel = guestToUse
-        ? getGuestDisplayName(guestToUse)
-        : null;
-
-      // Clear form
+      // Clear form — cart becomes empty, CartView auto-switches to Mode "Чеки"
       clearCart();
       clearCartStorage(partner.id);
       setSplitType('single');
@@ -2344,17 +2352,12 @@ export default function X() {
       setLoyaltyAccount(null);
       setRedeemedPoints(0);
 
-      // GAP-01: Show confirmation screen instead of toast
-      showConfirmation({
-        items: confirmedItems,
-        totalAmount: confirmedTotal,
-        guestLabel,
-        orderMode: "hall",
-        publicToken: order.public_token,
-        clientName: null,
-      });
-
-      console.log("Order created", order?.id);
+      // Cart Drawer v2: show toast, keep drawer open (Mode "Чеки" shows new order)
+      toast.success(
+        tr('cart.order_sent', '\u0417\u0430\u043A\u0430\u0437 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D \u043E\u0444\u0438\u0446\u0438\u0430\u043D\u0442\u0443'),
+        { id: 'order-sent', duration: 2000 }
+      );
+      // Drawer stays open — drawerMode remains 'cart'
       return true;
     } catch (err) {
       console.error(err);
@@ -3033,11 +3036,13 @@ export default function X() {
       )}
 
       {/* TASK-260203-01: Cart as Bottom Drawer */}
-      <Drawer 
-        open={drawerMode === 'cart'} 
+      {/* FIX-S74-05: snapPoints forces drawer to open at 85% height */}
+      <Drawer
+        open={drawerMode === 'cart'}
         onOpenChange={(open) => !open && setDrawerMode(null)}
+        snapPoints={[0.85]}
       >
-        <DrawerContent className="max-h-[85vh] overflow-hidden">
+        <DrawerContent className="max-h-[85vh] overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           <DrawerHeader className="sr-only">
             <DrawerTitle>Корзина</DrawerTitle>
           </DrawerHeader>

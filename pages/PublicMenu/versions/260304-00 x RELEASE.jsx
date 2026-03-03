@@ -10,6 +10,7 @@
 // FIXED: 2026-03-03 - GAP-01 fix - Confirmation as full-screen overlay (z-60)
 // FIXED: 2026-03-03 - GAP-02 fix - Embed OrderStatusScreen inside x.jsx (no /orderstatus route)
 // FIXED: 2026-03-03 - GAP-02 fix - Remove auto-dismiss timer (race condition: ghost click on menu)
+// PATCHED: 2026-03-04 - Cart Drawer v2: two-mode design (Заказ/Чеки), toast after submit
 // ======================================================
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -2342,14 +2343,7 @@ export default function X() {
       
       setSessionItems(prev => [...prev, ...itemsWithLinks]);
 
-      // GAP-01: Save cart snapshot for confirmation screen BEFORE clearing
-      const confirmedItems = [...cart];
-      const confirmedTotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
-      const guestLabel = guestToUse
-        ? getGuestDisplayName(guestToUse)
-        : null;
-
-      // Clear form
+      // Clear form — cart becomes empty, CartView auto-switches to Mode "Чеки"
       clearCart();
       clearCartStorage(partner.id);
       setSplitType('single');
@@ -2358,15 +2352,12 @@ export default function X() {
       setLoyaltyAccount(null);
       setRedeemedPoints(0);
 
-      // GAP-01: Show confirmation screen instead of toast
-      showConfirmation({
-        items: confirmedItems,
-        totalAmount: confirmedTotal,
-        guestLabel,
-        orderMode: "hall",
-        publicToken: order.public_token,
-        clientName: null,
-      });
+      // Cart Drawer v2: show toast, keep drawer open (Mode "Чеки" shows new order)
+      toast.success(
+        tr('cart.order_sent', '\u0417\u0430\u043A\u0430\u0437 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D \u043E\u0444\u0438\u0446\u0438\u0430\u043D\u0442\u0443'),
+        { id: 'order-sent', duration: 2000 }
+      );
+      // Drawer stays open — drawerMode remains 'cart'
 
       console.log("Order created", order?.id);
       return true;

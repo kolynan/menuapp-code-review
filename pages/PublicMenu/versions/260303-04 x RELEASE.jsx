@@ -1127,7 +1127,8 @@ export default function X() {
         setMobileLayout(saved);
       } else {
         // Default based on partner setting — S72: default list unless partner set 2-col grid
-        const defaultLayout = (partner.menu_grid_mobile ?? 1) === 2 ? 'tile' : 'list';
+        const mobileGrid = Number(partner.menu_grid_mobile ?? 1);
+        const defaultLayout = mobileGrid === 2 ? 'tile' : 'list';
         setMobileLayout(defaultLayout);
       }
     } catch (e) {
