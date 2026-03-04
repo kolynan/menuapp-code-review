@@ -1,7 +1,7 @@
 ---
-version: "2.6"
+version: "2.7"
 updated: "2026-03-04"
-session: 74
+session: 75
 ---
 
 # PublicMenu — README
@@ -30,7 +30,7 @@ session: 74
 | x.jsx | `260304-01 x RELEASE.jsx` | 4 мар 2026 |
 | useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 2 мар 2026 |
 | CartView.jsx | `260304-01 CartView RELEASE.jsx` | 4 мар 2026 |
-| MenuView.jsx | `260303-00 MenuView RELEASE.jsx` | 3 мар 2026 |
+| MenuView.jsx | `260304-00 MenuView RELEASE.jsx` | 4 мар 2026 |
 | CheckoutView.jsx | `260303-05 CheckoutView RELEASE.jsx` | 3 мар 2026 |
 | ModeTabs.jsx | `260223-00 ModeTabs RELEASE.jsx` | 23 фев 2026 |
 | StickyCartBar.jsx | `260222-00 StickyCartBar RELEASE.jsx` | 22 фев 2026 |
@@ -44,6 +44,16 @@ session: 74
 ---
 
 ## Changelog (UX/UI решения)
+
+### Session 75 — 4 мар 2026
+
+- **Dish Card UX Upgrade — большие фото + бейдж скидки (tile view):** Два визуальных улучшения по конкурентному анализу (Yandex Eda, Wolt KZ):
+  - Фото блюд: `h-36 sm:h-48` (фиксированная высота) заменено на `aspect-square` (квадрат 1:1, адаптивный). На мобильном 2-col grid ~150px x 150px. Фото теперь занимает ~60% карточки — "еда и есть карточка". Аналог Yandex Eda grid.
+  - Бейдж скидки: зелёный pill "-X%" в левом верхнем углу фото. Показывается когда `partner.discount_enabled && partner.discount_percent > 0`. Стиль: `bg-green-500 text-white text-xs font-bold rounded-full`.
+  - Цена со скидкой: зачёркнутая оригинальная цена (серый) + жирная цена со скидкой (зелёный). Формула: `Math.round(price * (1 - discount_percent / 100))`.
+  - List view: без изменений.
+  - Новые i18n ключи: нет (бейдж использует числовое значение "-X%").
+  - CC self-review: APPROVE (Codex timeout).
 
 ### Session 74 — 4 мар 2026
 
