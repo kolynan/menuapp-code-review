@@ -1,5 +1,5 @@
 ---
-version: "16.0"
+version: "17.0"
 updated: "2026-03-05"
 session: 82
 ---
@@ -47,6 +47,13 @@ session: 82
 - **Файл:** `x.jsx` — processHallOrder()
 - **Симптом:** Toast appeared for 2s (too short); on failure `setSubmitError` invisible in drawer.
 - **Фикс:** Toast duration 2s→4s; added `toast.error` in catch; cart cleared on success.
+- **RELEASE:** `260305-05 x RELEASE.jsx` | **Коммит:** `02ae5e5`
+
+### BUG-PM-030: Pickup/Delivery checkout used fullscreen instead of drawer (S81-14, P0) — FIXED S82
+- **Когда:** S81 testing
+- **Файл:** `x.jsx` — handleCheckoutClick, StickyCartBar for pickup/delivery
+- **Симптом:** Нажатие «Оформить» в режимах Самовывоз/Доставка открывало fullscreen checkout (отдельный экран) вместо bottom drawer. Несогласованный UX с режимом «В зале».
+- **Фикс:** Добавлен `PickupDeliveryCheckoutContent` — drawer-контент с полями: Имя + Телефон (обязательные) + Адрес (только Доставка) + Комментарий + Total + CTA. `handleCheckoutClick` теперь устанавливает `drawerMode = 'checkout'` вместо `setView("checkout")`. Drawer использует `SNAP_FULL` (90% высоты) для отображения формы. Drawer нельзя закрыть во время submit (`isSubmitting` guard). Ошибки очищаются при закрытии (`onOpenChange`).
 - **RELEASE:** `260305-05 x RELEASE.jsx` | **Коммит:** `02ae5e5`
 
 ### BUG-PM-026: Drawer pull-down swipe doesn't close drawer (S81-01, P1) — FIXED S82
