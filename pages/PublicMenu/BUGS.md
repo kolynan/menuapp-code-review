@@ -1,7 +1,7 @@
 ---
-version: "17.0"
-updated: "2026-03-05"
-session: 82
+version: "18.0"
+updated: "2026-03-06"
+session: 84
 ---
 
 # PublicMenu — Bug Registry
@@ -55,6 +55,30 @@ session: 82
 - **Симптом:** Нажатие «Оформить» в режимах Самовывоз/Доставка открывало fullscreen checkout (отдельный экран) вместо bottom drawer. Несогласованный UX с режимом «В зале».
 - **Фикс:** Добавлен `PickupDeliveryCheckoutContent` — drawer-контент с полями: Имя + Телефон (обязательные) + Адрес (только Доставка) + Комментарий + Total + CTA. `handleCheckoutClick` теперь устанавливает `drawerMode = 'checkout'` вместо `setView("checkout")`. Drawer использует `SNAP_FULL` (90% высоты) для отображения формы. Drawer нельзя закрыть во время submit (`isSubmitting` guard). Ошибки очищаются при закрытии (`onOpenChange`).
 - **RELEASE:** `260305-05 x RELEASE.jsx` | **Коммит:** `02ae5e5`
+
+### BUG-PM-031: Duplicate restaurant name in header (S81-07, P1) — FIXED S84
+- **Когда:** S84 Quick Test — regression from S79 (logo addition)
+- **Файл:** `x.jsx` — PublicMenuHeader + logo+name block
+- **Симптом:** Restaurant name shown twice: (1) in PublicMenuHeader h1, (2) in logo+name block below.
+- **Root cause:** S79 patch added logo+name block but didn't suppress the name already shown by PublicMenuHeader.
+- **Фикс:** Pass `partner={showLogo ? { ...partner, name: undefined } : partner}` to PublicMenuHeader. When logo block shows the name, PublicMenuHeader gets partner without name field.
+- **RELEASE:** `260306-00 x RELEASE.jsx` | **Коммиты:** `a89ce7c`, `03b2eb9`
+
+### BUG-PM-032: CTA button «Отправить официанту» below viewport (S81-03, P0) — FIXED S84
+- **Когда:** S84 Quick Test — regression: S82 fix (SNAP_FULL) was not enough
+- **Файл:** `x.jsx` — cart drawer structure
+- **Симптом:** "Send to Waiter" button at y≈729 (viewport 736px), not visible without manual scroll.
+- **Root cause:** RELEASE removed the `overflow-y-auto` wrapper around CartView (flex-col DrawerContent without scroll container). `sticky bottom-0` in CartView requires a scroll container parent.
+- **Фикс:** Added `<div className="flex-1 overflow-y-auto min-h-0">` wrapper around CartView (and PickupDeliveryCheckoutContent) inside DrawerContent. Also added `isSubmitting` guard to `onOpenChange`.
+- **RELEASE:** `260306-00 x RELEASE.jsx` | **Коммиты:** `32d7e8a`, `03b2eb9`
+
+### BUG-PM-033: Drawer drag handle swipe-to-close not working (S81-01, P0) — FIXED S84
+- **Когда:** S84 Quick Test — regression: S82 `setActiveSnapPoint(null)` approach didn't work
+- **Файл:** `x.jsx` — Drawer component
+- **Симптом:** Swipe down on drag handle (gray bar at top of drawer) did not close drawer.
+- **Root cause:** `setActiveSnapPoint(null)` relied on vaul snap point API that may not fire consistently. No fallback touch handler.
+- **Фикс:** Added custom drag handle div with `onTouchStart`/`onTouchEnd` handlers. Swipe >80px triggers close. Added `isSubmitting` guard. Applied to both cart and checkout drawers.
+- **RELEASE:** `260306-00 x RELEASE.jsx` | **Коммиты:** `270ad06`, `03b2eb9`
 
 ### BUG-PM-026: Drawer pull-down swipe doesn't close drawer (S81-01, P1) — FIXED S82
 - **Когда:** S81 testing

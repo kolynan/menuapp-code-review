@@ -1,7 +1,7 @@
 ---
-version: "2.0"
-updated: "2026-03-05"
-session: 82
+version: "3.0"
+updated: "2026-03-06"
+session: 84
 ---
 
 # PublicMenu — README
@@ -13,7 +13,7 @@ session: 82
 
 | Файл | RELEASE | Дата | Сессия |
 |---|---|---|---|
-| x.jsx | `260305-05 x RELEASE.jsx` | 05 мар 2026 | S82 |
+| x.jsx | `260306-00 x RELEASE.jsx` | 06 мар 2026 | S84 |
 | CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 мар 2026 | S82 |
 | MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 мар 2026 | S79 |
 | useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 мар 2026 | S68 |
@@ -26,6 +26,13 @@ session: 82
 ---
 
 ## Changelog (UX/UI решения)
+
+### Session 84 — 06 мар 2026
+
+- BUG-S81-07: Убрано дублирование названия ресторана в шапке (теперь только в блоке логотип+название)
+- BUG-S81-03: Кнопка «Отправить официанту» всегда видна — добавлен scroll контейнер внутри drawer
+- BUG-S81-01: Свайп вниз по drag handle закрывает drawer — кастомный обработчик touch событий (порог 80px)
+- Исправление: drawer не закрывается во время отправки заказа (isSubmitting guard)
 
 ### Session 82 — 05 мар 2026
 
