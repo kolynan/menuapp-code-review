@@ -1,9 +1,10 @@
 // CartView v3 — Drawer UX Refactor
 // RELEASE: 260305-03
-// Session: S79
+// Session: S79 + S82
 // Changes: sticky header, auto-grow detents, compact table code block,
 // 2-line dish layout, "Ваш заказ"/"Выгода" labels, simplified bill
 // Base: CartView v2 (260304-01) — two modes preserved
+// FIXED: 2026-03-05 - S82 BUG-S81-02: tableCodeLength default 5->4 (real codes are 4 digits)
 
 import React from "react";
 import { XIcon, Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, X, Minus, Plus, Star, Receipt, CreditCard } from "lucide-react";
@@ -133,7 +134,7 @@ export default function CartView({
   const tableCodeLength = React.useMemo(() => {
     const n = Number(partner?.table_code_length);
     if (Number.isFinite(n) && n > 0) return Math.max(3, Math.min(8, Math.round(n)));
-    return 5;
+    return 4; // S82 BUG-S81-02: real codes are 4 digits; was 5 which prevented auto-verify
   }, [partner?.table_code_length]);
 
   const maxCodeAttempts = React.useMemo(() => {

@@ -17,6 +17,7 @@
 // PATCHED: 2026-03-05 - S79: Drawer UX refactor — sticky header, detents, compact table code, 2-line items
 // FIXED: 2026-03-05 - S82 BUG-S81-01: setActiveSnapPoint(null) now closes drawer (swipe-to-close)
 // FIXED: 2026-03-05 - S82 BUG-S81-03: drawer auto-expands to full when cart has items (CTA visible)
+// FIXED: 2026-03-05 - S82 BUG-S81-17: Hall order toast extended 2s->4s + error toast visible in drawer
 // ======================================================
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -2391,15 +2392,17 @@ export default function X() {
       setLoyaltyAccount(null);
       setRedeemedPoints(0);
 
-      // Cart Drawer v2: show toast, keep drawer open (Mode "Чеки" shows new order)
+      // S82 BUG-S81-17: extended duration so user sees confirmation; drawer stays open (Mode "Чеки")
       toast.success(
         tr('cart.order_sent', '\u0417\u0430\u043A\u0430\u0437 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D \u043E\u0444\u0438\u0446\u0438\u0430\u043D\u0442\u0443'),
-        { id: 'order-sent', duration: 2000 }
+        { id: 'order-sent', duration: 4000 }
       );
-      // Drawer stays open — drawerMode remains 'cart'
+      // Drawer stays open — drawerMode remains 'cart', cart cleared above
       return true;
     } catch (err) {
       console.error(err);
+      // S82 BUG-S81-17: show error as toast (setSubmitError only visible in CheckoutView, not in drawer)
+      toast.error(t('error.submit_failed'), { id: 'order-err', duration: 4000 });
       setSubmitError(t('error.submit_failed'));
       return false;
     }
