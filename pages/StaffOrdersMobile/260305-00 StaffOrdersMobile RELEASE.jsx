@@ -501,15 +501,6 @@ function getShiftStartTime(workingHours) {
   return new Date(now.getTime() - FALLBACK_HOURS * 60 * 60 * 1000);
 }
 
-function isOrderOverdue(order, getStatusConfig, overdueMinutes = 10) {
-  const config = getStatusConfig(order);
-  if (!config.isFirstStage) return false;
-  
-  const created = safeParseDate(order.created_date).getTime();
-  const minutesOld = (Date.now() - created) / 60000;
-  
-  return minutesOld > overdueMinutes;
-}
 
 function formatRelativeTime(dateStr) {
   const date = safeParseDate(dateStr);
@@ -753,74 +744,6 @@ function computeTableStatus(group, activeRequests, getStatusConfig) {
   return 'PREPARING';
 }
 
-// V2-08: Compute the primary CTA for a group card
-function computeGroupCTA(group, tableStatus, getStatusConfig, guestsMap) {
-  const orders = group.orders.filter(o => o.status !== 'cancelled');
-
-  // BUG-S66-02 fix: PREPARING cards show CTA for orders that can be advanced
-  if (tableStatus === 'PREPARING') {
-    const advanceable = orders.filter(o => {
-      const config = getStatusConfig(o);
-      return !config.isFirstStage && !config.isFinishStage && (config.nextStageId || config.nextStatus);
-    });
-    if (!advanceable.length) return null;
-    advanceable.sort(
-      (a, b) => safeParseDate(a.created_date).getTime() - safeParseDate(b.created_date).getTime()
-    );
-    const target = advanceable[0];
-    const config = getStatusConfig(target);
-    const guestId = getLinkId(target.guest);
-    const guest = guestId && guestsMap ? guestsMap[guestId] : null;
-    const guestLabel = guest ? getGuestDisplayName(guest) : null;
-    const actionText = config.actionLabel || 'Готово';
-    const label = guestLabel ? `${actionText} (${guestLabel})` : actionText;
-    return { type: 'advance_order', orderId: target.id, config, label };
-  }
-
-  if (tableStatus === 'ALL_SERVED' || tableStatus === 'BILL_REQUESTED') {
-    return { type: 'close_table', label: 'Закрыть стол' };
-  }
-  // STALE: close table only for table groups (not pickup/delivery)
-  if (tableStatus === 'STALE') {
-    if (group.type === 'table') {
-      return { type: 'close_table', label: 'Закрыть стол' };
-    }
-    return null;
-  }
-
-  let targetOrders;
-  if (tableStatus === 'NEW') {
-    targetOrders = orders.filter(o => getStatusConfig(o).isFirstStage);
-  } else if (tableStatus === 'READY') {
-    targetOrders = orders.filter(o => getStatusConfig(o).isFinishStage);
-  } else {
-    return null;
-  }
-
-  if (!targetOrders.length) return null;
-
-  // Oldest order first (corresponds to lowest-numbered guest)
-  targetOrders.sort(
-    (a, b) => safeParseDate(a.created_date).getTime() - safeParseDate(b.created_date).getTime()
-  );
-  const targetOrder = targetOrders[0];
-
-  const config = getStatusConfig(targetOrder);
-  if (!(config.nextStageId || config.nextStatus)) return null;
-
-  // Guest label for CTA (V2-08)
-  const guestId = getLinkId(targetOrder.guest);
-  const guest = guestId && guestsMap ? guestsMap[guestId] : null;
-  const guestLabel = guest ? getGuestDisplayName(guest) : null;
-
-  // BUG-S65-04: first-stage CTA opens detail view (shows content before accept)
-  const actionText = tableStatus === 'NEW'
-    ? 'Открыть заказ'
-    : (config.actionLabel || 'Выдать');
-  const label = guestLabel ? `${actionText} (${guestLabel})` : actionText;
-
-  return { type: 'advance_order', orderId: targetOrder.id, config, label };
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SUB-COMPONENTS
@@ -1337,6 +1260,7 @@ function OrderGroupCard({
   effectiveUserId,
   onMutate,
   onCloseTable,
+  overdueMinutes,
   notifiedOrderIds,
   onClearNotified,
   tableMap,
@@ -1363,13 +1287,14 @@ function OrderGroupCard({
     return c.isFinishStage && o.status !== 'cancelled';
   }), [group.orders, getStatusConfig]);
 
-  // Fetch items for all orders in group (cached 60s, deduplicated by React Query)
+  // Fetch items only when expanded (lazy load — prevents API rate limit on mount)
   const itemResults = useQueries({
     queries: group.orders.map(order => ({
       queryKey: ['orderItems', order.id],
       queryFn: () => base44.entities.OrderItem.filter({ order: order.id }),
       staleTime: 60000,
       retry: shouldRetry,
+      enabled: isExpanded,
     })),
   });
 
@@ -1407,7 +1332,7 @@ function OrderGroupCard({
   const elapsedLabel = elapsedMin < 60 ? `${elapsedMin} \u043C\u0438\u043D` : `${Math.floor(elapsedMin / 60)}\u0447 ${elapsedMin % 60}\u043C`;
 
   // Overdue check
-  const isOverdue = elapsedMin > 10 && activeOrders.some(o => getStatusConfig(o).isFirstStage);
+  const isOverdue = elapsedMin > (overdueMinutes || 10) && activeOrders.some(o => getStatusConfig(o).isFirstStage);
 
   // Requests for this table
   const tableRequests = useMemo(() => {
@@ -1791,7 +1716,7 @@ function OrderGroupCard({
                           onClick={() => onCloseRequest(req.id, req.status)}
                           className="text-xs text-violet-600 bg-white border border-violet-300 px-2 py-1 rounded min-h-[28px] active:scale-95"
                         >
-                          {'\u0417\u0430\u043A\u0440\u044B\u0442\u044C'}
+                          {req.status === 'new' ? '\u0412 \u0440\u0430\u0431\u043E\u0442\u0443' : '\u0413\u043E\u0442\u043E\u0432\u043E'}
                         </button>
                       )}
                     </div>
@@ -3915,6 +3840,7 @@ export default function StaffOrdersMobile() {
                   effectiveUserId={effectiveUserId}
                   onMutate={trackOwnMutation}
                   onCloseTable={canCloseTable ? handleCloseTable : null}
+                  overdueMinutes={partnerData?.order_overdue_minutes}
                   notifiedOrderIds={notifiedOrderIds}
                   onClearNotified={clearNotified}
                   tableMap={tableMap}
