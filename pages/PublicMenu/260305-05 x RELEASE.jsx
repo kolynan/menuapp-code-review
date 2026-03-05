@@ -18,6 +18,8 @@
 // FIXED: 2026-03-05 - S82 BUG-S81-01: setActiveSnapPoint(null) now closes drawer (swipe-to-close)
 // FIXED: 2026-03-05 - S82 BUG-S81-03: drawer auto-expands to full when cart has items (CTA visible)
 // FIXED: 2026-03-05 - S82 BUG-S81-17: Hall order toast extended 2s->4s + error toast visible in drawer
+// FIXED: 2026-03-05 - S82 BUG-S81-14: Pickup/Delivery checkout replaced fullscreen->drawer
+// NOTE: S82 BUG-S81-02 fix (tableCodeLength 5->4) is in CartView component
 // ======================================================
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -983,6 +985,170 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
 }
 
 /* ============================================================
+   S82 BUG-S81-14: PICKUP/DELIVERY CHECKOUT DRAWER CONTENT
+   Replaces fullscreen CheckoutView for pickup and delivery modes.
+   Same form fields, rendered inside a bottom drawer.
+   i18n keys: form.name, form.required, form.phone, form.phone_placeholder,
+              form.address, form.comment, form.comment_placeholder,
+              cart.your_order, cart.total, cart.send_order, cart.submitting
+   ============================================================ */
+
+function PickupDeliveryCheckoutContent({
+  orderMode,
+  cart,
+  formatPrice,
+  finalTotal,
+  clientName, setClientName,
+  clientPhone, handlePhoneChange, handlePhoneFocus,
+  deliveryAddress, setDeliveryAddress,
+  comment, setComment,
+  errors,
+  submitError,
+  isSubmitting,
+  handleSubmitOrder,
+  onClose,
+  t,
+}) {
+  const isSubmitDisabled =
+    isSubmitting ||
+    !clientName.trim() ||
+    !clientPhone.trim() ||
+    (orderMode === 'delivery' && !deliveryAddress.trim());
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Sticky header */}
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100 shrink-0">
+        <button
+          className="flex items-center justify-center min-h-[44px] min-w-[44px] text-slate-500 hover:text-slate-700"
+          onClick={onClose}
+          aria-label={t('cart.back_to_menu')}
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <span className="font-semibold text-slate-800">{t('cart.your_order')}</span>
+      </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        {/* Order items summary */}
+        {cart.length > 0 && (
+          <div className="space-y-2 pb-4 border-b border-slate-100">
+            {cart.map((item) => (
+              <div key={item.dishId} className="flex justify-between items-center text-sm">
+                <span className="text-slate-700">
+                  {item.name}{' '}
+                  <span className="text-slate-400">x{item.quantity}</span>
+                </span>
+                <span className="font-medium text-slate-700 tabular-nums">
+                  {formatPrice(item.price * item.quantity)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Form fields */}
+        <div className="space-y-3">
+          {/* Name */}
+          <div data-field="clientName">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              {t('form.name')} <span className="text-red-500">{t('form.required')}</span>
+            </label>
+            <Input
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              placeholder={t('form.name')}
+              className={errors.clientName ? 'border-red-300' : ''}
+            />
+            {errors.clientName && (
+              <p className="text-xs text-red-500 mt-1">{errors.clientName}</p>
+            )}
+          </div>
+
+          {/* Phone */}
+          <div data-field="clientPhone">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              {t('form.phone')} <span className="text-red-500">{t('form.required')}</span>
+            </label>
+            <Input
+              type="tel"
+              inputMode="tel"
+              value={clientPhone}
+              onChange={handlePhoneChange}
+              onFocus={handlePhoneFocus}
+              placeholder={t('form.phone_placeholder')}
+              className={errors.clientPhone ? 'border-red-300' : ''}
+            />
+            {errors.clientPhone && (
+              <p className="text-xs text-red-500 mt-1">{errors.clientPhone}</p>
+            )}
+          </div>
+
+          {/* Delivery address — only for delivery mode */}
+          {orderMode === 'delivery' && (
+            <div data-field="deliveryAddress">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                {t('form.address')} <span className="text-red-500">{t('form.required')}</span>
+              </label>
+              <Input
+                value={deliveryAddress}
+                onChange={(e) => setDeliveryAddress(e.target.value)}
+                placeholder={t('form.address')}
+                className={errors.deliveryAddress ? 'border-red-300' : ''}
+              />
+              {errors.deliveryAddress && (
+                <p className="text-xs text-red-500 mt-1">{errors.deliveryAddress}</p>
+              )}
+            </div>
+          )}
+
+          {/* Comment */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              {t('form.comment')}
+            </label>
+            <Textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder={t('form.comment_placeholder')}
+              rows={2}
+              className="resize-none"
+            />
+          </div>
+        </div>
+
+        {/* Submit error */}
+        {submitError && (
+          <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {submitError}
+          </div>
+        )}
+      </div>
+
+      {/* Sticky footer: total + submit */}
+      <div className="shrink-0 px-4 pt-3 pb-4 border-t border-slate-100 space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="font-medium text-slate-700">{t('cart.total')}:</span>
+          <span className="font-bold text-indigo-600 tabular-nums text-lg">
+            {formatPrice(finalTotal)}
+          </span>
+        </div>
+        <Button
+          className="w-full h-12 text-base"
+          onClick={handleSubmitOrder}
+          disabled={isSubmitDisabled}
+        >
+          {isSubmitting && <Loader2 className="w-5 h-5 animate-spin mr-2" />}
+          {isSubmitting ? t('cart.submitting') : t('cart.send_order')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    TABLE CODE VERIFICATION HELPERS (simplified)
    P0-3: Only use Table.code for verification
    ============================================================ */
@@ -1051,7 +1217,7 @@ export default function X() {
   const [orderStatusToken, setOrderStatusToken] = useState(initialTrackToken);
   
   // TASK-260203-01: Drawer state
-  const [drawerMode, setDrawerMode] = useState(null); // 'cart' | null
+  const [drawerMode, setDrawerMode] = useState(null); // 'cart' | 'checkout' | null
   // S79: Drawer snap point — mid (0.6) or full (0.9)
   const SNAP_MID = 0.6;
   const SNAP_FULL = 0.9;
@@ -1063,9 +1229,12 @@ export default function X() {
 
   // S82 BUG-S81-03: Auto-expand to SNAP_FULL when cart has items so CTA button is always visible.
   // SNAP_MID (60%) only when cart is empty (receipt mode — no CTA needed).
+  // S82 BUG-S81-14: checkout drawer always uses SNAP_FULL (form needs full height).
   useEffect(() => {
     if (drawerMode === 'cart') {
       setDrawerSnapPoint(cart.length > 0 ? SNAP_FULL : SNAP_MID);
+    } else if (drawerMode === 'checkout') {
+      setDrawerSnapPoint(SNAP_FULL);
     }
   }, [drawerMode, cart.length]);
 
@@ -2727,11 +2896,13 @@ export default function X() {
           clientName: savedClientName,
         });
 
-        console.log("Order created", order?.id);
+        // Order created successfully
       }
     } catch (err) {
       console.error(err);
       setSubmitError(t('error.submit_failed'));
+      // S82 BUG-S81-14: show error as toast so it's visible even if drawer is being closed
+      toast.error(t('error.submit_failed'), { id: 'order-err', duration: 4000 });
     } finally {
       submitLockRef.current = false;
       setIsSubmitting(false);
@@ -2762,8 +2933,9 @@ export default function X() {
   };
 
   // Request bill (ServiceRequest)
+  // S82 BUG-S81-14: Open checkout as drawer (not fullscreen) for pickup/delivery
   const handleCheckoutClick = () => {
-    setView("checkout");
+    setDrawerMode('checkout');
   };
 
   const handleRequestBill = async () => {
@@ -3193,6 +3365,63 @@ export default function X() {
               hallGuestCodeEnabled={hallGuestCodeEnabled}
               guestCode={guestCode}
             />
+        </DrawerContent>
+      </Drawer>
+
+      {/* S82 BUG-S81-14: Pickup/Delivery Checkout Drawer */}
+      {/* Uses same snap points as cart drawer for reliable swipe-to-close */}
+      <Drawer
+        open={drawerMode === 'checkout'}
+        onOpenChange={(open) => {
+          if (!open && !isSubmitting) {
+            setDrawerMode(null);
+            setErrors({});
+            setSubmitError(null);
+          }
+        }}
+        snapPoints={[SNAP_MID, SNAP_FULL]}
+        activeSnapPoint={drawerSnapPoint}
+        setActiveSnapPoint={(sp) => {
+          if (sp === null && !isSubmitting) {
+            setDrawerMode(null);
+            setErrors({});
+            setSubmitError(null);
+          } else if (sp !== null) {
+            setDrawerSnapPoint(sp);
+          }
+        }}
+      >
+        <DrawerContent className="flex flex-col" style={{ paddingBottom: 0, maxHeight: '90vh' }}>
+          <DrawerHeader className="sr-only">
+            <DrawerTitle>{t('cart.your_order')}</DrawerTitle>
+          </DrawerHeader>
+          <PickupDeliveryCheckoutContent
+            orderMode={orderMode}
+            cart={cart}
+            formatPrice={formatPrice}
+            finalTotal={finalTotal}
+            clientName={clientName}
+            setClientName={setClientName}
+            clientPhone={clientPhone}
+            handlePhoneChange={handlePhoneChange}
+            handlePhoneFocus={handlePhoneFocus}
+            deliveryAddress={deliveryAddress}
+            setDeliveryAddress={setDeliveryAddress}
+            comment={comment}
+            setComment={setComment}
+            errors={errors}
+            submitError={submitError}
+            isSubmitting={isSubmitting}
+            handleSubmitOrder={handleSubmitOrder}
+            onClose={() => {
+              if (!isSubmitting) {
+                setDrawerMode(null);
+                setErrors({});
+                setSubmitError(null);
+              }
+            }}
+            t={t}
+          />
         </DrawerContent>
       </Drawer>
 
