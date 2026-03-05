@@ -57,7 +57,7 @@ export default function MenuView({
         key={dish.id}
         className="overflow-hidden hover:shadow-md transition-shadow border-slate-200"
       >
-        <CardContent className="p-3 flex gap-3 items-center">
+        <CardContent className="p-3 flex gap-3 items-start">
           {/* Image LEFT - fixed size */}
           <div className="w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100">
             {dish.image ? (
@@ -74,54 +74,60 @@ export default function MenuView({
             )}
           </div>
 
-          {/* Text MIDDLE - flexible */}
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-base text-slate-900 line-clamp-2">{getDishName(dish)}</h3>
-            {getDishDescription(dish) && (
-              <p className="text-sm text-slate-500 mt-1 line-clamp-1">
-                {getDishDescription(dish)}
-              </p>
-            )}
-            <div className="mt-1 font-bold text-indigo-600 text-sm">
-              {formatPrice(dish.price)}
+          {/* Text + button area — flexible, button pinned bottom-right */}
+          <div className="flex-1 min-w-0 flex flex-col justify-between h-24">
+            <div className="min-w-0">
+              <h3 className="font-semibold text-base text-slate-900 line-clamp-2">{getDishName(dish)}</h3>
+              {getDishDescription(dish) && (
+                <p className="text-sm text-slate-500 mt-0.5 line-clamp-1">
+                  {getDishDescription(dish)}
+                </p>
+              )}
             </div>
-            {showReviews && dishRatings?.[dish.id] && (
-              <div className="mt-1">
-                <DishRating
-                  avgRating={dishRatings[dish.id]?.avg}
-                  reviewCount={dishRatings[dish.id]?.count}
-                  onClick={onOpenReviews ? () => onOpenReviews(dish.id) : undefined}
-                />
+            <div className="flex items-end justify-between gap-2">
+              <div>
+                <div className="font-bold text-indigo-600 text-sm">
+                  {formatPrice(dish.price)}
+                </div>
+                {showReviews && dishRatings?.[dish.id] && (
+                  <DishRating
+                    avgRating={dishRatings[dish.id]?.avg}
+                    reviewCount={dishRatings[dish.id]?.count}
+                    onClick={onOpenReviews ? () => onOpenReviews(dish.id) : undefined}
+                  />
+                )}
               </div>
-            )}
-          </div>
-
-          {/* Plus button RIGHT - stable */}
-          <div className="shrink-0">
-            {!inCart ? (
-              <button
-                onClick={() => addToCart(dish)}
-                className="w-10 h-10 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
-              >
-                <Plus className="w-5 h-5 text-white" />
-              </button>
-            ) : (
-              <div className="flex items-center bg-slate-100 rounded-lg p-1">
-                <button
-                  onClick={() => updateQuantity(dish.id, -1)}
-                  className="p-1 hover:bg-white rounded-md transition-colors"
-                >
-                  <Minus className="w-4 h-4 text-slate-600" />
-                </button>
-                <span className="mx-2 font-medium text-slate-900 text-sm">{inCart.quantity}</span>
-                <button
-                  onClick={() => updateQuantity(dish.id, 1)}
-                  className="p-1 hover:bg-white rounded-md transition-colors"
-                >
-                  <Plus className="w-4 h-4 text-slate-600" />
-                </button>
+              {/* Plus button — bottom-right (industry standard: Glovo, Wolt, Yandex Eda) */}
+              <div className="shrink-0">
+                {!inCart ? (
+                  <button
+                    onClick={() => addToCart(dish)}
+                    aria-label={t('menu.add')}
+                    className="w-11 h-11 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
+                  >
+                    <Plus className="w-5 h-5 text-white" />
+                  </button>
+                ) : (
+                  <div className="flex items-center bg-slate-100 rounded-lg">
+                    <button
+                      onClick={() => updateQuantity(dish.id, -1)}
+                      aria-label={t('menu.remove')}
+                      className="w-9 h-9 flex items-center justify-center hover:bg-white rounded-md transition-colors"
+                    >
+                      <Minus className="w-4 h-4 text-slate-600" />
+                    </button>
+                    <span className="mx-1.5 font-medium text-slate-900 text-sm min-w-[18px] text-center">{inCart.quantity}</span>
+                    <button
+                      onClick={() => updateQuantity(dish.id, 1)}
+                      aria-label={t('menu.add')}
+                      className="w-9 h-9 flex items-center justify-center hover:bg-white rounded-md transition-colors"
+                    >
+                      <Plus className="w-4 h-4 text-slate-600" />
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </CardContent>
       </Card>

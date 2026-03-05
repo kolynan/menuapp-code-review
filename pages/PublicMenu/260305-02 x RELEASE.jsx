@@ -13,6 +13,7 @@
 // PATCHED: 2026-03-04 - Cart Drawer v2: two-mode design (Заказ/Чеки), toast after submit
 // FIXED: 2026-03-05 - BUG-S76-04: Replace persistent "invalid code" banner with auto-dismissing toast
 // PATCHED: 2026-03-05 - S79: Add restaurant logo (40px circle avatar) to menu and order status headers
+// PATCHED: 2026-03-05 - S79: Add "Closed" banner when partner.is_open === false
 // ======================================================
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -2928,6 +2929,17 @@ export default function X() {
           {partner?.name && (
             <span className="min-w-0 flex-1 truncate text-base font-semibold text-slate-800">{partner.name}</span>
           )}
+        </div>
+      )}
+
+      {/* Closed banner — shown when partner.is_open === false */}
+      {partner?.is_open === false && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mx-4 mt-2" role="status" aria-live="polite">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-3 h-3 rounded-full bg-red-500 shrink-0" />
+            <span className="font-semibold text-red-700 text-sm">{t("public.closed_banner.title")}</span>
+          </div>
+          <p className="text-xs text-red-600 mt-1 ml-5">{t("public.closed_banner.subtitle")}</p>
         </div>
       )}
 

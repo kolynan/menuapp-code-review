@@ -442,11 +442,14 @@ function WorkingHoursSection({ partner, onSave, saving, t }) {
   const [hours, setHours] = useState(() => parseWorkingHours(partner?.working_hours));
   const [note, setNote] = useState(partner?.working_hours_note || "");
   const [pendingCount, setPendingCount] = useState(0); // pending counter вместо boolean
+  // is_open toggle: undefined/null = true (fail-open)
+  const [isOpen, setIsOpen] = useState(partner?.is_open !== false);
 
   useEffect(() => {
     setHours(parseWorkingHours(partner?.working_hours));
     setNote(partner?.working_hours_note || "");
-  }, [partner?.id, partner?.working_hours, partner?.working_hours_note]);
+    setIsOpen(partner?.is_open !== false);
+  }, [partner?.id, partner?.working_hours, partner?.working_hours_note, partner?.is_open]);
 
   // P1-2: Debounced auto-save
   const debouncedSave = useDebouncedCallback(
@@ -488,6 +491,17 @@ function WorkingHoursSection({ partner, onSave, saving, t }) {
 
   const isSaving = saving || pendingCount > 0;
 
+  const handleIsOpenToggle = async () => {
+    const newValue = !isOpen;
+    setIsOpen(newValue);
+    setPendingCount(c => c + 1);
+    try {
+      await onSave({ is_open: newValue });
+    } finally {
+      setPendingCount(c => c - 1);
+    }
+  };
+
   return (
     <div id="section-hours" className="rounded-xl border bg-white p-4 sm:p-6 space-y-4 scroll-mt-20">
       <div className="flex items-center justify-between">
@@ -503,9 +517,9 @@ function WorkingHoursSection({ partner, onSave, saving, t }) {
             <p className="text-sm text-slate-500">{t("settings.hours.subtitle")}</p>
           </div>
         </div>
-        <Button 
-          size="sm" 
-          variant="outline" 
+        <Button
+          size="sm"
+          variant="outline"
           onClick={copyToAll}
           disabled={isSaving}
           className="hidden sm:flex min-h-[44px]"
@@ -515,9 +529,32 @@ function WorkingHoursSection({ partner, onSave, saving, t }) {
         </Button>
       </div>
 
-      <Button 
-        size="sm" 
-        variant="outline" 
+      {/* Open/Closed status toggle */}
+      <div className="flex items-center justify-between p-3 rounded-lg border bg-slate-50">
+        <div className="min-w-0">
+          <div className="font-medium text-sm">{t("settings.hours.status_label")}</div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {isOpen ? t("settings.hours.status_open_hint") : t("settings.hours.status_closed_hint")}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleIsOpenToggle}
+          disabled={isSaving}
+          className={`shrink-0 ml-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium min-h-[44px] transition-colors ${
+            isOpen
+              ? "bg-green-100 text-green-700 hover:bg-green-200"
+              : "bg-red-100 text-red-700 hover:bg-red-200"
+          } ${isSaving ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+        >
+          <span className={`inline-block w-2.5 h-2.5 rounded-full ${isOpen ? "bg-green-500" : "bg-red-500"}`} />
+          {isOpen ? t("settings.hours.status_open") : t("settings.hours.status_closed")}
+        </button>
+      </div>
+
+      <Button
+        size="sm"
+        variant="outline"
         onClick={copyToAll}
         disabled={isSaving}
         className="w-full sm:hidden min-h-[44px]"
