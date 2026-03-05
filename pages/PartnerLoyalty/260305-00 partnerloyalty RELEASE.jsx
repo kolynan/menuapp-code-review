@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, Check, Gift, AlertTriangle } from "lucide-react";
+import { Loader2, Check, AlertTriangle } from "lucide-react";
 
 /* ============================================================
    STICKY SAVE BAR COMPONENT
@@ -122,6 +122,8 @@ function PartnerLoyaltyContent() {
   const [lastSaved, setLastSaved] = useState(null);
   // Financial fields confirm dialog
   const [showLoyaltyConfirm, setShowLoyaltyConfirm] = useState(false);
+  // Timer ref for saved→idle transition (prevents race with rapid saves)
+  const savedTimerRef = useRef(null);
 
   const { data: partner, isLoading: loadingPartner } = useQuery({
     queryKey: ["partner", partnerId],
@@ -184,7 +186,9 @@ function PartnerLoyaltyContent() {
       queryClient.invalidateQueries({ queryKey: ["partner", partnerId] });
       setSaveStatus("saved");
       toast.success(t("partnerloyalty.toast.saved"), { id: "mm1" });
-      setTimeout(() => setSaveStatus("idle"), 2000);
+      // Clear any pending timer to prevent race with rapid saves
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
     },
     onError: () => {
       setSaveStatus("error");
@@ -284,7 +288,7 @@ function PartnerLoyaltyContent() {
 
   useEffect(() => {
     if (!isDirty) return;
-    const handler = (e) => { e.preventDefault(); };
+    const handler = (e) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty]);
@@ -541,7 +545,7 @@ function PartnerLoyaltyContent() {
             <Button variant="outline" onClick={() => setShowLoyaltyConfirm(false)} className="min-h-[44px]">
               {t("common.cancel")}
             </Button>
-            <Button onClick={() => { setShowLoyaltyConfirm(false); doSave(); }} className="min-h-[44px]">
+            <Button onClick={() => { setShowLoyaltyConfirm(false); doSave(); }} disabled={saveStatus === "saving"} className="min-h-[44px]">
               {t("common.save")}
             </Button>
           </div>

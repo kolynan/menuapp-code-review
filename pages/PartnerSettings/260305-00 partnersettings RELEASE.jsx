@@ -1615,6 +1615,8 @@ export default function PartnerSettings() {
   const savedProfileRef = useRef(null);
   // Profile-specific save status for 5-state sticky bar: idle | saving | saved | error
   const [profileSaveStatus, setProfileSaveStatus] = useState("idle");
+  // Timer ref for saved→idle transition (prevents race with rapid saves)
+  const profileSavedTimerRef = useRef(null);
 
   // Dialog state
   const [contactDialog, setContactDialog] = useState(false);
@@ -1732,7 +1734,7 @@ export default function PartnerSettings() {
   // Prevent leaving with unsaved profile changes
   useEffect(() => {
     if (!hasProfileChanges) return;
-    const handler = (e) => { e.preventDefault(); };
+    const handler = (e) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [hasProfileChanges]);
@@ -1754,7 +1756,9 @@ export default function PartnerSettings() {
       savedProfileRef.current = { name: partner?.name || "", address: partner?.address || "", logo: partner?.logo || "", address_map_url: partner?.address_map_url || "" };
       setProfileSaveStatus("saved");
       showToast(t("settings.toasts.profileSaved"));
-      setTimeout(() => setProfileSaveStatus("idle"), 2000);
+      // Clear any pending timer to prevent race with rapid saves
+      if (profileSavedTimerRef.current) clearTimeout(profileSavedTimerRef.current);
+      profileSavedTimerRef.current = setTimeout(() => setProfileSaveStatus("idle"), 2000);
     } catch (e) {
       setProfileSaveStatus("error");
       showError(t("settings.errors.error"), String(e?.message || e));
