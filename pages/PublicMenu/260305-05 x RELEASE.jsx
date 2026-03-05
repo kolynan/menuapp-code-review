@@ -2934,7 +2934,10 @@ export default function X() {
 
   // Request bill (ServiceRequest)
   // S82 BUG-S81-14: Open checkout as drawer (not fullscreen) for pickup/delivery
+  // Clear stale errors so re-opening doesn't show previous attempt's validation state
   const handleCheckoutClick = () => {
+    setErrors({});
+    setSubmitError(null);
     setDrawerMode('checkout');
   };
 
@@ -3520,12 +3523,13 @@ export default function X() {
             <StickyCartBar
               t={t}
               isHallMode={false}
+              isDrawerOpen={drawerMode === 'checkout'}
               hasCart={true}
               cartTotalItems={cartTotalItems}
               formattedCartTotal={formatPrice(cartTotalAmount)}
               isLoadingBill={false}
               formattedBillTotal=""
-              onButtonClick={handleCheckoutClick}
+              onButtonClick={drawerMode === 'checkout' ? () => setDrawerMode(null) : handleCheckoutClick}
               buttonLabel={t('cart.checkout')}
             />
           );
