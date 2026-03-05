@@ -3303,6 +3303,8 @@ export default function X() {
           <DrawerHeader className="sr-only">
             <DrawerTitle>Корзина</DrawerTitle>
           </DrawerHeader>
+          {/* S84 BUG-S81-03: flex-1 overflow-y-auto min-h-0 makes CartView scrollable so sticky CTA stays visible */}
+          <div className="flex-1 overflow-y-auto min-h-0">
             <CartView
               partner={partner}
               currentTable={currentTable}
@@ -3372,6 +3374,7 @@ export default function X() {
               hallGuestCodeEnabled={hallGuestCodeEnabled}
               guestCode={guestCode}
             />
+          </div>
         </DrawerContent>
       </Drawer>
 
@@ -3402,33 +3405,36 @@ export default function X() {
           <DrawerHeader className="sr-only">
             <DrawerTitle>{t('cart.your_order')}</DrawerTitle>
           </DrawerHeader>
-          <PickupDeliveryCheckoutContent
-            orderMode={orderMode}
-            cart={cart}
-            formatPrice={formatPrice}
-            finalTotal={finalTotal}
-            clientName={clientName}
-            setClientName={setClientName}
-            clientPhone={clientPhone}
-            handlePhoneChange={handlePhoneChange}
-            handlePhoneFocus={handlePhoneFocus}
-            deliveryAddress={deliveryAddress}
-            setDeliveryAddress={setDeliveryAddress}
-            comment={comment}
-            setComment={setComment}
-            errors={errors}
-            submitError={submitError}
-            isSubmitting={isSubmitting}
-            handleSubmitOrder={handleSubmitOrder}
-            onClose={() => {
-              if (!isSubmitting) {
-                setDrawerMode(null);
-                setErrors({});
-                setSubmitError(null);
-              }
-            }}
-            t={t}
-          />
+          {/* S84 BUG-S81-03: flex-1 overflow-y-auto min-h-0 for scrollable checkout content */}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <PickupDeliveryCheckoutContent
+              orderMode={orderMode}
+              cart={cart}
+              formatPrice={formatPrice}
+              finalTotal={finalTotal}
+              clientName={clientName}
+              setClientName={setClientName}
+              clientPhone={clientPhone}
+              handlePhoneChange={handlePhoneChange}
+              handlePhoneFocus={handlePhoneFocus}
+              deliveryAddress={deliveryAddress}
+              setDeliveryAddress={setDeliveryAddress}
+              comment={comment}
+              setComment={setComment}
+              errors={errors}
+              submitError={submitError}
+              isSubmitting={isSubmitting}
+              handleSubmitOrder={handleSubmitOrder}
+              onClose={() => {
+                if (!isSubmitting) {
+                  setDrawerMode(null);
+                  setErrors({});
+                  setSubmitError(null);
+                }
+              }}
+              t={t}
+            />
+          </div>
         </DrawerContent>
       </Drawer>
 
