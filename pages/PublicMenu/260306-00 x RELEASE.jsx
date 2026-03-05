@@ -1229,6 +1229,8 @@ export default function X() {
   const [activeCategoryKey, setActiveCategoryKey] = useState("all");
   const [cart, setCart] = useState([]); // { dishId, name, price, quantity }
   const cartRestoredRef = useRef(false);
+  // S84 BUG-S81-01: touch Y for custom swipe-to-close drag handle
+  const drawerDragStartY = useRef(0);
 
   // S82 BUG-S81-03: Auto-expand to SNAP_FULL when cart has items so CTA button is always visible.
   // SNAP_MID (60%) only when cart is empty (receipt mode — no CTA needed).
@@ -3303,6 +3305,17 @@ export default function X() {
           <DrawerHeader className="sr-only">
             <DrawerTitle>Корзина</DrawerTitle>
           </DrawerHeader>
+          {/* S84 BUG-S81-01: Custom drag handle — touch-based swipe-down to close (>80px triggers close) */}
+          <div
+            className="flex justify-center py-3 shrink-0 touch-none cursor-grab active:cursor-grabbing"
+            onTouchStart={(e) => { drawerDragStartY.current = e.touches[0].clientY; }}
+            onTouchEnd={(e) => {
+              const delta = e.changedTouches[0].clientY - drawerDragStartY.current;
+              if (delta > 80) setDrawerMode(null);
+            }}
+          >
+            <div className="w-12 h-1.5 rounded-full bg-slate-300" />
+          </div>
           {/* S84 BUG-S81-03: flex-1 overflow-y-auto min-h-0 makes CartView scrollable so sticky CTA stays visible */}
           <div className="flex-1 overflow-y-auto min-h-0">
             <CartView
@@ -3405,6 +3418,17 @@ export default function X() {
           <DrawerHeader className="sr-only">
             <DrawerTitle>{t('cart.your_order')}</DrawerTitle>
           </DrawerHeader>
+          {/* S84 BUG-S81-01: Custom drag handle for checkout drawer */}
+          <div
+            className="flex justify-center py-3 shrink-0 touch-none cursor-grab active:cursor-grabbing"
+            onTouchStart={(e) => { drawerDragStartY.current = e.touches[0].clientY; }}
+            onTouchEnd={(e) => {
+              const delta = e.changedTouches[0].clientY - drawerDragStartY.current;
+              if (delta > 80 && !isSubmitting) setDrawerMode(null);
+            }}
+          >
+            <div className="w-12 h-1.5 rounded-full bg-slate-300" />
+          </div>
           {/* S84 BUG-S81-03: flex-1 overflow-y-auto min-h-0 for scrollable checkout content */}
           <div className="flex-1 overflow-y-auto min-h-0">
             <PickupDeliveryCheckoutContent
