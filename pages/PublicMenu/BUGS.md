@@ -1,7 +1,7 @@
 ---
-version: "13.0"
+version: "14.0"
 updated: "2026-03-05"
-session: 79
+session: 82
 ---
 
 # PublicMenu — Bug Registry
@@ -12,6 +12,22 @@ session: 79
 ---
 
 ## Active Bugs (не исправлены)
+
+### BUG-PM-026: Drawer pull-down swipe doesn't close drawer (S81-01, P1) — FIXED S82
+- **Когда:** S81 testing
+- **Файл:** `x.jsx` — Drawer component
+- **Симптом:** Swipe down on drag handle did not close or collapse the drawer
+- **Root cause:** `setActiveSnapPoint` prop was wired to `setDrawerSnapPoint` directly. When vaul calls `setActiveSnapPoint(null)` to signal close (user dragged below lowest snap), `setDrawerMode(null)` was never called — drawer stayed open.
+- **Фикс:** Replaced `setActiveSnapPoint={setDrawerSnapPoint}` with an inline handler: `if (sp === null) setDrawerMode(null); else setDrawerSnapPoint(sp);`
+- **RELEASE:** `260305-04 x RELEASE.jsx`
+
+### BUG-PM-027: CTA button hidden at default drawer height (S81-03, P1) — FIXED S82
+- **Когда:** S81 testing
+- **Файл:** `x.jsx` — drawer snap point logic
+- **Симптом:** Drawer opens at SNAP_MID=60% by default. The «Отправить официанту» button lives in CartView sticky footer at bottom of full-height (90vh) content, so it is outside the visible 60% area. User must manually drag drawer up to see it.
+- **Root cause:** `useEffect` auto-grow only expanded to SNAP_FULL when `cart.length > 4`. With 1-4 items, drawer stayed at SNAP_MID and CTA was invisible.
+- **Фикс:** Changed condition to `cart.length > 0`: drawer auto-expands to SNAP_FULL whenever cart has any items (mode 'order'). SNAP_MID kept for empty cart (receipt mode — no CTA needed).
+- **RELEASE:** `260305-04 x RELEASE.jsx`
 
 ### BUG-PM-023: reviewedItems.has() without null guard (P0, pre-existing)
 - **Когда:** S79 review (pre-existing from S74)
