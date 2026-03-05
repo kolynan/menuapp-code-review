@@ -1,7 +1,7 @@
 ---
-version: "2.7"
-updated: "2026-03-04"
-session: 75
+version: "2.8"
+updated: "2026-03-05"
+session: 79
 ---
 
 # PublicMenu — README
@@ -27,7 +27,7 @@ session: 75
 
 | Файл | RELEASE | Дата |
 |---|---|---|
-| x.jsx | `260304-01 x RELEASE.jsx` | 4 мар 2026 |
+| x.jsx | `260305-01 x RELEASE.jsx` | 5 мар 2026 |
 | useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 2 мар 2026 |
 | CartView.jsx | `260304-01 CartView RELEASE.jsx` | 4 мар 2026 |
 | MenuView.jsx | `260304-00 MenuView RELEASE.jsx` | 4 мар 2026 |
@@ -44,6 +44,12 @@ session: 75
 ---
 
 ## Changelog (UX/UI решения)
+
+### Session 79 — 5 мар 2026
+
+- **Логотип ресторана в шапке /x:** Круглый аватар 40px (`w-10 h-10 rounded-full`) отображается рядом с названием ресторана в двух местах: (1) шапка главного меню (после `PublicMenuHeader`), (2) шапка экрана статуса заказа. Если логотип не загружен в PartnerSettings — без изменений (только название). Если URL битый — img скрывается через React state (`onError → setLogoError(true)`). Фон `bg-gray-100 border-gray-200` для тёмных/светлых логотипов. Whitespace-only URL отфильтровываются (`.trim()`). Имя ресторана с `truncate` + `min-w-0 flex-1` для длинных названий.
+  - Новые i18n ключи: нет (визуальный элемент)
+  - CC + Codex review: IMPROVE (Codex нашёл 3 улучшения: React state вместо DOM mutation, whitespace trim, flex truncation)
 
 ### Session 75 — 4 мар 2026
 
