@@ -667,6 +667,7 @@ function OSStatusProgress({ currentStatus, t }) {
 function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }) {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [secondsAgo, setSecondsAgo] = useState(0);
+  const [osLogoError, setOsLogoError] = useState(false);
 
   const {
     data: orderData,
@@ -861,13 +862,13 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
 
         {/* Restaurant header */}
         <div className="flex items-center gap-3 mb-6">
-          {partner?.logo && (
+          {partner?.logo && !osLogoError && (
             <img
               src={partner.logo}
-              alt=""
+              alt={partner?.name ? `${partner.name} logo` : ""}
               referrerPolicy="no-referrer"
-              className="w-10 h-10 rounded-full object-cover bg-gray-100 border border-gray-200 flex-shrink-0"
-              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              className="w-10 h-10 rounded-full object-cover bg-gray-100 border border-gray-200 shrink-0"
+              onError={() => setOsLogoError(true)}
             />
           )}
           {partner?.name && (
@@ -1051,6 +1052,9 @@ export default function X() {
   const [cart, setCart] = useState([]); // { dishId, name, price, quantity }
   const cartRestoredRef = useRef(false);
 
+  // Restaurant logo error state (hide on broken URL)
+  const [logoError, setLogoError] = useState(false);
+
   // Mobile breakpoint detection
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -1121,16 +1125,20 @@ export default function X() {
     },
   });
 
+  // Derived logo values (after partner query)
+  const logoUrl = typeof partner?.logo === "string" ? partner.logo.trim() : "";
+  const showLogo = !!logoUrl && !logoError;
+
   // Breakpoint listener
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 767px)");
-    
+
     const handleChange = (e) => {
       setIsMobile(e.matches);
     };
-    
+
     mediaQuery.addEventListener('change', handleChange);
-    
+
     return () => {
       mediaQuery.removeEventListener('change', handleChange);
     };
@@ -2908,17 +2916,17 @@ export default function X() {
       />
 
       {/* Restaurant logo + name (visible when logo is uploaded in PartnerSettings) */}
-      {partner?.logo && (
+      {showLogo && (
         <div className="flex items-center gap-3 px-4 pt-3 pb-1">
           <img
-            src={partner.logo}
-            alt=""
+            src={logoUrl}
+            alt={partner?.name ? `${partner.name} logo` : ""}
             referrerPolicy="no-referrer"
-            className="w-10 h-10 rounded-full object-cover bg-gray-100 border border-gray-200 flex-shrink-0"
-            onError={(e) => { e.currentTarget.parentElement.style.display = 'none'; }}
+            className="w-10 h-10 rounded-full object-cover bg-gray-100 border border-gray-200 shrink-0"
+            onError={() => setLogoError(true)}
           />
           {partner?.name && (
-            <span className="text-base font-semibold text-slate-800 truncate">{partner.name}</span>
+            <span className="min-w-0 flex-1 truncate text-base font-semibold text-slate-800">{partner.name}</span>
           )}
         </div>
       )}
