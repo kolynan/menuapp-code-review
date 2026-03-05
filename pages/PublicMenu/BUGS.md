@@ -1,5 +1,5 @@
 ---
-version: "15.0"
+version: "16.0"
 updated: "2026-03-05"
 session: 82
 ---
@@ -12,40 +12,6 @@ session: 82
 ---
 
 ## Active Bugs (не исправлены)
-
-### BUG-PM-028: Table code input shows 5 boxes for 4-digit codes (S81-02, P0) — FIXED S82
-- **Когда:** S81 testing
-- **Файл:** `CartView.jsx` — tableCodeLength useMemo
-- **Симптом:** OTP input renders 5 boxes but real codes are 4 digits. Auto-verify fires only when `safe.length === tableCodeLength`. User enters 4 digits → 5th box empty → auto-verify never fires → `isTableVerified` stays false → submit button disabled → "Стол —" no number → order blocked.
-- **Root cause:** `tableCodeLength` default was `5` when `partner?.table_code_length` is not set.
-- **Фикс:** Changed default from `5` to `4` in CartView.jsx (line 136).
-- **RELEASE:** `260305-03 CartView RELEASE.jsx`
-- **Коммит:** `e9050d3`
-
-### BUG-PM-029: No visible feedback after Hall order sent (S81-17, P1) — FIXED S82
-- **Когда:** S81 testing
-- **Файл:** `x.jsx` — processHallOrder()
-- **Симптом:** (a) Toast "Заказ отправлен официанту" appeared for only 2 seconds — too short, users missed it; (b) On order failure, `setSubmitError` was called but `submitError` renders only in `CheckoutView` (not in drawer) → failure invisible to Hall user.
-- **Root cause:** Toast duration was 2000ms; generic catch only used `setSubmitError`, not `toast.error`.
-- **Фикс:** (a) Extended toast duration 2000→4000ms. (b) Added `toast.error(t('error.submit_failed'), ...)` in catch block alongside `setSubmitError`.
-- **RELEASE:** `260305-04 x RELEASE.jsx`
-- **Коммит:** `e9050d3`
-
-### BUG-PM-026: Drawer pull-down swipe doesn't close drawer (S81-01, P1) — FIXED S82
-- **Когда:** S81 testing
-- **Файл:** `x.jsx` — Drawer component
-- **Симптом:** Swipe down on drag handle did not close or collapse the drawer
-- **Root cause:** `setActiveSnapPoint` prop was wired to `setDrawerSnapPoint` directly. When vaul calls `setActiveSnapPoint(null)` to signal close (user dragged below lowest snap), `setDrawerMode(null)` was never called — drawer stayed open.
-- **Фикс:** Replaced `setActiveSnapPoint={setDrawerSnapPoint}` with an inline handler: `if (sp === null) setDrawerMode(null); else setDrawerSnapPoint(sp);`
-- **RELEASE:** `260305-04 x RELEASE.jsx`
-
-### BUG-PM-027: CTA button hidden at default drawer height (S81-03, P1) — FIXED S82
-- **Когда:** S81 testing
-- **Файл:** `x.jsx` — drawer snap point logic
-- **Симптом:** Drawer opens at SNAP_MID=60% by default. The «Отправить официанту» button lives in CartView sticky footer at bottom of full-height (90vh) content, so it is outside the visible 60% area. User must manually drag drawer up to see it.
-- **Root cause:** `useEffect` auto-grow only expanded to SNAP_FULL when `cart.length > 4`. With 1-4 items, drawer stayed at SNAP_MID and CTA was invisible.
-- **Фикс:** Changed condition to `cart.length > 0`: drawer auto-expands to SNAP_FULL whenever cart has any items (mode 'order'). SNAP_MID kept for empty cart (receipt mode — no CTA needed).
-- **RELEASE:** `260305-04 x RELEASE.jsx`
 
 ### BUG-PM-023: reviewedItems.has() without null guard (P0, pre-existing)
 - **Когда:** S79 review (pre-existing from S74)
@@ -68,6 +34,34 @@ session: 82
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-028: Table code input shows 5 boxes for 4-digit codes (S81-02, P0) — FIXED S82
+- **Когда:** S81 testing
+- **Файл:** `CartView.jsx` — tableCodeLength useMemo
+- **Симптом:** OTP input renders 5 boxes but real codes are 4 digits → auto-verify never fires → order blocked.
+- **Фикс:** tableCodeLength default 5→4 (reads from partner.table_code_length if set).
+- **RELEASE:** `260305-03 CartView RELEASE.jsx` | **Коммит:** `e9050d3`
+
+### BUG-PM-029: No visible feedback after Hall order sent (S81-17, P1) — FIXED S82
+- **Когда:** S81 testing
+- **Файл:** `x.jsx` — processHallOrder()
+- **Симптом:** Toast appeared for 2s (too short); on failure `setSubmitError` invisible in drawer.
+- **Фикс:** Toast duration 2s→4s; added `toast.error` in catch; cart cleared on success.
+- **RELEASE:** `260305-05 x RELEASE.jsx` | **Коммит:** `02ae5e5`
+
+### BUG-PM-026: Drawer pull-down swipe doesn't close drawer (S81-01, P1) — FIXED S82
+- **Когда:** S81 testing
+- **Файл:** `x.jsx` — Drawer setActiveSnapPoint
+- **Симптом:** Swipe down on drag handle did not close the drawer.
+- **Фикс:** `setActiveSnapPoint` handler: `if (sp === null) setDrawerMode(null); else setDrawerSnapPoint(sp);`
+- **RELEASE:** `260305-05 x RELEASE.jsx`
+
+### BUG-PM-027: CTA button hidden at default drawer height (S81-03, P1) — FIXED S82
+- **Когда:** S81 testing
+- **Файл:** `x.jsx` — drawer snap point auto-grow
+- **Симптом:** Drawer at SNAP_MID (60%); CTA outside visible area with 1-4 items.
+- **Фикс:** Auto-expand to SNAP_FULL when `cart.length > 0` (was `> 4`).
+- **RELEASE:** `260305-05 x RELEASE.jsx`
 
 ### BUG-PM-018: Confirmation screen shows "Заказ принят!" before waiter accepts (P0)
 - **Приоритет:** P0 (wrong semantics breaks user trust)
