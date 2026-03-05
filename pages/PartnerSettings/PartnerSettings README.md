@@ -1,5 +1,5 @@
 ---
-version: "1.3"
+version: "1.4"
 updated: "2026-03-05"
 session: 52
 ---
@@ -48,6 +48,7 @@ session: 52
 |------|--------|----------------|
 | 2026-02-24 | 1.0 | Первичное сохранение кода (из B44) |
 | 2026-02-28 | 1.1 | Phase 1 UX: sticky Save/Discard бар для профиля (определение несохранённых изменений), увеличены тач-цели до 44px по всей странице (время, кнопки, переключатели) |
+| 2026-03-05 | 1.4 | Toggle "Открыто/Закрыто" в WorkingHoursSection: is_open boolean, immediate save (не debounced), fail-open (undefined=true). Цветная pill-кнопка (зелёный/красный) с точкой-индикатором + microcopy hint. CC+Codex reviewed. |
 | 2026-03-05 | 1.3 | 5-state sticky save bar: idle/dirty/saving/saved/error. Кнопка "Отменить" откатывает профиль. beforeunload при несохранённых изменениях. Timer race fix. CC+Codex reviewed. |
 | 2026-03-01 | 1.2 | Phase 1v2 CC+Codex: 8 оставшихся тач-целей исправлены (rate input, custom currency, nav tabs, copy-to-all, contact add, hall/wifi save кнопки) |
 

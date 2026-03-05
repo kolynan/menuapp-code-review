@@ -27,10 +27,10 @@ session: 79
 
 | Файл | RELEASE | Дата |
 |---|---|---|
-| x.jsx | `260305-01 x RELEASE.jsx` | 5 мар 2026 |
+| x.jsx | `260305-02 x RELEASE.jsx` | 5 мар 2026 |
 | useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 2 мар 2026 |
 | CartView.jsx | `260304-01 CartView RELEASE.jsx` | 4 мар 2026 |
-| MenuView.jsx | `260304-00 MenuView RELEASE.jsx` | 4 мар 2026 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 5 мар 2026 |
 | CheckoutView.jsx | `260303-05 CheckoutView RELEASE.jsx` | 3 мар 2026 |
 | ModeTabs.jsx | `260223-00 ModeTabs RELEASE.jsx` | 23 фев 2026 |
 | StickyCartBar.jsx | `260222-00 StickyCartBar RELEASE.jsx` | 22 фев 2026 |
@@ -47,6 +47,12 @@ session: 79
 
 ### Session 79 — 5 мар 2026
 
+- **Статус "Открыто/Закрыто" (Этап A):** Баннер "Закрыто" показывается на `/x` когда партнёр переключает `is_open` в `false` через PartnerSettings. Красный блок (`bg-red-50 border-red-200`) с точкой, заголовком и подтекстом. Когда `is_open === true` или не задан (fail-open) — баннер скрыт. Заказы НЕ блокируются (только информационный баннер). `aria-live="polite"` для accessibility.
+  - Новые i18n ключи: `public.closed_banner.title`, `public.closed_banner.subtitle`
+  - CC + Codex review: Codex рекомендовал banner-only (без блокировки кнопок), CC согласен
+- **Кнопка "+" в list view — перемещена в правый нижний угол:** Промышленный стандарт (Glovo, Wolt, Yandex Eda). Карточка перестроена: текст сверху, цена + кнопка внизу на одной линии. Touch target увеличен до 44px (`w-11 h-11`). Stepper кнопки увеличены до `w-9 h-9` (36px). `aria-label` добавлен.
+  - Новые i18n ключи: нет
+  - CC + Codex review: Codex нашёл P1 touch target (40→44px), CC применил
 - **Логотип ресторана в шапке /x:** Круглый аватар 40px (`w-10 h-10 rounded-full`) отображается рядом с названием ресторана в двух местах: (1) шапка главного меню (после `PublicMenuHeader`), (2) шапка экрана статуса заказа. Если логотип не загружен в PartnerSettings — без изменений (только название). Если URL битый — img скрывается через React state (`onError → setLogoError(true)`). Фон `bg-gray-100 border-gray-200` для тёмных/светлых логотипов. Whitespace-only URL отфильтровываются (`.trim()`). Имя ресторана с `truncate` + `min-w-0 flex-1` для длинных названий.
   - Новые i18n ключи: нет (визуальный элемент)
   - CC + Codex review: IMPROVE (Codex нашёл 3 улучшения: React state вместо DOM mutation, whitespace trim, flex truncation)

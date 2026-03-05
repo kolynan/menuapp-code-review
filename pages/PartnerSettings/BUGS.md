@@ -87,6 +87,16 @@
 
 ---
 
+## Fixed (in RELEASE 260305-01)
+
+### FEATURE: is_open toggle (Этап A — ручной переключатель)
+- **Line:** ~492 (WorkingHoursSection)
+- **What:** Toggle "Открыто/Закрыто" с immediate save в Partner entity
+- **Note:** Поле `is_open` (boolean) может ещё не существовать в Partner entity. Arman должен добавить через B44 entity editor: Partner → Add field → `is_open` → Boolean → Default: true
+- **Status:** IMPLEMENTED (needs entity field)
+
+---
+
 ## Active Bugs
 
 ### BUG-PS-009 (P2) -- address_map_url accepts arbitrary URLs
