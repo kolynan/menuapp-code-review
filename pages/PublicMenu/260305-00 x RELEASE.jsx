@@ -11,6 +11,7 @@
 // FIXED: 2026-03-03 - GAP-02 fix - Embed OrderStatusScreen inside x.jsx (no /orderstatus route)
 // FIXED: 2026-03-03 - GAP-02 fix - Remove auto-dismiss timer (race condition: ghost click on menu)
 // PATCHED: 2026-03-04 - Cart Drawer v2: two-mode design (Заказ/Чеки), toast after submit
+// FIXED: 2026-03-05 - BUG-S76-04: Replace persistent "invalid code" banner with auto-dismissing toast
 // ======================================================
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1282,6 +1283,13 @@ export default function X() {
     codeVerificationError,
     verifyTableCode,
   } = useHallTable({ partner, location, orderMode, t });
+
+  // BUG-S76-04: Show code verification error as auto-dismissing toast instead of persistent banner
+  useEffect(() => {
+    if (codeVerificationError) {
+      toast.error(codeVerificationError, { duration: 4000 });
+    }
+  }, [codeVerificationError]);
 
   // Helper for saving table selection (used by help requests and other features)
   const saveTableSelection = (partnerId, tableId) => {
@@ -2858,7 +2866,7 @@ export default function X() {
           tableCodeInput={tableCodeInput}
           setTableCodeInput={setTableCodeInput}
           isVerifyingCode={isVerifyingCode}
-          codeVerificationError={codeVerificationError}
+          codeVerificationError={null}
           hallGuestCodeEnabled={hallGuestCodeEnabled}
           guestCode={guestCode}
           partner={partner}
@@ -3112,7 +3120,7 @@ export default function X() {
               setTableCodeInput={setTableCodeInput}
               isVerifyingCode={isVerifyingCode}
               verifyTableCode={verifyTableCode}
-              codeVerificationError={codeVerificationError}
+              codeVerificationError={null}
               hallGuestCodeEnabled={hallGuestCodeEnabled}
               guestCode={guestCode}
             />

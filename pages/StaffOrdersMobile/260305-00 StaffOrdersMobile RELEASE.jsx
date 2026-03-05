@@ -1,5 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   STAFFORDERSMOBILE — v3.6.0 (2026-03-04) Stale Data + Close Table Confirm S74
+   STAFFORDERSMOBILE — v3.7.0 (2026-03-05) Bug Fixes S76
+
+   CHANGES in v3.7.0 (Bug Fixes — S76):
+   - BUG-S76-01: Fixed i18n — status badge now translates OrderStage names via t()
+   - BUG-S76-02: Fixed i18n — action button text now translates OrderStage names via t()
+   - BUG-S76-03: Fixed client_name display in detail view for Pickup/Delivery orders
 
    CHANGES in v3.6.0 (P0 Stale Data + Close Table Confirm — S74):
    - P0: Detail view forces refetch on open (prevents stale order list)
@@ -176,6 +181,8 @@ import { Badge } from "@/components/ui/badge";
 import { getGuestDisplayName, closeSession } from "@/components/sessionHelpers";
 // SESS-016: Import session cleanup job (auto-expire stale sessions)
 import { runSessionCleanup } from "@/components/sessionCleanupJob";
+// BUG-S76-01/02: i18n for OrderStage names
+import { useI18n } from "@/components/i18n";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CONSTANTS
@@ -1838,7 +1845,11 @@ function TableDetailScreen({
         {ordersByGuest.noGuest.length > 0 && (
           <GuestOrderSection
             key="__no_guest__"
-            guestLabel="Заказ (гость не определён)"
+            guestLabel={
+              ordersByGuest.noGuest[0]?.client_name
+                ? [ordersByGuest.noGuest[0].client_name, ordersByGuest.noGuest[0].client_phone].filter(Boolean).join(', ')
+                : "Заказ (гость не определён)"
+            }
             orders={ordersByGuest.noGuest}
             getStatusConfig={getStatusConfig}
             effectiveUserId={effectiveUserId}
@@ -2356,6 +2367,7 @@ function BannerNotification({ banner, onDismiss, onNavigate }) {
 
 export default function StaffOrdersMobile() {
   const queryClient = useQueryClient();
+  const { t } = useI18n(); // BUG-S76-01/02: translate stage names
 
   const [urlParams] = useState(() => new URLSearchParams(window.location.search));
   const token = urlParams.get("token");
@@ -2918,9 +2930,9 @@ export default function StaffOrdersMobile() {
       const isFinishStage = stage.internal_code === 'finish' || currentIndex === relevantStages.length - 1;
       
       return {
-        label: stage.name,
+        label: t(stage.name) || stage.name,
         color: stage.color,
-        actionLabel: nextStage ? `→ ${nextStage.name}` : null,
+        actionLabel: nextStage ? `→ ${t(nextStage.name) || nextStage.name}` : null,
         nextStageId: nextStage?.id || null,
         nextStatus: null, // don't use old status
         badgeClass: '', // will use inline style with color
@@ -2943,7 +2955,7 @@ export default function StaffOrdersMobile() {
       isFirstStage: order.status === 'new',
       isFinishStage: order.status === 'ready' || order.status === 'served',
     };
-  }, [stagesMap, sortedStages]);
+  }, [stagesMap, sortedStages, t]);
 
   const effectivePollingInterval = rateLimitHit ? false : (pollingInterval === 0 ? false : pollingInterval);
 
