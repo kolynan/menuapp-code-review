@@ -3290,7 +3290,7 @@ export default function X() {
       {/* S82 BUG-S81-01: setActiveSnapPoint handles null (swipe-down-to-close) */}
       <Drawer
         open={drawerMode === 'cart'}
-        onOpenChange={(open) => !open && setDrawerMode(null)}
+        onOpenChange={(open) => !open && !isSubmitting && setDrawerMode(null)}
         snapPoints={[SNAP_MID, SNAP_FULL]}
         activeSnapPoint={drawerSnapPoint}
         setActiveSnapPoint={(sp) => {
@@ -3311,7 +3311,7 @@ export default function X() {
             onTouchStart={(e) => { drawerDragStartY.current = e.touches[0].clientY; }}
             onTouchEnd={(e) => {
               const delta = e.changedTouches[0].clientY - drawerDragStartY.current;
-              if (delta > 80) setDrawerMode(null);
+              if (delta > 80 && !isSubmitting) setDrawerMode(null);
             }}
           >
             <div className="w-12 h-1.5 rounded-full bg-slate-300" />
