@@ -1,5 +1,5 @@
 ---
-version: "14.0"
+version: "15.0"
 updated: "2026-03-05"
 session: 82
 ---
@@ -12,6 +12,24 @@ session: 82
 ---
 
 ## Active Bugs (не исправлены)
+
+### BUG-PM-028: Table code input shows 5 boxes for 4-digit codes (S81-02, P0) — FIXED S82
+- **Когда:** S81 testing
+- **Файл:** `CartView.jsx` — tableCodeLength useMemo
+- **Симптом:** OTP input renders 5 boxes but real codes are 4 digits. Auto-verify fires only when `safe.length === tableCodeLength`. User enters 4 digits → 5th box empty → auto-verify never fires → `isTableVerified` stays false → submit button disabled → "Стол —" no number → order blocked.
+- **Root cause:** `tableCodeLength` default was `5` when `partner?.table_code_length` is not set.
+- **Фикс:** Changed default from `5` to `4` in CartView.jsx (line 136).
+- **RELEASE:** `260305-03 CartView RELEASE.jsx`
+- **Коммит:** `e9050d3`
+
+### BUG-PM-029: No visible feedback after Hall order sent (S81-17, P1) — FIXED S82
+- **Когда:** S81 testing
+- **Файл:** `x.jsx` — processHallOrder()
+- **Симптом:** (a) Toast "Заказ отправлен официанту" appeared for only 2 seconds — too short, users missed it; (b) On order failure, `setSubmitError` was called but `submitError` renders only in `CheckoutView` (not in drawer) → failure invisible to Hall user.
+- **Root cause:** Toast duration was 2000ms; generic catch only used `setSubmitError`, not `toast.error`.
+- **Фикс:** (a) Extended toast duration 2000→4000ms. (b) Added `toast.error(t('error.submit_failed'), ...)` in catch block alongside `setSubmitError`.
+- **RELEASE:** `260305-04 x RELEASE.jsx`
+- **Коммит:** `e9050d3`
 
 ### BUG-PM-026: Drawer pull-down swipe doesn't close drawer (S81-01, P1) — FIXED S82
 - **Когда:** S81 testing
