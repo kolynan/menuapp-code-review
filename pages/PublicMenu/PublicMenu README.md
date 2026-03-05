@@ -1,5 +1,5 @@
 ---
-version: "2.8"
+version: "2.9"
 updated: "2026-03-05"
 session: 79
 ---
@@ -27,9 +27,9 @@ session: 79
 
 | Файл | RELEASE | Дата |
 |---|---|---|
-| x.jsx | `260305-02 x RELEASE.jsx` | 5 мар 2026 |
+| x.jsx | `260305-03 x RELEASE.jsx` | 5 мар 2026 |
 | useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 2 мар 2026 |
-| CartView.jsx | `260304-01 CartView RELEASE.jsx` | 4 мар 2026 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 5 мар 2026 |
 | MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 5 мар 2026 |
 | CheckoutView.jsx | `260303-05 CheckoutView RELEASE.jsx` | 3 мар 2026 |
 | ModeTabs.jsx | `260223-00 ModeTabs RELEASE.jsx` | 23 фев 2026 |
@@ -47,6 +47,9 @@ session: 79
 
 ### Session 79 — 5 мар 2026
 
+- **Drawer UX Refactor (CartView v3):** 5 UX-улучшений корзины: (1) Sticky header — шапка (Bell + Стол/Гость + X) фиксирована при скролле. (2) Авто-рост drawer — 2 детента: 60% (mid) и 90% (full), авто-переход в full при >4 позициях. (3) Код стола вынесен из аккордеона "Подробности" в отдельный компактный блок между "Ваш заказ" и "Выгода". (4) 2-строчный layout блюд — название+цена на строке 1, stepper на строке 2, `line-clamp-2` для длинных названий. (5) "Новый заказ" -> "Ваш заказ", "Подробности" -> "Выгода", упрощённый "Счёт" без "Только мне" для одного гостя.
+  - Новые i18n ключи: `cart.your_order`, `cart.savings`, `cart.or_tell_waiter`
+  - CC + Codex review: correctness (3 pre-existing P0 null guards noted), style (3 P1 i18n, 5 P2). 2 bonus fixes: aria-label on close button, "Показать все" onClick wired up.
 - **Статус "Открыто/Закрыто" (Этап A):** Баннер "Закрыто" показывается на `/x` когда партнёр переключает `is_open` в `false` через PartnerSettings. Красный блок (`bg-red-50 border-red-200`) с точкой, заголовком и подтекстом. Когда `is_open === true` или не задан (fail-open) — баннер скрыт. Заказы НЕ блокируются (только информационный баннер). `aria-live="polite"` для accessibility.
   - Новые i18n ключи: `public.closed_banner.title`, `public.closed_banner.subtitle`
   - CC + Codex review: Codex рекомендовал banner-only (без блокировки кнопок), CC согласен

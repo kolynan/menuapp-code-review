@@ -1,7 +1,7 @@
 ---
-version: "12.0"
-updated: "2026-03-04"
-session: 74
+version: "13.0"
+updated: "2026-03-05"
+session: 79
 ---
 
 # PublicMenu — Bug Registry
@@ -13,7 +13,23 @@ session: 74
 
 ## Active Bugs (не исправлены)
 
-*Нет активных багов.*
+### BUG-PM-023: reviewedItems.has() without null guard (P0, pre-existing)
+- **Когда:** S79 review (pre-existing from S74)
+- **Файл:** CartView.jsx, Mode 2 order render
+- **Симптом:** If `reviewedItems` prop is undefined, calling `.has()` crashes the render
+- **Фикс:** Add `safeReviewedItems` default in safe prop defaults block
+
+### BUG-PM-024: loyaltyAccount.balance without null guard (P0, pre-existing)
+- **Когда:** S79 review (pre-existing from S74)
+- **Файл:** CartView.jsx, loyalty section
+- **Симптом:** If `loyaltyAccount.balance` is undefined/null, `.toLocaleString()` crashes
+- **Фикс:** Wrap with `Number(loyaltyAccount.balance || 0)`
+
+### BUG-PM-025: draftRatings prop without null guard (P1, pre-existing)
+- **Когда:** S79 review (pre-existing from S74)
+- **Файл:** CartView.jsx, Mode 2 order render
+- **Симптом:** If `draftRatings` is undefined, accessing `draftRatings[itemId]` crashes
+- **Фикс:** Add `safeDraftRatings` default in safe prop defaults block
 
 ---
 
