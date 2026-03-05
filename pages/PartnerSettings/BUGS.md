@@ -1,7 +1,7 @@
 # PartnerSettings Bug Tracker
 
 **Page:** `pages/PartnerSettings/partnersettings.jsx`
-**Last updated:** 2026-03-01
+**Last updated:** 2026-03-05
 
 ---
 
@@ -67,6 +67,22 @@
 - **Lines:** currency rate input (h-8), custom currency input (h-8), custom currency add button (h-8), section nav tabs (~40px), copy-to-all buttons (size=sm), contact add button (size=sm), hall code save button (size=sm), wifi save button
 - **Fix:** Currency rate input h-8->h-11, custom currency input h-8->h-11, custom currency add button h-8->min-h-[44px], section nav tabs +min-h-[44px], copy-to-all buttons +min-h-[44px], contact add button +min-h-[44px], hall code save +min-h-[44px], wifi save +min-h-[44px]
 - **Commit:** Phase 1v2 CC+Codex fix (`c286a70`)
+- **Status:** FIXED
+
+---
+
+## Fixed (in RELEASE 260305-00)
+
+### BUG-PS-019 (P1) -- beforeunload handler missing e.returnValue
+- **Line:** ~1735
+- **Fix:** Added `e.returnValue = ""` for cross-browser compatibility
+- **Commit:** `f28feb3`
+- **Status:** FIXED
+
+### BUG-PS-020 (P1) -- setTimeout race in saved→idle transition
+- **Line:** ~1757
+- **Fix:** Track timer with ref, clear on subsequent saves
+- **Commit:** `f28feb3`
 - **Status:** FIXED
 
 ---

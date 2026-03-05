@@ -1,8 +1,17 @@
 # PartnerLoyalty — Bug Tracker
 
-**Last updated:** 2026-03-01
+**Last updated:** 2026-03-05
 
 ---
+
+## Fixed (in RELEASE 260305-00)
+
+| ID | Priority | Description | Commit |
+|----|----------|-------------|--------|
+| BUG-PL-014 | P1 | beforeunload handler missing e.returnValue — browser may not warn on close | `f28feb3` |
+| BUG-PL-015 | P1 | setTimeout race — saved→idle timer can overwrite newer saving/error states | `f28feb3` |
+| BUG-PL-016 | P2 | Financial confirm dialog Save button not disabled during save — double-click risk | `f28feb3` |
+| BUG-PL-017 | P2 | Unused Gift import | `f28feb3` |
 
 ## Fixed (in RELEASE 260301-00)
 
