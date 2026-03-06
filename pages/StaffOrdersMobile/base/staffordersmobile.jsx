@@ -256,8 +256,8 @@ const TYPE_THEME = {
   },
 };
 
-// FIX SO-S89-01: OrderStage.name may contain raw i18n keys like "orderprocess.default.new"
-// Map known keys to Russian display names as fallback
+// FIX SO-S89-01 (v2): OrderStage.name may contain raw i18n keys like "orderprocess.default.new"
+// Map known keys AND short names to Russian display names as fallback
 const STAGE_NAME_FALLBACKS = {
   "orderprocess.default.new": "Новый",
   "orderprocess.default.accepted": "Принят",
@@ -265,11 +265,31 @@ const STAGE_NAME_FALLBACKS = {
   "orderprocess.default.ready": "Готов",
   "orderprocess.default.served": "Выдан",
   "orderprocess.default.cancelled": "Отменён",
+  "new": "Новый",
+  "accepted": "Принят",
+  "in_progress": "Готовится",
+  "ready": "Готов",
+  "served": "Выдан",
+  "cancelled": "Отменён",
 };
 
-function getStageName(stage) {
+function getStageName(stage, t) {
   if (!stage?.name) return "—";
-  return STAGE_NAME_FALLBACKS[stage.name] || stage.name;
+  const name = stage.name;
+  // 1. Try t() if available (proper B44 i18n)
+  if (t) {
+    const translated = t(name);
+    if (translated && translated !== name) return translated;
+  }
+  // 2. Direct lookup in fallback map (exact key or short name)
+  if (STAGE_NAME_FALLBACKS[name]) return STAGE_NAME_FALLBACKS[name];
+  // 3. Extract last segment from dotted key (e.g. "orderprocess.foo.new" → "new")
+  if (name.includes('.')) {
+    const lastSegment = name.split('.').pop();
+    if (STAGE_NAME_FALLBACKS[lastSegment]) return STAGE_NAME_FALLBACKS[lastSegment];
+  }
+  // 4. Return raw name as last resort
+  return name;
 }
 
 const REQUEST_TYPE_LABELS = {
@@ -2912,9 +2932,9 @@ export default function StaffOrdersMobile() {
       const isFinishStage = stage.internal_code === 'finish' || currentIndex === relevantStages.length - 1;
       
       return {
-        label: getStageName(stage),
+        label: getStageName(stage, t),
         color: stage.color,
-        actionLabel: nextStage ? `→ ${getStageName(nextStage)}` : null,
+        actionLabel: nextStage ? `→ ${getStageName(nextStage, t)}` : null,
         nextStageId: nextStage?.id || null,
         nextStatus: null, // don't use old status
         badgeClass: '', // will use inline style with color
@@ -2927,7 +2947,7 @@ export default function StaffOrdersMobile() {
     // Priority 2: Fallback to STATUS_FLOW
     const flow = STATUS_FLOW[order.status];
     return {
-      label: flow?.label || order.status,
+      label: flow?.label || STAGE_NAME_FALLBACKS[order.status] || order.status,
       color: null,
       actionLabel: flow?.actionLabel || null,
       nextStageId: null,
