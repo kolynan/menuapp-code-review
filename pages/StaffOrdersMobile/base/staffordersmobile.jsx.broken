@@ -1,74 +1,4 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   STAFFORDERSMOBILE — v4.0.0 (2026-03-05) UX Redesign — Expand/Collapse Cards
-
-   CHANGES in v4.0.0 (UX Redesign — Expand/Collapse Cards — S77):
-   - Replaced detail view navigation with inline expand/collapse cards
-   - Collapsed card: identifier + elapsed time + channel + status + items preview + request badges
-   - Expanded card (Hall): Block A (active orders) + Block B (action) + Block C (requests)
-     + Block E (bill summary) + Block F (completed orders) + Block D (close table)
-   - Expanded card (Pickup/Delivery): Block A (full items) + Block B (action) + contacts
-   - Max 1 expanded card at a time; tap to toggle
-   - Animation: height 200ms ease-out, content opacity transition
-   - Items loaded per-order via useQueries, cached 60s
-   - Human-readable status labels, no system IDs or raw i18n keys
-   - Order number displayed as secondary gray text
-   - Request badges (bill/waiter) on collapsed hall cards
-   - Bill summary with per-guest breakdown
-   - Close table with disable reasons
-
-   CHANGES in v3.7.0 (Bug Fixes — S76):
-   - BUG-S76-01: Fixed i18n — status badge now translates OrderStage names via t()
-   - BUG-S76-02: Fixed i18n — action button text now translates OrderStage names via t()
-   - BUG-S76-03: Fixed client_name display in detail view for Pickup/Delivery orders
-
-   CHANGES in v3.6.0 (P0 Stale Data + Close Table Confirm — S74):
-   - P0: Detail view forces refetch on open (prevents stale order list)
-   - P0: Notification effect invalidates orders query when new orders detected
-   - P0: computeTableStatus reordered — NEW before STALE (new orders clear ПРОСРОЧЕН)
-   - P0: "Закрыть стол" replaced browser confirm() with React confirmation dialog
-   - Dialog: table name in title, destructive red button, 44px touch targets, mobile 320px safe
-
-   CHANGES in v3.5.0 (SESS-016 — Session Cleanup Integration):
-   - Added runSessionCleanup() import from @/components/sessionCleanupJob
-   - Added useEffect + setInterval(5min) to auto-expire stale sessions
-   - Silent background job: logs only when actions taken or errors occur
-   - Idempotent: safe to run on each mount + every 5 minutes
-
-   CHANGES in v3.4.0 (UI Bug Fixes — 4 bugs from Deep Test S66):
-   - BUG-S66-01: Detail view now opens reliably (removed translate-x animation, z-40)
-   - BUG-S66-02: PREPARING cards show CTA for advanceable orders (was hidden)
-   - BUG-S65-04: First-stage CTA opens detail view (prevents blind accept)
-   - BUG-S65-05: Fixed double "Стол" prefix (displayName + banner)
-
-   CHANGES in v3.2.0 (Sprint D — Waiter Screen V2):
-   - V2-09: BannerNotification — in-app banner overlay for new order events
-   - Fixed position at top of viewport, z-60 (above everything)
-   - Content: "Стол N: Новый заказ" with table name + event type
-   - Auto-hide after 5 seconds, swipe-up to dismiss early
-   - Tap banner → scroll to relevant table card with brief highlight
-   - De-duplication: multiple events in same cycle → "3 новых заказа"
-   - Works on all screens (Mine, Free, Others, Detail view)
-   - Non-blocking: content below remains interactive
-
-   CHANGES in v3.1.0 (Sprint B — Waiter Screen V2):
-   - V2-02: TableDetailScreen — full-screen detail view, slide-in from right
-   - V2-03: Split-tap — CTA button executes action, card body opens detail view
-   - Scroll position preserved when returning from detail view
-   - DetailOrderRow — auto-fetches items in detail view (no lazy loading needed)
-   - GuestOrderSection — per-guest action buttons (48px min, full-width)
-   - Swipe-right back navigation on TableDetailScreen
-   - liveDetailGroup: detail view auto-updates via polling
-
-   CHANGES in v3.0.0 (Sprint A — Waiter Screen V2):
-   - V2-01: Compact card layout (table name + zone, status badge, guest/order count, elapsed time, 1 CTA)
-   - V2-05: Color-coded left borders (purple/blue/amber/green/gray/red per status)
-   - V2-06: Muted Preparing cards (gray bg, 2px border, no CTA)
-   - V2-08: Guest-labeled CTA ("Accept (Guest #N)" format)
-   - V2-10: 52px min-height full-width primary CTA button
-   - Sort: Mine tab sorted BILL_REQUESTED > NEW > READY > ALL_SERVED > PREPARING (oldest first within group)
-   - Added computeTableStatus() and computeGroupCTA() helpers
-   - Added TABLE_STATUS_STYLES and TABLE_STATUS_SORT_PRIORITY mappings
-
    STAFFORDERSMOBILE — v2.7.3 (2026-02-02)
    
    CHANGES in v2.7.3 (shift filtering):
@@ -158,14 +88,13 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { useMutation, useQuery, useQueryClient, useQueries } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDown,
   ArrowUp,
   Bell,
   Briefcase,
   ChevronDown,
-  ChevronLeft,
   ChevronUp,
   Clock,
   Hand,
@@ -186,10 +115,6 @@ import {
   LogOut,
   ChevronRight,
   HelpCircle,
-  Phone,
-  MapPin,
-  DollarSign,
-  CheckCircle2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -198,10 +123,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 // D1: Import session helpers
 import { getGuestDisplayName, closeSession } from "@/components/sessionHelpers";
-// SESS-016: Import session cleanup job (auto-expire stale sessions)
-import { runSessionCleanup } from "@/components/sessionCleanupJob";
-// BUG-S76-01/02: i18n for OrderStage names
-import { useI18n } from "@/components/i18n";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CONSTANTS
@@ -256,6 +177,22 @@ const TYPE_THEME = {
   },
 };
 
+// FIX SO-S89-01: OrderStage.name may contain raw i18n keys like "orderprocess.default.new"
+// Since this page doesn't use useI18n, map known keys to Russian display names
+const STAGE_NAME_FALLBACKS = {
+  "orderprocess.default.new": "Новый",
+  "orderprocess.default.accepted": "Принят",
+  "orderprocess.default.in_progress": "Готовится",
+  "orderprocess.default.ready": "Готов",
+  "orderprocess.default.served": "Выдан",
+  "orderprocess.default.cancelled": "Отменён",
+};
+
+function getStageName(stage) {
+  if (!stage?.name) return "—";
+  return STAGE_NAME_FALLBACKS[stage.name] || stage.name;
+}
+
 const REQUEST_TYPE_LABELS = {
   call_waiter: "Позвать официанта",
   bill: "Принести счёт",
@@ -280,68 +217,6 @@ const SORT_ORDER_KEY = "menuapp_staff_sort_order";
 
 // P0: Роли с доступом к кабинету
 const CABINET_ACCESS_ROLES = ['director', 'managing_director'];
-
-// V2-05: Table-level status color/style mapping (Sprint A)
-const TABLE_STATUS_STYLES = {
-  BILL_REQUESTED: {
-    borderClass: 'border-l-4 border-l-violet-500',
-    bgClass: 'bg-violet-50',
-    badgeClass: 'bg-violet-500 text-white',
-    textClass: 'text-slate-900',
-    ctaBgClass: 'bg-violet-600 hover:bg-violet-700 text-white',
-    label: 'СЧЁТ',
-  },
-  NEW: {
-    borderClass: 'border-l-4 border-l-blue-500',
-    bgClass: 'bg-blue-50',
-    badgeClass: 'bg-blue-500 text-white',
-    textClass: 'text-slate-900',
-    ctaBgClass: 'bg-blue-600 hover:bg-blue-700 text-white',
-    label: 'НОВЫЙ',
-  },
-  READY: {
-    borderClass: 'border-l-4 border-l-amber-500',
-    bgClass: 'bg-amber-50',
-    badgeClass: 'bg-amber-500 text-white',
-    textClass: 'text-slate-900',
-    ctaBgClass: 'bg-amber-600 hover:bg-amber-700 text-white',
-    label: 'ГОТОВ',
-  },
-  ALL_SERVED: {
-    borderClass: 'border-l-4 border-l-green-500',
-    bgClass: 'bg-green-50',
-    badgeClass: 'bg-green-500 text-white',
-    textClass: 'text-slate-900',
-    ctaBgClass: 'bg-green-600 hover:bg-green-700 text-white',
-    label: 'ОБСЛУЖЕНО',
-  },
-  PREPARING: {
-    borderClass: 'border-l-2 border-l-slate-300',
-    bgClass: 'bg-slate-50',
-    badgeClass: 'bg-slate-400 text-white',
-    textClass: 'text-slate-500',
-    ctaBgClass: 'bg-slate-600 hover:bg-slate-700 text-white',
-    label: 'ГОТОВИТСЯ',
-  },
-  STALE: {
-    borderClass: 'border-l-4 border-l-red-500',
-    bgClass: 'bg-red-50',
-    badgeClass: 'bg-red-500 text-white',
-    textClass: 'text-slate-900',
-    ctaBgClass: 'bg-red-600 hover:bg-red-700 text-white',
-    label: 'ПРОСРОЧЕН',
-  },
-};
-
-// V2: Sort priority for Mine tab (0 = highest priority)
-const TABLE_STATUS_SORT_PRIORITY = {
-  BILL_REQUESTED: 0,
-  STALE: 0,
-  NEW: 1,
-  READY: 2,
-  ALL_SERVED: 3,
-  PREPARING: 4,
-};
 
 const ALL_CHANNELS = ["hall", "pickup", "delivery"];
 const ALL_ASSIGN_FILTERS = ["mine", "others", "free"];
@@ -391,6 +266,11 @@ function getLinkId(field) {
   }
 
   return null;
+}
+
+function withTablePrefix(name) {
+  if (!name) return "Стол …";
+  return String(name).startsWith("Стол ") ? String(name) : `Стол ${name}`;
 }
 
 function getAssignee(order) {
@@ -501,6 +381,15 @@ function getShiftStartTime(workingHours) {
   return new Date(now.getTime() - FALLBACK_HOURS * 60 * 60 * 1000);
 }
 
+function isOrderOverdue(order, getStatusConfig, overdueMinutes = 10) {
+  const config = getStatusConfig(order);
+  if (!config.isFirstStage) return false;
+  
+  const created = safeParseDate(order.created_date).getTime();
+  const minutesOld = (Date.now() - created) / 60000;
+  
+  return minutesOld > overdueMinutes;
+}
 
 function formatRelativeTime(dateStr) {
   const date = safeParseDate(dateStr);
@@ -709,42 +598,6 @@ function getStagesForOrder(order, stages) {
   return filtered;
 }
 
-// V2-05: Compute table-level status from group orders + service requests
-function computeTableStatus(group, activeRequests, getStatusConfig) {
-  const orders = group.orders.filter(o => o.status !== 'cancelled');
-
-  // 1. Bill request check (table groups only, highest priority)
-  if (group.type === 'table') {
-    const hasBillRequest = (activeRequests || []).some(
-      r => getLinkId(r.table) === group.id && r.request_type === 'bill'
-    );
-    if (hasBillRequest) return 'BILL_REQUESTED';
-  }
-
-  if (orders.length === 0) return 'ALL_SERVED';
-
-  // 2. Any order needs accepting (first stage)? — takes priority over STALE
-  // v3.6.0: Moved before STALE so new orders clear ПРОСРОЧЕН label
-  if (orders.some(o => getStatusConfig(o).isFirstStage)) return 'NEW';
-
-  // 3. STALE: all orders have no assignee and oldest is >3 min (Free tab signal)
-  const allFree = orders.every(o => !getLinkId(o.assignee));
-  if (allFree) {
-    const oldest = Math.min(...orders.map(o => safeParseDate(o.created_date).getTime()));
-    if (Date.now() - oldest > 3 * 60 * 1000) return 'STALE';
-  }
-
-  // 4. All orders at finish stage → waiter should close the table
-  if (orders.every(o => getStatusConfig(o).isFinishStage)) return 'ALL_SERVED';
-
-  // 5. Some orders at finish stage (food ready, needs serving)
-  if (orders.some(o => getStatusConfig(o).isFinishStage)) return 'READY';
-
-  // 6. All in middle stages (kitchen working)
-  return 'PREPARING';
-}
-
-
 /* ═══════════════════════════════════════════════════════════════════════════
    SUB-COMPONENTS
 ═══════════════════════════════════════════════════════════════════════════ */
@@ -879,7 +732,7 @@ function RequestCard({ request, tableData, onAction, isPending, isFavorite, onTo
   
   // P0-1: Normalize table link
   const reqTableId = getLinkId(request.table);
-  const tableLabel = reqTableId && tableData ? `Стол ${tableData.name}` : request.table ? "Стол …" : "—";
+  const tableLabel = reqTableId && tableData ? withTablePrefix(tableData.name) : request.table ? "Стол …" : "—";
 
   const statusLabel = request.status === "new" ? "Новый" : "В работе";
   const statusBadgeClass =
@@ -1048,7 +901,7 @@ function OrderCard({
   if (order.order_type === "hall") {
     // P0-1: Use normalized tableId
     if (tableId && tableData) {
-      mainText = `Стол ${tableData.name}`;
+      mainText = withTablePrefix(tableData.name);
       if (tableData.zone_name) secondaryText = tableData.zone_name;
     } else {
       mainText = "Стол не указан";
@@ -1057,7 +910,7 @@ function OrderCard({
         const lines = order.comment.split("\n");
         const note = lines[0].replace("Стол:", "").trim();
         if (note) {
-          mainText = `Стол ${note}`;
+          mainText = withTablePrefix(note);
           isTableMissing = false;
           displayComment = lines.slice(1).join("\n").trim() || null;
         }
@@ -1216,7 +1069,7 @@ function OrderCard({
                 size="sm"
                 onClick={(e) => {
                   e.stopPropagation(); // P0-3: prevent card toggle
-                  onCloseTable(tableSessionId, tableData?.name || 'стол');
+                  onCloseTable(tableSessionId);
                 }}
                 className="h-8 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
               >
@@ -1245,614 +1098,135 @@ function OrderCard({
   );
 }
 
-
-
-// v4.0.0: OrderGroupCard — Expand/Collapse design (replaces detail view)
-function OrderGroupCard({
-  group,
-  isExpanded,
-  onToggleExpand,
-  isHighlighted,
-  isFavorite,
-  onToggleFavorite,
-  getStatusConfig,
-  guestsMap,
-  effectiveUserId,
-  onMutate,
-  onCloseTable,
-  overdueMinutes,
-  notifiedOrderIds,
-  onClearNotified,
+// v2.7.0: OrderGroupCard component
+function OrderGroupCard({ 
+  group, 
+  isExpanded, 
+  onToggle, 
+  isFavorite, 
+  onToggleFavorite, 
+  getStatusConfig, 
+  guestsMap, 
+  effectiveUserId, 
+  onMutate, 
+  onCloseTable, 
+  notifiedOrderIds, 
+  onClearNotified, 
   tableMap,
-  activeRequests,
+  overdueMinutes,
   onCloseAllOrders,
-  onCloseRequest,
 }) {
-  const queryClient = useQueryClient();
+  const hasActive = group.orders.some(o => {
+    const config = getStatusConfig(o);
+    return !config.isFinishStage && o.status !== 'cancelled';
+  });
+  const status = hasActive ? 'occupied' : 'free';
 
-  // --- Core data ---
-  const tableId = group.type === 'table' ? group.id : null;
-  const tableData = tableId ? tableMap[tableId] : null;
-  const tableStatus = computeTableStatus(group, activeRequests, getStatusConfig);
-  const style = TABLE_STATUS_STYLES[tableStatus] || TABLE_STATUS_STYLES.PREPARING;
+  const newCount = group.orders.filter(o => getStatusConfig(o).isFirstStage).length;
+  const oldestNew = newCount > 0 
+    ? group.orders
+        .filter(o => getStatusConfig(o).isFirstStage)
+        .map(o => safeParseDate(o.created_date).getTime())
+        .reduce((min, t) => Math.min(min, t), Infinity)
+    : null;
+  const waitingMinutes = oldestNew ? Math.floor((Date.now() - oldestNew) / 1000 / 60) : null;
 
-  // Split orders into active vs completed
-  const activeOrders = useMemo(() => group.orders.filter(o => {
-    const c = getStatusConfig(o);
-    return !c.isFinishStage && o.status !== 'cancelled';
-  }), [group.orders, getStatusConfig]);
+  const overdueMinutesValue = overdueMinutes || 10;
+  const hasOverdue = group.orders.some(o => isOrderOverdue(o, getStatusConfig, overdueMinutesValue));
 
-  const completedOrders = useMemo(() => group.orders.filter(o => {
-    const c = getStatusConfig(o);
-    return c.isFinishStage && o.status !== 'cancelled';
-  }), [group.orders, getStatusConfig]);
+  const totalAmount = group.orders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
 
-  // Fetch items only when expanded (lazy load — prevents API rate limit on mount)
-  const itemResults = useQueries({
-    queries: group.orders.map(order => ({
-      queryKey: ['orderItems', order.id],
-      queryFn: () => base44.entities.OrderItem.filter({ order: order.id }),
-      staleTime: 60000,
-      retry: shouldRetry,
-      enabled: isExpanded,
-    })),
+  const allReady = group.type === 'table' && group.orders.length > 0 && group.orders.every(o => {
+    const config = getStatusConfig(o);
+    return config.isFinishStage || o.status === 'cancelled';
   });
 
-  const itemsByOrder = useMemo(() => {
-    const map = {};
-    group.orders.forEach((order, idx) => {
-      if (itemResults[idx]?.data) map[order.id] = itemResults[idx].data;
-    });
-    return map;
-  }, [group.orders, itemResults]);
-
-  // Aggregate items for preview (collapsed card)
-  const allItems = useMemo(() => {
-    const items = [];
-    group.orders.forEach(order => {
-      (itemsByOrder[order.id] || []).forEach(item => items.push(item));
-    });
-    return items;
-  }, [group.orders, itemsByOrder]);
-
-  const itemsPreview = useMemo(() => {
-    if (allItems.length === 0) return null;
-    const display = allItems.slice(0, 3).map(i => `${i.dish_name}\u00D7${i.quantity}`);
-    const rest = allItems.length - 3;
-    if (rest > 0) display.push(`+${rest}`);
-    return display.join(', ');
-  }, [allItems]);
-
-  // Elapsed time since oldest order
-  const elapsedMin = useMemo(() => {
-    if (!group.orders.length) return 0;
-    const oldest = Math.min(...group.orders.map(o => safeParseDate(o.created_date).getTime()));
-    return Math.floor((Date.now() - oldest) / 60000);
-  }, [group.orders]);
-  const elapsedLabel = elapsedMin < 60 ? `${elapsedMin} \u043C\u0438\u043D` : `${Math.floor(elapsedMin / 60)}\u0447 ${elapsedMin % 60}\u043C`;
-
-  // Overdue check
-  const isOverdue = elapsedMin > (overdueMinutes || 10) && activeOrders.some(o => getStatusConfig(o).isFirstStage);
-
-  // Requests for this table
-  const tableRequests = useMemo(() => {
-    if (group.type !== 'table' || !activeRequests) return [];
-    return activeRequests.filter(r => getLinkId(r.table) === group.id);
-  }, [group.type, group.id, activeRequests]);
-
-  // --- Display helpers ---
-
-  const channelType = group.type === 'table' ? 'hall' : group.type;
-  const channelConfig = TYPE_THEME[channelType] || TYPE_THEME.hall;
-  const ChannelIcon = channelConfig.icon;
-
-  // Row 1 identifier
-  let identifier;
-  if (group.type === 'table') {
-    identifier = tableData?.name ? `\u0421\u0442\u043E\u043B ${tableData.name}` : group.displayName;
-  } else {
-    const order = group.orders[0];
-    const prefix = group.type === 'pickup' ? '\u0421\u0412' : '\u0414\u041E\u0421';
-    identifier = `\u0417\u0430\u043A\u0430\u0437 ${prefix}-${order?.order_number || order?.id?.slice(-3) || '???'}`;
-  }
-
-  // Status label
-  const statusLabel = (() => {
-    if (group.type === 'table') return style.label;
-    const order = group.orders[0];
-    return order ? getStatusConfig(order).label : '';
-  })();
-
-  // Contacts (pickup/delivery only)
-  const contactInfo = group.type !== 'table' ? (() => {
-    const o = group.orders[0];
-    return o ? { name: o.client_name, phone: o.client_phone, address: o.delivery_address } : null;
-  })() : null;
-
-  // Request badges for collapsed card
-  const requestBadges = useMemo(() => {
-    if (!tableRequests.length) return [];
-    const badges = [];
-    const counts = { bill: 0, call_waiter: 0, other: 0 };
-    tableRequests.forEach(r => {
-      if (r.request_type === 'bill') counts.bill++;
-      else if (r.request_type === 'call_waiter') counts.call_waiter++;
-      else counts.other++;
-    });
-    if (counts.bill > 0) badges.push({ type: 'bill', count: counts.bill });
-    if (counts.call_waiter > 0) badges.push({ type: 'waiter', count: counts.call_waiter });
-    if (counts.other > 0) badges.push({ type: 'other', count: counts.other });
-    return badges;
-  }, [tableRequests]);
-
-  // NeedsAction marker
-  const needsAction = activeOrders.some(o => {
-    const c = getStatusConfig(o);
-    return c.isFirstStage || c.isFinishStage;
-  }) || tableRequests.length > 0;
-
-  // --- Expanded state ---
-
-  const [selectedOrderId, setSelectedOrderId] = useState(null);
-  const [billExpanded, setBillExpanded] = useState(false);
-  const [completedExpanded, setCompletedExpanded] = useState(false);
-
-  // Auto-select most urgent order (new > ready > cooking, oldest first)
-  const autoSelected = useMemo(() => {
-    if (!activeOrders.length) return null;
-    const sorted = [...activeOrders].sort((a, b) => {
-      const ac = getStatusConfig(a);
-      const bc = getStatusConfig(b);
-      const ap = ac.isFirstStage ? 0 : ac.isFinishStage ? 1 : 2;
-      const bp = bc.isFirstStage ? 0 : bc.isFinishStage ? 1 : 2;
-      if (ap !== bp) return ap - bp;
-      return safeParseDate(a.created_date).getTime() - safeParseDate(b.created_date).getTime();
-    });
-    return sorted[0];
-  }, [activeOrders, getStatusConfig]);
-
-  const selectedOrder = (selectedOrderId ? activeOrders.find(o => o.id === selectedOrderId) : null) || autoSelected;
-
-  // Block B: compute next action for selected order
-  const nextAction = useMemo(() => {
-    if (!selectedOrder) return null;
-    const config = getStatusConfig(selectedOrder);
-    if (!config.nextStageId && !config.nextStatus) return null;
-    let label;
-    if (config.isFirstStage) label = '\u041F\u0440\u0438\u043D\u044F\u0442\u044C';
-    else if (config.nextStatus === 'served') label = group.type === 'table' ? '\u041F\u043E\u0434\u0430\u043D\u043E' : '\u0412\u044B\u0434\u0430\u0442\u044C';
-    else label = config.actionLabel || '\u0414\u0430\u043B\u0435\u0435';
-    return { order: selectedOrder, config, label };
-  }, [selectedOrder, getStatusConfig, group.type]);
-
-  // Advance order mutation
-  const advanceMutation = useMutation({
-    mutationFn: ({ id, payload }) => base44.entities.Order.update(id, payload),
-    onMutate: async ({ id, payload }) => {
-      if (onMutate) onMutate(id, payload.status || payload.stage_id);
-      await queryClient.cancelQueries({ queryKey: ['orders'] });
-      const prev = queryClient.getQueriesData({ queryKey: ['orders'] });
-      queryClient.setQueriesData({ queryKey: ['orders'] }, old =>
-        Array.isArray(old) ? old.map(o => (o.id === id ? { ...o, ...payload } : o)) : old
-      );
-      return { prev };
-    },
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) ctx.prev.forEach(([key, data]) => queryClient.setQueryData(key, data));
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['orders'] }),
-  });
-
-  const handleAdvance = () => {
-    if (!nextAction || advanceMutation.isPending) return;
-    const { order, config } = nextAction;
-    const payload = {};
-    if (config.nextStageId) payload.stage_id = config.nextStageId;
-    else if (config.nextStatus) payload.status = config.nextStatus;
-    if (config.isFirstStage && effectiveUserId && !getAssigneeId(order)) {
-      payload.assignee = effectiveUserId;
-      payload.assigned_at = new Date().toISOString();
-    }
-    if (onClearNotified) onClearNotified(order.id);
-    advanceMutation.mutate({ id: order.id, payload });
-  };
-
-  // Bill data (Block E)
-  const billData = useMemo(() => {
-    if (group.type !== 'table') return null;
-    const guests = {};
-    let total = 0;
-    group.orders.filter(o => o.status !== 'cancelled').forEach(order => {
-      const gid = getLinkId(order.guest) || '__default';
-      if (!guests[gid]) {
-        const g = gid !== '__default' && guestsMap ? guestsMap[gid] : null;
-        guests[gid] = { name: g ? getGuestDisplayName(g) : '\u0413\u043E\u0441\u0442\u044C', total: 0 };
-      }
-      guests[gid].total += order.total_amount || 0;
-      total += order.total_amount || 0;
-    });
-    return { guests: Object.values(guests), total };
-  }, [group.orders, guestsMap, group.type]);
-
-  const hasBillRequest = tableRequests.some(r => r.request_type === 'bill');
-
-  // Block D: close table checks
-  const hasNewOrders = activeOrders.some(o => getStatusConfig(o).isFirstStage);
-  const hasCookingOrders = activeOrders.some(o => {
-    const c = getStatusConfig(o);
-    return !c.isFirstStage && !c.isFinishStage;
-  });
-  const closeDisabledReason = hasNewOrders
-    ? '\u0415\u0441\u0442\u044C \u043D\u043E\u0432\u044B\u0439 \u0437\u0430\u043A\u0430\u0437 (\u043D\u0435 \u043F\u0440\u0438\u043D\u044F\u0442)'
-    : hasCookingOrders
-      ? '\u0415\u0441\u0442\u044C \u0431\u043B\u044E\u0434\u0430 \u0432 \u0440\u0430\u0431\u043E\u0442\u0435'
-      : null;
-
-  const handleCloseTableClick = () => {
-    if (onCloseTable && group.type === 'table') {
-      const sessionId = group.orders.length > 0 ? getLinkId(group.orders[0].table_session) : null;
-      if (sessionId) { onCloseTable(sessionId, identifier); return; }
-    }
-    if (onCloseAllOrders) onCloseAllOrders(group.orders);
-  };
-
-  // Guest display name helper
-  const guestName = (order) => {
-    const gid = getLinkId(order.guest);
-    const guest = gid && guestsMap ? guestsMap[gid] : null;
-    if (guest) return getGuestDisplayName(guest);
-    if (order.client_name) return order.client_name;
-    return '\u0413\u043E\u0441\u0442\u044C';
-  };
-
-  const highlightRing = isHighlighted ? 'ring-2 ring-indigo-400 ring-offset-1' : '';
-
-  // Status transition text for Block B
-  const transitionText = useMemo(() => {
-    if (!nextAction) return '';
-    const { config } = nextAction;
-    const from = config.label || '';
-    let to = '';
-    if (config.nextStageId) {
-      to = config.actionLabel ? config.actionLabel.replace('\u2192 ', '') : '';
-    } else if (config.nextStatus) {
-      to = STATUS_FLOW[config.nextStatus]?.label || config.nextStatus || '';
-    }
-    return `${from} \u2192 ${to}`;
-  }, [nextAction]);
+  const IconComponent = group.type === 'table' ? Utensils : group.type === 'pickup' ? ShoppingBag : Truck;
 
   return (
-    <div
-      data-group-id={group.id}
-      className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-all duration-300 ${style.bgClass} ${style.borderClass} ${highlightRing}`}
-    >
-      {/* ═══ COLLAPSED HEADER — always visible, tap to toggle ═══ */}
-      <div
-        className="px-4 pt-3 pb-3 cursor-pointer active:opacity-80"
-        onClick={onToggleExpand}
-        role="button"
-        aria-expanded={isExpanded}
-        aria-label={`${identifier}: ${statusLabel}`}
+    <div className="mb-3">
+      <button
+        type="button"
+        onClick={() => onToggle(group.id)}
+        className={`w-full flex items-center justify-between p-3 rounded-t-lg border transition-all ${
+          isExpanded ? 'bg-white border-slate-300' : 'bg-white border-slate-200 rounded-lg'
+        }`}
       >
-        {/* Row 1: identifier + elapsed time */}
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <span className="font-bold text-base leading-tight flex-1 min-w-0 text-slate-900 truncate">
-            {identifier}
+        <div className="flex items-center gap-3">
+          <div className={`w-2 h-2 rounded-full ${status === 'occupied' ? 'bg-green-500' : 'bg-gray-400'}`} />
+          <IconComponent className="w-5 h-5 text-slate-600" />
+          <span className="font-bold text-slate-900">
+            {group.displayName}
           </span>
-          <span className={`text-xs font-medium shrink-0 flex items-center gap-0.5 ${isOverdue ? 'text-red-600' : 'text-slate-500'}`}>
-            <Clock className={`w-3 h-3 ${isOverdue ? 'text-red-500' : ''}`} />
-            {elapsedLabel}
-          </span>
-        </div>
-
-        {/* Row 2: channel + status + needsAction + contacts + favorite */}
-        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-          <span className="flex items-center gap-1 text-xs text-slate-500">
-            <ChannelIcon className="w-3.5 h-3.5" />
-            {channelConfig.label}
-          </span>
-          <span className="text-slate-300">{'\u00B7'}</span>
-          <span className={`text-xs font-semibold ${style.textClass || 'text-slate-700'}`}>
-            {statusLabel}
-          </span>
-          {needsAction && (
-            <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+          {hasOverdue && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-red-600 bg-red-100 px-1.5 py-0.5 rounded border border-red-200">
+              <Clock className="w-3 h-3" />
+            </span>
           )}
-          {/* Contacts for pickup/delivery */}
-          {contactInfo && (contactInfo.name || contactInfo.phone) && (
-            <React.Fragment>
-              <span className="text-xs text-slate-500 ml-auto truncate max-w-[120px]">
-                {contactInfo.name || ''}
-              </span>
-              {contactInfo.phone && (
-                <a
-                  href={`tel:${contactInfo.phone}`}
-                  onClick={e => e.stopPropagation()}
-                  className="text-xs text-blue-600 shrink-0"
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite(group.type === 'table' ? 'table' : 'order', group.id);
+            }}
+            className="p-1 -m-1"
+          >
+            <Star className={`w-4 h-4 ${isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-slate-300'}`} />
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          {!isExpanded && (
+            <span className="text-xs text-slate-500">
+              {newCount > 0 && `Новых: ${newCount}`}
+              {waitingMinutes !== null && ` · ждёт: ${waitingMinutes} мин`}
+            </span>
+          )}
+          {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="border-x border-b border-slate-300 rounded-b-lg p-2 bg-slate-50">
+          {group.orders.map(o => {
+            const tableId = getLinkId(o.table);
+            return (
+              <OrderCard
+                key={o.id}
+                order={o}
+                tableData={tableId ? tableMap[tableId] : null}
+                isFavorite={false}
+                onToggleFavorite={() => {}}
+                disableServe={false}
+                onMutate={onMutate}
+                effectiveUserId={effectiveUserId}
+                isNotified={notifiedOrderIds.has(o.id)}
+                onClearNotified={onClearNotified}
+                getStatusConfig={getStatusConfig}
+                isKitchen={false}
+                guestsMap={guestsMap}
+                onCloseTable={onCloseTable}
+              />
+            );
+          })}
+          <div className="flex items-center justify-between mt-2 pr-3">
+            <div>
+              {allReady && onCloseAllOrders && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onCloseAllOrders(group.orders)}
+                  className="h-7 text-xs text-green-600 border-green-200 hover:bg-green-50"
                 >
-                  +7{'\u2026'}{contactInfo.phone.slice(-4)}
-                </a>
+                  Закрыть стол
+                </Button>
               )}
-            </React.Fragment>
-          )}
-          {/* Favorite star */}
-          {group.type === 'table' && tableId && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onToggleFavorite('table', tableId); }}
-              className="p-1 -m-1 active:scale-90 ml-auto"
-              aria-label={isFavorite ? "\u0423\u0431\u0440\u0430\u0442\u044C \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E" : "\u0412 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435"}
-            >
-              <Star className={`w-4 h-4 ${isFavorite ? "fill-yellow-400 text-yellow-400" : "text-slate-300"}`} />
-            </button>
-          )}
-        </div>
-
-        {/* Row 3: items preview */}
-        <div className="text-sm text-slate-600 truncate">
-          {itemsPreview || (
-            itemResults.some(r => r.isLoading)
-              ? <span className="text-xs text-slate-400 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> ...</span>
-              : <span className="text-xs text-slate-400">{'\u041D\u0435\u0442 \u043F\u043E\u0437\u0438\u0446\u0438\u0439'}</span>
-          )}
-        </div>
-
-        {/* Row 4: request badges (Hall only) */}
-        {requestBadges.length > 0 && (
-          <div className="flex gap-2 mt-1.5">
-            {requestBadges.map((badge, idx) => (
-              <span key={idx} className="inline-flex items-center gap-1 text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">
-                {badge.type === 'bill' ? <Bell className="w-3 h-3" /> : badge.type === 'waiter' ? <Hand className="w-3 h-3" /> : <Bell className="w-3 h-3" />}
-                {badge.type === 'bill' ? '\u0421\u0447\u0451\u0442' : badge.type === 'waiter' ? '\u041E\u0444\u0438\u0446\u0438\u0430\u043D\u0442' : '\u0417\u0430\u043F\u0440\u043E\u0441'}
-                {badge.count > 1 && `(${badge.count})`}
-              </span>
-            ))}
+            </div>
+            <div className="text-sm font-semibold text-slate-700">
+              Итого: {totalAmount}₸
+            </div>
           </div>
-        )}
-      </div>
-
-      {/* ═══ EXPANDED CONTENT — animated show/hide ═══ */}
-      <div className={`overflow-hidden transition-all duration-200 ease-out ${isExpanded ? 'max-h-[3000px] opacity-100' : 'max-h-0 opacity-0'}`}>
-        <div className="border-t border-slate-200 px-4 py-3 space-y-4">
-
-          {/* ═══ Block A — Active Orders ═══ */}
-          {activeOrders.length > 0 && (
-            <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">{'\u0417\u0430\u043A\u0430\u0437\u044B'}</p>
-              <div className="space-y-2">
-                {activeOrders.map(order => {
-                  const config = getStatusConfig(order);
-                  const isSelected = selectedOrder?.id === order.id;
-                  const orderItems = itemsByOrder[order.id] || [];
-                  const orderTime = new Date(safeParseDate(order.created_date)).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
-                  const badgeStyle = config.color ? {
-                    backgroundColor: `${config.color}20`,
-                    borderColor: config.color,
-                    color: config.color,
-                  } : undefined;
-
-                  return (
-                    <div
-                      key={order.id}
-                      className={`p-2.5 rounded-lg border cursor-pointer transition-colors ${
-                        isSelected ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200 bg-white hover:bg-slate-50'
-                      }`}
-                      onClick={() => setSelectedOrderId(order.id)}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-slate-800">{guestName(order)}</span>
-                          <span className="text-xs text-slate-400">{orderTime}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className={`text-[9px] px-1.5 py-0 h-4 ${config.badgeClass || ''}`}
-                            style={badgeStyle}
-                          >
-                            {config.label}
-                          </Badge>
-                          {config.isFirstStage && <span className="text-red-500 text-sm font-bold">(!)</span>}
-                        </div>
-                      </div>
-                      <div className="text-sm text-slate-600">
-                        {orderItems.length > 0
-                          ? orderItems.map(i => `${i.dish_name}\u00D7${i.quantity}`).join(', ')
-                          : <span className="text-slate-400 italic">{'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430...'}</span>
-                        }
-                      </div>
-                      {/* Order number — secondary gray text */}
-                      {order.order_number && (
-                        <div className="text-[10px] text-slate-400 mt-1 text-right">{order.order_number}</div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* ═══ Block B — Action Button ═══ */}
-          {nextAction && (
-            <div>
-              <button
-                type="button"
-                onClick={handleAdvance}
-                disabled={advanceMutation.isPending}
-                className={`w-full min-h-[48px] flex items-center justify-center font-semibold text-sm rounded-lg transition-all active:scale-[0.99] disabled:opacity-60 text-white ${
-                  nextAction.config.isFirstStage ? 'bg-blue-600 hover:bg-blue-700' : 'bg-amber-600 hover:bg-amber-700'
-                }`}
-              >
-                {advanceMutation.isPending
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : nextAction.label
-                }
-              </button>
-              {transitionText && (
-                <p className="text-[11px] text-slate-400 text-center mt-1">{transitionText}</p>
-              )}
-              {advanceMutation.isPending && (
-                <p className="text-[11px] text-slate-400 text-center mt-1">{'\u0421\u043E\u0445\u0440\u0430\u043D\u044F\u0435\u043C\u2026'}</p>
-              )}
-            </div>
-          )}
-
-          {/* ═══ Block C — Guest Requests (Hall only) ═══ */}
-          {group.type === 'table' && tableRequests.length > 0 && (
-            <div>
-              <p className="text-[11px] font-bold text-violet-500 uppercase tracking-wider mb-2">{'\u0417\u0430\u043F\u0440\u043E\u0441\u044B'}</p>
-              <div className="space-y-2">
-                {tableRequests.map(req => {
-                  const age = Math.floor((Date.now() - safeParseDate(req.created_date).getTime()) / 60000);
-                  return (
-                    <div key={req.id} className="flex items-center justify-between p-2 bg-violet-50 rounded-lg border border-violet-200">
-                      <div className="flex items-center gap-2">
-                        {req.request_type === 'bill' ? <Bell className="w-4 h-4 text-violet-600" /> : <Hand className="w-4 h-4 text-violet-600" />}
-                        <span className="text-sm text-violet-800">{REQUEST_TYPE_LABELS[req.request_type] || req.request_type}</span>
-                        <span className="text-xs text-violet-400">{age} {'\u043C\u0438\u043D'}</span>
-                      </div>
-                      {onCloseRequest && (
-                        <button
-                          type="button"
-                          onClick={() => onCloseRequest(req.id, req.status)}
-                          className="text-xs text-violet-600 bg-white border border-violet-300 px-2 py-1 rounded min-h-[28px] active:scale-95"
-                        >
-                          {req.status === 'new' ? '\u0412 \u0440\u0430\u0431\u043E\u0442\u0443' : '\u0413\u043E\u0442\u043E\u0432\u043E'}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* ═══ Block E — Bill Summary (Hall only) ═══ */}
-          {group.type === 'table' && billData && billData.total > 0 && (
-            <div className={`rounded-lg border p-3 ${hasBillRequest ? 'border-violet-300 bg-violet-50' : 'border-slate-200 bg-slate-50'}`}>
-              <div
-                className="flex items-center justify-between cursor-pointer"
-                onClick={() => setBillExpanded(!billExpanded)}
-              >
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <DollarSign className="w-4 h-4 text-slate-500 shrink-0" />
-                  <span className="text-sm font-medium text-slate-700 truncate">
-                    {'\u0421\u0447\u0451\u0442: '}
-                    {billData.guests.length === 1
-                      ? `${billData.total.toLocaleString()} \u20B8`
-                      : billData.guests.slice(0, 3).map(g => `${g.name} \u2014 ${g.total.toLocaleString()} \u20B8`).join(' \u00B7 ')
-                    }
-                    {billData.guests.length > 3 && ` \u00B7 \u0415\u0449\u0451 ${billData.guests.length - 3}`}
-                  </span>
-                </div>
-                {billData.guests.length > 1 && (
-                  <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${billExpanded ? 'rotate-180' : ''}`} />
-                )}
-              </div>
-              {billExpanded && billData.guests.length > 1 && (
-                <div className="mt-2 pt-2 border-t border-slate-200 space-y-1">
-                  {billData.guests.map((g, idx) => (
-                    <div key={idx} className="flex justify-between text-sm">
-                      <span className="text-slate-600">{g.name}</span>
-                      <span className="font-medium text-slate-800">{g.total.toLocaleString()} {'\u20B8'}</span>
-                    </div>
-                  ))}
-                  <div className="flex justify-between text-sm font-bold pt-1 border-t border-slate-200">
-                    <span>{'\u0418\u0422\u041E\u0413\u041E'}</span>
-                    <span>{billData.total.toLocaleString()} {'\u20B8'}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ═══ Block F — Completed Orders (Hall only) ═══ */}
-          {group.type === 'table' && completedOrders.length > 0 && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div
-                className="flex items-center justify-between cursor-pointer"
-                onClick={() => setCompletedExpanded(!completedExpanded)}
-              >
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-green-500" />
-                  <span className="text-sm font-medium text-slate-700">
-                    {'\u0412\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043E: '}
-                    {completedOrders.length} {completedOrders.length === 1 ? '\u0437\u0430\u043A\u0430\u0437' : completedOrders.length < 5 ? '\u0437\u0430\u043A\u0430\u0437\u0430' : '\u0437\u0430\u043A\u0430\u0437\u043E\u0432'}
-                    {' \u00B7 '}{completedOrders.reduce((s, o) => s + (o.total_amount || 0), 0).toLocaleString()} {'\u20B8'}
-                  </span>
-                </div>
-                <span className="text-xs text-slate-500">{completedExpanded ? '\u0421\u043A\u0440\u044B\u0442\u044C' : '\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C'}</span>
-              </div>
-              {completedExpanded && (
-                <div className="mt-2 pt-2 border-t border-slate-200 space-y-2">
-                  {completedOrders.slice(0, 3).map(order => {
-                    const items = itemsByOrder[order.id] || [];
-                    return (
-                      <div key={order.id} className="text-sm text-slate-600">
-                        <span className="font-medium">{guestName(order)}</span>
-                        {': '}
-                        {items.length > 0
-                          ? items.map(i => `${i.dish_name}\u00D7${i.quantity}`).join(', ')
-                          : `${(order.total_amount || 0).toLocaleString()} \u20B8`
-                        }
-                      </div>
-                    );
-                  })}
-                  {completedOrders.length > 3 && (
-                    <div className="text-xs text-slate-400">{`\u0415\u0449\u0451 ${completedOrders.length - 3}`}</div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ═══ Block D — Close Table (Hall only) ═══ */}
-          {group.type === 'table' && onCloseTable && (
-            <div className="pt-2 border-t border-slate-200">
-              <button
-                type="button"
-                onClick={handleCloseTableClick}
-                disabled={!!closeDisabledReason}
-                className={`w-full min-h-[44px] flex items-center justify-center gap-2 font-medium text-sm rounded-lg border transition-all active:scale-[0.99] ${
-                  closeDisabledReason
-                    ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
-                    : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
-                }`}
-              >
-                <X className="w-4 h-4" />
-                {'\u0417\u0430\u043A\u0440\u044B\u0442\u044C \u0441\u0442\u043E\u043B'}
-              </button>
-              {closeDisabledReason && (
-                <p className="text-[10px] text-slate-400 text-center mt-1">{closeDisabledReason}</p>
-              )}
-            </div>
-          )}
-
-          {/* Pickup/Delivery: full contacts in expanded view */}
-          {group.type !== 'table' && contactInfo && (
-            <div className="space-y-2 pt-2 border-t border-slate-200">
-              {contactInfo.name && (
-                <div className="flex items-center gap-2 text-sm">
-                  <User className="w-4 h-4 text-slate-400" />
-                  <span className="text-slate-700">{contactInfo.name}</span>
-                </div>
-              )}
-              {contactInfo.phone && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="w-4 h-4 text-slate-400" />
-                  <a href={`tel:${contactInfo.phone}`} className="text-blue-600 underline">{contactInfo.phone}</a>
-                </div>
-              )}
-              {contactInfo.address && (
-                <div className="flex items-center gap-2 text-sm">
-                  <MapPin className="w-4 h-4 text-slate-400" />
-                  <span className="text-slate-600">{contactInfo.address}</span>
-                </div>
-              )}
-            </div>
-          )}
-
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -1927,7 +1301,7 @@ function MyTablesModal({ open, onClose, tables, favorites, onToggleFavorite, onC
                   <div className="flex items-center gap-3">
                     <Star className={`w-5 h-5 ${isFav ? "fill-yellow-400 text-yellow-400" : "text-slate-300"}`} />
                     <div className="text-left">
-                      <div className="font-medium text-slate-900">Стол {table.name}</div>
+                      <div className="font-medium text-slate-900">{withTablePrefix(table.name)}</div>
                       {table.zone_name && <div className="text-xs text-slate-500">{table.zone_name}</div>}
                     </div>
                   </div>
@@ -2219,123 +1593,11 @@ function SettingsPanel({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SPRINT D: V2-09 Banner Notification Component
-═══════════════════════════════════════════════════════════════════════════ */
-
-/**
- * BannerNotification — in-app overlay banner for new order events.
- * Fixed at top of viewport, z-60 (above sticky header z-20, detail view z-30, modals z-40).
- * Auto-hides after 5s. Swipe-up or tap X to dismiss. Tap body → navigate to relevant group.
- * Non-blocking: pointer-events only on the banner itself, not full-screen overlay.
- *
- * Props:
- *   banner: { id, text, groupId, count } | null
- *   onDismiss: () => void
- *   onNavigate: (groupId) => void
- */
-function BannerNotification({ banner, onDismiss, onNavigate }) {
-  const [visible, setVisible] = useState(false);
-  const [dismissing, setDismissing] = useState(false);
-  const touchStartY = useRef(null);
-  const autoHideTimer = useRef(null);
-  const dismissAnimTimer = useRef(null);
-
-  // Clear all pending timers
-  const clearTimers = useCallback(() => {
-    if (autoHideTimer.current) { clearTimeout(autoHideTimer.current); autoHideTimer.current = null; }
-    if (dismissAnimTimer.current) { clearTimeout(dismissAnimTimer.current); dismissAnimTimer.current = null; }
-  }, []);
-
-  // Animate in on mount / new banner
-  useEffect(() => {
-    if (!banner) {
-      setVisible(false);
-      setDismissing(false);
-      return;
-    }
-    setDismissing(false);
-    // Small delay to trigger CSS transition
-    const raf = requestAnimationFrame(() => setVisible(true));
-    // Auto-hide after 5s
-    autoHideTimer.current = setTimeout(() => {
-      setDismissing(true);
-      dismissAnimTimer.current = setTimeout(() => onDismiss(), 300);
-    }, 5000);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimers();
-    };
-  }, [banner?.id]);
-
-  const handleDismiss = useCallback(() => {
-    clearTimers();
-    setDismissing(true);
-    dismissAnimTimer.current = setTimeout(() => onDismiss(), 300);
-  }, [onDismiss, clearTimers]);
-
-  const handleTap = useCallback(() => {
-    clearTimers();
-    if (banner?.groupId) {
-      onNavigate(banner.groupId);
-    }
-    setDismissing(true);
-    dismissAnimTimer.current = setTimeout(() => onDismiss(), 200);
-  }, [banner, onNavigate, onDismiss, clearTimers]);
-
-  const handleTouchStart = useCallback((e) => {
-    touchStartY.current = e.touches[0].clientY;
-  }, []);
-
-  const handleTouchEnd = useCallback((e) => {
-    if (touchStartY.current === null) return;
-    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
-    touchStartY.current = null;
-    // Swipe up to dismiss (threshold: 30px)
-    if (deltaY < -30) handleDismiss();
-  }, [handleDismiss]);
-
-  if (!banner) return null;
-
-  const translateClass = visible && !dismissing
-    ? 'translate-y-0 opacity-100'
-    : '-translate-y-full opacity-0';
-
-  return (
-    <div
-      className={`fixed top-0 left-0 right-0 z-[60] flex justify-center px-3 pt-2 transition-all duration-300 ease-out ${translateClass}`}
-      style={{ pointerEvents: 'none' }}
-    >
-      <div
-        className="w-full max-w-md bg-indigo-600 text-white rounded-xl shadow-lg px-4 py-3 flex items-center gap-3"
-        style={{ pointerEvents: 'auto' }}
-        onClick={handleTap}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        role="alert"
-        aria-live="assertive"
-      >
-        <Bell className="w-5 h-5 shrink-0" />
-        <span className="flex-1 text-sm font-medium leading-tight">{banner.text}</span>
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); handleDismiss(); }}
-          className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-white/20 active:bg-white/30"
-          aria-label="Закрыть"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════════════════════════════════════ */
 
 export default function StaffOrdersMobile() {
   const queryClient = useQueryClient();
-  const { t } = useI18n(); // BUG-S76-01/02: translate stage names
 
   const [urlParams] = useState(() => new URLSearchParams(window.location.search));
   const token = urlParams.get("token");
@@ -2403,13 +1665,6 @@ export default function StaffOrdersMobile() {
   
   const [notifiedOrderIds, setNotifiedOrderIds] = useState(() => new Set());
 
-  // V2-09: Sprint D — Banner notification state
-  const [bannerData, setBannerData] = useState(null);
-  const bannerIdCounter = useRef(0);
-
-  // v3.6.0: Close table confirmation dialog state
-  const [closeTableConfirm, setCloseTableConfirm] = useState(null); // { sessionId, tableName } | null
-
   const updateNotifPrefs = (patch) => {
     setNotifPrefs((prev) => {
       const next = { ...prev, ...patch };
@@ -2435,23 +1690,6 @@ export default function StaffOrdersMobile() {
     };
     window.addEventListener("pointerdown", h, { passive: true });
     return () => window.removeEventListener("pointerdown", h);
-  }, []);
-
-  // SESS-016: Auto-expire stale sessions (runs every 5 min while page is open)
-  useEffect(() => {
-    const cleanup = async () => {
-      try {
-        const result = await runSessionCleanup({ dryRun: false });
-        if (result.expired > 0 || result.skipped_stale > 0 || result.errors.length > 0) {
-          console.log('[SessionCleanup]', result);
-        }
-      } catch (err) {
-        console.log('[SessionCleanup] error:', err.message);
-      }
-    };
-    cleanup();
-    const interval = setInterval(cleanup, 5 * 60 * 1000);
-    return () => clearInterval(interval);
   }, []);
 
   const ownMutationRef = useRef(null);
@@ -2512,13 +1750,10 @@ export default function StaffOrdersMobile() {
 
   // v2.7.0: Expanded groups state
   const [expandedGroups, setExpandedGroups] = useState(new Set());
-
+  
   // v2.7.1: Tabs and favorites filter state
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'completed'
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
-
-  // v4.0.0: Expand/collapse — max 1 expanded card at a time
-  const [expandedGroupId, setExpandedGroupId] = useState(null);
 
   useEffect(() => {
     if (favoritesInitializedRef.current) return;
@@ -2896,9 +2131,9 @@ export default function StaffOrdersMobile() {
       const isFinishStage = stage.internal_code === 'finish' || currentIndex === relevantStages.length - 1;
       
       return {
-        label: t(stage.name) || stage.name,
+        label: getStageName(stage),
         color: stage.color,
-        actionLabel: nextStage ? `→ ${t(nextStage.name) || nextStage.name}` : null,
+        actionLabel: nextStage ? `→ ${getStageName(nextStage)}` : null,
         nextStageId: nextStage?.id || null,
         nextStatus: null, // don't use old status
         badgeClass: '', // will use inline style with color
@@ -2921,7 +2156,7 @@ export default function StaffOrdersMobile() {
       isFirstStage: order.status === 'new',
       isFinishStage: order.status === 'ready' || order.status === 'served',
     };
-  }, [stagesMap, sortedStages, t]);
+  }, [stagesMap, sortedStages]);
 
   const effectivePollingInterval = rateLimitHit ? false : (pollingInterval === 0 ? false : pollingInterval);
 
@@ -3006,13 +2241,10 @@ export default function StaffOrdersMobile() {
     const shiftCutoff = shiftStartTime.getTime();
     
     return orders.filter((o) => {
-      // P0-3: For hall orders, require table_session (filter out legacy/orphan orders)
-      if (o.order_type === 'hall' && !getLinkId(o.table_session)) return false;
-
       // SHIFT FILTER: only orders created after shift start
       const createdAt = safeParseDate(o.created_date).getTime();
       if (createdAt < shiftCutoff) return false;
-
+      
       // Existing status filter (unchanged)
       const stageId = getLinkId(o.stage_id);
       if (stageId && stagesMap[stageId]) {
@@ -3190,7 +2422,7 @@ export default function StaffOrdersMobile() {
           tableGroups[tableId] = {
             type: 'table',
             id: tableId,
-            displayName: tableName,
+            displayName: withTablePrefix(tableName),
             orders: [],
           };
           groups.push(tableGroups[tableId]);
@@ -3298,31 +2530,15 @@ export default function StaffOrdersMobile() {
     );
   }, [activeRequests, showOnlyFavorites, favorites]);
 
-  // V2: Sort groups by table status priority (Mine tab sort order spec)
-  const v2SortedGroups = useMemo(() => {
-    if (!finalGroups.length) return finalGroups;
-    return [...finalGroups].sort((a, b) => {
-      const statusA = computeTableStatus(a, activeRequests, getStatusConfig);
-      const statusB = computeTableStatus(b, activeRequests, getStatusConfig);
-      const pa = TABLE_STATUS_SORT_PRIORITY[statusA] ?? 5;
-      const pb = TABLE_STATUS_SORT_PRIORITY[statusB] ?? 5;
-      if (pa !== pb) return pa - pb;
-      // Within same status group: oldest order first
-      const ta = Math.min(...a.orders.map(o => safeParseDate(o.created_date).getTime()));
-      const tb = Math.min(...b.orders.map(o => safeParseDate(o.created_date).getTime()));
-      return ta - tb;
-    });
-  }, [finalGroups, activeRequests, getStatusConfig]);
-
   // v2.7.0: Removed favoriteOrders/otherOrders (replaced by orderGroups)
 
   const prevDigestRef = useRef(null);
   const prevStatusMapRef = useRef({});
 
-  const pushNotify = (title, newOrderIds = [], bannerInfo = null) => {
+  const pushNotify = (title, newOrderIds = []) => {
     if (!notifPrefs?.enabled) return;
     setNotifDot(true);
-
+    
     if (newOrderIds.length > 0) {
       setNotifiedOrderIds((prev) => {
         const next = new Set(prev);
@@ -3330,23 +2546,12 @@ export default function StaffOrdersMobile() {
         return next;
       });
     }
-
+    
     if (notifPrefs.sound && audioUnlockedRef.current && audioRef.current?.play) {
       try { audioRef.current.play(); } catch { /* ignore */ }
     }
     tryVibrate(notifPrefs.vibrate);
-    // V2-09: Show banner instead of toast for richer notification
-    if (bannerInfo) {
-      bannerIdCounter.current += 1;
-      setBannerData({
-        id: bannerIdCounter.current,
-        text: bannerInfo.text || title,
-        groupId: bannerInfo.groupId || null,
-        count: bannerInfo.count || 1,
-      });
-    } else {
-      showToast(title);
-    }
+    showToast(title);
     if (notifPrefs.system && canUseNotifications() && Notification.permission === "granted") {
       try { new Notification(title); } catch { /* ignore */ }
     }
@@ -3406,73 +2611,30 @@ export default function StaffOrdersMobile() {
 
     let becameReady = 0;
     const newOrderIds = [];
-    const readyOrderIds = [];
-
+    
     eligibleOrders.forEach((o) => {
       if (ownRecent && own.orderId === o.id) return;
       const pst = prevMap[o.id];
-      if (!pst) {
+      if (!pst) { 
         newOrderIds.push(o.id);
-        return;
+        return; 
       }
       // Check if became ready (either by status or by stage) - P0-1: use normalized ids
       const pstStageId = pst.stage_id; // already normalized in prevMap
       const currStageId = getLinkId(o.stage_id);
       const wasReady = pst.status === 'ready' || (pstStageId && stagesMap[pstStageId]?.internal_code === 'finish');
       const isReady = o.status === 'ready' || (currStageId && stagesMap[currStageId]?.internal_code === 'finish');
-      if (!wasReady && isReady) { becameReady++; readyOrderIds.push(o.id); }
+      if (!wasReady && isReady) becameReady++;
     });
 
-    // V2-09: Build banner info with table context
-    const buildBannerInfo = (orderIds, eventType) => {
-      if (!orderIds.length) return null;
-      // Find which table(s) these orders belong to
-      const orderMap = {};
-      eligibleOrders.forEach(o => { orderMap[o.id] = o; });
-      const tableIds = new Set();
-      orderIds.forEach(id => {
-        const o = orderMap[id];
-        if (o) {
-          const tId = getLinkId(o.table);
-          if (tId) tableIds.add(tId);
-        }
-      });
-      const tableNames = [...tableIds].map(tId => {
-        const t = tableMap[tId];
-        return t?.name ? `${t.name}` : null;
-      }).filter(Boolean);
-
-      // Single table: "Стол 5: Новый заказ"
-      if (tableNames.length === 1 && orderIds.length === 1) {
-        const label = eventType === 'ready' ? 'Заказ готов' : 'Новый заказ';
-        return {
-          text: `${tableNames[0]}: ${label}`,
-          groupId: [...tableIds][0],
-          count: 1,
-        };
-      }
-      // Multiple: "3 новых заказа" or "2 заказа готовы"
-      const count = orderIds.length;
-      if (eventType === 'ready') {
-        const word = count === 1 ? 'заказ готов' : count < 5 ? 'заказа готовы' : 'заказов готовы';
-        return { text: `${count} ${word}`, groupId: tableIds.size === 1 ? [...tableIds][0] : null, count };
-      }
-      const word = count === 1 ? 'новый заказ' : count < 5 ? 'новых заказа' : 'новых заказов';
-      return { text: `${count} ${word}`, groupId: tableIds.size === 1 ? [...tableIds][0] : null, count };
-    };
-
-    if (becameReady > 0) {
-      const banner = buildBannerInfo(readyOrderIds, 'ready');
-      pushNotify(`Готово: +${becameReady}`, [], banner);
-      return;
+    if (becameReady > 0) { 
+      pushNotify(`Готово: +${becameReady}`); 
+      return; 
     }
-    if (newOrderIds.length > 0) {
-      const banner = buildBannerInfo(newOrderIds, 'new');
-      pushNotify(`Новые: +${newOrderIds.length}`, newOrderIds, banner);
-      // v3.6.0: Force refetch to ensure detail view gets fresh data immediately
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    if (newOrderIds.length > 0) { 
+      pushNotify(`Новые: +${newOrderIds.length}`, newOrderIds); 
     }
-  }, [roleFilteredOrders, assignFilters, selectedTypes, canFetch, notifPrefs, effectiveUserId, stagesMap, tableMap, queryClient]);
+  }, [roleFilteredOrders, assignFilters, selectedTypes, canFetch, notifPrefs, effectiveUserId, stagesMap]);
 
   const toggleChannel = (type) => {
     const on = selectedTypes.includes(type);
@@ -3500,42 +2662,6 @@ export default function StaffOrdersMobile() {
     setAssignFilters((p) => (p.includes(key) ? p.filter((x) => x !== key) : [...p, key]));
   };
 
-  // v4.0.0: Toggle expand/collapse — max 1 card expanded
-  const handleToggleExpand = useCallback((groupId) => {
-    setExpandedGroupId(prev => prev === groupId ? null : groupId);
-  }, []);
-
-  // V2-09: Sprint D — Highlight state for banner-navigate
-  const [highlightGroupId, setHighlightGroupId] = useState(null);
-  const highlightTimerRef = useRef(null);
-
-  // v4.0.0: Banner tap → expand card + scroll to it + highlight briefly
-  const handleBannerNavigate = useCallback((groupId) => {
-    if (!groupId) return;
-    setExpandedGroupId(groupId);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const el = document.querySelector(`[data-group-id="${CSS.escape(String(groupId))}"]`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          setHighlightGroupId(groupId);
-          if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
-          highlightTimerRef.current = setTimeout(() => setHighlightGroupId(null), 1500);
-        }
-      });
-    });
-  }, []);
-
-  // Cleanup highlight timer
-  useEffect(() => () => {
-    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
-  }, []);
-
-  // V2-09: Banner dismiss handler
-  const handleBannerDismiss = useCallback(() => {
-    setBannerData(null);
-  }, []);
-
   const handleRefresh = () => {
     setManualRefreshTs(Date.now());
     refetchOrders();
@@ -3543,24 +2669,18 @@ export default function StaffOrdersMobile() {
   };
 
   // D1-007, D1-008, D1-009: Close table handler
-  // v3.6.0: Shows confirmation dialog instead of browser confirm()
-  const handleCloseTable = (tableSessionField, tableName) => {
+  const handleCloseTable = async (tableSessionField) => {
     const sessionId = getLinkId(tableSessionField);
     if (!sessionId) return;
-    setCloseTableConfirm({ sessionId, tableName: tableName || 'стол' });
-  };
-
-  // v3.6.0: Confirmation dialog — executes close after user confirms
-  const confirmCloseTable = async () => {
-    if (!closeTableConfirm) return;
-    const { sessionId } = closeTableConfirm;
-    setCloseTableConfirm(null);
+    
+    if (!confirm("Закрыть стол? Сессия будет завершена.")) return;
+    
     try {
       await closeSession(sessionId);
       showToast("Стол закрыт");
-      setExpandedGroupId(null); // Collapse expanded card — table no longer active
       refetchOrders();
     } catch (err) {
+      console.error("Error closing table:", err);
       showToast("Ошибка при закрытии");
     }
   };
@@ -3780,7 +2900,7 @@ export default function StaffOrdersMobile() {
           </div>
         )}
 
-        {(isKitchen ? visibleOrders.length === 0 : (v2SortedGroups.length === 0 && finalRequests.length === 0)) && !hasErrors ? (
+        {(isKitchen ? visibleOrders.length === 0 : (finalGroups.length === 0 && finalRequests.length === 0)) && !hasErrors ? (
           <div className="text-center py-10 text-slate-400">
             <div className="mb-2">
               {isKitchen 
@@ -3796,7 +2916,7 @@ export default function StaffOrdersMobile() {
           </div>
         ) : (
           <React.Fragment>
-            {(isKitchen ? visibleOrders.length > 0 : v2SortedGroups.length > 0) && (
+            {(isKitchen ? visibleOrders.length > 0 : finalGroups.length > 0) && (
               <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                 <UtensilsCrossed className="w-3 h-3" /> ЗАКАЗЫ
               </h2>
@@ -3826,13 +2946,12 @@ export default function StaffOrdersMobile() {
                 );
               })
             ) : (
-              v2SortedGroups.map(group => (
+              finalGroups.map(group => (
                 <OrderGroupCard
                   key={group.id}
                   group={group}
-                  isExpanded={expandedGroupId === group.id}
-                  onToggleExpand={() => handleToggleExpand(group.id)}
-                  isHighlighted={highlightGroupId === group.id}
+                  isExpanded={expandedGroups.has(group.id)}
+                  onToggle={toggleGroupExpand}
                   isFavorite={isFavorite(group.type === 'table' ? 'table' : 'order', group.id)}
                   onToggleFavorite={toggleFavorite}
                   getStatusConfig={getStatusConfig}
@@ -3840,13 +2959,11 @@ export default function StaffOrdersMobile() {
                   effectiveUserId={effectiveUserId}
                   onMutate={trackOwnMutation}
                   onCloseTable={canCloseTable ? handleCloseTable : null}
-                  overdueMinutes={partnerData?.order_overdue_minutes}
                   notifiedOrderIds={notifiedOrderIds}
                   onClearNotified={clearNotified}
                   tableMap={tableMap}
+                  overdueMinutes={partnerData?.order_overdue_minutes || 10}
                   onCloseAllOrders={handleCloseAllOrders}
-                  activeRequests={activeRequests}
-                  onCloseRequest={(reqId, status) => updateRequestMutation.mutate({ id: reqId, status: status === 'new' ? 'in_progress' : 'done' })}
                 />
               ))
             )}
@@ -3855,13 +2972,13 @@ export default function StaffOrdersMobile() {
       </div>
 
       {/* Modals */}
-      <MyTablesModal
-        open={myTablesOpen}
-        onClose={() => setMyTablesOpen(false)}
-        tables={tables || []}
-        favorites={favorites}
-        onToggleFavorite={toggleFavorite}
-        onClearAll={clearAllFavorites}
+      <MyTablesModal 
+        open={myTablesOpen} 
+        onClose={() => setMyTablesOpen(false)} 
+        tables={tables || []} 
+        favorites={favorites} 
+        onToggleFavorite={toggleFavorite} 
+        onClearAll={clearAllFavorites} 
       />
       
       <ProfileSheet
@@ -3932,48 +3049,11 @@ export default function StaffOrdersMobile() {
         </div>
       )}
 
-      {/* v3.6.0: Close table confirmation dialog */}
-      {closeTableConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
-            <h3 className="text-lg font-bold text-slate-900 mb-2">
-              {`Закрыть ${closeTableConfirm.tableName}?`}
-            </h3>
-            <p className="text-sm text-slate-600 mb-6">
-              Гости больше не смогут отправлять заказы.
-            </p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setCloseTableConfirm(null)}
-                className="flex-1 min-h-[44px] rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 active:scale-[0.98]"
-              >
-                Отмена
-              </button>
-              <button
-                type="button"
-                onClick={confirmCloseTable}
-                className="flex-1 min-h-[44px] rounded-lg bg-red-600 text-white text-sm font-semibold active:scale-[0.98]"
-              >
-                Закрыть
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {toastMsg && (
         <div className="fixed left-0 right-0 bottom-6 z-50 flex justify-center px-4 pointer-events-none">
           <div className="bg-slate-900 text-white text-sm px-4 py-2 rounded-full shadow-lg">{toastMsg}</div>
         </div>
       )}
-
-      {/* V2-09: Sprint D — Banner notification overlay */}
-      <BannerNotification
-        banner={bannerData}
-        onDismiss={handleBannerDismiss}
-        onNavigate={handleBannerNavigate}
-      />
     </div>
   );
 }
