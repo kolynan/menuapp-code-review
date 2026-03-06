@@ -121,10 +121,11 @@
 ### BUG-SO-S89-01 (P1) -- Raw i18n key `orderprocess.default.new` in status badge — REGRESSION
 - **Function:** getStatusConfig / getStageName
 - **Root cause:** OrderStage entity stores i18n keys (like `orderprocess.default.new`) in the `name` field instead of display names. `getStatusConfig` returned `stage.name` directly as label, showing raw keys.
-- **Fix:** Added `STAGE_NAME_FALLBACKS` map + `getStageName()` helper. Known i18n keys are mapped to Russian display names ("Новый", "Принят", etc.). Applied to both `label` and `actionLabel` in getStatusConfig.
-- **Commit:** `a3727f4` (original S89), `03bab9e` (re-applied on restored base S90)
-- **RELEASE:** `260306-04 StaffOrdersMobile RELEASE.jsx` (260306-01 and 260306-03 were truncated/defective)
-- **Status:** FIXED
+- **Fix v1 (S89-S90):** Added `STAGE_NAME_FALLBACKS` map + `getStageName()` helper. Deployed as 260306-04 but bug persisted.
+- **Fix v2 (S91):** Made `getStageName` more robust: (1) tries `t()` first for proper B44 i18n, (2) added short name mappings ("new" → "Новый"), (3) added dotted-key last-segment extraction, (4) added fallback protection to STATUS_FLOW path too.
+- **Commit:** `a3727f4` (v1 S89), `03bab9e` (v1 restored S90), `8be58c6` (v2 S91)
+- **RELEASE:** `260306-05 StaffOrdersMobile RELEASE.jsx`
+- **Status:** FIXED (v2)
 
 ## Active Bugs
 

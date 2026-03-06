@@ -22,11 +22,17 @@
 
 ---
 
+## Fixed (in RELEASE 260306-03)
+
+| ID | Priority | Description | Commit |
+|----|----------|-------------|--------|
+| BUG-PC-S89-01 | P2 | "1 Баллы" — wrong Russian declension in client detail balance. v1 (260306-02) added pluralPoints() with t() but bug persisted (B44 translations may have all forms set to "Баллы"). v2 uses hardcoded Russian directly — guaranteed correct. | `336dea5` |
+
 ## Fixed (in RELEASE 260306-02)
 
 | ID | Priority | Description | Commit |
 |----|----------|-------------|--------|
-| BUG-PC-S89-01 | P2 | "1 Баллы" — wrong Russian declension in client detail balance. Added pluralPoints() for correct pluralization (1→Балл, 2-4→Балла, 5+→Баллов) | `a2acbd4` |
+| BUG-PC-S89-01-v1 | P2 | First attempt at pluralPoints() with t()-based translation. Deployed but didn't work — t() returned wrong translations. | `a2acbd4` |
 
 ## Active
 
