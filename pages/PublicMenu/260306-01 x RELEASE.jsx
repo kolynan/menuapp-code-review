@@ -10,19 +10,6 @@
 // FIXED: 2026-03-03 - GAP-01 fix - Confirmation as full-screen overlay (z-60)
 // FIXED: 2026-03-03 - GAP-02 fix - Embed OrderStatusScreen inside x.jsx (no /orderstatus route)
 // FIXED: 2026-03-03 - GAP-02 fix - Remove auto-dismiss timer (race condition: ghost click on menu)
-// PATCHED: 2026-03-04 - Cart Drawer v2: two-mode design (Заказ/Чеки), toast after submit
-// FIXED: 2026-03-05 - BUG-S76-04: Replace persistent "invalid code" banner with auto-dismissing toast
-// PATCHED: 2026-03-05 - S79: Add restaurant logo (40px circle avatar) to menu and order status headers
-// PATCHED: 2026-03-05 - S79: Add "Closed" banner when partner.is_open === false
-// PATCHED: 2026-03-05 - S79: Drawer UX refactor — sticky header, detents, compact table code, 2-line items
-// FIXED: 2026-03-05 - S82 BUG-S81-01: setActiveSnapPoint(null) now closes drawer (swipe-to-close)
-// FIXED: 2026-03-05 - S82 BUG-S81-03: drawer auto-expands to full when cart has items (CTA visible)
-// FIXED: 2026-03-05 - S82 BUG-S81-17: Hall order toast extended 2s->4s + error toast visible in drawer
-// FIXED: 2026-03-05 - S82 BUG-S81-14: Pickup/Delivery checkout replaced fullscreen->drawer
-// NOTE: S82 BUG-S81-02 fix (tableCodeLength 5->4) is in CartView component
-// FIXED: 2026-03-06 - S84 BUG-S81-07: suppress partner.name in PublicMenuHeader when logo block shows it
-// FIXED: 2026-03-06 - S84 BUG-S81-03: add overflow-y-auto scroll container in drawer (sticky CTA fix)
-// FIXED: 2026-03-06 - S84 BUG-S81-01: custom drag handle with touch events for reliable swipe-to-close
 // ======================================================
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -131,13 +118,11 @@ import { useTableSession } from "@/components/publicMenu/refactor/hooks/useTable
 // CONSTANTS & HELPERS
 // ============================================================
 
-const IS_ARCHIVED_TAG = ":::archived:::";
-
 const isDishArchived = (dish) =>
-  !!dish?.description && dish.description.includes(IS_ARCHIVED_TAG);
+  !!dish?.description && dish.description.toLowerCase().includes(":::archived:::");
 
 const getCleanDescription = (desc) =>
-  desc ? desc.replace(IS_ARCHIVED_TAG, "").trim() : "";
+  desc ? desc.replace(/:::archived:::/gi, "").trim() : "";
 
 const looksLikePartnerId = (value) =>
   /^[0-9a-f]{24}$/i.test(String(value || "").trim());
@@ -401,7 +386,7 @@ function OrderConfirmationScreen({
   onTrackOrder,
   t,
 }) {
-  // Safe translation with fallback (same pattern as CartView)
+  // Safe translation with fallback
   const tr = (key, fallback) => {
     const val = typeof t === "function" ? t(key) : "";
     if (!val || typeof val !== "string") return fallback;
@@ -409,6 +394,7 @@ function OrderConfirmationScreen({
     if (norm === key || norm.startsWith(key + ":")) return fallback;
     return norm;
   };
+
   return (
     <div className="fixed inset-0 z-[60] bg-white overflow-y-auto">
     <div className="px-4 py-8 max-w-md mx-auto animate-[fadeInUp_0.3s_ease-out]">
@@ -472,23 +458,16 @@ function OrderConfirmationScreen({
         </div>
       </div>
 
-      {/* Title — FIX-S74-01: "Отправлен", not "Принят" (order is not yet accepted by waiter) */}
-      <h2 className="text-xl font-semibold text-center text-slate-800 mb-1">
-        {orderMode === "hall"
-          ? tr("confirmation.sent_to_waiter", "Заказ отправлен официанту")
-          : tr("confirmation.order_sent", "Заказ отправлен")}
+      {/* Title */}
+      <h2 className="text-xl font-semibold text-center text-slate-800 mb-6">
+        {tr("confirmation.title", "Заказ отправлен!")}
       </h2>
-      <p className="text-sm text-center text-slate-500 mb-6">
-        {orderMode === "hall"
-          ? tr("confirmation.status_hint_hall", "Статус обновится, когда официант примет заказ")
-          : tr("confirmation.status_hint", "Мы начнём готовить ваш заказ")}
-      </p>
 
       {/* Order summary card */}
       <Card className="mb-6">
         <CardContent className="p-4">
           <p className="text-sm font-medium text-slate-600 mb-3">
-            {t("confirmation.your_order")}
+            {tr("confirmation.your_order", "Ваш заказ")}
           </p>
 
           {/* Items list */}
@@ -513,7 +492,7 @@ function OrderConfirmationScreen({
           <div className="border-t border-slate-200 pt-3 mt-3">
             <div className="flex justify-between items-center">
               <span className="font-medium text-slate-800">
-                {t("confirmation.total")}
+                {tr("confirmation.total", "Итого")}
               </span>
               <span className="font-semibold text-slate-800 tabular-nums">
                 {formatPrice(totalAmount)}
@@ -524,14 +503,14 @@ function OrderConfirmationScreen({
           {/* Guest label */}
           {guestLabel && (
             <p className="text-sm text-slate-500 mt-3">
-              {t("confirmation.guest_label")}: {guestLabel}
+              {tr("confirmation.guest_label", "Гость")}: {guestLabel}
             </p>
           )}
 
           {/* Client name (pickup/delivery) */}
           {clientName && orderMode !== "hall" && (
             <p className="text-sm text-slate-500 mt-1">
-              {t("confirmation.client_name")}: {clientName}
+              {tr("confirmation.client_name", "Имя")}: {clientName}
             </p>
           )}
         </CardContent>
@@ -543,7 +522,7 @@ function OrderConfirmationScreen({
           className="w-full h-12"
           onClick={onBackToMenu}
         >
-          {t("confirmation.back_to_menu")}
+          {tr("confirmation.back_to_menu", "Вернуться в меню")}
         </Button>
 
         <Button
@@ -551,7 +530,7 @@ function OrderConfirmationScreen({
           className="w-full h-12"
           onClick={onOpenOrders}
         >
-          {t("confirmation.my_orders")}
+          {tr("confirmation.my_orders", "Мои заказы")}
         </Button>
 
         {/* Track order — pickup/delivery only (GAP-02: navigate to embedded status view) */}
@@ -563,7 +542,7 @@ function OrderConfirmationScreen({
               onTrackOrder(publicToken);
             }}
           >
-            {t("confirmation.track_order")}
+            {tr("confirmation.track_order", "Отследить заказ")}
           </Button>
         )}
       </div>
@@ -677,7 +656,6 @@ function OSStatusProgress({ currentStatus, t }) {
 function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }) {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [secondsAgo, setSecondsAgo] = useState(0);
-  const [osLogoError, setOsLogoError] = useState(false);
 
   const {
     data: orderData,
@@ -872,14 +850,8 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
 
         {/* Restaurant header */}
         <div className="flex items-center gap-3 mb-6">
-          {partner?.logo && !osLogoError && (
-            <img
-              src={partner.logo}
-              alt={partner?.name ? `${partner.name} logo` : ""}
-              referrerPolicy="no-referrer"
-              className="w-10 h-10 rounded-full object-cover bg-gray-100 border border-gray-200 shrink-0"
-              onError={() => setOsLogoError(true)}
-            />
+          {partner?.logo && (
+            <img src={partner.logo} alt="" referrerPolicy="no-referrer" className="w-10 h-10 rounded-lg object-cover" />
           )}
           {partner?.name && (
             <h1 className="text-base font-semibold text-slate-800">{partner.name}</h1>
@@ -988,170 +960,6 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
 }
 
 /* ============================================================
-   S82 BUG-S81-14: PICKUP/DELIVERY CHECKOUT DRAWER CONTENT
-   Replaces fullscreen CheckoutView for pickup and delivery modes.
-   Same form fields, rendered inside a bottom drawer.
-   i18n keys: form.name, form.required, form.phone, form.phone_placeholder,
-              form.address, form.comment, form.comment_placeholder,
-              cart.your_order, cart.total, cart.send_order, cart.submitting
-   ============================================================ */
-
-function PickupDeliveryCheckoutContent({
-  orderMode,
-  cart,
-  formatPrice,
-  finalTotal,
-  clientName, setClientName,
-  clientPhone, handlePhoneChange, handlePhoneFocus,
-  deliveryAddress, setDeliveryAddress,
-  comment, setComment,
-  errors,
-  submitError,
-  isSubmitting,
-  handleSubmitOrder,
-  onClose,
-  t,
-}) {
-  const isSubmitDisabled =
-    isSubmitting ||
-    !clientName.trim() ||
-    !clientPhone.trim() ||
-    (orderMode === 'delivery' && !deliveryAddress.trim());
-
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Sticky header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100 shrink-0">
-        <button
-          className="flex items-center justify-center min-h-[44px] min-w-[44px] text-slate-500 hover:text-slate-700"
-          onClick={onClose}
-          aria-label={t('cart.back_to_menu')}
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <span className="font-semibold text-slate-800">{t('cart.your_order')}</span>
-      </div>
-
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {/* Order items summary */}
-        {cart.length > 0 && (
-          <div className="space-y-2 pb-4 border-b border-slate-100">
-            {cart.map((item) => (
-              <div key={item.dishId} className="flex justify-between items-center text-sm">
-                <span className="text-slate-700">
-                  {item.name}{' '}
-                  <span className="text-slate-400">x{item.quantity}</span>
-                </span>
-                <span className="font-medium text-slate-700 tabular-nums">
-                  {formatPrice(item.price * item.quantity)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Form fields */}
-        <div className="space-y-3">
-          {/* Name */}
-          <div data-field="clientName">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              {t('form.name')} <span className="text-red-500">{t('form.required')}</span>
-            </label>
-            <Input
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              placeholder={t('form.name')}
-              className={errors.clientName ? 'border-red-300' : ''}
-            />
-            {errors.clientName && (
-              <p className="text-xs text-red-500 mt-1">{errors.clientName}</p>
-            )}
-          </div>
-
-          {/* Phone */}
-          <div data-field="clientPhone">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              {t('form.phone')} <span className="text-red-500">{t('form.required')}</span>
-            </label>
-            <Input
-              type="tel"
-              inputMode="tel"
-              value={clientPhone}
-              onChange={handlePhoneChange}
-              onFocus={handlePhoneFocus}
-              placeholder={t('form.phone_placeholder')}
-              className={errors.clientPhone ? 'border-red-300' : ''}
-            />
-            {errors.clientPhone && (
-              <p className="text-xs text-red-500 mt-1">{errors.clientPhone}</p>
-            )}
-          </div>
-
-          {/* Delivery address — only for delivery mode */}
-          {orderMode === 'delivery' && (
-            <div data-field="deliveryAddress">
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                {t('form.address')} <span className="text-red-500">{t('form.required')}</span>
-              </label>
-              <Input
-                value={deliveryAddress}
-                onChange={(e) => setDeliveryAddress(e.target.value)}
-                placeholder={t('form.address')}
-                className={errors.deliveryAddress ? 'border-red-300' : ''}
-              />
-              {errors.deliveryAddress && (
-                <p className="text-xs text-red-500 mt-1">{errors.deliveryAddress}</p>
-              )}
-            </div>
-          )}
-
-          {/* Comment */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              {t('form.comment')}
-            </label>
-            <Textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder={t('form.comment_placeholder')}
-              rows={2}
-              className="resize-none"
-            />
-          </div>
-        </div>
-
-        {/* Submit error */}
-        {submitError && (
-          <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            {submitError}
-          </div>
-        )}
-      </div>
-
-      {/* Sticky footer: total + submit */}
-      <div className="shrink-0 px-4 pt-3 pb-4 border-t border-slate-100 space-y-3">
-        <div className="flex justify-between items-center">
-          <span className="font-medium text-slate-700">{t('cart.total')}:</span>
-          <span className="font-bold text-indigo-600 tabular-nums text-lg">
-            {formatPrice(finalTotal)}
-          </span>
-        </div>
-        <Button
-          className="w-full h-12 text-base"
-          onClick={handleSubmitOrder}
-          disabled={isSubmitDisabled}
-        >
-          {isSubmitting && <Loader2 className="w-5 h-5 animate-spin mr-2" />}
-          {isSubmitting ? t('cart.submitting') : t('cart.send_order')}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================
    TABLE CODE VERIFICATION HELPERS (simplified)
    P0-3: Only use Table.code for verification
    ============================================================ */
@@ -1185,6 +993,16 @@ function formatOrderTime(order) {
 
 export default function X() {
   const { lang, setLang, t } = useI18n();
+
+  // Safe translation with fallback (t() returns key when missing)
+  const tr = (key, fallback) => {
+    const val = typeof t === "function" ? t(key) : "";
+    if (!val || typeof val !== "string") return fallback;
+    const norm = val.trim();
+    if (norm === key || norm.startsWith(key + ":")) return fallback;
+    return norm;
+  };
+
   const location = useLocation();
   const queryClient = useQueryClient();
 
@@ -1220,31 +1038,11 @@ export default function X() {
   const [orderStatusToken, setOrderStatusToken] = useState(initialTrackToken);
   
   // TASK-260203-01: Drawer state
-  const [drawerMode, setDrawerMode] = useState(null); // 'cart' | 'checkout' | null
-  // S79: Drawer snap point — mid (0.6) or full (0.9)
-  const SNAP_MID = 0.6;
-  const SNAP_FULL = 0.9;
-  const [drawerSnapPoint, setDrawerSnapPoint] = useState(SNAP_MID);
+  const [drawerMode, setDrawerMode] = useState(null); // 'cart' | null
   
   const [activeCategoryKey, setActiveCategoryKey] = useState("all");
   const [cart, setCart] = useState([]); // { dishId, name, price, quantity }
   const cartRestoredRef = useRef(false);
-  // S84 BUG-S81-01: touch Y for custom swipe-to-close drag handle
-  const drawerDragStartY = useRef(0);
-
-  // S82 BUG-S81-03: Auto-expand to SNAP_FULL when cart has items so CTA button is always visible.
-  // SNAP_MID (60%) only when cart is empty (receipt mode — no CTA needed).
-  // S82 BUG-S81-14: checkout drawer always uses SNAP_FULL (form needs full height).
-  useEffect(() => {
-    if (drawerMode === 'cart') {
-      setDrawerSnapPoint(cart.length > 0 ? SNAP_FULL : SNAP_MID);
-    } else if (drawerMode === 'checkout') {
-      setDrawerSnapPoint(SNAP_FULL);
-    }
-  }, [drawerMode, cart.length]);
-
-  // Restaurant logo error state (hide on broken URL)
-  const [logoError, setLogoError] = useState(false);
 
   // Mobile breakpoint detection
   const [isMobile, setIsMobile] = useState(() => {
@@ -1316,20 +1114,16 @@ export default function X() {
     },
   });
 
-  // Derived logo values (after partner query)
-  const logoUrl = typeof partner?.logo === "string" ? partner.logo.trim() : "";
-  const showLogo = !!logoUrl && !logoError;
-
   // Breakpoint listener
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 767px)");
-
+    
     const handleChange = (e) => {
       setIsMobile(e.matches);
     };
-
+    
     mediaQuery.addEventListener('change', handleChange);
-
+    
     return () => {
       mediaQuery.removeEventListener('change', handleChange);
     };
@@ -1350,7 +1144,8 @@ export default function X() {
         setMobileLayout(saved);
       } else {
         // Default based on partner setting — S72: default list unless partner set 2-col grid
-        const defaultLayout = (partner.menu_grid_mobile ?? 1) === 2 ? 'tile' : 'list';
+        const mobileGrid = Number(partner.menu_grid_mobile ?? 1);
+        const defaultLayout = mobileGrid === 2 ? 'tile' : 'list';
         setMobileLayout(defaultLayout);
       }
     } catch (e) {
@@ -1489,13 +1284,6 @@ export default function X() {
     codeVerificationError,
     verifyTableCode,
   } = useHallTable({ partner, location, orderMode, t });
-
-  // BUG-S76-04: Show code verification error as auto-dismissing toast instead of persistent banner
-  useEffect(() => {
-    if (codeVerificationError) {
-      toast.error(codeVerificationError, { duration: 4000 });
-    }
-  }, [codeVerificationError]);
 
   // Helper for saving table selection (used by help requests and other features)
   const saveTableSelection = (partnerId, tableId) => {
@@ -1730,7 +1518,7 @@ export default function X() {
 
   const getDishDescription = (dish) => {
     const translated = dishTransMap[dish.id]?.description;
-    if (translated) return translated;
+    if (translated) return getCleanDescription(translated);
     return getCleanDescription(dish.description);
   };
 
@@ -2071,22 +1859,22 @@ export default function X() {
   // Hall StickyBar label: текст кнопки
   const hallStickyButtonLabel =
     hallStickyMode === "cart"
-      ? t("cart.checkout")
+      ? tr("cart.checkout", "Оформить заказ")
       : hallStickyMode === "myBill"
-        ? (t("cart.my_bill") || "Мой счёт")
+        ? tr("cart.my_bill", "Мой счёт")
         : hallStickyMode === "tableOrders"
-          ? (t("cart.table_orders") || "Заказы стола →")
+          ? tr("cart.table_orders", "Заказы стола")
           : isSessionLoading
-            ? (t("common.loading") || "Загрузка...")
-            : (t("cart.view") || "Открыть");
+            ? tr("common.loading", "Загрузка...")
+            : tr("cart.view", "Открыть");
 
   // Hall StickyBar: заголовок (для режимов без корзины)
-  const hallStickyModeLabel = 
-    hallStickyMode === "myBill" 
-      ? (t("cart.my_bill") || "📋 Мой счёт") 
-      : hallStickyMode === "tableOrders" 
-        ? (t("cart.table_orders") || "📋 Заказы стола") 
-        : (t("cart.your_orders") || "Ваши заказы");
+  const hallStickyModeLabel =
+    hallStickyMode === "myBill"
+      ? tr("cart.my_bill", "Мой счёт")
+      : hallStickyMode === "tableOrders"
+        ? tr("cart.table_orders", "Заказы стола")
+        : tr("cart.your_orders", "Ваши заказы");
 
   // Hall StickyBar: сумма для показа
   const hallStickyBillTotal = 
@@ -2557,7 +2345,14 @@ export default function X() {
       
       setSessionItems(prev => [...prev, ...itemsWithLinks]);
 
-      // Clear form — cart becomes empty, CartView auto-switches to Mode "Чеки"
+      // GAP-01: Save cart snapshot for confirmation screen BEFORE clearing
+      const confirmedItems = [...cart];
+      const confirmedTotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+      const guestLabel = guestToUse
+        ? getGuestDisplayName(guestToUse)
+        : null;
+
+      // Clear form
       clearCart();
       clearCartStorage(partner.id);
       setSplitType('single');
@@ -2566,17 +2361,20 @@ export default function X() {
       setLoyaltyAccount(null);
       setRedeemedPoints(0);
 
-      // S82 BUG-S81-17: extended duration so user sees confirmation; drawer stays open (Mode "Чеки")
-      toast.success(
-        tr('cart.order_sent', '\u0417\u0430\u043A\u0430\u0437 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D \u043E\u0444\u0438\u0446\u0438\u0430\u043D\u0442\u0443'),
-        { id: 'order-sent', duration: 4000 }
-      );
-      // Drawer stays open — drawerMode remains 'cart', cart cleared above
+      // GAP-01: Show confirmation screen instead of toast
+      showConfirmation({
+        items: confirmedItems,
+        totalAmount: confirmedTotal,
+        guestLabel,
+        orderMode: "hall",
+        publicToken: order.public_token,
+        clientName: null,
+      });
+
+      console.log("Order created", order?.id);
       return true;
     } catch (err) {
       console.error(err);
-      // S82 BUG-S81-17: show error as toast (setSubmitError only visible in CheckoutView, not in drawer)
-      toast.error(t('error.submit_failed'), { id: 'order-err', duration: 4000 });
       setSubmitError(t('error.submit_failed'));
       return false;
     }
@@ -2590,7 +2388,7 @@ export default function X() {
     
     // Empty cart guard
     if (cart.length === 0) {
-      toast.error(t('cart.empty'), { id: 'mm1' });
+      toast.error(tr('cart.empty', 'Корзина пуста'), { id: 'mm1' });
       return;
     }
 
@@ -2901,13 +2699,11 @@ export default function X() {
           clientName: savedClientName,
         });
 
-        // Order created successfully
+        console.log("Order created", order?.id);
       }
     } catch (err) {
       console.error(err);
       setSubmitError(t('error.submit_failed'));
-      // S82 BUG-S81-14: show error as toast so it's visible even if drawer is being closed
-      toast.error(t('error.submit_failed'), { id: 'order-err', duration: 4000 });
     } finally {
       submitLockRef.current = false;
       setIsSubmitting(false);
@@ -2938,17 +2734,13 @@ export default function X() {
   };
 
   // Request bill (ServiceRequest)
-  // S82 BUG-S81-14: Open checkout as drawer (not fullscreen) for pickup/delivery
-  // Clear stale errors so re-opening doesn't show previous attempt's validation state
   const handleCheckoutClick = () => {
-    setErrors({});
-    setSubmitError(null);
-    setDrawerMode('checkout');
+    setView("checkout");
   };
 
   const handleRequestBill = async () => {
     if (billCooldown || billRequested) {
-      toast.info(t('cart.bill_already_requested') || 'Счёт уже запрошен', { id: 'mm1' });
+      toast.info(tr('cart.bill_already_requested', 'Счёт уже запрошен'), { id: 'mm1' });
       return;
     }
     
@@ -2965,7 +2757,7 @@ export default function X() {
       
       setBillCooldownStorage(currentTableId);
       setBillCooldown(true);
-      toast.success(t('cart.bill_requested') || 'Официант скоро принесёт счёт', { id: 'mm1' });
+      toast.success(tr('cart.bill_requested', 'Официант скоро принесёт счёт'), { id: 'mm1' });
     } catch (err) {
       console.error('Failed to request bill:', err);
       toast.error(t('toast.error') || 'Ошибка', { id: 'mm1' });
@@ -3080,7 +2872,7 @@ export default function X() {
           tableCodeInput={tableCodeInput}
           setTableCodeInput={setTableCodeInput}
           isVerifyingCode={isVerifyingCode}
-          codeVerificationError={null}
+          codeVerificationError={codeVerificationError}
           hallGuestCodeEnabled={hallGuestCodeEnabled}
           guestCode={guestCode}
           partner={partner}
@@ -3098,9 +2890,8 @@ export default function X() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-24 font-sans">
-      {/* S84 BUG-S81-07: pass partner without name when logo block below shows name */}
       <PublicMenuHeader
-        partner={showLogo ? { ...partner, name: undefined } : partner}
+        partner={partner}
         activeContactLinks={activeContactLinks}
         viewMode={viewMode}
         enabledLanguages={enabledLanguages}
@@ -3114,33 +2905,6 @@ export default function X() {
         t={t}
         CURRENCY_SYMBOLS={CURRENCY_SYMBOLS}
       />
-
-      {/* Restaurant logo + name (visible when logo is uploaded in PartnerSettings) */}
-      {showLogo && (
-        <div className="flex items-center gap-3 px-4 pt-3 pb-1">
-          <img
-            src={logoUrl}
-            alt={partner?.name ? `${partner.name} logo` : ""}
-            referrerPolicy="no-referrer"
-            className="w-10 h-10 rounded-full object-cover bg-gray-100 border border-gray-200 shrink-0"
-            onError={() => setLogoError(true)}
-          />
-          {partner?.name && (
-            <span className="min-w-0 flex-1 truncate text-base font-semibold text-slate-800">{partner.name}</span>
-          )}
-        </div>
-      )}
-
-      {/* Closed banner — shown when partner.is_open === false */}
-      {partner?.is_open === false && (
-        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mx-4 mt-2" role="status" aria-live="polite">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-3 h-3 rounded-full bg-red-500 shrink-0" />
-            <span className="font-semibold text-red-700 text-sm">{t("public.closed_banner.title")}</span>
-          </div>
-          <p className="text-xs text-red-600 mt-1 ml-5">{t("public.closed_banner.subtitle")}</p>
-        </div>
-      )}
 
       {/* Redirect banner */}
       {redirectBanner && (
@@ -3286,38 +3050,15 @@ export default function X() {
       )}
 
       {/* TASK-260203-01: Cart as Bottom Drawer */}
-      {/* S79: Two detents (mid 60%, full 90%) */}
-      {/* S82 BUG-S81-01: setActiveSnapPoint handles null (swipe-down-to-close) */}
-      <Drawer
-        open={drawerMode === 'cart'}
-        onOpenChange={(open) => !open && !isSubmitting && setDrawerMode(null)}
-        snapPoints={[SNAP_MID, SNAP_FULL]}
-        activeSnapPoint={drawerSnapPoint}
-        setActiveSnapPoint={(sp) => {
-          if (sp === null && !isSubmitting) {
-            setDrawerMode(null);
-          } else if (sp !== null) {
-            setDrawerSnapPoint(sp);
-          }
-        }}
+      <Drawer 
+        open={drawerMode === 'cart'} 
+        onOpenChange={(open) => !open && setDrawerMode(null)}
       >
-        <DrawerContent className="flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', maxHeight: '90vh' }}>
+        <DrawerContent className="max-h-[85vh] overflow-hidden">
           <DrawerHeader className="sr-only">
             <DrawerTitle>Корзина</DrawerTitle>
           </DrawerHeader>
-          {/* S84 BUG-S81-01: Custom drag handle — touch-based swipe-down to close (>80px triggers close) */}
-          <div
-            className="flex justify-center py-3 shrink-0 touch-none cursor-grab active:cursor-grabbing"
-            onTouchStart={(e) => { drawerDragStartY.current = e.touches[0].clientY; }}
-            onTouchEnd={(e) => {
-              const delta = e.changedTouches[0].clientY - drawerDragStartY.current;
-              if (delta > 80 && !isSubmitting) setDrawerMode(null);
-            }}
-          >
-            <div className="w-12 h-1.5 rounded-full bg-slate-300" />
-          </div>
-          {/* S84 BUG-S81-03: flex-1 overflow-y-auto min-h-0 makes CartView scrollable so sticky CTA stays visible */}
-          <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="overflow-y-auto max-h-[calc(85vh-2rem)]">
             <CartView
               partner={partner}
               currentTable={currentTable}
@@ -3383,80 +3124,9 @@ export default function X() {
               setTableCodeInput={setTableCodeInput}
               isVerifyingCode={isVerifyingCode}
               verifyTableCode={verifyTableCode}
-              codeVerificationError={null}
+              codeVerificationError={codeVerificationError}
               hallGuestCodeEnabled={hallGuestCodeEnabled}
               guestCode={guestCode}
-            />
-          </div>
-        </DrawerContent>
-      </Drawer>
-
-      {/* S82 BUG-S81-14: Pickup/Delivery Checkout Drawer */}
-      {/* Uses same snap points as cart drawer for reliable swipe-to-close */}
-      <Drawer
-        open={drawerMode === 'checkout'}
-        onOpenChange={(open) => {
-          if (!open && !isSubmitting) {
-            setDrawerMode(null);
-            setErrors({});
-            setSubmitError(null);
-          }
-        }}
-        snapPoints={[SNAP_MID, SNAP_FULL]}
-        activeSnapPoint={drawerSnapPoint}
-        setActiveSnapPoint={(sp) => {
-          if (sp === null && !isSubmitting) {
-            setDrawerMode(null);
-            setErrors({});
-            setSubmitError(null);
-          } else if (sp !== null) {
-            setDrawerSnapPoint(sp);
-          }
-        }}
-      >
-        <DrawerContent className="flex flex-col" style={{ paddingBottom: 0, maxHeight: '90vh' }}>
-          <DrawerHeader className="sr-only">
-            <DrawerTitle>{t('cart.your_order')}</DrawerTitle>
-          </DrawerHeader>
-          {/* S84 BUG-S81-01: Custom drag handle for checkout drawer */}
-          <div
-            className="flex justify-center py-3 shrink-0 touch-none cursor-grab active:cursor-grabbing"
-            onTouchStart={(e) => { drawerDragStartY.current = e.touches[0].clientY; }}
-            onTouchEnd={(e) => {
-              const delta = e.changedTouches[0].clientY - drawerDragStartY.current;
-              if (delta > 80 && !isSubmitting) setDrawerMode(null);
-            }}
-          >
-            <div className="w-12 h-1.5 rounded-full bg-slate-300" />
-          </div>
-          {/* S84 BUG-S81-03: flex-1 overflow-y-auto min-h-0 for scrollable checkout content */}
-          <div className="flex-1 overflow-y-auto min-h-0">
-            <PickupDeliveryCheckoutContent
-              orderMode={orderMode}
-              cart={cart}
-              formatPrice={formatPrice}
-              finalTotal={finalTotal}
-              clientName={clientName}
-              setClientName={setClientName}
-              clientPhone={clientPhone}
-              handlePhoneChange={handlePhoneChange}
-              handlePhoneFocus={handlePhoneFocus}
-              deliveryAddress={deliveryAddress}
-              setDeliveryAddress={setDeliveryAddress}
-              comment={comment}
-              setComment={setComment}
-              errors={errors}
-              submitError={submitError}
-              isSubmitting={isSubmitting}
-              handleSubmitOrder={handleSubmitOrder}
-              onClose={() => {
-                if (!isSubmitting) {
-                  setDrawerMode(null);
-                  setErrors({});
-                  setSubmitError(null);
-                }
-              }}
-              t={t}
             />
           </div>
         </DrawerContent>
@@ -3557,14 +3227,13 @@ export default function X() {
             <StickyCartBar
               t={t}
               isHallMode={false}
-              isDrawerOpen={drawerMode === 'checkout'}
               hasCart={true}
               cartTotalItems={cartTotalItems}
               formattedCartTotal={formatPrice(cartTotalAmount)}
               isLoadingBill={false}
               formattedBillTotal=""
-              onButtonClick={drawerMode === 'checkout' ? () => setDrawerMode(null) : handleCheckoutClick}
-              buttonLabel={t('cart.checkout')}
+              onButtonClick={handleCheckoutClick}
+              buttonLabel={tr('cart.checkout', 'Оформить заказ')}
             />
           );
         }

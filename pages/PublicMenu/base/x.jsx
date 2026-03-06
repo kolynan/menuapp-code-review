@@ -118,13 +118,11 @@ import { useTableSession } from "@/components/publicMenu/refactor/hooks/useTable
 // CONSTANTS & HELPERS
 // ============================================================
 
-const IS_ARCHIVED_TAG = ":::archived:::";
-
 const isDishArchived = (dish) =>
-  !!dish?.description && dish.description.includes(IS_ARCHIVED_TAG);
+  !!dish?.description && dish.description.toLowerCase().includes(":::archived:::");
 
 const getCleanDescription = (desc) =>
-  desc ? desc.replace(IS_ARCHIVED_TAG, "").trim() : "";
+  desc ? desc.replace(/:::archived:::/gi, "").trim() : "";
 
 const looksLikePartnerId = (value) =>
   /^[0-9a-f]{24}$/i.test(String(value || "").trim());
@@ -388,6 +386,15 @@ function OrderConfirmationScreen({
   onTrackOrder,
   t,
 }) {
+  // Safe translation with fallback
+  const tr = (key, fallback) => {
+    const val = typeof t === "function" ? t(key) : "";
+    if (!val || typeof val !== "string") return fallback;
+    const norm = val.trim();
+    if (norm === key || norm.startsWith(key + ":")) return fallback;
+    return norm;
+  };
+
   return (
     <div className="fixed inset-0 z-[60] bg-white overflow-y-auto">
     <div className="px-4 py-8 max-w-md mx-auto animate-[fadeInUp_0.3s_ease-out]">
@@ -453,14 +460,14 @@ function OrderConfirmationScreen({
 
       {/* Title */}
       <h2 className="text-xl font-semibold text-center text-slate-800 mb-6">
-        {t("confirmation.title")}
+        {tr("confirmation.title", "Заказ отправлен!")}
       </h2>
 
       {/* Order summary card */}
       <Card className="mb-6">
         <CardContent className="p-4">
           <p className="text-sm font-medium text-slate-600 mb-3">
-            {t("confirmation.your_order")}
+            {tr("confirmation.your_order", "Ваш заказ")}
           </p>
 
           {/* Items list */}
@@ -485,7 +492,7 @@ function OrderConfirmationScreen({
           <div className="border-t border-slate-200 pt-3 mt-3">
             <div className="flex justify-between items-center">
               <span className="font-medium text-slate-800">
-                {t("confirmation.total")}
+                {tr("confirmation.total", "Итого")}
               </span>
               <span className="font-semibold text-slate-800 tabular-nums">
                 {formatPrice(totalAmount)}
@@ -496,14 +503,14 @@ function OrderConfirmationScreen({
           {/* Guest label */}
           {guestLabel && (
             <p className="text-sm text-slate-500 mt-3">
-              {t("confirmation.guest_label")}: {guestLabel}
+              {tr("confirmation.guest_label", "Гость")}: {guestLabel}
             </p>
           )}
 
           {/* Client name (pickup/delivery) */}
           {clientName && orderMode !== "hall" && (
             <p className="text-sm text-slate-500 mt-1">
-              {t("confirmation.client_name")}: {clientName}
+              {tr("confirmation.client_name", "Имя")}: {clientName}
             </p>
           )}
         </CardContent>
@@ -515,7 +522,7 @@ function OrderConfirmationScreen({
           className="w-full h-12"
           onClick={onBackToMenu}
         >
-          {t("confirmation.back_to_menu")}
+          {tr("confirmation.back_to_menu", "Вернуться в меню")}
         </Button>
 
         <Button
@@ -523,7 +530,7 @@ function OrderConfirmationScreen({
           className="w-full h-12"
           onClick={onOpenOrders}
         >
-          {t("confirmation.my_orders")}
+          {tr("confirmation.my_orders", "Мои заказы")}
         </Button>
 
         {/* Track order — pickup/delivery only (GAP-02: navigate to embedded status view) */}
@@ -535,7 +542,7 @@ function OrderConfirmationScreen({
               onTrackOrder(publicToken);
             }}
           >
-            {t("confirmation.track_order")}
+            {tr("confirmation.track_order", "Отследить заказ")}
           </Button>
         )}
       </div>
@@ -986,6 +993,16 @@ function formatOrderTime(order) {
 
 export default function X() {
   const { lang, setLang, t } = useI18n();
+
+  // Safe translation with fallback (t() returns key when missing)
+  const tr = (key, fallback) => {
+    const val = typeof t === "function" ? t(key) : "";
+    if (!val || typeof val !== "string") return fallback;
+    const norm = val.trim();
+    if (norm === key || norm.startsWith(key + ":")) return fallback;
+    return norm;
+  };
+
   const location = useLocation();
   const queryClient = useQueryClient();
 
@@ -1501,7 +1518,7 @@ export default function X() {
 
   const getDishDescription = (dish) => {
     const translated = dishTransMap[dish.id]?.description;
-    if (translated) return translated;
+    if (translated) return getCleanDescription(translated);
     return getCleanDescription(dish.description);
   };
 
@@ -1842,22 +1859,22 @@ export default function X() {
   // Hall StickyBar label: текст кнопки
   const hallStickyButtonLabel =
     hallStickyMode === "cart"
-      ? t("cart.checkout")
+      ? tr("cart.checkout", "Оформить заказ")
       : hallStickyMode === "myBill"
-        ? (t("cart.my_bill") || "Мой счёт")
+        ? tr("cart.my_bill", "Мой счёт")
         : hallStickyMode === "tableOrders"
-          ? (t("cart.table_orders") || "Заказы стола →")
+          ? tr("cart.table_orders", "Заказы стола")
           : isSessionLoading
-            ? (t("common.loading") || "Загрузка...")
-            : (t("cart.view") || "Открыть");
+            ? tr("common.loading", "Загрузка...")
+            : tr("cart.view", "Открыть");
 
   // Hall StickyBar: заголовок (для режимов без корзины)
-  const hallStickyModeLabel = 
-    hallStickyMode === "myBill" 
-      ? (t("cart.my_bill") || "📋 Мой счёт") 
-      : hallStickyMode === "tableOrders" 
-        ? (t("cart.table_orders") || "📋 Заказы стола") 
-        : (t("cart.your_orders") || "Ваши заказы");
+  const hallStickyModeLabel =
+    hallStickyMode === "myBill"
+      ? tr("cart.my_bill", "Мой счёт")
+      : hallStickyMode === "tableOrders"
+        ? tr("cart.table_orders", "Заказы стола")
+        : tr("cart.your_orders", "Ваши заказы");
 
   // Hall StickyBar: сумма для показа
   const hallStickyBillTotal = 
@@ -2371,7 +2388,7 @@ export default function X() {
     
     // Empty cart guard
     if (cart.length === 0) {
-      toast.error(t('cart.empty'), { id: 'mm1' });
+      toast.error(tr('cart.empty', 'Корзина пуста'), { id: 'mm1' });
       return;
     }
 
@@ -2723,7 +2740,7 @@ export default function X() {
 
   const handleRequestBill = async () => {
     if (billCooldown || billRequested) {
-      toast.info(t('cart.bill_already_requested') || 'Счёт уже запрошен', { id: 'mm1' });
+      toast.info(tr('cart.bill_already_requested', 'Счёт уже запрошен'), { id: 'mm1' });
       return;
     }
     
@@ -2740,7 +2757,7 @@ export default function X() {
       
       setBillCooldownStorage(currentTableId);
       setBillCooldown(true);
-      toast.success(t('cart.bill_requested') || 'Официант скоро принесёт счёт', { id: 'mm1' });
+      toast.success(tr('cart.bill_requested', 'Официант скоро принесёт счёт'), { id: 'mm1' });
     } catch (err) {
       console.error('Failed to request bill:', err);
       toast.error(t('toast.error') || 'Ошибка', { id: 'mm1' });
@@ -3216,7 +3233,7 @@ export default function X() {
               isLoadingBill={false}
               formattedBillTotal=""
               onButtonClick={handleCheckoutClick}
-              buttonLabel={t('cart.checkout')}
+              buttonLabel={tr('cart.checkout', 'Оформить заказ')}
             />
           );
         }
