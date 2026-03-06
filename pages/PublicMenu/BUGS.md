@@ -14,6 +14,7 @@ session: 84
 ## Active Bugs (не исправлены)
 
 ### BUG-PM-023: reviewedItems.has() without null guard (P0, pre-existing)
+
 - **Когда:** S79 review (pre-existing from S74)
 - **Файл:** CartView.jsx, Mode 2 order render
 - **Симптом:** If `reviewedItems` prop is undefined, calling `.has()` crashes the render
@@ -86,6 +87,22 @@ session: 84
 - **Симптом:** Cart drawer could be closed via vaul snap API swipe even during order submission (vaul internal swipe). Inconsistency with checkout drawer which already had the guard.
 - **Root cause:** Cart drawer `setActiveSnapPoint` used `if (sp === null)` without `!isSubmitting`, unlike checkout drawer which used `if (sp === null && !isSubmitting)`.
 - **Фикс:** Added `&& !isSubmitting` to cart drawer `setActiveSnapPoint` condition + changed `else` to `else if (sp !== null)` for symmetry with checkout drawer.
+- **RELEASE:** `260306-01 x RELEASE.jsx`
+
+### BUG-PM-S87-01: :::ARCHIVED::: marker visible to guests in dish descriptions (P1) — FIXED S87
+- **Когда:** S87 testing
+- **Файл:** `x.jsx` — isDishArchived(), getCleanDescription(), getDishDescription()
+- **Симптом:** Guests see raw `:::ARCHIVED:::` text in dish descriptions (e.g., "пропрол :::ARCHIVED:::").
+- **Root cause:** IS_ARCHIVED_TAG was lowercase `:::archived:::` but actual data has uppercase `:::ARCHIVED:::`. String.includes() and String.replace() are case-sensitive.
+- **Фикс:** isDishArchived() now uses `.toLowerCase().includes()`. getCleanDescription() now uses `/:::archived:::/gi` regex. getDishDescription() now also cleans translated descriptions.
+- **RELEASE:** `260306-01 x RELEASE.jsx`
+
+### BUG-PM-S87-02: Raw i18n keys visible after order submission (P1) — FIXED S87
+- **Когда:** S87 testing
+- **Файл:** `x.jsx` — OrderConfirmationScreen, StickyCartBar labels
+- **Симптом:** After submitting order, confirmation screen shows raw keys like `confirmation.title`, `CART.MY_BILL` instead of Russian text.
+- **Root cause:** `t()` returns the key string when translation is missing. `|| "fallback"` pattern doesn't catch it because the key string is truthy. OrderConfirmationScreen used bare `t()` without fallbacks.
+- **Фикс:** Added `tr()` helper to both x.jsx main component and OrderConfirmationScreen (same pattern as CartView). All confirmation.* keys and cart.* button labels now use `tr("key", "Russian fallback")`. 28 i18n keys added to `i18n_pending.csv`.
 - **RELEASE:** `260306-01 x RELEASE.jsx`
 
 ### BUG-PM-026: Drawer pull-down swipe doesn't close drawer (S81-01, P1) — FIXED S82

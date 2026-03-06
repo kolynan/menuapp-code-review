@@ -56,6 +56,13 @@
 - **Analysis:** Code verified correct: `handleBack()` calls `navigate("/menumanage")`, button `onClick={handleBack}` is properly wired, button is in sticky toolbar outside DnD zones. Bug may be environment-specific, already resolved, or a Base44 routing transient.
 - **Status:** VERIFIED (code correct, no change needed)
 
+### BUG-MD-S87-01 (P2) — :::ARCHIVED::: marker visible in dish descriptions
+- **Lines:** 145-147, 2349-2358, 1210
+- **RELEASE:** 260306-01
+- **Problem:** `getCleanDescription()` was removed in P1.4 migration (assumed descriptions are clean since is_archived field is used). But old dishes still have `:::ARCHIVED:::` text in their description field.
+- **Fix:** Restored `getCleanDescription()` with case-insensitive regex `/:::archived:::/gi`. Applied to display rendering (line ~2353) and edit form loading (line ~1210).
+- **Status:** FIXED
+
 ---
 
 ## Active Bugs

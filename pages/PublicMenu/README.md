@@ -13,7 +13,7 @@ session: 85
 
 | Файл | RELEASE | Дата | Сессия |
 |---|---|---|---|
-| x.jsx | `260306-01 x RELEASE.jsx` | 06 мар 2026 | S85 |
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 мар 2026 | S87 |
 | CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 мар 2026 | S82 |
 | MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 мар 2026 | S79 |
 | useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 мар 2026 | S68 |
@@ -26,6 +26,11 @@ session: 85
 ---
 
 ## Changelog (UX/UI решения)
+
+### Session 87 — 06 мар 2026
+
+- BUG-PM-S87-01: Маркер :::ARCHIVED::: больше не виден гостям — регистронезависимая очистка описаний блюд
+- BUG-PM-S87-02: Экран подтверждения заказа и кнопки корзины теперь показывают русский текст вместо сырых i18n ключей (добавлен tr() с фоллбэками)
 
 ### Session 85 — 06 мар 2026
 

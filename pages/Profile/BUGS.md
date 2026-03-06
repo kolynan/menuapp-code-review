@@ -151,6 +151,12 @@ RELEASE: 260301-01 profile RELEASE.jsx
 - **Fix:** Added fallback: `t("profile.fullName", "Полное имя")`. Also added fallback to `t("common.loading", "Загрузка...")` on line 115. Key added to `i18n_pending.csv`.
 - **Status:** FIXED
 
+### BUG-PR-S83-04v2 (P1) — i18n keys still shown as raw text (regression)
+- **RELEASE:** 260306-02
+- **Problem:** Previous fix used `t("key", "fallback")` but `t()` ignores the second argument — it returns the key string when translation missing. All labels still showed raw keys like `profile.fullName`.
+- **Fix:** Added `tr()` wrapper function (same pattern as CartView) that detects when `t()` returns the key itself and falls back to human-readable Russian text. All `t()` calls converted to `tr()` with fallbacks: fullName, email, role, restaurant, save/saved/saving, back, title, toast messages.
+- **Status:** FIXED
+
 ---
 
 ## Active Bugs (not fixed)
