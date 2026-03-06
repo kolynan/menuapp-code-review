@@ -22,17 +22,23 @@
 
 ---
 
-## Fixed (in RELEASE 260306-03)
+## Fixed (in RELEASE 260306-04)
 
 | ID | Priority | Description | Commit |
 |----|----------|-------------|--------|
-| BUG-PC-S89-01 | P2 | "1 Баллы" — wrong Russian declension in client detail balance. v1 (260306-02) added pluralPoints() with t() but bug persisted (B44 translations may have all forms set to "Баллы"). v2 uses hardcoded Russian directly — guaranteed correct. | `336dea5` |
+| BUG-PC-S89-01 | P2 | "1 Баллы" — ROOT CAUSE FOUND: root-level `partnerclients.jsx` (actual B44 production code) used `t("clients.detail.points")` which always returned "Баллы". Previous fixes (v1, v2) edited `base/partnerclients.jsx` — a different file that was NOT in production. v3 adds `pluralPoints()` to the correct file with hardcoded Russian declension. | pending |
+
+## Fixed (in RELEASE 260306-03, superseded by 260306-04)
+
+| ID | Priority | Description | Commit |
+|----|----------|-------------|--------|
+| BUG-PC-S89-01-v2 | P2 | Applied pluralPoints() to base/partnerclients.jsx — but that file was NOT in B44 production. Bug persisted. | `336dea5` |
 
 ## Fixed (in RELEASE 260306-02)
 
 | ID | Priority | Description | Commit |
 |----|----------|-------------|--------|
-| BUG-PC-S89-01-v1 | P2 | First attempt at pluralPoints() with t()-based translation. Deployed but didn't work — t() returned wrong translations. | `a2acbd4` |
+| BUG-PC-S89-01-v1 | P2 | First attempt at pluralPoints() with t()-based translation. Applied to wrong file. | `a2acbd4` |
 
 ## Active
 

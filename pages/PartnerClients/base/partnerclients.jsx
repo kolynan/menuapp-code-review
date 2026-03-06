@@ -13,45 +13,27 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "sonner";
 import { Loader2, Mail, Star, Search } from "lucide-react";
 import { format } from "date-fns";
-import { ru } from "date-fns/locale";
 
 function getClientNumber(account, allAccounts) {
   const sorted = [...allAccounts].sort((a, b) => 
     new Date(a.created_at || 0) - new Date(b.created_at || 0)
   );
   const index = sorted.findIndex(a => a.id === account.id);
-  return index >= 0 ? index + 1 : parseInt(account.id.slice(-4), 16) || 0;
+  return index >= 0 ? index + 1 : parseInt(String(account.id).slice(-4), 16) || 0;
 }
 
+// FIX BUG-PC-002: removed hardcoded Russian locale — use locale-neutral format
 function formatDate(dateStr) {
   if (!dateStr) return "—";
   try {
-    return format(new Date(dateStr), "d MMM yyyy", { locale: ru });
+    return format(new Date(dateStr), "dd.MM.yyyy");
   } catch {
     return "—";
   }
 }
 
-const TRANSACTION_FALLBACKS = {
-  "loyalty.transaction.earn_order": "Начислено за заказ",
-  "loyalty.transaction.earn_review": "Начислено за отзыв",
-  "loyalty.transaction.redeem": "Списание баллов",
-  "loyalty.transaction.expire": "Сгорание баллов",
-  "loyalty.transaction.manual": "Ручная корректировка",
-};
-
-function translateDescription(desc, t) {
-  if (!desc) return "—";
-  if (TRANSACTION_FALLBACKS[desc]) {
-    const translated = t(desc);
-    return translated !== desc ? translated : TRANSACTION_FALLBACKS[desc];
-  }
-  return desc;
-}
-
-// FIX PC-S89-01 (v2): Russian pluralization for points
-// v2: Use hardcoded Russian directly — B44 translations for plural forms may be incorrect
-// (all set to "Баллы" instead of proper Балл/Балла/Баллов)
+// FIX PC-S89-01 (v3): Russian pluralization for points
+// Hardcoded Russian — B44 i18n key "clients.detail.points" always returns "Баллы"
 function pluralPoints(n) {
   const abs = Math.abs(n) % 100;
   const rem = abs % 10;
@@ -68,6 +50,8 @@ function PartnerClientsContent() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAccount, setSelectedAccount] = useState(null);
+  // FIX BUG-PC-001: separate message target from sheet's selectedAccount
+  const [messageTarget, setMessageTarget] = useState(null);
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const [messageForm, setMessageForm] = useState({ title: "", body: "" });
 
@@ -79,13 +63,15 @@ function PartnerClientsContent() {
 
   const { data: transactions, isLoading: loadingTransactions } = useQuery({
     queryKey: ["loyaltyTransactions", selectedAccount?.id],
-    queryFn: () => base44.entities.LoyaltyTransaction.filter({ account: selectedAccount.id }),
+    // FIX BUG-PC-003: optional chaining prevents crash if selectedAccount becomes null mid-revalidation
+    queryFn: () => base44.entities.LoyaltyTransaction.filter({ account: selectedAccount?.id }),
     enabled: !!selectedAccount?.id,
   });
 
   const { data: reviews, isLoading: loadingReviews } = useQuery({
     queryKey: ["dishFeedback", selectedAccount?.id],
-    queryFn: () => base44.entities.DishFeedback.filter({ reviewed_by: selectedAccount.id }),
+    // FIX BUG-PC-003: optional chaining
+    queryFn: () => base44.entities.DishFeedback.filter({ reviewed_by: selectedAccount?.id }),
     enabled: !!selectedAccount?.id,
   });
 
@@ -100,6 +86,7 @@ function PartnerClientsContent() {
     onSuccess: () => {
       toast.success(t("clients.message.sent"), { id: "mm1" });
       setMessageDialogOpen(false);
+      setMessageTarget(null);
       setMessageForm({ title: "", body: "" });
     },
     onError: () => {
@@ -117,18 +104,21 @@ function PartnerClientsContent() {
     });
   }, [accounts, searchQuery]);
 
+  // FIX BUG-PC-001: mail icon from card only opens dialog (not sheet)
   const handleOpenMessage = (account, e) => {
     e?.stopPropagation();
-    setSelectedAccount(account);
+    setMessageTarget(account);
     setMessageDialogOpen(true);
   };
 
+  // FIX BUG-PC-001: use messageTarget (not selectedAccount) for send
   const handleSendMessage = () => {
     if (!messageForm.title.trim() || !messageForm.body.trim()) return;
-    
+    if (!messageTarget?.id) return;
+
     sendMessageMutation.mutate({
       partner: partnerId,
-      account: selectedAccount.id,
+      account: messageTarget.id,
       title: messageForm.title.trim(),
       body: messageForm.body.trim(),
       is_read: false,
@@ -279,7 +269,7 @@ function PartnerClientsContent() {
                       {sortedTransactions.map((tx) => (
                         <div key={tx.id} className="flex items-start justify-between text-sm border-b pb-2">
                           <div className="flex-1">
-                            <div className="text-slate-700">{translateDescription(tx.description, t)}</div>
+                            <div className="text-slate-700">{tx.description}</div>
                             <div className="text-xs text-slate-400">{formatDate(tx.created_at)}</div>
                           </div>
                           <div className={`font-semibold ${tx.amount > 0 ? "text-green-600" : "text-red-600"}`}>
@@ -329,6 +319,7 @@ function PartnerClientsContent() {
                   className="w-full"
                   onClick={(e) => {
                     e.stopPropagation();
+                    setMessageTarget(selectedAccount);
                     setMessageDialogOpen(true);
                   }}
                 >
@@ -342,7 +333,14 @@ function PartnerClientsContent() {
       </Sheet>
 
       {/* Message Dialog */}
-      <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
+      {/* FIX BUG-PC-001: clear messageTarget + form when dialog closes */}
+      <Dialog open={messageDialogOpen} onOpenChange={(open) => {
+        setMessageDialogOpen(open);
+        if (!open) {
+          setMessageTarget(null);
+          setMessageForm({ title: "", body: "" });
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("clients.message.title")}</DialogTitle>
@@ -377,7 +375,7 @@ function PartnerClientsContent() {
             </Button>
             <Button
               onClick={handleSendMessage}
-              disabled={!messageForm.title.trim() || !messageForm.body.trim() || sendMessageMutation.isPending}
+              disabled={!messageForm.title.trim() || !messageForm.body.trim() || !messageTarget?.id || sendMessageMutation.isPending}
             >
               {sendMessageMutation.isPending ? (
                 <>
