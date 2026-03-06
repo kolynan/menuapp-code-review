@@ -49,6 +49,24 @@ function translateDescription(desc, t) {
   return desc;
 }
 
+// FIX PC-S89-01: Russian pluralization for points (same as PartnerLoyalty)
+function pluralPoints(n, t) {
+  const abs = Math.abs(n) % 100;
+  const rem = abs % 10;
+  let key, fallback;
+  if (abs >= 11 && abs <= 14) {
+    key = "loyalty.stats.points_many"; fallback = "Баллов";
+  } else if (rem === 1) {
+    key = "loyalty.stats.points_one"; fallback = "Балл";
+  } else if (rem >= 2 && rem <= 4) {
+    key = "loyalty.stats.points_few"; fallback = "Балла";
+  } else {
+    key = "loyalty.stats.points_many"; fallback = "Баллов";
+  }
+  const translated = t(key);
+  return translated !== key ? translated : fallback;
+}
+
 function PartnerClientsContent() {
   const { partnerId } = usePartnerAccess();
   const { t } = useI18n();
@@ -231,7 +249,7 @@ function PartnerClientsContent() {
                   <div className="bg-slate-50 p-3 rounded-lg">
                     <div className="text-xs text-slate-500">{t("clients.detail.balance")}</div>
                     <div className="text-xl font-bold text-indigo-600">
-                      {selectedAccount.balance || 0} {t("clients.detail.points")}
+                      {selectedAccount.balance || 0} {pluralPoints(selectedAccount.balance || 0, t)}
                     </div>
                   </div>
                   <div className="bg-slate-50 p-3 rounded-lg">
