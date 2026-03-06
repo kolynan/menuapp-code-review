@@ -1,7 +1,7 @@
 # StaffOrdersMobile Bug Tracker
 
-**Page:** `pages/StaffOrdersMobile/260304-00 StaffOrdersMobile RELEASE.jsx`
-**Last updated:** 2026-03-06 (Session 88 — P2 double Стол regression fix)
+**Page:** `pages/StaffOrdersMobile/260306-04 StaffOrdersMobile RELEASE.jsx`
+**Last updated:** 2026-03-06 (Session 90 — restored from 260305-00 + re-applied SO-S89-01)
 
 ---
 
@@ -122,8 +122,8 @@
 - **Function:** getStatusConfig / getStageName
 - **Root cause:** OrderStage entity stores i18n keys (like `orderprocess.default.new`) in the `name` field instead of display names. `getStatusConfig` returned `stage.name` directly as label, showing raw keys.
 - **Fix:** Added `STAGE_NAME_FALLBACKS` map + `getStageName()` helper. Known i18n keys are mapped to Russian display names ("Новый", "Принят", etc.). Applied to both `label` and `actionLabel` in getStatusConfig.
-- **Commit:** `a3727f4`
-- **RELEASE:** `260306-03 StaffOrdersMobile RELEASE.jsx`
+- **Commit:** `a3727f4` (original S89), `03bab9e` (re-applied on restored base S90)
+- **RELEASE:** `260306-04 StaffOrdersMobile RELEASE.jsx` (260306-01 and 260306-03 were truncated/defective)
 - **Status:** FIXED
 
 ## Active Bugs
