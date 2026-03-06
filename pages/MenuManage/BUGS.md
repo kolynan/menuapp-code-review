@@ -43,6 +43,13 @@
 - **RELEASE:** 260301-00
 - **Status:** FIXED
 
+### BUG-MM-S83-06 (P1) — :::ARCHIVED::: raw marker visible in descriptions
+- **Lines:** 319, 326
+- **RELEASE:** 260306-00
+- **Problem:** `getTranslatedDish()` returned dish descriptions as-is. Legacy data with `:::ARCHIVED:::` marker in description text was displayed raw to users.
+- **Fix:** Added `cleanDesc()` helper to strip `:::ARCHIVED:::` markers. Applied in `getTranslatedDish()` return values for both default-language and translated descriptions.
+- **Status:** FIXED
+
 ---
 
 ## Active Bugs

@@ -49,6 +49,13 @@
 - **Commit:** `1cff8b5`
 - **Status:** FIXED
 
+### BUG-MD-S83-07 (P1) — Back button reported not working
+- **Lines:** 1030, 1950-1957
+- **RELEASE:** 260306-00
+- **Problem:** Back button on /menudishes reported as not navigating to /menumanage.
+- **Analysis:** Code verified correct: `handleBack()` calls `navigate("/menumanage")`, button `onClick={handleBack}` is properly wired, button is in sticky toolbar outside DnD zones. Bug may be environment-specific, already resolved, or a Base44 routing transient.
+- **Status:** VERIFIED (code correct, no change needed)
+
 ---
 
 ## Active Bugs

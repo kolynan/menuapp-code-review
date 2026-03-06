@@ -97,6 +97,16 @@
 
 ---
 
+## Fixed (in i18n_pending.csv, 260306-00)
+
+### BUG-PS-S83-01 (P1) — `common.loading` raw i18n key
+- **Problem:** Raw key `common.loading` reported visible during PartnerSettings load.
+- **Analysis:** PartnerSettings itself does NOT use `t("common.loading")` — its loading state shows only a Loader2 spinner. The key exists in PartnerShell's LoadingScreen as `aria-label` (not visible text). Issue is the missing i18n key in the translation system.
+- **Fix:** Added `common.loading` key to `i18n_pending.csv` with ru/en/kk translations. No code change in PartnerSettings needed.
+- **Status:** FIXED (i18n-only)
+
+---
+
 ## Active Bugs
 
 ### BUG-PS-009 (P2) -- address_map_url accepts arbitrary URLs

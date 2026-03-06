@@ -144,6 +144,13 @@ RELEASE: 260301-01 profile RELEASE.jsx
 - **Problem:** `import { PartnerShell }` uses named import, but PartnerShell.jsx uses `export default`. Causes `SyntaxError: does not provide an export named 'PartnerShell'` at runtime. B44 had to auto-fix after deploy.
 - **Fix:** Changed to `import PartnerShell from "@/components/PartnerShell"` (default import).
 
+### BUG-PR-S83-04 (P1) — "Full Name" label shown in English
+- **Line:** 175
+- **RELEASE:** 260306-00
+- **Problem:** `t("profile.fullName")` had no fallback. If key missing from locale, raw English "Full Name" shown instead of Russian.
+- **Fix:** Added fallback: `t("profile.fullName", "Полное имя")`. Also added fallback to `t("common.loading", "Загрузка...")` on line 115. Key added to `i18n_pending.csv`.
+- **Status:** FIXED
+
 ---
 
 ## Active Bugs (not fixed)
