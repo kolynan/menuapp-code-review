@@ -1,7 +1,7 @@
 # StaffOrdersMobile Bug Tracker
 
 **Page:** `pages/StaffOrdersMobile/260304-00 StaffOrdersMobile RELEASE.jsx`
-**Last updated:** 2026-03-04 (Session 74 — P0 stale data + close table confirm)
+**Last updated:** 2026-03-06 (Session 88 — P2 double Стол regression fix)
 
 ---
 
@@ -108,6 +108,14 @@
 - **Fix:** Changed check from `=== 'unpaid'` to `!== 'paid'`. Now undefined/null/unpaid all correctly flag as problem orders.
 - **RELEASE:** `260303-02 sessionCleanupJob RELEASE.js`
 - **Commit:** `c30f1a9`
+- **Status:** FIXED
+
+### BUG-SO-S61-07 (P2) -- "Стол Стол 1" double prefix REGRESSION
+- **Function:** RequestCard / OrderCard / table picker / orderGroups
+- **Root cause:** 5 locations added hardcoded `"Стол "` prefix to table names that already contain the prefix from DB. Previous fix in v2.7.2 only addressed the group header.
+- **Fix:** Added `withTablePrefix()` helper that checks `name.startsWith("Стол ")` before adding prefix. Applied to all 5 locations: RequestCard (line 714), OrderCard (line 883, 892), table picker (line 1283), orderGroups (line 2404).
+- **Commit:** `ece5c64`
+- **RELEASE:** `260306-01 StaffOrdersMobile RELEASE.jsx`
 - **Status:** FIXED
 
 ## Active Bugs

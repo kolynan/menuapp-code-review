@@ -1,8 +1,14 @@
 # PartnerClients — Bug Tracker
 
-**Last updated:** 2026-02-24
+**Last updated:** 2026-03-06
 
 ---
+
+## Fixed (in RELEASE 260306-01)
+
+| ID | Priority | Description | Commit |
+|----|----------|-------------|--------|
+| BUG-PC-S87-01 | P2 | `loyalty.transaction.earn_order` raw i18n key visible in transaction history — added translateDescription() with fallback mapping | `07f7f25` |
 
 ## Fixed (in RELEASE 260224-00)
 

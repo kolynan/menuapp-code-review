@@ -1,8 +1,14 @@
 # PartnerLoyalty — Bug Tracker
 
-**Last updated:** 2026-03-05
+**Last updated:** 2026-03-06
 
 ---
+
+## Fixed (in RELEASE 260306-01)
+
+| ID | Priority | Description | Commit |
+|----|----------|-------------|--------|
+| BUG-PL-S83-02 | P2 | "1 Баллы" wrong plural — added pluralPoints() with Russian declension rules | `4723aa0` |
 
 ## Fixed (in RELEASE 260305-00)
 
