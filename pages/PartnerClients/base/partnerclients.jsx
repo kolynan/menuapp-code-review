@@ -32,6 +32,23 @@ function formatDate(dateStr) {
   }
 }
 
+const TRANSACTION_FALLBACKS = {
+  "loyalty.transaction.earn_order": "Начислено за заказ",
+  "loyalty.transaction.earn_review": "Начислено за отзыв",
+  "loyalty.transaction.redeem": "Списание баллов",
+  "loyalty.transaction.expire": "Сгорание баллов",
+  "loyalty.transaction.manual": "Ручная корректировка",
+};
+
+function translateDescription(desc, t) {
+  if (!desc) return "—";
+  if (TRANSACTION_FALLBACKS[desc]) {
+    const translated = t(desc);
+    return translated !== desc ? translated : TRANSACTION_FALLBACKS[desc];
+  }
+  return desc;
+}
+
 function PartnerClientsContent() {
   const { partnerId } = usePartnerAccess();
   const { t } = useI18n();
@@ -250,7 +267,7 @@ function PartnerClientsContent() {
                       {sortedTransactions.map((tx) => (
                         <div key={tx.id} className="flex items-start justify-between text-sm border-b pb-2">
                           <div className="flex-1">
-                            <div className="text-slate-700">{tx.description}</div>
+                            <div className="text-slate-700">{translateDescription(tx.description, t)}</div>
                             <div className="text-xs text-slate-400">{formatDate(tx.created_at)}</div>
                           </div>
                           <div className={`font-semibold ${tx.amount > 0 ? "text-green-600" : "text-red-600"}`}>
