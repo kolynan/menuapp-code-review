@@ -11,6 +11,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { toast } from "sonner";
 import { Loader2, Check, Gift } from "lucide-react";
 
+function pluralPoints(n, t) {
+  const abs = Math.abs(n) % 100;
+  if (abs >= 11 && abs <= 14) return t("loyalty.stats.points_many");
+  const rem = abs % 10;
+  if (rem === 1) return t("loyalty.stats.points_one");
+  if (rem >= 2 && rem <= 4) return t("loyalty.stats.points_few");
+  return t("loyalty.stats.points_many");
+}
+
 function PartnerLoyaltyContent() {
   const { partnerId } = usePartnerAccess();
   const { t } = useI18n();
@@ -315,15 +324,15 @@ function PartnerLoyaltyContent() {
             </div>
             <div className="bg-slate-50 p-4 rounded-lg">
               <div className="text-sm text-slate-500">{t("loyalty.stats.total_earned")}</div>
-              <div className="text-2xl font-bold text-green-600">{stats?.totalEarned || 0} {t("loyalty.stats.points")}</div>
+              <div className="text-2xl font-bold text-green-600">{stats?.totalEarned || 0} {pluralPoints(stats?.totalEarned || 0, t)}</div>
             </div>
             <div className="bg-slate-50 p-4 rounded-lg">
               <div className="text-sm text-slate-500">{t("loyalty.stats.total_spent")}</div>
-              <div className="text-2xl font-bold text-indigo-600">{stats?.totalSpent || 0} {t("loyalty.stats.points")}</div>
+              <div className="text-2xl font-bold text-indigo-600">{stats?.totalSpent || 0} {pluralPoints(stats?.totalSpent || 0, t)}</div>
             </div>
             <div className="bg-slate-50 p-4 rounded-lg">
               <div className="text-sm text-slate-500">{t("loyalty.stats.total_expired")}</div>
-              <div className="text-2xl font-bold text-amber-600">{stats?.totalExpired || 0} {t("loyalty.stats.points")}</div>
+              <div className="text-2xl font-bold text-amber-600">{stats?.totalExpired || 0} {pluralPoints(stats?.totalExpired || 0, t)}</div>
             </div>
             <div className="bg-slate-50 p-4 rounded-lg">
               <div className="text-sm text-slate-500">{t("loyalty.stats.reviews")}</div>
