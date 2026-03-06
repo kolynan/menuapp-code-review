@@ -256,6 +256,22 @@ const TYPE_THEME = {
   },
 };
 
+// FIX SO-S89-01: OrderStage.name may contain raw i18n keys like "orderprocess.default.new"
+// Map known keys to Russian display names as fallback
+const STAGE_NAME_FALLBACKS = {
+  "orderprocess.default.new": "Новый",
+  "orderprocess.default.accepted": "Принят",
+  "orderprocess.default.in_progress": "Готовится",
+  "orderprocess.default.ready": "Готов",
+  "orderprocess.default.served": "Выдан",
+  "orderprocess.default.cancelled": "Отменён",
+};
+
+function getStageName(stage) {
+  if (!stage?.name) return "—";
+  return STAGE_NAME_FALLBACKS[stage.name] || stage.name;
+}
+
 const REQUEST_TYPE_LABELS = {
   call_waiter: "Позвать официанта",
   bill: "Принести счёт",
@@ -2896,9 +2912,9 @@ export default function StaffOrdersMobile() {
       const isFinishStage = stage.internal_code === 'finish' || currentIndex === relevantStages.length - 1;
       
       return {
-        label: t(stage.name) || stage.name,
+        label: getStageName(stage),
         color: stage.color,
-        actionLabel: nextStage ? `→ ${t(nextStage.name) || nextStage.name}` : null,
+        actionLabel: nextStage ? `→ ${getStageName(nextStage)}` : null,
         nextStageId: nextStage?.id || null,
         nextStatus: null, // don't use old status
         badgeClass: '', // will use inline style with color
