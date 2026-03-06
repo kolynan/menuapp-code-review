@@ -22,6 +22,12 @@
 
 ---
 
+## Fixed (in RELEASE 260306-02)
+
+| ID | Priority | Description | Commit |
+|----|----------|-------------|--------|
+| BUG-PC-S89-01 | P2 | "1 Баллы" — wrong Russian declension in client detail balance. Added pluralPoints() for correct pluralization (1→Балл, 2-4→Балла, 5+→Баллов) | `a2acbd4` |
+
 ## Active
 
 | ID | Priority | Description | Line(s) | Notes |
