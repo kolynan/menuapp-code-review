@@ -13,11 +13,19 @@ import { Loader2, Check, Gift } from "lucide-react";
 
 function pluralPoints(n, t) {
   const abs = Math.abs(n) % 100;
-  if (abs >= 11 && abs <= 14) return t("loyalty.stats.points_many");
   const rem = abs % 10;
-  if (rem === 1) return t("loyalty.stats.points_one");
-  if (rem >= 2 && rem <= 4) return t("loyalty.stats.points_few");
-  return t("loyalty.stats.points_many");
+  let key, fallback;
+  if (abs >= 11 && abs <= 14) {
+    key = "loyalty.stats.points_many"; fallback = "Баллов";
+  } else if (rem === 1) {
+    key = "loyalty.stats.points_one"; fallback = "Балл";
+  } else if (rem >= 2 && rem <= 4) {
+    key = "loyalty.stats.points_few"; fallback = "Балла";
+  } else {
+    key = "loyalty.stats.points_many"; fallback = "Баллов";
+  }
+  const translated = t(key);
+  return translated !== key ? translated : fallback;
 }
 
 function PartnerLoyaltyContent() {
