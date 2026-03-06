@@ -252,6 +252,11 @@ function getLinkId(field) {
   return null;
 }
 
+function withTablePrefix(name) {
+  if (!name) return "Стол …";
+  return String(name).startsWith("Стол ") ? String(name) : `Стол ${name}`;
+}
+
 function getAssignee(order) {
   return order.assignee || null;
 }
@@ -711,7 +716,7 @@ function RequestCard({ request, tableData, onAction, isPending, isFavorite, onTo
   
   // P0-1: Normalize table link
   const reqTableId = getLinkId(request.table);
-  const tableLabel = reqTableId && tableData ? `Стол ${tableData.name}` : request.table ? "Стол …" : "—";
+  const tableLabel = reqTableId && tableData ? withTablePrefix(tableData.name) : request.table ? "Стол …" : "—";
 
   const statusLabel = request.status === "new" ? "Новый" : "В работе";
   const statusBadgeClass =
@@ -880,7 +885,7 @@ function OrderCard({
   if (order.order_type === "hall") {
     // P0-1: Use normalized tableId
     if (tableId && tableData) {
-      mainText = `Стол ${tableData.name}`;
+      mainText = withTablePrefix(tableData.name);
       if (tableData.zone_name) secondaryText = tableData.zone_name;
     } else {
       mainText = "Стол не указан";
@@ -889,7 +894,7 @@ function OrderCard({
         const lines = order.comment.split("\n");
         const note = lines[0].replace("Стол:", "").trim();
         if (note) {
-          mainText = `Стол ${note}`;
+          mainText = withTablePrefix(note);
           isTableMissing = false;
           displayComment = lines.slice(1).join("\n").trim() || null;
         }
@@ -1280,7 +1285,7 @@ function MyTablesModal({ open, onClose, tables, favorites, onToggleFavorite, onC
                   <div className="flex items-center gap-3">
                     <Star className={`w-5 h-5 ${isFav ? "fill-yellow-400 text-yellow-400" : "text-slate-300"}`} />
                     <div className="text-left">
-                      <div className="font-medium text-slate-900">Стол {table.name}</div>
+                      <div className="font-medium text-slate-900">{withTablePrefix(table.name)}</div>
                       {table.zone_name && <div className="text-xs text-slate-500">{table.zone_name}</div>}
                     </div>
                   </div>
@@ -2401,7 +2406,7 @@ export default function StaffOrdersMobile() {
           tableGroups[tableId] = {
             type: 'table',
             id: tableId,
-            displayName: `Стол ${tableName}`,
+            displayName: withTablePrefix(tableName),
             orders: [],
           };
           groups.push(tableGroups[tableId]);
