@@ -28,7 +28,7 @@ export default function StickyCartBar({
   const isCloseMode = isDrawerOpen === true;
   
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 safe-area-pb z-30">
+    <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 pb-[max(1rem,env(safe-area-inset-bottom))] z-30">
       <div className="max-w-2xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-full ${isCloseMode ? 'bg-slate-200' : 'bg-indigo-100'}`}>

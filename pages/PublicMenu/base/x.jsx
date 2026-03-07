@@ -395,7 +395,13 @@ const I18N_FALLBACKS = {
   "cart.your_order": "Ваш заказ",
   "cart.back_to_menu": "Назад к меню",
   "cart.total": "Итого",
+  "cart.expected_savings": "Ожидаемая выгода",
   "cart.submitting": "Отправка...",
+  "cta.sending": "Отправляем...",
+  "cta.retry": "Повторить отправку",
+  "error.send.title": "Не удалось отправить",
+  "error.send.subtitle": "Ваш заказ сохранён. Попробуйте снова",
+  "cart.item_added": "Добавлено",
   "cart.send_to_waiter": "Отправить официанту",
   "cart.send_order": "Отправить заказ",
   // Checkout form (CheckoutView)
@@ -2152,14 +2158,16 @@ export default function X() {
       if (existing) {
         return prev.map((i) => (i.dishId === dish.id ? { ...i, quantity: i.quantity + 1 } : i));
       }
-      return [...prev, { 
-        dishId: dish.id, 
-        name: translatedName, 
+      return [...prev, {
+        dishId: dish.id,
+        name: translatedName,
         originalName: dish.name,
-        price: dish.price, 
-        quantity: 1 
+        price: dish.price,
+        quantity: 1
       }];
     });
+    // AC-09: Toast "Добавлено" — non-blocking, auto-dismiss 2s
+    toast.success(t('cart.item_added'), { id: 'cart-add', duration: 2000 });
   };
 
   const updateQuantity = (dishId, delta) => {
@@ -2516,7 +2524,7 @@ export default function X() {
       return true;
     } catch (err) {
       console.error(err);
-      setSubmitError(t('error.submit_failed'));
+      setSubmitError(t('error.send.title'));
       return false;
     }
   };
@@ -2844,7 +2852,7 @@ export default function X() {
       }
     } catch (err) {
       console.error(err);
-      setSubmitError(t('error.submit_failed'));
+      setSubmitError(t('error.send.title'));
     } finally {
       submitLockRef.current = false;
       setIsSubmitting(false);
@@ -3233,6 +3241,8 @@ export default function X() {
               discountAmount={discountAmount}
               pointsDiscountAmount={pointsDiscountAmount}
               isSubmitting={isSubmitting}
+              submitError={submitError}
+              setSubmitError={setSubmitError}
               handleSubmitOrder={handleSubmitOrder}
               myOrders={myOrders}
               itemsByOrder={itemsByOrder}

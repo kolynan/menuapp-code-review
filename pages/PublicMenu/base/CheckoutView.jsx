@@ -149,21 +149,37 @@ export default function CheckoutView({
         </CardContent>
       </Card>
 
-      {submitError && <div className="text-sm text-red-600 text-center bg-red-50 p-2 rounded">{submitError}</div>}
+      {/* AC-08: Error state with subtitle */}
+      {submitError && (
+        <div className="text-center bg-red-50 border border-red-200 p-3 rounded-lg">
+          <p className="text-sm font-medium text-red-700">{submitError}</p>
+          <p className="text-xs text-red-500 mt-1">{t('error.send.subtitle')}</p>
+        </div>
+      )}
 
       {/* Spacer so sticky button doesn't overlap last content */}
       {(orderMode !== "hall" || isTableVerified) && <div className="h-20" />}
 
       {/* Submit button - sticky at bottom of viewport */}
       {(orderMode !== "hall" || isTableVerified) && (
-        <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 -mx-4">
+        <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] -mx-4">
           <Button
             size="lg"
-            className="w-full bg-green-600 hover:bg-green-700 text-lg h-12"
+            className={`w-full text-lg h-12 ${
+              isSubmitting
+                ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
+                : submitError
+                  ? 'bg-red-600 hover:bg-red-700'
+                  : 'bg-green-600 hover:bg-green-700'
+            }`}
             onClick={handleSubmitOrder}
             disabled={isSubmitting}
           >
-            {isSubmitting ? (t('cart.submitting')) : (orderMode === 'hall' ? t('cart.send_to_waiter') : t('cart.send_order'))}
+            {isSubmitting
+              ? t('cta.sending')
+              : submitError
+                ? t('cta.retry')
+                : (orderMode === 'hall' ? t('cart.send_to_waiter') : t('cart.send_order'))}
           </Button>
         </div>
       )}

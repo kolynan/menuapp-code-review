@@ -37,6 +37,8 @@ export default function CartView({
   discountAmount,
   pointsDiscountAmount,
   isSubmitting,
+  submitError,
+  setSubmitError,
   handleSubmitOrder,
   myOrders,
   itemsByOrder,
@@ -1008,7 +1010,12 @@ export default function CartView({
                   </button>
                 </div>
 
-                {/* Benefits are shown only when partner enabled them; no "if enabled" text */}
+                {/* AC-03: Expected savings — separate from total, not subtracted */}
+                {(discountAmount > 0 || (partner?.loyalty_enabled && earnedPoints > 0) || pointsDiscountAmount > 0) && (
+                  <p className="text-xs text-amber-700 font-medium mb-1">
+                    {tr('cart.expected_savings', 'Ожидаемая выгода')}:
+                  </p>
+                )}
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-sm text-amber-900">
                     <span>{tr('cart.verify.discount_label', 'Скидка за онлайн-заказ')}</span>
@@ -1198,20 +1205,41 @@ export default function CartView({
       {/* Spacer so sticky button doesn't overlap last content */}
       {cart.length > 0 && <div className="h-20" />}
 
+      {/* AC-08: Error state with retry */}
+      {submitError && cart.length > 0 && (
+        <div className="mx-0 mb-2 p-3 bg-red-50 border border-red-200 rounded-lg text-center">
+          <p className="text-sm font-medium text-red-700">{submitError}</p>
+          <p className="text-xs text-red-500 mt-1">
+            {tr('error.send.subtitle', 'Ваш заказ сохранён. Попробуйте снова')}
+          </p>
+        </div>
+      )}
+
       {/* Submit button - sticky at bottom of drawer scroll area */}
       {cart.length > 0 && (
         <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 -mx-4">
           <Button
             size="lg"
             className={`w-full ${
-              isTableVerified === false
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300'
-                : 'bg-green-600 hover:bg-green-700'
+              isSubmitting
+                ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
+                : isTableVerified === false
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300'
+                  : submitError
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-green-600 hover:bg-green-700'
             }`}
-            onClick={handleSubmitOrder}
+            onClick={() => {
+              if (submitError && setSubmitError) setSubmitError(null);
+              handleSubmitOrder();
+            }}
             disabled={isSubmitting || isTableVerified === false}
           >
-            {isSubmitting ? tr('cart.submitting', 'Отправка...') : tr('cart.send_to_waiter', 'Отправить заказ официанту')}
+            {isSubmitting
+              ? tr('cta.sending', 'Отправляем...')
+              : submitError
+                ? tr('cta.retry', 'Повторить отправку')
+                : tr('cart.send_to_waiter', 'Отправить заказ официанту')}
           </Button>
           {isTableVerified === false && (
             <p className="text-xs text-gray-400 text-center mt-1">
