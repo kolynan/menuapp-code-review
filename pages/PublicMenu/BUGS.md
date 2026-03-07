@@ -1,7 +1,7 @@
 ---
-version: "18.0"
-updated: "2026-03-06"
-session: 84
+version: "19.0"
+updated: "2026-03-07"
+session: 87
 ---
 
 # PublicMenu — Bug Registry
@@ -35,6 +35,14 @@ session: 84
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-S87-03: CTA button "Send to waiter" looks active when disabled (P2) — FIXED S87
+- **Когда:** S87 testing
+- **Файл:** `CartView.jsx` — submit button at bottom of cart drawer
+- **Симптом:** Button always shows `bg-green-600` regardless of disabled state. When `isTableVerified === false`, button looks clickable (green) but does nothing. Confusing UX.
+- **Root cause:** `className="w-full bg-green-600 hover:bg-green-700"` was unconditional — no visual change for disabled state.
+- **Фикс:** Conditional className: `isTableVerified === false` → `bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300`. Added hint text `tr('cart.enter_table_code_hint', 'Введите код стола чтобы отправить заказ')` below button when disabled.
+- **RELEASE:** pending (parallel mode, pre-merge)
 
 ### BUG-PM-028: Table code input shows 5 boxes for 4-digit codes (S81-02, P0) — FIXED S82
 - **Когда:** S81 testing
