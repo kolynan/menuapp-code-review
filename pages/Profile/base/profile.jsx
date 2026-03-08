@@ -2,7 +2,7 @@
 // BLOCK 00 — IMPORTS & CONSTANTS
 // ============================================================
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useI18n } from "@/components/i18n";
@@ -12,6 +12,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
+import PartnerShell from "@/components/PartnerShell";
+
+const GLOBAL_ADMIN_PARTNER = "global_admin";
 
 const ROLE_BADGE_CLASSES = {
   admin: "bg-red-100 text-red-800",
@@ -25,7 +28,7 @@ const ROLE_BADGE_CLASSES = {
 // BLOCK 01 — MAIN COMPONENT
 // ============================================================
 
-export default function Profile() {
+function ProfileContent() {
   const navigate = useNavigate();
   const { t } = useI18n();
 
@@ -44,40 +47,51 @@ export default function Profile() {
   const [initialFullName, setInitialFullName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | success
+  const timerRef = useRef(null);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   // ============================================================
   // BLOCK 02 — DATA LOADING
   // ============================================================
 
   useEffect(() => {
+    let isMounted = true;
     const loadUser = async () => {
       try {
         const userData = await base44.auth.me();
+        if (!isMounted) return;
         setUser(userData);
-        setFullName(userData.full_name || "");
-        setInitialFullName(userData.full_name || "");
+        setFullName((userData.full_name || "").trim());
+        setInitialFullName((userData.full_name || "").trim());
 
         // Load partner name if exists
-        if (userData.partner && userData.partner !== "global_admin") {
+        if (userData.partner && userData.partner !== GLOBAL_ADMIN_PARTNER) {
           try {
             const partner = await base44.entities.Partner.get(userData.partner);
-            if (partner) {
+            if (isMounted && partner) {
               setPartnerName(partner.name);
             }
           } catch (err) {
-            console.error("Failed to load partner:", err);
+            // Partner load failed — user sees "Не привязан"
           }
         }
       } catch (error) {
-        console.error("Failed to load user:", error);
+        if (!isMounted) return;
         toast.error(tr("toast.error", "Ошибка"), { id: "mm1" });
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
 
     loadUser();
-  }, [t]);
+    return () => { isMounted = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ============================================================
   // BLOCK 03 — HANDLERS
@@ -94,11 +108,10 @@ export default function Profile() {
       await base44.auth.updateMe({ full_name: fullName.trim() });
       setInitialFullName(fullName.trim());
       setSaveStatus("success");
-      toast.success(tr("toast.profile_saved", "Профиль сохранён"), { id: "mm1" });
+      toast.success(tr("toast.saved", "Сохранено"), { id: "mm1" });
 
-      setTimeout(() => setSaveStatus("idle"), 2000);
+      timerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (error) {
-      console.error("Failed to save:", error);
       toast.error(tr("toast.error", "Ошибка"), { id: "mm1" });
       setSaveStatus("idle");
     }
@@ -165,7 +178,7 @@ export default function Profile() {
           variant="ghost"
           size="sm"
           onClick={() => navigate("/partnerhome")}
-          className="flex items-center gap-1 -ml-2"
+          className="flex items-center gap-1 -ml-2 min-h-[44px]"
         >
           <ArrowLeft className="w-4 h-4" />
           {tr("common.back", "Назад")}
@@ -181,12 +194,11 @@ export default function Profile() {
           <CardContent className="space-y-4">
             {/* Full Name - editable */}
             <div className="space-y-2">
-              <Label htmlFor="fullName">{tr("profile.fullName", "Полное имя")}</Label>
+              <Label htmlFor="fullName">{tr("profile.full_name", "Полное имя")}</Label>
               <Input
                 id="fullName"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                autoFocus
               />
             </div>
 
@@ -223,7 +235,7 @@ export default function Profile() {
             <Button
               onClick={handleSave}
               disabled={!canSave || saveStatus !== "idle"}
-              className="w-full"
+              className="w-full min-h-[44px]"
             >
               {getSaveButtonContent()}
             </Button>
@@ -231,5 +243,17 @@ export default function Profile() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// ============================================================
+// BLOCK 07 — PARTNERSHELL WRAPPER
+// ============================================================
+
+export default function Profile() {
+  return (
+    <PartnerShell>
+      <ProfileContent />
+    </PartnerShell>
   );
 }
