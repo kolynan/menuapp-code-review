@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import PartnerShell from "@/components/PartnerShell";
 
 const GLOBAL_ADMIN_PARTNER = "global_admin";
+const BACK_ROUTE = "/partnerhome";
 
 const ROLE_BADGE_CLASSES = {
   admin: "bg-red-100 text-red-800",
@@ -177,7 +178,7 @@ function ProfileContent() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate("/partnerhome")}
+          onClick={() => navigate(BACK_ROUTE)}
           className="flex items-center gap-1 -ml-2 min-h-[44px]"
         >
           <ArrowLeft className="w-4 h-4" />

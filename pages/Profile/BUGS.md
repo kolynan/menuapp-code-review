@@ -159,11 +159,14 @@ RELEASE: 260301-01 profile RELEASE.jsx
 
 ---
 
-## Active Bugs (not fixed)
-
 ### BUG-PF-008 (P2) — autoFocus triggers keyboard on mobile
-- **Line:** 231
-- **Impact:** Virtual keyboard opens immediately on profile page, pushing content up. Jarring on read-heavy page.
+- **RELEASE:** 260308-00 (S101, CC)
+- **Problem:** Virtual keyboard opens immediately on profile page, pushing content up. Jarring on read-heavy page.
+- **Fix:** Removed autoFocus from fullName Input. (Was already applied in base file from S100.)
+
+---
+
+## Active Bugs (not fixed)
 
 ### BUG-PF-010 (P3) — Decorative icons missing aria-hidden
 - **Lines:** 150, 179, 187, 212
