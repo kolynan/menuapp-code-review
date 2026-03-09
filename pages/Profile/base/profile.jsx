@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Loader2, Check } from "lucide-react";
+import { ArrowLeft, AlertCircle, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
 import PartnerShell from "@/components/PartnerShell";
 
@@ -47,6 +47,7 @@ function ProfileContent() {
   const [fullName, setFullName] = useState("");
   const [initialFullName, setInitialFullName] = useState("");
   const [isUserLoading, setIsUserLoading] = useState(true);
+  const [isLoadError, setIsLoadError] = useState(false);
   const [isPartnerLoading, setIsPartnerLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | success
   const timerRef = useRef(null);
@@ -92,7 +93,7 @@ function ProfileContent() {
         }
       } catch (error) {
         if (!isMounted) return;
-        toast.error(tr("toast.error", "Ошибка"), { id: "mm1" });
+        setIsLoadError(true);
         setIsUserLoading(false);
       }
     };
@@ -148,6 +149,23 @@ function ProfileContent() {
           <Loader2 className="w-5 h-5 animate-spin" />
           <span>{tr("common.loading", "Загрузка...")}</span>
         </div>
+      </div>
+    );
+  }
+
+  if (isLoadError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 p-4">
+        <AlertCircle className="w-10 h-10 text-red-400" />
+        <p className="text-gray-600 text-center">{tr("profile.load_error", "Не удалось загрузить профиль")}</p>
+        <Button
+          variant="outline"
+          onClick={() => navigate(BACK_ROUTE)}
+          className="min-h-[44px] min-w-[44px]"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          {tr("common.back", "Назад")}
+        </Button>
       </div>
     );
   }

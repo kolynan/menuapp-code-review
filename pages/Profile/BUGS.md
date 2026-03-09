@@ -184,6 +184,21 @@ Fixed bugs: BUG-PF-002, BUG-PF-004, BUG-PF-005, BUG-PF-007, BUG-PF-008,
 - **Lines:** 150, 179, 187, 212
 - **Impact:** Screen readers announce decorative SVG icons.
 
+### BUG-S105-02 (P2) — Input fields missing min-h-[44px]
+- **Lines:** ~211, ~221 (Full Name and Email inputs)
+- **Problem:** BUG-PF-025 was fixed in RELEASE 260301-00, but current base file doesn't have `min-h-[44px]` on Input components. Touch targets below 44px minimum on mobile.
+- **Fix:** Add `className="min-h-[44px]"` to both Full Name and Email `<Input>` components.
+
+### BUG-S105-03 (P2) — Save button not in fixed footer on mobile
+- **Lines:** ~255-261 (save button inside CardContent)
+- **Problem:** BUG-PF-023 was fixed in RELEASE 260301-00 (sticky→fixed for iOS Safari), but current base has the save button inline in the form — not always visible without scrolling on mobile.
+- **Fix:** Move save button to `fixed inset-x-0 bottom-0` footer with safe-area padding; add spacer div for content offset.
+
+### BUG-S105-04 (P2) — Partner load failure indistinguishable from "no restaurant"
+- **Lines:** ~87-91 (partner catch block)
+- **Problem:** BUG-PF-015 fixed `isPartnerLoadFailed` state in RELEASE 260227-01, but current base shows "Не привязан" for both "user has no partner" and "partner fetch failed". README states this should show a distinct message.
+- **Fix:** Add `isPartnerLoadFailed` state. In partner catch block, `setIsPartnerLoadFailed(true)`. In render, show `tr("profile.restaurant_load_error", "Ошибка загрузки")` when `isPartnerLoadFailed`.
+
 ---
 
 ## S105 Session (2026-03-09) — 5 bugs fixed from S104 analysis
@@ -220,3 +235,17 @@ Commit: `fix: Profile PR-S104-01..05 (unmount guard, loading states, a11y fixes)
 - **Problem:** Screen readers not notified when page is loading.
 - **Fix:** Added `role="status"` and `aria-live="polite"` to the full-page loading container div.
 - **Status:** FIXED
+
+---
+
+## S105 Smoke Test (2026-03-09) — task smoke-test-v61-s105
+
+Smoke test for run-vsc-task.sh v6.1. Primary goal: verify `--full-auto` Codex flag.
+**Codex result:** `--full-auto` flag accepted (no flag error = v6.1 smoke test PASS). But `codex-mini-latest` model unsupported for ChatGPT account — no Codex findings.
+**CC analysis:** 1 P1 regression fixed, 3 P2 regressions logged as Active Bugs.
+
+### BUG-S105-01 (P1) — Missing error state when auth.me() fails [REGRESSION]
+- **Session:** S105 smoke test
+- **Problem:** BUG-PF-001 / BUG-PF-017 were previously fixed (error screen with icon + back button), but the fix was lost in subsequent base file updates. Current code only shows a brief toast then renders an empty form — user has no persistent error indicator, no way to navigate back except browser history. README explicitly states "Error state screen with icon + message if auth.me() fails" as a feature.
+- **Fix applied:** Added `isLoadError` state. Catch block now sets `setIsLoadError(true)`. Added error render block with `AlertCircle` icon, `tr("profile.load_error", "Не удалось загрузить профиль")`, and Back button (`min-h-[44px]`). Also added `AlertCircle` to lucide-react import.
+- **Status:** FIXED (S105 smoke test commit)
