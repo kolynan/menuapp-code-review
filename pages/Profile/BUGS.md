@@ -6,6 +6,18 @@ RELEASE: 260301-01 profile RELEASE.jsx
 
 ---
 
+## S101 Session (2026-03-09) — 12 bugs applied from S100 analysis
+
+All 6 P1 and 6 P2 bugs from S100 (cc-analysis-task-260308-114704) were verified applied.
+S100 commit: `4e9c943` | BACK_ROUTE constant: `de3fc98`
+RELEASE: 260309-00 (pending merge with Codex)
+
+Fixed bugs: BUG-PF-002, BUG-PF-004, BUG-PF-005, BUG-PF-007, BUG-PF-008,
+            BUG-PF-011, BUG-PF-012, BUG-PF-013, BUG-PF-014, BUG-PF-018,
+            BUG-PF-021 (x2: back + save buttons)
+
+---
+
 ## Fixed Bugs
 
 ### BUG-PF-001 (P1) — No error state when auth.me() fails
