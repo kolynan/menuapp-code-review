@@ -180,6 +180,18 @@ Fixed bugs: BUG-PF-002, BUG-PF-004, BUG-PF-005, BUG-PF-007, BUG-PF-008,
 
 ## Active Bugs (not fixed)
 
+### BUG-S106-01 (P3) — PartnerShell missing activeTab prop
+- **Lines:** 294 (`<PartnerShell>`)
+- **Session:** S106 smoke test v6.2
+- **Problem:** `<PartnerShell>` called without `activeTab` prop. CLAUDE.md pattern requires `<PartnerShell activeTab="tabname">`. Navigation tabs may show no active state.
+- **Fix:** Determine correct activeTab value for Profile (likely "profile" or omit if Profile is not in partner nav).
+
+### BUG-S106-02 (P3) — getRoleLabel null guard missing
+- **Lines:** 133–135 (`getRoleLabel`)
+- **Session:** S106 smoke test v6.2
+- **Problem:** `getRoleLabel(undefined)` returns `undefined` because `tr("profile.role.undefined", undefined)` returns `undefined` as fallback. Badge renders with correct CSS but no text. i18n key `profile.role.unknown` listed in README but never used. Regression from BUG-PF-003.
+- **Fix:** Add null guard: `if (!userRole) return tr("profile.role.unknown", "Неизвестная роль");` at start of getRoleLabel.
+
 ### BUG-PF-010 (P3) — Decorative icons missing aria-hidden
 - **Lines:** 150, 179, 187, 212
 - **Impact:** Screen readers announce decorative SVG icons.
@@ -235,6 +247,17 @@ Commit: `fix: Profile PR-S104-01..05 (unmount guard, loading states, a11y fixes)
 - **Problem:** Screen readers not notified when page is loading.
 - **Fix:** Added `role="status"` and `aria-live="polite"` to the full-page loading container div.
 - **Status:** FIXED
+
+---
+
+## S106 Smoke Test (2026-03-09) — task smoke-test-v62-s105
+
+Smoke test for run-vsc-task.sh v6.2. Primary goal: verify `-C path` and default model flags.
+**Codex result:** Flags accepted (--full-auto + -C path + default gpt-5.4 model all OK). Internal PowerShell commands timed out (exit 124) — no findings. v6.2 pipeline flags PASS.
+**CC analysis:** 0 P1 bugs, 2 new P3 bugs logged. No code changes made.
+
+### BUG-S106-01 (P3) — PartnerShell missing activeTab prop [logged, not fixed]
+### BUG-S106-02 (P3) — getRoleLabel null guard missing [logged, not fixed]
 
 ---
 
