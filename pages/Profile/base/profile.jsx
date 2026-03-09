@@ -46,13 +46,16 @@ function ProfileContent() {
   const [partnerName, setPartnerName] = useState(null);
   const [fullName, setFullName] = useState("");
   const [initialFullName, setInitialFullName] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isUserLoading, setIsUserLoading] = useState(true);
+  const [isPartnerLoading, setIsPartnerLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | success
   const timerRef = useRef(null);
+  const isMountedRef = useRef(true);
 
   // Cleanup timer on unmount
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);
@@ -71,8 +74,11 @@ function ProfileContent() {
         setFullName((userData.full_name || "").trim());
         setInitialFullName((userData.full_name || "").trim());
 
+        if (isMounted) setIsUserLoading(false);
+
         // Load partner name if exists
         if (userData.partner && userData.partner !== GLOBAL_ADMIN_PARTNER) {
+          if (isMounted) setIsPartnerLoading(true);
           try {
             const partner = await base44.entities.Partner.get(userData.partner);
             if (isMounted && partner) {
@@ -80,13 +86,14 @@ function ProfileContent() {
             }
           } catch (err) {
             // Partner load failed — user sees "Не привязан"
+          } finally {
+            if (isMounted) setIsPartnerLoading(false);
           }
         }
       } catch (error) {
         if (!isMounted) return;
         toast.error(tr("toast.error", "Ошибка"), { id: "mm1" });
-      } finally {
-        if (isMounted) setIsLoading(false);
+        setIsUserLoading(false);
       }
     };
 
@@ -107,12 +114,16 @@ function ProfileContent() {
     setSaveStatus("saving");
     try {
       await base44.auth.updateMe({ full_name: fullName.trim() });
+      if (!isMountedRef.current) return;
       setInitialFullName(fullName.trim());
       setSaveStatus("success");
       toast.success(tr("toast.saved", "Сохранено"), { id: "mm1" });
 
-      timerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+      timerRef.current = setTimeout(() => {
+        if (isMountedRef.current) setSaveStatus("idle");
+      }, 2000);
     } catch (error) {
+      if (!isMountedRef.current) return;
       toast.error(tr("toast.error", "Ошибка"), { id: "mm1" });
       setSaveStatus("idle");
     }
@@ -130,10 +141,10 @@ function ProfileContent() {
   // BLOCK 04 — LOADING STATE
   // ============================================================
 
-  if (isLoading) {
+  if (isUserLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex items-center gap-2 text-gray-500">
+        <div className="flex items-center gap-2 text-gray-500" role="status" aria-live="polite">
           <Loader2 className="w-5 h-5 animate-spin" />
           <span>{tr("common.loading", "Загрузка...")}</span>
         </div>
@@ -192,7 +203,8 @@ function ProfileContent() {
           <CardHeader>
             <CardTitle>{tr("profile.title", "Профиль")}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
+            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
             {/* Full Name - editable */}
             <div className="space-y-2">
               <Label htmlFor="fullName">{tr("profile.full_name", "Полное имя")}</Label>
@@ -216,7 +228,7 @@ function ProfileContent() {
 
             {/* Role - badge */}
             <div className="space-y-2">
-              <Label>{tr("profile.role", "Роль")}</Label>
+              <p className="text-sm font-medium">{tr("profile.role", "Роль")}</p>
               <div>
                 <span
                   className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeClass(user?.user_role)}`}
@@ -228,18 +240,26 @@ function ProfileContent() {
 
             {/* Restaurant - text */}
             <div className="space-y-2">
-              <Label>{tr("profile.restaurant", "Ресторан")}</Label>
-              <p className="text-sm text-gray-700">{restaurantDisplay}</p>
+              <p className="text-sm font-medium">{tr("profile.restaurant", "Ресторан")}</p>
+              {isPartnerLoading ? (
+                <div className="flex items-center gap-1 text-gray-400" role="status" aria-live="polite">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span className="text-sm">{tr("common.loading", "Загрузка...")}</span>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-700">{restaurantDisplay}</p>
+              )}
             </div>
 
-            {/* Save Button */}
-            <Button
-              onClick={handleSave}
-              disabled={!canSave || saveStatus !== "idle"}
-              className="w-full min-h-[44px]"
-            >
-              {getSaveButtonContent()}
-            </Button>
+              {/* Save Button */}
+              <Button
+                type="submit"
+                disabled={!canSave || saveStatus !== "idle"}
+                className="w-full min-h-[44px]"
+              >
+                {getSaveButtonContent()}
+              </Button>
+            </form>
           </CardContent>
         </Card>
       </div>

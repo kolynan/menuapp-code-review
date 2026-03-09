@@ -183,3 +183,40 @@ Fixed bugs: BUG-PF-002, BUG-PF-004, BUG-PF-005, BUG-PF-007, BUG-PF-008,
 ### BUG-PF-010 (P3) — Decorative icons missing aria-hidden
 - **Lines:** 150, 179, 187, 212
 - **Impact:** Screen readers announce decorative SVG icons.
+
+---
+
+## S105 Session (2026-03-09) — 5 bugs fixed from S104 analysis
+
+All 5 bugs found by Codex in S104 (PR-S104-01..05) applied by CC in S105.
+Commit: `fix: Profile PR-S104-01..05 (unmount guard, loading states, a11y fixes)`
+
+### PR-S104-01 (P2) — handleSave() without unmount guard
+- **RELEASE:** S105
+- **Problem:** If user navigates away during save, resolved promise calls `setInitialFullName`, `setSaveStatus`, `toast` on unmounted component → memory leak + React warning.
+- **Fix:** Added `isMountedRef = useRef(true)` set to `false` in cleanup. Guard all state updates in `handleSave` with `if (!isMountedRef.current) return;`. Also guards `setSaveStatus("idle")` inside setTimeout.
+- **Status:** FIXED
+
+### PR-S104-02 (P2) — Partner.get() blocks full screen spinner
+- **RELEASE:** S105
+- **Problem:** `isLoading=true` during both user AND partner data load. Full-screen spinner shown unnecessarily while partner name loads (user data already available).
+- **Fix:** Replaced `isLoading` with `isUserLoading` + `isPartnerLoading`. `setIsUserLoading(false)` called immediately after user data loads (before partner fetch). Partner section shows small inline `Loader2` spinner during `isPartnerLoading`.
+- **Status:** FIXED
+
+### PR-S104-03 (P3) — Orphaned `<Label>` for static text
+- **RELEASE:** S105
+- **Problem:** `<Label>` used for role and restaurant display (no `htmlFor`). Invalid markup for screen readers.
+- **Fix:** Replaced with `<p className="text-sm font-medium">` for role and restaurant headings. Full Name and Email `<Label htmlFor=...>` remain unchanged.
+- **Status:** FIXED
+
+### PR-S104-04 (P3) — No `<form>` wrapper
+- **RELEASE:** S105
+- **Problem:** Pressing Enter in name input does not submit. Mobile IME "Go" button does not trigger save.
+- **Fix:** Wrapped `CardContent` children in `<form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>`. Changed Save button to `type="submit"`, removed `onClick`.
+- **Status:** FIXED
+
+### PR-S104-05 (P3) — Loading state without aria attributes
+- **RELEASE:** S105
+- **Problem:** Screen readers not notified when page is loading.
+- **Fix:** Added `role="status"` and `aria-live="polite"` to the full-page loading container div.
+- **Status:** FIXED
