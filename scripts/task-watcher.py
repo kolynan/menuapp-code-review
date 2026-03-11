@@ -748,6 +748,20 @@ def detect_codex_status(ctx: TaskContext) -> str:
     except OSError:
         pass
 
+    # Also check agent worktrees (CC with --agent may write files there) — KB-016/KB-018
+    try:
+        for worktree_dir in sorted(
+            ctx.work_dir.glob('.claude/worktrees/agent-*/'),
+            key=lambda d: d.stat().st_mtime,
+            reverse=True,
+        ):
+            for cdx_file in worktree_dir.glob('codex-round*-discussion.md'):
+                if cdx_file.stat().st_size > 0 and int(cdx_file.stat().st_mtime) >= ctx.start_epoch:
+                    return 'done'
+            break  # only check newest worktree
+    except OSError:
+        pass
+
     analysis_text = read_text(ctx.cc_analysis_file)
     progress_text = read_text(ctx.progress_file)
     if 'CODEX FAILED' in analysis_text or 'Codex: failed' in progress_text or 'Cdx: failed' in progress_text:
