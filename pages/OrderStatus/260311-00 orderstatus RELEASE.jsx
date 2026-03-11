@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 // ── Constants ──────────────────────────────────────────
 const POLL_INTERVAL_MS = 10000;
 const ORDER_MAX_AGE_HOURS = 24;
-const TERMINAL_STATUSES = ["served", "completed", "cancelled"];
+const TERMINAL_STATUSES = ["served", "completed", "closed", "cancelled"];
 const SAFE_TEL_RE = /^tel:[+\d\s\-().]+$/;
 const TOKEN_RE = /^[a-z0-9]{4,20}$/;
 
@@ -84,6 +84,13 @@ function getStatusConfig(status, t) {
       border: "border-slate-200",
       icon: Check,
     },
+    closed: {
+      label: t("order_status.status_served"),
+      color: "text-slate-500",
+      bg: "bg-slate-50",
+      border: "border-slate-200",
+      icon: Check,
+    },
     cancelled: {
       label: t("order_status.status_cancelled"),
       color: "text-red-600",
@@ -99,7 +106,7 @@ function getStatusConfig(status, t) {
 function StatusProgress({ currentStatus, t }) {
   const currentIdx = getStepIndex(currentStatus);
   const isCancelled = currentStatus === "cancelled";
-  const isTerminal = currentStatus === "served" || currentStatus === "completed" || currentStatus === "ready";
+  const isTerminal = currentStatus === "served" || currentStatus === "completed" || currentStatus === "closed" || currentStatus === "ready";
 
   const steps = [
     { key: "new", label: t("order_status.step_received") },
@@ -291,12 +298,16 @@ export default function OrderStatus() {
     };
   }, [token, order?.id, isTerminal, isExpired, refetchOrder]);
 
-  // Set initial lastUpdated when order loads
+  // Reset lastUpdated when order loads or changes
   useEffect(() => {
-    if (order && !lastUpdated) {
+    if (order) {
       setLastUpdated(new Date());
+      setSecondsAgo(0);
+    } else {
+      setLastUpdated(null);
+      setSecondsAgo(0);
     }
-  }, [order, lastUpdated]);
+  }, [order?.id]);
 
   // ── "seconds ago" counter ───────────────────────────
   useEffect(() => {
@@ -359,7 +370,33 @@ export default function OrderStatus() {
     );
   }
 
-  if (orderError || !order) {
+  if (orderError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-8 text-center">
+            <XCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            <h2 className="text-lg font-semibold text-slate-800 mb-2">
+              {t("order_status.load_error")}
+            </h2>
+            <p className="text-sm text-slate-500 mb-4">
+              {t("order_status.try_again_later")}
+            </p>
+            <Button
+              variant="outline"
+              className="min-h-[44px]"
+              onClick={() => refetchOrder()}
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              {t("order_status.refresh")}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!order) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
         <Card className="w-full max-w-md">
