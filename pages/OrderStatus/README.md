@@ -36,8 +36,10 @@ Public order status tracking page for pickup/delivery guests.
 | Date | Version | Description |
 |---|---|---|
 | 2026-03-03 | 260303-01 | Initial implementation (GAP-02, S71) |
+| 2026-03-11 | 260311-00 | Code review S110: touch target, itemsTotal falsy fix, aria-label |
 
 ## UX Changelog
 | Date | Change |
 |---|---|
 | 2026-03-03 | New: page for tracking pickup/delivery order status |
+| 2026-03-11 | Fix: кнопка обновления увеличена до 44px, исправлен расчет для бесплатных позиций, добавлен aria-label |
