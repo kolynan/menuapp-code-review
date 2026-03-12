@@ -1,7 +1,7 @@
 ---
-version: "5.0"
-updated: "2026-03-07"
-session: 87
+version: "6.0"
+updated: "2026-03-12"
+session: 116
 ---
 
 # PublicMenu — README
@@ -20,12 +20,18 @@ session: 87
 
 ## Активные баги
 
-3 pre-existing бага (BUG-PM-023, BUG-PM-024, BUG-PM-025) — нет гарда null в CartView.
-Подробности: BUGS.md
+Нет активных багов. Все 3 pre-existing бага (BUG-PM-023, BUG-PM-024, BUG-PM-025) исправлены в S116.
 
 ---
 
 ## Changelog (UX/UI решения)
+
+### Session 116 — 12 мар 2026
+
+- BUG-PM-023: Исправлен краш при undefined `reviewedItems` — добавлен `safeReviewedItems` default
+- BUG-PM-024: Исправлен краш при undefined `loyaltyAccount.balance` — обёрнуто в `Number(... || 0)`
+- BUG-PM-025: Исправлен краш при undefined `draftRatings` — добавлен `safeDraftRatings` default
+- V7 smoke test: полный code review всех base файлов PublicMenu
 
 ### Session 87 — 07 мар 2026
 

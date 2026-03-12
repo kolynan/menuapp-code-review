@@ -1,7 +1,7 @@
 ---
-version: "19.0"
-updated: "2026-03-07"
-session: 87
+version: "20.0"
+updated: "2026-03-12"
+session: 116
 ---
 
 # PublicMenu — Bug Registry
@@ -13,28 +13,29 @@ session: 87
 
 ## Active Bugs (не исправлены)
 
-### BUG-PM-023: reviewedItems.has() without null guard (P0, pre-existing)
-
-- **Когда:** S79 review (pre-existing from S74)
-- **Файл:** CartView.jsx, Mode 2 order render
-- **Симптом:** If `reviewedItems` prop is undefined, calling `.has()` crashes the render
-- **Фикс:** Add `safeReviewedItems` default in safe prop defaults block
-
-### BUG-PM-024: loyaltyAccount.balance without null guard (P0, pre-existing)
-- **Когда:** S79 review (pre-existing from S74)
-- **Файл:** CartView.jsx, loyalty section
-- **Симптом:** If `loyaltyAccount.balance` is undefined/null, `.toLocaleString()` crashes
-- **Фикс:** Wrap with `Number(loyaltyAccount.balance || 0)`
-
-### BUG-PM-025: draftRatings prop without null guard (P1, pre-existing)
-- **Когда:** S79 review (pre-existing from S74)
-- **Файл:** CartView.jsx, Mode 2 order render
-- **Симптом:** If `draftRatings` is undefined, accessing `draftRatings[itemId]` crashes
-- **Фикс:** Add `safeDraftRatings` default in safe prop defaults block
+*Нет активных багов.*
 
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-023: reviewedItems.has() without null guard (P0) — FIXED S116
+- **Когда:** S79 review (pre-existing from S74), fixed S116
+- **Файл:** CartView.jsx, Mode 2 order render
+- **Симптом:** If `reviewedItems` prop is undefined, calling `.has()` crashes the render
+- **Фикс:** Added `safeReviewedItems = reviewedItems || new Set()` in safe prop defaults block. All `.has()` calls use safeReviewedItems.
+
+### BUG-PM-024: loyaltyAccount.balance without null guard (P0) — FIXED S116
+- **Когда:** S79 review (pre-existing from S74), fixed S116
+- **Файл:** CartView.jsx, loyalty section
+- **Симптом:** If `loyaltyAccount.balance` is undefined/null, `.toLocaleString()` crashes
+- **Фикс:** Wrapped all `loyaltyAccount.balance` usages with `Number(loyaltyAccount.balance || 0)`.
+
+### BUG-PM-025: draftRatings prop without null guard (P1) — FIXED S116
+- **Когда:** S79 review (pre-existing from S74), fixed S116
+- **Файл:** CartView.jsx, Mode 2 order render
+- **Симптом:** If `draftRatings` is undefined, accessing `draftRatings[itemId]` crashes
+- **Фикс:** Added `safeDraftRatings = draftRatings || {}` in safe prop defaults block. All `draftRatings[itemId]` uses safeDraftRatings.
 
 ### BUG-PM-S87-03: CTA button "Send to waiter" looks active when disabled (P2) — FIXED S87
 - **Когда:** S87 testing

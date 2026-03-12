@@ -71,6 +71,10 @@ export default function CartView({
   hallGuestCodeEnabled,
   guestCode,
 }) {
+  // ===== P0: Safe prop defaults (BUG-PM-023, BUG-PM-025) =====
+  const safeReviewedItems = reviewedItems || new Set();
+  const safeDraftRatings = draftRatings || {};
+
   // ===== P1 Expandable States =====
   const [splitExpanded, setSplitExpanded] = React.useState(false);
   const [loyaltyExpanded, setLoyaltyExpanded] = React.useState(false);
@@ -368,8 +372,8 @@ export default function CartView({
 
   // Есть ли хоть одна оценка (draft или сохранённая)
   const hasAnyRating = React.useMemo(() => {
-    const reviewedCount = reviewedItems?.size ? Number(reviewedItems.size) : 0;
-    const draftCount = draftRatings ? Object.values(draftRatings).filter(v => Number(v) > 0).length : 0;
+    const reviewedCount = safeReviewedItems.size ? Number(safeReviewedItems.size) : 0;
+    const draftCount = safeDraftRatings ? Object.values(safeDraftRatings).filter(v => Number(v) > 0).length : 0;
     return reviewedCount > 0 || draftCount > 0;
   }, [reviewedItems, draftRatings]);
 
@@ -391,8 +395,8 @@ export default function CartView({
 
   // Loyalty summary
   const loyaltySummary = React.useMemo(() => {
-    if (loyaltyAccount?.balance > 0) {
-      return `${loyaltyAccount.balance.toLocaleString('ru-RU')} ${tr('loyalty.points_short', 'баллов')}`;
+    if (Number(loyaltyAccount?.balance || 0) > 0) {
+      return `${Number(loyaltyAccount.balance || 0).toLocaleString('ru-RU')} ${tr('loyalty.points_short', 'баллов')}`;
     }
     if (earnedPoints > 0) {
       return `+${earnedPoints}`;
@@ -684,8 +688,8 @@ export default function CartView({
                         <div className="space-y-2">
                           {orderItems.map((item, idx) => {
                             const itemId = item.id || `${order.id}_${idx}`;
-                            const hasReview = reviewedItems.has(itemId);
-                            const draftRating = draftRatings[itemId] || 0;
+                            const hasReview = safeReviewedItems.has(itemId);
+                            const draftRating = safeDraftRatings[itemId] || 0;
 
                             return (
                               <div key={itemId} className="space-y-1">
@@ -915,10 +919,10 @@ export default function CartView({
                       <div className="space-y-2">
                         <div className="bg-indigo-50 p-2 rounded-lg text-xs">
                           <div className="text-slate-600">
-                            {trFormat('loyalty.your_balance', { points: loyaltyAccount.balance.toLocaleString('ru-RU') }, `Ваш баланс: ${loyaltyAccount.balance.toLocaleString('ru-RU')} баллов`)}
+                            {trFormat('loyalty.your_balance', { points: Number(loyaltyAccount.balance || 0).toLocaleString('ru-RU') }, `Ваш баланс: ${Number(loyaltyAccount.balance || 0).toLocaleString('ru-RU')} баллов`)}
                           </div>
                           <div className="text-slate-500">
-                            = {(loyaltyAccount.balance * (partner?.loyalty_redeem_rate || 1)).toLocaleString('ru-RU')}₸
+                            = {(Number(loyaltyAccount.balance || 0) * (partner?.loyalty_redeem_rate || 1)).toLocaleString('ru-RU')}₸
                           </div>
                         </div>
 
