@@ -1,4 +1,4 @@
-﻿Set-StrictMode -Version 2
+Set-StrictMode -Version 2
 $ErrorActionPreference = "Stop"
 
 function Get-V7DefaultConfig {
@@ -31,14 +31,15 @@ function Get-V7DefaultConfig {
 
 function Merge-V7Hashtable {
     param(
-        [hashtable]$Base,
-        [hashtable]$Override
+        [System.Collections.IDictionary]$Base,
+        [System.Collections.IDictionary]$Override
     )
 
     foreach ($key in $Override.Keys) {
         $overrideValue = $Override[$key]
-        if ($Base.Contains($key) -and $Base[$key] -is [hashtable] -and $overrideValue -is [hashtable]) {
-            Merge-V7Hashtable -Base $Base[$key] -Override $overrideValue
+        $baseValue = $Base[$key]
+        if ($Base.Contains($key) -and $baseValue -is [System.Collections.IDictionary] -and $overrideValue -is [System.Collections.IDictionary]) {
+            Merge-V7Hashtable -Base $baseValue -Override $overrideValue
             continue
         }
         $Base[$key] = $overrideValue
@@ -72,7 +73,7 @@ function Get-V7Config {
 
     $config = Get-V7DefaultConfig
     if ($ConfigPath -and (Test-Path -LiteralPath $ConfigPath)) {
-        $raw = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $raw = (Read-V7TextFile -Path $ConfigPath) | ConvertFrom-Json
         $override = ConvertTo-V7Hashtable -InputObject $raw
         Merge-V7Hashtable -Base $config -Override $override
     }
@@ -122,13 +123,24 @@ function Write-V7Json {
     [System.IO.File]::WriteAllText($Path, $json, [System.Text.Encoding]::UTF8)
 }
 
+function Read-V7TextFile {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $reader = New-Object System.IO.StreamReader($Path, $true)
+    try {
+        return $reader.ReadToEnd()
+    } finally {
+        $reader.Dispose()
+    }
+}
+
 function Read-V7Json {
     param([Parameter(Mandatory = $true)][string]$Path)
 
     if (-not (Test-Path -LiteralPath $Path)) {
         return $null
     }
-    return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+    return (Read-V7TextFile -Path $Path) | ConvertFrom-Json
 }
 
 function Add-V7Event {
@@ -164,7 +176,7 @@ function Set-V7Status {
 function Get-V7TaskParts {
     param([Parameter(Mandatory = $true)][string]$TaskFile)
 
-    $content = Get-Content -LiteralPath $TaskFile -Raw -Encoding UTF8
+    $content = Read-V7TextFile -Path $TaskFile
     $meta = [ordered]@{}
     $body = $content
 
@@ -426,29 +438,103 @@ function Move-V7QueueRunDir {
     return $destination
 }
 
+function Get-V7TelegramDiagnosticsPath {
+    param(
+        [string]$EventsPath,
+        [string]$DiagnosticsPath
+    )
+
+    if ($DiagnosticsPath) {
+        return $DiagnosticsPath
+    }
+    if ($EventsPath) {
+        return Join-Path (Split-Path -Parent $EventsPath) 'telegram-error.log'
+    }
+    return ''
+}
+
+function Write-V7TelegramDiagnostic {
+    param(
+        [string]$EventsPath,
+        [string]$DiagnosticsPath,
+        [string]$Text,
+        [string]$Message,
+        [string]$Uri,
+        $ErrorRecord
+    )
+
+    $path = Get-V7TelegramDiagnosticsPath -EventsPath $EventsPath -DiagnosticsPath $DiagnosticsPath
+    if ([string]::IsNullOrWhiteSpace($path)) {
+        return
+    }
+
+    $parent = Split-Path -Parent $path
+    if ($parent) {
+        Ensure-V7Directory -Path $parent | Out-Null
+    }
+
+    $responseBody = ''
+    if ($ErrorRecord -and $ErrorRecord.Exception -and $ErrorRecord.Exception.Response) {
+        try {
+            $stream = $ErrorRecord.Exception.Response.GetResponseStream()
+            if ($stream) {
+                $reader = New-Object System.IO.StreamReader($stream)
+                $responseBody = $reader.ReadToEnd()
+                $reader.Dispose()
+            }
+        } catch {
+        }
+    }
+
+    $lines = @(
+        ('timestamp: ' + (Get-V7Timestamp)),
+        ('message: ' + $Message),
+        ('uri: ' + $Uri),
+        ('text: ' + $Text)
+    )
+    if ($ErrorRecord) {
+        $lines += @(
+            ('exception: ' + $ErrorRecord.Exception.Message),
+            ('script_stack_trace: ' + $ErrorRecord.ScriptStackTrace),
+            'error_record:',
+            ($ErrorRecord | Out-String).TrimEnd()
+        )
+    }
+    if ($responseBody) {
+        $lines += @('response:', $responseBody)
+    }
+    $lines += ''
+
+    Add-Content -LiteralPath $path -Value ($lines -join "`n") -Encoding UTF8
+}
+
 function Send-V7Telegram {
     param(
         [Parameter(Mandatory = $true)][hashtable]$Config,
-        [Parameter(Mandatory = $true)][string]$Text
+        [Parameter(Mandatory = $true)][string]$Text,
+        [string]$EventsPath,
+        [string]$DiagnosticsPath
     )
 
     $token = $Config.telegram.bot_token
     $chatId = $Config.telegram.chat_id
+    $uri = if ([string]::IsNullOrWhiteSpace($token)) { 'https://api.telegram.org/bot<missing>/sendMessage' } else { "https://api.telegram.org/bot$token/sendMessage" }
     if ([string]::IsNullOrWhiteSpace($token) -or [string]::IsNullOrWhiteSpace($chatId)) {
+        Write-V7TelegramDiagnostic -EventsPath $EventsPath -DiagnosticsPath $DiagnosticsPath -Text $Text -Message 'Telegram credentials missing' -Uri $uri -ErrorRecord $null
         return $false
     }
 
-    $uri = "https://api.telegram.org/bot$token/sendMessage"
     $body = @{ chat_id = $chatId; text = $Text } | ConvertTo-Json
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
     try {
         Invoke-RestMethod -Uri $uri -Method Post -ContentType "application/json" -Body $body | Out-Null
         return $true
     } catch {
+        Write-V7TelegramDiagnostic -EventsPath $EventsPath -DiagnosticsPath $DiagnosticsPath -Text $Text -Message 'Invoke-RestMethod failed while sending Telegram message' -Uri $uri -ErrorRecord $_
         return $false
     }
 }
-
 function New-V7StatusObject {
     param(
         [Parameter(Mandatory = $true)][string]$TaskId,
