@@ -20,7 +20,8 @@ session: 116
 
 ## Активные баги
 
-Нет активных багов. Все 3 pre-existing бага (BUG-PM-023, BUG-PM-024, BUG-PM-025) исправлены в S116.
+3 pre-existing бага (BUG-PM-023, BUG-PM-024, BUG-PM-025) исправлены в S116.
+14 новых багов найдено Codex (BUG-PM-026 -- BUG-PM-039): 6x P1 + 8x P2. Подробности в BUGS.md.
 
 ---
 
@@ -32,6 +33,7 @@ session: 116
 - BUG-PM-024: Исправлен краш при undefined `loyaltyAccount.balance` — обёрнуто в `Number(... || 0)`
 - BUG-PM-025: Исправлен краш при undefined `draftRatings` — добавлен `safeDraftRatings` default
 - V7 smoke test: полный code review всех base файлов PublicMenu
+- Codex review (253k tokens): +14 багов найдено (6x P1 рег., 8x P2), добавлены в BUGS.md
 
 ### Session 87 — 07 мар 2026
 
