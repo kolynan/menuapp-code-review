@@ -2,7 +2,12 @@ param(
     [Parameter(Mandatory = $true)][string]$TaskFile,
     [string]$TaskId,
     [string]$ConfigPath,
-    [string]$RepoRoot
+    [string]$RepoRoot,
+    [string]$TaskType,
+    [string]$TaskPage,
+    [string]$TaskTopic,
+    [string]$TaskBudget,
+    [string]$TaskAgent
 )
 
 $commonPath = Join-Path $PSScriptRoot 'V7.Common.ps1'
@@ -11,6 +16,46 @@ $commonPath = Join-Path $PSScriptRoot 'V7.Common.ps1'
 function New-StageSummary {
     param([string]$TaskId, [string]$Workflow, [string]$State, [string]$Message)
     return "[$State] $TaskId [$Workflow] $Message"
+}
+
+function Invoke-V7TelegramScript {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [string]$ConfigPath,
+        [string]$EventsPath,
+        [string]$WarningMessage,
+        [hashtable]$WarningData
+    )
+
+    $scriptPath = Join-Path $PSScriptRoot 'Send-Telegram.ps1'
+    $args = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath, '-Text', $Text)
+    if ($ConfigPath) {
+        $args += @('-ConfigPath', $ConfigPath)
+    }
+
+    $warningPayload = if ($WarningData) { $WarningData.Clone() } else { @{} }
+    $warningPayload.telegram_text = $Text
+
+    try {
+        & $env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe @args
+        $exitCode = $LASTEXITCODE
+    } catch {
+        if ($EventsPath -and $WarningMessage) {
+            $warningPayload.error = $_.Exception.Message
+            Add-V7Event -EventsPath $EventsPath -State 'WARNING' -Message $WarningMessage -Data $warningPayload
+        }
+        return $false
+    }
+
+    if ($exitCode -eq 0) {
+        return $true
+    }
+
+    if ($EventsPath -and $WarningMessage) {
+        $warningPayload.telegram_exit_code = $exitCode
+        Add-V7Event -EventsPath $EventsPath -State 'WARNING' -Message $WarningMessage -Data $warningPayload
+    }
+    return $false
 }
 
 function Start-V7WorkerLauncher {
@@ -39,6 +84,7 @@ function Wait-V7Launchers {
         [hashtable]$Status,
         [string]$EventsPath,
         [hashtable]$Config,
+        [string]$ConfigPath,
         [string]$TaskId,
         [string]$Workflow,
         [string]$HeartbeatLabel
@@ -74,11 +120,10 @@ function Wait-V7Launchers {
         }
         if ((Get-Date) -ge $nextHeartbeat) {
             $elapsedMinutes = [int][Math]::Floor(((Get-Date) - $startedAt).TotalMinutes)
-            $pidLabel = if ($alivePids.Count -gt 0) { $alivePids -join ', ' } else { 'none' }
-            $heartbeatMessage = if ($HeartbeatLabel) { $HeartbeatLabel } else { 'Workers still running' }
-            $heartbeatText = "$heartbeatMessage | elapsed ${elapsedMinutes}m | pids: $pidLabel"
-            Add-V7Event -EventsPath $EventsPath -State 'HEARTBEAT' -Message $heartbeatText -Data @{ pids = $alivePids; elapsed_minutes = $elapsedMinutes }
-            Send-V7Telegram -Config $Config -Text (New-StageSummary -TaskId $TaskId -Workflow $Workflow -State 'HEARTBEAT' -Message $heartbeatText) | Out-Null
+            $stageName = if ($HeartbeatLabel) { $HeartbeatLabel } elseif ($Status.current_step) { [string]$Status.current_step } else { 'stage' }
+            $heartbeatText = "⏳ [$stageName] running... (${elapsedMinutes}m elapsed)"
+            Add-V7Event -EventsPath $EventsPath -State 'HEARTBEAT' -Message $heartbeatText -Data @{ stage = $stageName; pids = $alivePids; elapsed_minutes = $elapsedMinutes }
+            Invoke-V7TelegramScript -Text $heartbeatText -ConfigPath $ConfigPath -EventsPath $EventsPath -WarningMessage 'Telegram heartbeat failed' -WarningData @{ stage = $stageName; elapsed_minutes = $elapsedMinutes; pids = $alivePids } | Out-Null
             $nextHeartbeat = $nextHeartbeat.AddMinutes(5)
         }
         Start-Sleep -Seconds 5
@@ -99,15 +144,17 @@ function Invoke-V7Stage {
         [string]$EventsPath,
         [string]$Mode,
         [hashtable]$Config,
+        [string]$ConfigPath,
         [string]$TaskId,
         [string]$Workflow
     )
 
     $proc = Start-V7WorkerLauncher -ScriptPath $ScriptPath -TaskJsonPath $TaskJsonPath -Name $Name -LogsDir $LogsDir -Mode $Mode
     $Status.processes[$Name] = [ordered]@{ pid = $proc.Id; state = 'running' }
+    $Status.current_step = $Name
     Set-V7Status -StatusPath $StatusPath -Status $Status
     Add-V7Event -EventsPath $EventsPath -State 'RUNNING' -Message "Started $Name" -Data @{ pid = $proc.Id }
-    $ok = Wait-V7Launchers -Processes @($proc) -TimeoutMinutes $TimeoutMinutes -StatusPath $StatusPath -Status $Status -EventsPath $EventsPath -Config $Config -TaskId $TaskId -Workflow $Workflow -HeartbeatLabel "$Name still running"
+    $ok = Wait-V7Launchers -Processes @($proc) -TimeoutMinutes $TimeoutMinutes -StatusPath $StatusPath -Status $Status -EventsPath $EventsPath -Config $Config -ConfigPath $ConfigPath -TaskId $TaskId -Workflow $Workflow -HeartbeatLabel $Name
     $Status.processes[$Name].state = if ($proc.HasExited) { 'completed' } else { 'failed' }
     $Status.processes[$Name].exit_code = $proc.ExitCode
     Set-V7Status -StatusPath $StatusPath -Status $Status
@@ -126,11 +173,15 @@ $localRunRoot = Ensure-V7Directory -Path $config.pipeline.local_run_root
 $queueRunDir = Split-Path -Parent $TaskFile
 $parts = Get-V7TaskParts -TaskFile $TaskFile
 $meta = $parts.metadata
-$workflow = if ($meta.ContainsKey('type')) { $meta['type'] } else { 'code-review' }
-$taskPage = if ($meta.ContainsKey('page')) { $meta['page'] } else { '' }
-$taskTopic = if ($meta.ContainsKey('topic')) { $meta['topic'] } else { '' }
-$taskBudget = if ($meta.ContainsKey('budget')) { ($meta['budget'] -replace '[$"'']', '').Trim() } else { '10' }
-$taskAgent = if ($meta.ContainsKey('agent')) { $meta['agent'] } else { '' }
+$workflow = if ($TaskType) { $TaskType } elseif ($meta.ContainsKey('type')) { $meta['type'] } else { 'code-review' }
+$taskPage = if ($TaskPage) { $TaskPage } elseif ($meta.ContainsKey('page')) { $meta['page'] } else { '' }
+$taskTopic = if ($TaskTopic) { $TaskTopic } elseif ($meta.ContainsKey('topic')) { $meta['topic'] } else { '' }
+$budgetSource = if ($TaskBudget) { $TaskBudget } elseif ($meta.ContainsKey('budget')) { $meta['budget'] } else { '10' }
+$taskBudget = ($budgetSource -replace '[$"'']', '').Trim()
+if ([string]::IsNullOrWhiteSpace($taskBudget)) {
+    $taskBudget = '10'
+}
+$taskAgent = if ($TaskAgent) { $TaskAgent } elseif ($meta.ContainsKey('agent')) { $meta['agent'] } else { '' }
 
 if (-not $TaskId) {
     $stem = [System.IO.Path]::GetFileNameWithoutExtension($TaskFile)
@@ -264,7 +315,7 @@ try {
         $status.processes['codex_reviewer'] = [ordered]@{ pid = $reviewerProc.Id; state = 'running' }
         Set-V7Status -StatusPath $statusPath -Status $status
 
-        $parallelOk = Wait-V7Launchers -Processes @($writerProc, $reviewerProc) -TimeoutMinutes $codeReviewTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -Config $config -TaskId $TaskId -Workflow $workflow -HeartbeatLabel 'Claude writer + Codex reviewer still running'
+        $parallelOk = Wait-V7Launchers -Processes @($writerProc, $reviewerProc) -TimeoutMinutes $codeReviewTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -Config $config -ConfigPath $resolvedConfigPath -TaskId $TaskId -Workflow $workflow -HeartbeatLabel $status.current_step
         $status.processes['claude_writer'].state = if ($writerProc.HasExited) { 'completed' } else { 'failed' }
         $status.processes['claude_writer'].exit_code = $writerProc.ExitCode
         $status.processes['codex_reviewer'].state = if ($reviewerProc.HasExited) { 'completed' } else { 'failed' }
@@ -299,15 +350,15 @@ try {
         Add-V7Event -EventsPath $eventsPath -State 'RUNNING' -Message 'Starting UX discussion rounds' -Data $null
         Send-V7Telegram -Config $config -Text (New-StageSummary -TaskId $TaskId -Workflow $workflow -State 'RUNNING' -Message 'Claude round 1 analyst') | Out-Null
 
-        $round1Ok = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-ClaudeAnalyst.ps1') -TaskJsonPath $taskJsonLocal -Name 'claude-round1' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -Config $config -TaskId $TaskId -Workflow $workflow -Mode ''
+        $round1Ok = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-ClaudeAnalyst.ps1') -TaskJsonPath $taskJsonLocal -Name 'claude-round1' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -Config $config -ConfigPath $resolvedConfigPath -TaskId $TaskId -Workflow $workflow -Mode ''
         if (-not $round1Ok) { throw 'Claude round 1 failed' }
 
         Send-V7Telegram -Config $config -Text (New-StageSummary -TaskId $TaskId -Workflow $workflow -State 'RUNNING' -Message 'Codex round 2 analyst') | Out-Null
-        $round2Ok = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-CodexAnalyst.ps1') -TaskJsonPath $taskJsonLocal -Name 'codex-round1' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -Config $config -TaskId $TaskId -Workflow $workflow -Mode ''
+        $round2Ok = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-CodexAnalyst.ps1') -TaskJsonPath $taskJsonLocal -Name 'codex-round1' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -Config $config -ConfigPath $resolvedConfigPath -TaskId $TaskId -Workflow $workflow -Mode ''
         if (-not $round2Ok) { throw 'Codex round 2 failed' }
 
         Send-V7Telegram -Config $config -Text (New-StageSummary -TaskId $TaskId -Workflow $workflow -State 'RUNNING' -Message 'Claude round 3 synthesis') | Out-Null
-        $round3Ok = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-ClaudeSynthesizer.ps1') -TaskJsonPath $taskJsonLocal -Name 'claude-round3' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -Config $config -TaskId $TaskId -Workflow $workflow -Mode ''
+        $round3Ok = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-ClaudeSynthesizer.ps1') -TaskJsonPath $taskJsonLocal -Name 'claude-round3' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -Config $config -ConfigPath $resolvedConfigPath -TaskId $TaskId -Workflow $workflow -Mode ''
         if (-not $round3Ok) { throw 'Claude round 3 failed' }
     }
 
@@ -333,11 +384,21 @@ try {
     if (Test-Path -LiteralPath $queueRunDir) {
         $finalQueueDir = Move-V7QueueRunDir -QueueRunDir $queueRunDir -State $finalState
     }
+    $finalEventsPath = Join-Path $finalQueueDir 'events.jsonl'
     try {
         if (Test-Path -LiteralPath $taskJsonLocal) {
+            Add-V7Event -EventsPath $finalEventsPath -State 'CLEANUP' -Message 'Starting task cleanup' -Data @{ task_json = $taskJsonLocal }
             & $env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $workerRoot 'Cleanup-TaskRun.ps1') -TaskJsonPath $taskJsonLocal 1> (Join-Path $logsDir 'cleanup.stdout.log') 2> (Join-Path $logsDir 'cleanup.stderr.log')
+            if ($LASTEXITCODE -eq 0) {
+                Add-V7Event -EventsPath $finalEventsPath -State 'CLEANUP' -Message 'Task cleanup completed' -Data @{ task_json = $taskJsonLocal; exit_code = 0 }
+            } else {
+                Add-V7Event -EventsPath $finalEventsPath -State 'WARNING' -Message 'Task cleanup failed' -Data @{ task_json = $taskJsonLocal; exit_code = $LASTEXITCODE }
+            }
+        } else {
+            Add-V7Event -EventsPath $finalEventsPath -State 'CLEANUP' -Message 'Task cleanup skipped: task manifest not found' -Data @{ task_json = $taskJsonLocal }
         }
     } catch {
+        Add-V7Event -EventsPath $finalEventsPath -State 'WARNING' -Message 'Task cleanup threw an exception' -Data @{ task_json = $taskJsonLocal; error = $_.Exception.Message }
     }
 }
 

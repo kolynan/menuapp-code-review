@@ -3,8 +3,8 @@
 Task watcher v7 dispatcher.
 
 Default behavior:
-- V7 for known workflow types: code-review, ux-discussion
-- Legacy v3 fallback if frontmatter has pipeline: v3 or task type is unknown
+- pipeline: v7 dispatches to the V7 PowerShell supervisor
+- pipeline: v3 or no pipeline frontmatter stays on the legacy v3 path
 
 The watcher is intentionally thin for V7 tasks:
 - poll queue/ for markdown tasks
@@ -101,10 +101,7 @@ def parse_frontmatter(content: str) -> dict:
 
 def determine_pipeline(meta: dict) -> str:
     pipeline_version = meta.get("pipeline", "").strip().lower()
-    task_type = meta.get("type", "code-review").strip()
-    if pipeline_version == "v3":
-        return "v3"
-    if task_type in V7_TYPES:
+    if pipeline_version == "v7":
         return "v7"
     return "v3"
 
@@ -161,7 +158,7 @@ def claim_v7_task(task_file: Path, queue_dir: Path, meta: dict) -> tuple[str, Pa
     return task_id, dest
 
 
-def launch_v7_supervisor(task_id: str, task_file: Path, cfg: dict, logger: logging.Logger) -> int:
+def launch_v7_supervisor(task_id: str, task_file: Path, meta: dict, cfg: dict, logger: logging.Logger) -> int:
     repo_dir = Path(cfg["paths"]["repo_dir"])
     supervisor = repo_dir / "pipeline" / "v7" / "scripts" / "Start-TaskSupervisor.ps1"
     if not supervisor.exists():
@@ -183,6 +180,16 @@ def launch_v7_supervisor(task_id: str, task_file: Path, cfg: dict, logger: loggi
         "-RepoRoot",
         str(repo_dir),
     ]
+    for key, flag in (
+        ("type", "-TaskType"),
+        ("page", "-TaskPage"),
+        ("topic", "-TaskTopic"),
+        ("budget", "-TaskBudget"),
+        ("agent", "-TaskAgent"),
+    ):
+        value = str(meta.get(key, "")).strip()
+        if value:
+            args.extend([flag, value])
     if CONFIG_PATH.exists():
         args.extend(["-ConfigPath", str(CONFIG_PATH)])
 
@@ -281,7 +288,7 @@ def main() -> None:
                 if pipeline_name == "v7":
                     task_id, claimed_task = claim_v7_task(task_file, queue_dir, meta)
                     logger.info("Claimed %s as V7 task %s", task_file.name, task_id)
-                    launch_v7_supervisor(task_id, claimed_task, cfg, logger)
+                    launch_v7_supervisor(task_id, claimed_task, meta, cfg, logger)
                 else:
                     logger.info("Dispatching %s via legacy v3 path", task_file.name)
                     launch_legacy_task(task_file, logger)
