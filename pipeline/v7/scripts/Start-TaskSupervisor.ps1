@@ -173,15 +173,15 @@ $localRunRoot = Ensure-V7Directory -Path $config.pipeline.local_run_root
 $queueRunDir = Split-Path -Parent $TaskFile
 $parts = Get-V7TaskParts -TaskFile $TaskFile
 $meta = $parts.metadata
-$workflow = if ($TaskType) { $TaskType } elseif ($meta.ContainsKey('type')) { $meta['type'] } else { 'code-review' }
-$taskPage = if ($TaskPage) { $TaskPage } elseif ($meta.ContainsKey('page')) { $meta['page'] } else { '' }
-$taskTopic = if ($TaskTopic) { $TaskTopic } elseif ($meta.ContainsKey('topic')) { $meta['topic'] } else { '' }
-$budgetSource = if ($TaskBudget) { $TaskBudget } elseif ($meta.ContainsKey('budget')) { $meta['budget'] } else { '10' }
+$workflow = if ($TaskType) { $TaskType } elseif ($meta.Contains('type')) { $meta['type'] } else { 'code-review' }
+$taskPage = if ($TaskPage) { $TaskPage } elseif ($meta.Contains('page')) { $meta['page'] } else { '' }
+$taskTopic = if ($TaskTopic) { $TaskTopic } elseif ($meta.Contains('topic')) { $meta['topic'] } else { '' }
+$budgetSource = if ($TaskBudget) { $TaskBudget } elseif ($meta.Contains('budget')) { $meta['budget'] } else { '10' }
 $taskBudget = ($budgetSource -replace '[$"'']', '').Trim()
 if ([string]::IsNullOrWhiteSpace($taskBudget)) {
     $taskBudget = '10'
 }
-$taskAgent = if ($TaskAgent) { $TaskAgent } elseif ($meta.ContainsKey('agent')) { $meta['agent'] } else { '' }
+$taskAgent = if ($TaskAgent) { $TaskAgent } elseif ($meta.Contains('agent')) { $meta['agent'] } else { '' }
 
 if (-not $TaskId) {
     $stem = [System.IO.Path]::GetFileNameWithoutExtension($TaskFile)

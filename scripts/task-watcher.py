@@ -58,7 +58,7 @@ def load_config() -> dict:
     cfg = json.loads(json.dumps(DEFAULTS))
     source = CONFIG_PATH if CONFIG_PATH.exists() else EXAMPLE_CONFIG_PATH
     if source.exists():
-        with source.open(encoding="utf-8") as handle:
+        with source.open(encoding="utf-8-sig") as handle:
             merge_dict(cfg, json.load(handle))
     return cfg
 

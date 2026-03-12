@@ -37,7 +37,7 @@ function Merge-V7Hashtable {
 
     foreach ($key in $Override.Keys) {
         $overrideValue = $Override[$key]
-        if ($Base.ContainsKey($key) -and $Base[$key] -is [hashtable] -and $overrideValue -is [hashtable]) {
+        if ($Base.Contains($key) -and $Base[$key] -is [hashtable] -and $overrideValue -is [hashtable]) {
             Merge-V7Hashtable -Base $Base[$key] -Override $overrideValue
             continue
         }
@@ -232,7 +232,7 @@ function Get-V7TaskImages {
         }
     }
 
-    if ($Metadata.ContainsKey("images")) {
+    if ($Metadata.Contains("images")) {
         foreach ($item in ($Metadata["images"] -split ",")) {
             $resolved = Resolve-V7Path -BasePath $TaskDir -Candidate $item.Trim()
             if ($resolved) {
