@@ -12,6 +12,7 @@ param(
 
 $commonPath = Join-Path $PSScriptRoot 'V7.Common.ps1'
 . $commonPath
+$script:SupervisorStepCounter = 0
 
 function New-StageSummary {
     param([string]$TaskId, [string]$Workflow, [string]$State, [string]$Message)
