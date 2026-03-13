@@ -29,6 +29,12 @@ const ROLE_BADGE_CLASSES = {
 // BLOCK 01 — MAIN COMPONENT
 // ============================================================
 
+/**
+ * ProfileContent — displays and edits user/partner profile information.
+ * Shows editable full name, read-only email, role badge, and linked restaurant.
+ * Handles loading, error, and save states with optimistic UI feedback.
+ * Must be rendered inside <PartnerShell> (see default export).
+ */
 function ProfileContent() {
   const navigate = useNavigate();
   const { t } = useI18n();
@@ -289,6 +295,10 @@ function ProfileContent() {
 // BLOCK 07 — PARTNERSHELL WRAPPER
 // ============================================================
 
+/**
+ * Profile — default export. Wraps ProfileContent in PartnerShell
+ * to provide partner authentication context and layout.
+ */
 export default function Profile() {
   return (
     <PartnerShell>

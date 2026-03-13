@@ -36,6 +36,9 @@ Accessed by logged-in users. Wrapped in `PartnerShell` (uses `base44.auth.me()` 
 | 260301-00 | 2026-03-01 | `260301-00 profile RELEASE.jsx` | Phase 1v2 CC+Codex. Fixed: tr() type safety, sticky->fixed for iOS, error-state button 44px, input fields 44px. |
 | 260301-01 | 2026-03-01 | `260301-01 profile RELEASE.jsx` | Hotfix: PartnerShell named import -> default import (P0 crash fix). |
 
+### S123 (2026-03-14)
+- Added JSDoc comments to ProfileContent and Profile (default export) components
+
 ## UX Changelog
 
 ### 260301-01 (Hotfix)
