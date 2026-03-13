@@ -1,7 +1,7 @@
 ---
-version: "6.0"
-updated: "2026-03-12"
-session: 116
+version: "7.0"
+updated: "2026-03-13"
+session: 120
 ---
 
 # PublicMenu — README
@@ -20,12 +20,24 @@ session: 116
 
 ## Активные баги
 
-3 pre-existing бага (BUG-PM-023, BUG-PM-024, BUG-PM-025) исправлены в S116.
-14 новых багов найдено Codex (BUG-PM-026 -- BUG-PM-039): 6x P1 + 8x P2. Подробности в BUGS.md.
+7 активных багов (было 14). 8 исправлено в S120 (BUG-PM-026..032, 034-R, 036, 040).
+Оставшиеся: BUG-PM-028, 029, 033, 035, 037, 038, 039. Подробности в BUGS.md.
 
 ---
 
 ## Changelog (UX/UI решения)
+
+### Session 120 — 13 мар 2026
+
+- BUG-PM-026: tableCodeLength default 5->4 (регрессия BUG-PM-S81-02)
+- BUG-PM-027: Loyalty/discount section теперь видна без рейтинга (showLoyaltySection)
+- BUG-PM-030: Баннер "За отзыв +N" показывается только при наличии reviewableItems
+- BUG-PM-031: Кнопка закрытия и drawer заблокированы во время отправки заказа
+- BUG-PM-032: getSafeStatus() — добавлены accepted, served в fallback map
+- BUG-PM-034-R: Guest code скрыт из шапки drawer когда hallGuestCodeEnabled выключен
+- BUG-PM-036: Убран hardcoded ru-RU locale и ₸, используется formatPrice()
+- BUG-PM-040: Удалены console.log из processHallOrder и pickup/delivery submit
+- V7 smoke test 5: полный code review CartView.jsx, x.jsx, MenuView, ModeTabs, CheckoutView, useTableSession
 
 ### Session 116 — 12 мар 2026
 

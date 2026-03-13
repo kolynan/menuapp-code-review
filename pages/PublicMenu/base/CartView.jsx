@@ -23,6 +23,7 @@ export default function CartView({
   sessionGuests,
   splitType,
   setSplitType,
+  showLoyaltySection,
   showLoginPromptAfterRating,
   customerEmail,
   setCustomerEmail,
@@ -98,7 +99,7 @@ export default function CartView({
   const tableCodeLength = React.useMemo(() => {
     const n = Number(partner?.table_code_length);
     if (Number.isFinite(n) && n > 0) return Math.max(3, Math.min(8, Math.round(n)));
-    return 5;
+    return 4;
   }, [partner?.table_code_length]);
 
   const maxCodeAttempts = React.useMemo(() => {
@@ -239,12 +240,14 @@ export default function CartView({
       // Use human-readable fallbacks based on code
       const fallbacks = {
         'new': tr('status.new', 'Заказано'),
+        'accepted': tr('status.accepted', 'Принят'),
         'start': tr('status.cooking', 'Готовится'),
         'cook': tr('status.cooking', 'Готовится'),
         'cooking': tr('status.cooking', 'Готовится'),
         'finish': tr('status.ready', 'Готово'),
         'ready': tr('status.ready', 'Готово'),
         'done': tr('status.ready', 'Готово'),
+        'served': tr('status.ready', 'Готово'),
         'cancel': tr('status.cancelled', 'Отменён'),
         'cancelled': tr('status.cancelled', 'Отменён'),
       };
@@ -278,8 +281,8 @@ export default function CartView({
     ? (currentGuest.name || getGuestDisplayName(currentGuest))
     : tr("cart.guest", "Гость");
 
-  const guestDisplay = effectiveGuestCode 
-    ? `${guestBaseName} #${effectiveGuestCode}` 
+  const guestDisplay = (hallGuestCodeEnabled && effectiveGuestCode)
+    ? `${guestBaseName} #${effectiveGuestCode}`
     : guestBaseName;
 
   // Table label: avoid "Стол Стол 3"
@@ -383,7 +386,7 @@ export default function CartView({
   );
 
   // Показывать hint "За отзыв +N бонусов" сразу
-  const shouldShowReviewRewardHint = isReviewRewardActive && (myOrders?.length > 0);
+  const shouldShowReviewRewardHint = isReviewRewardActive && (myOrders?.length > 0) && (reviewableItems?.length > 0);
 
   // Показывать nudge "Введите email" после первой оценки
   const shouldShowReviewRewardNudge = isReviewRewardActive && hasAnyRating && !isCustomerIdentified;
@@ -396,7 +399,7 @@ export default function CartView({
   // Loyalty summary
   const loyaltySummary = React.useMemo(() => {
     if (Number(loyaltyAccount?.balance || 0) > 0) {
-      return `${Number(loyaltyAccount.balance || 0).toLocaleString('ru-RU')} ${tr('loyalty.points_short', 'баллов')}`;
+      return `${Number(loyaltyAccount.balance || 0).toLocaleString()} ${tr('loyalty.points_short', 'баллов')}`;
     }
     if (earnedPoints > 0) {
       return `+${earnedPoints}`;
@@ -462,8 +465,9 @@ export default function CartView({
 
           {/* Right: Close */}
           <button
-            onClick={() => onClose ? onClose() : setView("menu")}
-            className="p-2 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
+            onClick={() => !isSubmitting && (onClose ? onClose() : setView("menu"))}
+            disabled={isSubmitting}
+            className={`p-2 rounded-full ${isSubmitting ? 'bg-slate-50 text-slate-300 cursor-not-allowed' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
           >
             <X className="w-5 h-5" />
           </button>
@@ -856,7 +860,7 @@ export default function CartView({
             )}
 
             {/* P1: Loyalty section - COLLAPSIBLE */}
-            {showLoginPromptAfterRating && (
+            {(showLoyaltySection || showLoginPromptAfterRating) && (
               <div className="mt-4 pt-4 border-t">
                 <button
                   type="button"
@@ -919,10 +923,10 @@ export default function CartView({
                       <div className="space-y-2">
                         <div className="bg-indigo-50 p-2 rounded-lg text-xs">
                           <div className="text-slate-600">
-                            {trFormat('loyalty.your_balance', { points: Number(loyaltyAccount.balance || 0).toLocaleString('ru-RU') }, `Ваш баланс: ${Number(loyaltyAccount.balance || 0).toLocaleString('ru-RU')} баллов`)}
+                            {trFormat('loyalty.your_balance', { points: Number(loyaltyAccount.balance || 0).toLocaleString() }, `Ваш баланс: ${Number(loyaltyAccount.balance || 0).toLocaleString()} баллов`)}
                           </div>
                           <div className="text-slate-500">
-                            = {(Number(loyaltyAccount.balance || 0) * (partner?.loyalty_redeem_rate || 1)).toLocaleString('ru-RU')}₸
+                            = {formatPrice(Number(loyaltyAccount.balance || 0) * (partner?.loyalty_redeem_rate || 1))}
                           </div>
                         </div>
 
@@ -956,7 +960,7 @@ export default function CartView({
                             </div>
                             <p className="text-xs text-slate-500">
                               {trFormat('loyalty.max_redeem', { 
-                                max: maxRedeemPoints.toLocaleString('ru-RU'), 
+                                max: maxRedeemPoints.toLocaleString(), 
                                 percent: partner?.loyalty_max_redeem_percent || 0 
                               }, `Максимум ${maxRedeemPoints} баллов (${partner?.loyalty_max_redeem_percent || 0}% от заказа)`) }
                             </p>
@@ -986,7 +990,7 @@ export default function CartView({
               {partner?.loyalty_enabled && earnedPoints > 0 && !loyaltyExpanded && (
                 <div className="flex justify-between text-sm text-green-600">
                   <span>{tr('loyalty.online_bonus_label', 'Бонусы за онлайн-заказ')}</span>
-                  <span>+{Number(earnedPoints || 0).toLocaleString('ru-RU')}Б</span>
+                  <span>+{Number(earnedPoints || 0).toLocaleString()}Б</span>
                 </div>
               )}
 
@@ -1030,7 +1034,7 @@ export default function CartView({
                 {partner?.loyalty_enabled && earnedPoints > 0 && (
                   <div className="flex justify-between text-sm text-amber-900">
                     <span>{tr('cart.verify.bonus_label', 'Бонусы за онлайн-заказ')}</span>
-                    <span>+{Number(earnedPoints || 0).toLocaleString('ru-RU')}Б</span>
+                    <span>+{Number(earnedPoints || 0).toLocaleString()}Б</span>
                   </div>
                 )}
 

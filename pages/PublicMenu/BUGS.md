@@ -1,7 +1,7 @@
 ---
-version: "21.0"
-updated: "2026-03-12"
-session: 116
+version: "22.0"
+updated: "2026-03-13"
+session: 120
 ---
 
 # PublicMenu — Bug Registry
@@ -13,22 +13,7 @@ session: 116
 
 ## Active Bugs (не исправлены)
 
-*14 active bugs found by Codex in S116 review (regressions + new findings).*
-
-### BUG-PM-026: tableCodeLength default regressed to 5 (P1)
-- **Приоритет:** P1
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:101
-- **Симптом:** Default table code length is 5, but BUG-PM-S81-02 fixed it to 4. With partner config unset, guests enter wrong number of digits.
-- **Фикс:** Change fallback from `return 5` to `return 4`.
-- **Регрессия:** BUG-PM-S81-02
-
-### BUG-PM-027: Loyalty/discount UI hidden for normal checkout (P1)
-- **Приоритет:** P1
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:859, x.jsx:1937,3295
-- **Симптом:** Loyalty section gated on `showLoginPromptAfterRating` instead of `showLoyaltySection`. Email entry, balance display, and point redemption unavailable until after a dish rating exists (never for fresh cart).
-- **Фикс:** Use `showLoyaltySection` for checkout loyalty; keep `showLoginPromptAfterRating` only for review nudge.
+*7 active bugs remaining (was 14; 7 fixed in S120).*
 
 ### BUG-PM-028: Failed star-rating saves leave dishes permanently locked (P1)
 - **Приоритет:** P1
@@ -44,30 +29,6 @@ session: 116
 - **Симптом:** `lastSentVerifyCodeRef` never cleared on error or after cooldown unlock. Transient API failure forces guest to change digits to retry.
 - **Фикс:** Clear `lastSentVerifyCodeRef` on failed verification, on unlock, and when input becomes incomplete.
 
-### BUG-PM-030: Review-reward banner shows before any dish is reviewable (P1)
-- **Приоритет:** P1
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:386
-- **Симптом:** "За отзыв +N" hint shows when `myOrders.length > 0` regardless of order status. Guests see reward prompt before anything is ready/served.
-- **Фикс:** Gate banner on ready/served statuses + `reviewableItems.length > 0`.
-- **Регрессия:** BUG-PM-021
-
-### BUG-PM-031: Cart can still be closed during order submission (P1)
-- **Приоритет:** P1
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:464, x.jsx:3269
-- **Симптом:** Close button active while `isSubmitting`. Drawer also closes unconditionally. Can hide in-flight errors.
-- **Фикс:** Disable close button and block drawer close while `isSubmitting`.
-- **Регрессия:** BUG-PM-034 (S85)
-
-### BUG-PM-032: Order-status differentiation regressed (P2)
-- **Приоритет:** P2
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:240
-- **Симптом:** `getSafeStatus()` missing `accepted` fallback. Render paths ignore `status.icon`. Sent/accepted/cooking/ready collapse into near-identical text.
-- **Фикс:** Add `accepted` to fallback map. Render `{icon} {label}` in all badge locations.
-- **Регрессия:** BUG-PM-019
-
 ### BUG-PM-033: Scroll position not reset after table verification (P2)
 - **Приоритет:** P2
 - **Когда:** S116 (Codex review)
@@ -76,14 +37,6 @@ session: 116
 - **Фикс:** Restore scroll reset using `prevTableVerifiedRef` and nearest scrollable ancestor.
 - **Регрессия:** BUG-PM-S81-03
 
-### BUG-PM-034-R: Guest code leaked back into drawer header (P2)
-- **Приоритет:** P2
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:274,281
-- **Симптом:** `#guestCode` appended to "Вы:" label, exposing internal identifier even when `hallGuestCodeEnabled` is off.
-- **Фикс:** Show code only in dedicated waiter-code block.
-- **Регрессия:** BUG-PM-020
-
 ### BUG-PM-035: Verified-table block regresses mobile UX (P2)
 - **Приоритет:** P2
 - **Когда:** S116 (Codex review)
@@ -91,13 +44,6 @@ session: 116
 - **Симптом:** Duplicate "Стол подтвержден" header after verification. Info buttons are tiny icon-only touch targets (< 44px).
 - **Фикс:** Restore `shouldShowOnlineOrderBlock` logic. Replace icon-only info controls with 44px labeled buttons.
 - **Регрессия:** BUG-PM-008, BUG-PM-S81-07
-
-### BUG-PM-036: Loyalty amounts bypass app localization (P2)
-- **Приоритет:** P2
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:398,922,925
-- **Симптом:** Hard-coded `toLocaleString('ru-RU')` and `₸` instead of `formatPrice`. Wrong currency/locale for non-Russian/non-tenge partners.
-- **Фикс:** Use same formatter/locale as rest of page.
 
 ### BUG-PM-037: Reward email flow reports success without validation (P2)
 - **Приоритет:** P2
@@ -123,6 +69,59 @@ session: 116
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-026: tableCodeLength default regressed to 5 (P1) — FIXED S120
+- **Когда:** S116 (Codex review), fixed S120
+- **Файл:** CartView.jsx:102
+- **Симптом:** Default table code length 5 instead of 4. Guests enter wrong digits.
+- **Фикс:** Changed fallback from `return 5` to `return 4`.
+- **Регрессия:** BUG-PM-S81-02
+
+### BUG-PM-027: Loyalty/discount UI hidden for normal checkout (P1) — FIXED S120
+- **Когда:** S116 (Codex review), fixed S120
+- **Файл:** CartView.jsx:860
+- **Симптом:** Loyalty section gated only on `showLoginPromptAfterRating`, hidden until after first rating.
+- **Фикс:** Added `showLoyaltySection` prop and gated loyalty section on `showLoyaltySection || showLoginPromptAfterRating`.
+
+### BUG-PM-030: Review-reward banner shows before any dish is reviewable (P1) — FIXED S120
+- **Когда:** S116 (Codex review), fixed S120
+- **Файл:** CartView.jsx:388
+- **Симптом:** "За отзыв +N" hint shows when `myOrders.length > 0` regardless of order status.
+- **Фикс:** Added `reviewableItems?.length > 0` check to `shouldShowReviewRewardHint`.
+- **Регрессия:** BUG-PM-021
+
+### BUG-PM-031: Cart can still be closed during order submission (P1) — FIXED S120
+- **Когда:** S116 (Codex review), fixed S120
+- **Файл:** CartView.jsx:466, x.jsx:3270
+- **Симптом:** Close button and drawer close active while `isSubmitting`.
+- **Фикс:** Disabled close button during submission; added `!isSubmitting` guard to drawer `onOpenChange`.
+- **Регрессия:** BUG-PM-034 (S85)
+
+### BUG-PM-032: Order-status differentiation regressed (P2) — FIXED S120
+- **Когда:** S116 (Codex review), fixed S120
+- **Файл:** CartView.jsx:244
+- **Симптом:** `getSafeStatus()` missing `accepted` and `served` fallbacks.
+- **Фикс:** Added `accepted` and `served` to fallback map.
+- **Регрессия:** BUG-PM-019
+
+### BUG-PM-034-R: Guest code leaked back into drawer header (P2) — FIXED S120
+- **Когда:** S116 (Codex review), fixed S120
+- **Файл:** CartView.jsx:282
+- **Симптом:** `#guestCode` shown in header even when `hallGuestCodeEnabled` is off.
+- **Фикс:** Gated `effectiveGuestCode` display on `hallGuestCodeEnabled`.
+- **Регрессия:** BUG-PM-020
+
+### BUG-PM-036: Loyalty amounts bypass app localization (P2) — FIXED S120
+- **Когда:** S116 (Codex review), fixed S120
+- **Файл:** CartView.jsx:399,923,926,964,994,1038
+- **Симптом:** Hard-coded `toLocaleString('ru-RU')` and `₸` currency symbol.
+- **Фикс:** Replaced with `toLocaleString()` (browser default) and `formatPrice()`.
+
+### BUG-PM-040: console.log in production order submission (P2) — FIXED S120
+- **Когда:** S120 (code review)
+- **Файл:** x.jsx:2589,2917
+- **Симптом:** `console.log("Order created"...)` left in production. Leaks order IDs to browser console.
+- **Фикс:** Removed both `console.log` statements from `processHallOrder` and pickup/delivery flow.
 
 ### BUG-PM-023: reviewedItems.has() without null guard (P0) — FIXED S116
 - **Когда:** S79 review (pre-existing from S74), fixed S116

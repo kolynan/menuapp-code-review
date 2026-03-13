@@ -2586,7 +2586,6 @@ export default function X() {
         clientName: null,
       });
 
-      console.log("Order created", order?.id);
       return true;
     } catch (err) {
       console.error(err);
@@ -2913,8 +2912,6 @@ export default function X() {
           publicToken: order.public_token,
           clientName: savedClientName,
         });
-
-        console.log("Order created", order?.id);
       }
     } catch (err) {
       console.error(err);
@@ -3266,8 +3263,8 @@ export default function X() {
 
       {/* TASK-260203-01: Cart as Bottom Drawer */}
       <Drawer 
-        open={drawerMode === 'cart'} 
-        onOpenChange={(open) => !open && setDrawerMode(null)}
+        open={drawerMode === 'cart'}
+        onOpenChange={(open) => !open && !isSubmitting && setDrawerMode(null)}
       >
         <DrawerContent className="max-h-[85vh] overflow-hidden">
           <DrawerHeader className="sr-only">
