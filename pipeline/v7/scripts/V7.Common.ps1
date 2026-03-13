@@ -113,6 +113,145 @@ function Get-V7Utf8NoBomEncoding {
     return [System.Text.UTF8Encoding]::new($false)
 }
 
+function Test-V7RetryableFileException {
+    param($Exception)
+
+    if ($null -eq $Exception) {
+        return $false
+    }
+    if ($Exception -is [System.IO.IOException]) {
+        return $true
+    }
+    if ($Exception -is [System.UnauthorizedAccessException]) {
+        $message = [string]$Exception.Message
+        if ($message -match 'used by another process|process cannot access the file') {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Get-V7RetryDelayMilliseconds {
+    param(
+        [int]$Attempt,
+        [int]$InitialDelayMs = 500
+    )
+
+    if ($Attempt -lt 1) {
+        $Attempt = 1
+    }
+    return [int]($InitialDelayMs * [math]::Pow(2, $Attempt - 1))
+}
+
+function Invoke-V7RetryableFileOperation {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Action,
+        [Parameter(Mandatory = $true)][scriptblock]$Operation,
+        [int]$MaxAttempts = 5,
+        [int]$InitialDelayMs = 500
+    )
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            & $Operation
+            return
+        } catch {
+            if (-not (Test-V7RetryableFileException -Exception $_.Exception)) {
+                throw
+            }
+            if ($attempt -ge $MaxAttempts) {
+                throw
+            }
+            $delayMs = Get-V7RetryDelayMilliseconds -Attempt $attempt -InitialDelayMs $InitialDelayMs
+            Write-Warning ("{0} retry {1}/{2} for locked path {3}; waiting {4}ms" -f $Action, $attempt, $MaxAttempts, $Path, $delayMs)
+            Start-Sleep -Milliseconds $delayMs
+        }
+    }
+}
+
+function Write-V7FileWithRetry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Content
+    )
+
+    $parent = Split-Path -Parent $Path
+    if (-not $parent) {
+        $parent = (Get-Location).Path
+    }
+    Ensure-V7Directory -Path $parent | Out-Null
+
+    Invoke-V7RetryableFileOperation -Path $Path -Action 'Write file' -Operation {
+        $tempPath = Join-Path $parent ((Split-Path -Leaf $Path) + '.tmp-' + [guid]::NewGuid().ToString('N'))
+        try {
+            [System.IO.File]::WriteAllText($tempPath, $Content, (Get-V7Utf8NoBomEncoding))
+            Move-Item -LiteralPath $tempPath -Destination $Path -Force
+        } finally {
+            if (Test-Path -LiteralPath $tempPath) {
+                Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
+
+function Append-V7FileWithRetry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Content
+    )
+
+    $parent = Split-Path -Parent $Path
+    if ($parent) {
+        Ensure-V7Directory -Path $parent | Out-Null
+    }
+
+    Invoke-V7RetryableFileOperation -Path $Path -Action 'Append file' -Operation {
+        $writer = New-Object System.IO.StreamWriter($Path, $true, (Get-V7Utf8NoBomEncoding))
+        try {
+            $writer.Write($Content)
+        } finally {
+            $writer.Dispose()
+        }
+    }
+}
+
+function Copy-V7FileWithRetry {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourcePath,
+        [Parameter(Mandatory = $true)][string]$DestinationPath
+    )
+
+    $destinationParent = Split-Path -Parent $DestinationPath
+    if (-not $destinationParent) {
+        $destinationParent = (Get-Location).Path
+    }
+    Ensure-V7Directory -Path $destinationParent | Out-Null
+
+    Invoke-V7RetryableFileOperation -Path $DestinationPath -Action 'Copy file' -Operation {
+        $tempPath = Join-Path $destinationParent ((Split-Path -Leaf $DestinationPath) + '.tmp-' + [guid]::NewGuid().ToString('N'))
+        try {
+            Copy-Item -LiteralPath $SourcePath -Destination $tempPath -Force
+            Move-Item -LiteralPath $tempPath -Destination $DestinationPath -Force
+        } finally {
+            if (Test-Path -LiteralPath $tempPath) {
+                Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
+
+function Move-V7PathWithRetry {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourcePath,
+        [Parameter(Mandatory = $true)][string]$DestinationPath
+    )
+
+    Invoke-V7RetryableFileOperation -Path $DestinationPath -Action 'Move path' -Operation {
+        Move-Item -LiteralPath $SourcePath -Destination $DestinationPath -Force
+    }
+}
+
 function Write-V7TextFile {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -124,7 +263,7 @@ function Write-V7TextFile {
         Ensure-V7Directory -Path $parent | Out-Null
     }
 
-    [System.IO.File]::WriteAllText($Path, $Content, (Get-V7Utf8NoBomEncoding))
+    Write-V7FileWithRetry -Path $Path -Content $Content
 }
 
 function Append-V7TextFile {
@@ -138,12 +277,7 @@ function Append-V7TextFile {
         Ensure-V7Directory -Path $parent | Out-Null
     }
 
-    $writer = New-Object System.IO.StreamWriter($Path, $true, (Get-V7Utf8NoBomEncoding))
-    try {
-        $writer.Write($Content)
-    } finally {
-        $writer.Dispose()
-    }
+    Append-V7FileWithRetry -Path $Path -Content $Content
 }
 
 function Write-V7Json {
@@ -738,7 +872,7 @@ function Copy-V7ArtifactsToResults {
         if ($destinationParent) {
             Ensure-V7Directory -Path $destinationParent | Out-Null
         }
-        Copy-Item -LiteralPath $item.FullName -Destination $destination -Force
+        Copy-V7FileWithRetry -SourcePath $item.FullName -DestinationPath $destination
     }
 }
 
@@ -754,10 +888,12 @@ function Move-V7QueueRunDir {
     }
     $targetRoot = Ensure-V7Directory -Path (Join-Path $queueRoot $State)
     $destination = Join-Path $targetRoot (Split-Path -Leaf $QueueRunDir)
-    if (Test-Path -LiteralPath $destination) {
-        Remove-Item -LiteralPath $destination -Recurse -Force
+    Invoke-V7RetryableFileOperation -Path $destination -Action 'Move queue run directory' -Operation {
+        if (Test-Path -LiteralPath $destination) {
+            Remove-Item -LiteralPath $destination -Recurse -Force
+        }
+        Move-Item -LiteralPath $QueueRunDir -Destination $destination -Force
     }
-    Move-Item -LiteralPath $QueueRunDir -Destination $destination
     return $destination
 }
 
