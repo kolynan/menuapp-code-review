@@ -1,7 +1,7 @@
 ---
-version: "6.0"
-updated: "2026-03-12"
-session: 116
+version: "7.0"
+updated: "2026-03-13"
+session: 120
 ---
 
 # PublicMenu — README
@@ -20,12 +20,21 @@ session: 116
 
 ## Активные баги
 
-3 pre-existing бага (BUG-PM-023, BUG-PM-024, BUG-PM-025) исправлены в S116.
-14 новых багов найдено Codex (BUG-PM-026 -- BUG-PM-039): 6x P1 + 8x P2. Подробности в BUGS.md.
+S116: 3 pre-existing (BUG-PM-023..025) fixed. 14 new found by Codex (BUG-PM-026..039).
+S120: BUG-PM-026 fixed. 5 new bugs found (BUG-PM-040..044): 1x P0 + 2x P1 + 2x P2. Details in BUGS.md.
 
 ---
 
 ## Changelog (UX/UI решения)
+
+### Session 120 — 13 мар 2026
+
+- BUG-PM-026: Fixed tableCodeLength default 5->4 regression (CartView.jsx)
+- P0 fix: Added cancellation guard to polling scheduleNext (useTableSession.jsx)
+- P1 fix: Added try/catch to isBillOnCooldown/setBillCooldownStorage for Safari private mode (x.jsx)
+- P2 fix: Added cleanup for redirect banner timeout (x.jsx)
+- P2 fix: Removed console.log from production order submission (x.jsx)
+- Code review: 5 new bugs found (BUG-PM-040..044), added to BUGS.md
 
 ### Session 116 — 12 мар 2026
 

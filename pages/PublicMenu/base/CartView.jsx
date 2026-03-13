@@ -98,7 +98,7 @@ export default function CartView({
   const tableCodeLength = React.useMemo(() => {
     const n = Number(partner?.table_code_length);
     if (Number.isFinite(n) && n > 0) return Math.max(3, Math.min(8, Math.round(n)));
-    return 5;
+    return 4;
   }, [partner?.table_code_length]);
 
   const maxCodeAttempts = React.useMemo(() => {

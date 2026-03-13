@@ -669,6 +669,7 @@ export function useTableSession({
     
     const scheduleNext = () => {
       intervalId = setTimeout(() => {
+        if (cancelled) return;
         pollSessionData();
         scheduleNext();
       }, getInterval());

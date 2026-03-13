@@ -281,15 +281,19 @@ const BILL_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 const getBillCooldownKey = (tableId) => `menuapp_bill_requested_${tableId}`;
 
 const isBillOnCooldown = (tableId) => {
-  const key = getBillCooldownKey(tableId);
-  const timestamp = localStorage.getItem(key);
-  if (!timestamp) return false;
-  return Date.now() - parseInt(timestamp, 10) < BILL_COOLDOWN_MS;
+  try {
+    const key = getBillCooldownKey(tableId);
+    const timestamp = localStorage.getItem(key);
+    if (!timestamp) return false;
+    return Date.now() - parseInt(timestamp, 10) < BILL_COOLDOWN_MS;
+  } catch { return false; }
 };
 
 const setBillCooldownStorage = (tableId) => {
-  const key = getBillCooldownKey(tableId);
-  localStorage.setItem(key, String(Date.now()));
+  try {
+    const key = getBillCooldownKey(tableId);
+    localStorage.setItem(key, String(Date.now()));
+  } catch {}
 };
 
 /**
@@ -1867,8 +1871,9 @@ export default function X() {
           originalMode: modeLabels[originalMode] || originalMode,
           newMode: modeLabels[firstAvailable.id] || firstAvailable.id,
         });
-        
-        setTimeout(() => setRedirectBanner(null), 5000);
+
+        const timerId = setTimeout(() => setRedirectBanner(null), 5000);
+        return () => clearTimeout(timerId);
       }
     }
   }, [partner, loadingDishes, channels, orderMode, visibleModeTabs, t]);
@@ -2586,10 +2591,8 @@ export default function X() {
         clientName: null,
       });
 
-      console.log("Order created", order?.id);
       return true;
     } catch (err) {
-      console.error(err);
       setSubmitError(t('error.send.title'));
       return false;
     }
@@ -2914,10 +2917,8 @@ export default function X() {
           clientName: savedClientName,
         });
 
-        console.log("Order created", order?.id);
       }
     } catch (err) {
-      console.error(err);
       setSubmitError(t('error.send.title'));
     } finally {
       submitLockRef.current = false;

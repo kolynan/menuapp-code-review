@@ -1,7 +1,7 @@
 ---
-version: "21.0"
-updated: "2026-03-12"
-session: 116
+version: "22.0"
+updated: "2026-03-13"
+session: 120
 ---
 
 # PublicMenu — Bug Registry
@@ -13,15 +13,42 @@ session: 116
 
 ## Active Bugs (не исправлены)
 
-*14 active bugs found by Codex in S116 review (regressions + new findings).*
+*13 active bugs from S116 + 5 new bugs from S120 review.*
 
-### BUG-PM-026: tableCodeLength default regressed to 5 (P1)
+### BUG-PM-040: Loyalty points deducted before order created — no rollback on failure (P0)
+- **Приоритет:** P0
+- **Когда:** S120 (correctness review)
+- **Файл:** x.jsx:2443-2455, 2817-2829
+- **Симптом:** In both processHallOrder and pickup/delivery flow, LoyaltyTransaction is created and balance decremented BEFORE Order.create. If order creation fails, points are lost with no order.
+- **Фикс:** Move redemption after order+items are created, or add compensating transaction on failure.
+
+### BUG-PM-041: OrderItem.bulkCreate failure leaves orphan order + skipped order number (P1)
 - **Приоритет:** P1
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:101
-- **Симптом:** Default table code length is 5, but BUG-PM-S81-02 fixed it to 4. With partner config unset, guests enter wrong number of digits.
-- **Фикс:** Change fallback from `return 5` to `return 4`.
-- **Регрессия:** BUG-PM-S81-02
+- **Когда:** S120 (correctness review)
+- **Файл:** x.jsx:2498, 2863
+- **Симптом:** If OrderItem.bulkCreate throws after Order.create, the order exists with no items and the partner counter has been incremented. Guest sees error and retries, creating gaps.
+- **Фикс:** Cleanup orphan order on bulkCreate failure, or wrap in transaction.
+
+### BUG-PM-042: handleRateDish race condition on saving guard (P1)
+- **Приоритет:** P1
+- **Когда:** S120 (correctness review)
+- **Файл:** x.jsx:2013
+- **Симптом:** `ratingSavingByItemId[itemId]` check reads from closure snapshot. Two rapid clicks on different items may both pass the guard because setState hasn't flushed.
+- **Фикс:** Use a ref for in-progress tracking instead of state.
+
+### BUG-PM-043: getOrderStatus not memoized — invalidates all consumer memos (P2)
+- **Приоритет:** P2
+- **Когда:** S120 (correctness review)
+- **Файл:** useTableSession.jsx:796
+- **Симптом:** Plain function recreated every render. Any consumer using it in useMemo/useEffect deps always invalidates.
+- **Фикс:** Wrap in useCallback with [stagesMap, t] deps.
+
+### BUG-PM-044: Parallel restore + polling causes double DB reads on mount (P2)
+- **Приоритет:** P2
+- **Когда:** S120 (correctness review)
+- **Файл:** useTableSession.jsx:265,493
+- **Симптом:** Restore and polling effects both fire on mount, causing two parallel fetch chains for guests/orders/items. Doubles API cost, may trigger rate limits.
+- **Фикс:** Gate polling immediate call on didAttemptRestoreRef completion.
 
 ### BUG-PM-027: Loyalty/discount UI hidden for normal checkout (P1)
 - **Приоритет:** P1
@@ -123,6 +150,13 @@ session: 116
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-026: tableCodeLength default regressed to 5 (P1) — FIXED S120
+- **Когда:** S116 (found), S120 (fixed)
+- **Файл:** CartView.jsx:101
+- **Симптом:** Default table code length is 5, but BUG-PM-S81-02 fixed it to 4. With partner config unset, guests enter wrong number of digits.
+- **Фикс:** Changed fallback from `return 5` to `return 4`.
+- **Регрессия:** BUG-PM-S81-02
 
 ### BUG-PM-023: reviewedItems.has() without null guard (P0) — FIXED S116
 - **Когда:** S79 review (pre-existing from S74), fixed S116
