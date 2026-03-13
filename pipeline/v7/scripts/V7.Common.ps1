@@ -381,6 +381,135 @@ function Get-V7ChangedFiles {
             Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
     )
 }
+function Get-V7NormalizedPath {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return ''
+    }
+
+    try {
+        return ([System.IO.Path]::GetFullPath($Path)).TrimEnd([char[]]'\/').ToLowerInvariant()
+    } catch {
+        return $Path.TrimEnd([char[]]'\/').ToLowerInvariant()
+    }
+}
+
+function Get-V7WorktreeRecords {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $result = Invoke-V7Git -RepoRoot $RepoRoot -Arguments @('worktree', 'list', '--porcelain') -FailureMessage 'Unable to list worktrees'
+    $records = @()
+    $lines = @()
+    if (-not [string]::IsNullOrWhiteSpace([string]$result.stdout)) {
+        $lines += ($result.stdout -split "`r?`n")
+    }
+    $lines += ''
+
+    $current = $null
+    foreach ($line in $lines) {
+        if ([string]::IsNullOrWhiteSpace([string]$line)) {
+            if ($null -ne $current) {
+                $records += [pscustomobject]$current
+                $current = $null
+            }
+            continue
+        }
+
+        if ($line.StartsWith('worktree ')) {
+            if ($null -ne $current) {
+                $records += [pscustomobject]$current
+            }
+            $current = [ordered]@{
+                path = $line.Substring(9)
+                branch = ''
+                head = ''
+                detached = $false
+                locked = $false
+            }
+            continue
+        }
+
+        if ($null -eq $current) {
+            continue
+        }
+
+        if ($line.StartsWith('branch ')) {
+            $branchRef = $line.Substring(7)
+            $current.branch = $branchRef -replace '^refs/heads/', ''
+        } elseif ($line.StartsWith('HEAD ')) {
+            $current.head = $line.Substring(5)
+        } elseif ($line -eq 'detached') {
+            $current.detached = $true
+        } elseif ($line.StartsWith('locked')) {
+            $current.locked = $true
+        }
+    }
+
+    return @($records)
+}
+
+function Get-V7WorktreeRecordByPath {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    $target = Get-V7NormalizedPath -Path $Path
+    foreach ($record in (Get-V7WorktreeRecords -RepoRoot $RepoRoot)) {
+        if ((Get-V7NormalizedPath -Path $record.path) -eq $target) {
+            return $record
+        }
+    }
+    return $null
+}
+
+function Get-V7WorktreeRecordByBranch {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$BranchName
+    )
+
+    foreach ($record in (Get-V7WorktreeRecords -RepoRoot $RepoRoot)) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$record.branch) -and $record.branch -ieq $BranchName) {
+            return $record
+        }
+    }
+    return $null
+}
+
+function Test-V7BranchExists {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$BranchName
+    )
+
+    if ([string]::IsNullOrWhiteSpace($BranchName)) {
+        return $false
+    }
+
+    $result = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C', $RepoRoot, 'show-ref', '--verify', '--quiet', ('refs/heads/' + $BranchName)) -WorkingDirectory $RepoRoot
+    return $result.exit_code -eq 0
+}
+
+function Remove-V7Branch {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$BranchName
+    )
+
+    if (-not (Test-V7BranchExists -RepoRoot $RepoRoot -BranchName $BranchName)) {
+        return
+    }
+
+    $result = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C', $RepoRoot, 'branch', '-D', $BranchName) -WorkingDirectory $RepoRoot
+    if ($result.exit_code -ne 0) {
+        $details = @($result.stderr, $result.stdout) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
+        $suffix = if ($details.Count -gt 0) { ': ' + (($details -join [Environment]::NewLine).Trim()) } else { '' }
+        throw ('Unable to delete existing branch ' + $BranchName + $suffix)
+    }
+}
+
 function Get-V7RepoHead {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
     return (Invoke-V7Git -RepoRoot $RepoRoot -Arguments @('rev-parse', 'HEAD') -FailureMessage 'Unable to resolve repository HEAD').stdout.Trim()
@@ -394,17 +523,35 @@ function New-V7Worktree {
         [string]$BranchName
     )
 
-    if (Test-Path -LiteralPath $Path) {
-        return
+    $normalizedPath = Get-V7NormalizedPath -Path $Path
+    $existingPathRecord = Get-V7WorktreeRecordByPath -RepoRoot $RepoRoot -Path $Path
+    if ($existingPathRecord) {
+        Remove-V7Worktree -RepoRoot $RepoRoot -Path $existingPathRecord.path
     }
+
+    if ($BranchName) {
+        $existingBranchRecord = Get-V7WorktreeRecordByBranch -RepoRoot $RepoRoot -BranchName $BranchName
+        if ($existingBranchRecord -and ((Get-V7NormalizedPath -Path $existingBranchRecord.path) -ne $normalizedPath)) {
+            Remove-V7Worktree -RepoRoot $RepoRoot -Path $existingBranchRecord.path
+        }
+        if (Test-V7BranchExists -RepoRoot $RepoRoot -BranchName $BranchName) {
+            Remove-V7Branch -RepoRoot $RepoRoot -BranchName $BranchName
+        }
+    }
+
+    if (Test-Path -LiteralPath $Path) {
+        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     $parent = Split-Path -Parent $Path
     if ($parent) {
         Ensure-V7Directory -Path $parent | Out-Null
     }
+
     if ($BranchName) {
-        Invoke-V7Git -RepoRoot $RepoRoot -Arguments @('worktree', 'add', $Path, '-b', $BranchName, $BaseCommit) -FailureMessage 'Unable to create worktree' | Out-Null
+        Invoke-V7Git -RepoRoot $RepoRoot -Arguments @('worktree', 'add', '--force', '-B', $BranchName, $Path, $BaseCommit) -FailureMessage 'Unable to create worktree' | Out-Null
     } else {
-        Invoke-V7Git -RepoRoot $RepoRoot -Arguments @('worktree', 'add', '--detach', $Path, $BaseCommit) -FailureMessage 'Unable to create detached worktree' | Out-Null
+        Invoke-V7Git -RepoRoot $RepoRoot -Arguments @('worktree', 'add', '--force', '--detach', $Path, $BaseCommit) -FailureMessage 'Unable to create detached worktree' | Out-Null
     }
 }
 
@@ -414,11 +561,26 @@ function Remove-V7Worktree {
         [Parameter(Mandatory = $true)][string]$Path
     )
 
-    if (Test-Path -LiteralPath $Path) {
-        try {
-            Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C', $RepoRoot, 'worktree', 'remove', '--force', $Path) -WorkingDirectory $RepoRoot | Out-Null
-        } catch {
+    $record = Get-V7WorktreeRecordByPath -RepoRoot $RepoRoot -Path $Path
+    $removePath = if ($record) { [string]$record.path } else { $Path }
+    $branchName = if ($record -and -not [string]::IsNullOrWhiteSpace([string]$record.branch)) { [string]$record.branch } else { '' }
+
+    $shouldAttemptRemove = $record -or (Test-Path -LiteralPath $removePath)
+    if ($shouldAttemptRemove) {
+        $result = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C', $RepoRoot, 'worktree', 'remove', '--force', $removePath) -WorkingDirectory $RepoRoot
+        if ($result.exit_code -ne 0) {
+            $details = @($result.stderr, $result.stdout) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
+            $suffix = if ($details.Count -gt 0) { ': ' + (($details -join [Environment]::NewLine).Trim()) } else { '' }
+            throw ('Unable to remove worktree ' + $removePath + $suffix)
         }
+    }
+
+    if (Test-Path -LiteralPath $removePath) {
+        Remove-Item -LiteralPath $removePath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($branchName) -and $branchName.StartsWith('task/')) {
+        Remove-V7Branch -RepoRoot $RepoRoot -BranchName $branchName
     }
 }
 
@@ -469,6 +631,24 @@ function Get-V7ClaudeCommandPrefix {
     return @($RawPath)
 }
 
+function ConvertTo-V7ProcessArgument {
+    param([AllowEmptyString()][string]$Value)
+
+    if ($null -eq $Value) {
+        $Value = ''
+    }
+    if ($Value.Length -eq 0) {
+        return '""'
+    }
+    if ($Value -notmatch '[\s"]') {
+        return $Value
+    }
+
+    $escaped = $Value -replace '(\\*)"', '$1$1\"'
+    $escaped = $escaped -replace '(\\+)$', '$1$1'
+    return '"' + $escaped + '"'
+}
+
 function Invoke-V7CommandToFiles {
     param(
         [Parameter(Mandatory = $true)][string[]]$CommandPrefix,
@@ -484,20 +664,53 @@ function Invoke-V7CommandToFiles {
     if ($parentOut) { Ensure-V7Directory -Path $parentOut | Out-Null }
     if ($parentErr) { Ensure-V7Directory -Path $parentErr | Out-Null }
 
-    Push-Location $WorkingDirectory
+    Write-V7TextFile -Path $StdOutPath -Content ''
+    Write-V7TextFile -Path $StdErrPath -Content ''
+
+    $allArguments = @()
+    if ($CommandPrefix.Length -gt 1) {
+        $allArguments += $CommandPrefix[1..($CommandPrefix.Length - 1)]
+    }
+    $allArguments += $Arguments
+    $argumentString = (@($allArguments | ForEach-Object { ConvertTo-V7ProcessArgument -Value ([string]$_) }) -join ' ')
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $CommandPrefix[0]
+    $psi.Arguments = $argumentString
+    $psi.WorkingDirectory = $WorkingDirectory
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+
+    $hasInput = $PSBoundParameters.ContainsKey('InputText') -and $null -ne $InputText
+    $psi.RedirectStandardInput = $hasInput
+
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $psi
+
     try {
-        $prefixArgs = @()
-        if ($CommandPrefix.Length -gt 1) {
-            $prefixArgs = $CommandPrefix[1..($CommandPrefix.Length - 1)]
+        if (-not $process.Start()) {
+            throw 'Failed to start external command process.'
         }
-        if ($InputText) {
-            $InputText | & $CommandPrefix[0] @prefixArgs @Arguments 1> $StdOutPath 2> $StdErrPath
-        } else {
-            & $CommandPrefix[0] @prefixArgs @Arguments 1> $StdOutPath 2> $StdErrPath
+
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+
+        if ($hasInput) {
+            $process.StandardInput.Write($InputText)
+            $process.StandardInput.Close()
         }
-        return $LASTEXITCODE
+
+        $process.WaitForExit()
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
+
+        Write-V7TextFile -Path $StdOutPath -Content $stdout
+        Write-V7TextFile -Path $StdErrPath -Content $stderr
+        return $process.ExitCode
     } finally {
-        Pop-Location
+        $process.Dispose()
     }
 }
 
