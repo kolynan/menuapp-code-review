@@ -180,6 +180,24 @@ Fixed bugs: BUG-PF-002, BUG-PF-004, BUG-PF-005, BUG-PF-007, BUG-PF-008,
 
 ## Active Bugs (not fixed)
 
+### BUG-S123-01 (P2) — Profile ignores PartnerShell context and re-fetches user/partner data
+- **Lines:** 68–103 (data loading useEffect)
+- **Session:** S123 code review
+- **Problem:** `ProfileContent` does its own `auth.me()`/`Partner.get()` load even though it is always rendered inside `PartnerShell`, which already resolves `currentUser`, `userRole`, and the effective `partner`. For director/managing_director users whose `User.partner` is null, this page can incorrectly fall back to "no restaurant" and show a mismatched role, and every visit pays for a second blocking load.
+- **Fix:** Consume `usePartnerAccess()` inside `ProfileContent` for `currentUser`, `userRole`, and `partner`, seed local editable state from that context, and keep only the `updateMe()` mutation local.
+
+### BUG-S123-02 (P3) — Nested min-h-screen containers create extra viewport height inside PartnerShell
+- **Lines:** 147, 158, 207 (min-h-screen divs)
+- **Session:** S123 code review
+- **Problem:** Loading, error, and ready states all use `min-h-screen`. Since `PartnerShell` already provides a full-height layout with header and nav, this adds another 100vh inside the content area, producing unnecessary scroll space on mobile.
+- **Fix:** Remove inner `min-h-screen`; size the page to the shell content area with `w-full h-full` or a smaller local min-height.
+
+### BUG-S123-03 (P3) — Load error state not announced to assistive technology
+- **Lines:** 158–170 (error render block)
+- **Session:** S123 code review
+- **Problem:** When `auth.me()` fails, the error container replaces the loading region but has no `role="alert"` and focus is not moved. Screen-reader users may not be told that loading finished with an error.
+- **Fix:** Add `role="alert"` to the error container div.
+
 ### BUG-S106-01 (P3) — PartnerShell missing activeTab prop
 - **Lines:** 294 (`<PartnerShell>`)
 - **Session:** S106 smoke test v6.2
