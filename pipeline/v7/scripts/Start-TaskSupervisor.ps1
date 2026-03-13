@@ -412,7 +412,7 @@ function Get-SupervisorChangedFiles {
     }
 
     $changedFiles = @()
-    foreach ($resultName in @('merge.result.json', 'claude-writer.result.json')) {
+    foreach ($resultName in @('merge.result.json', 'claude-writer.result.json', 'ux-discussion.result.json')) {
         $resultPath = Join-Path $ArtifactsDir $resultName
         $result = Read-V7Json -Path $resultPath
         if ($result -and $result.changed_files) {
@@ -629,6 +629,15 @@ try {
     $parts = Get-V7TaskParts -TaskFile $TaskFile
     $meta = $parts.metadata
     $workflow = if ($TaskType) { $TaskType } elseif ($meta.Contains('type')) { $meta['type'] } else { 'code-review' }
+    if ([string]::IsNullOrWhiteSpace([string]$workflow)) {
+        $workflow = 'code-review'
+    } else {
+        $workflow = ([string]$workflow).Trim().ToLowerInvariant()
+    }
+    switch ($workflow) {
+        'bugfix' { $workflow = 'code-review' }
+        'feature' { $workflow = 'code-review' }
+    }
     $taskPage = if ($TaskPage) { $TaskPage } elseif ($meta.Contains('page')) { $meta['page'] } else { '' }
     $taskTopic = if ($TaskTopic) { $TaskTopic } elseif ($meta.Contains('topic')) { $meta['topic'] } else { '' }
     $budgetSource = if ($TaskBudget) { $TaskBudget } elseif ($meta.Contains('budget')) { $meta['budget'] } else { '10' }
@@ -801,23 +810,25 @@ try {
         }
         Set-V7Status -StatusPath $statusPath -Status $status
         Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'MERGING' -Message 'Merge step completed' -Data @{ merge_commit = $status.git.merge_commit; writer_commit = $status.git.writer_commit; result_path = (Join-Path $artifactsDir 'merge.result.json') }
-    } else {
+    } elseif ($workflow -eq 'ux-discussion') {
         $status.state = 'RUNNING'
-        $status.current_step = 'claude-round1'
+        $status.current_step = 'ux-discussion'
         Set-V7Status -StatusPath $statusPath -Status $status
-        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Starting UX discussion rounds' -Data @{ task_json = $taskJsonLocal; logs_dir = $logsDir; timeout_minutes = $uxTimeout }
-        Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'RUNNING' -Message 'Claude round 1 analyst' -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram UX round 1 notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
+        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Starting UX discussion workflow' -Data @{ task_json = $taskJsonLocal; logs_dir = $logsDir; timeout_minutes = $uxTimeout; topic = $taskTopic }
+        Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'RUNNING' -Message 'Claude + Codex + Claude synthesis' -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram UX discussion notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
 
-        $round1Ok = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-ClaudeAnalyst.ps1') -TaskJsonPath $taskJsonLocal -Name 'claude-round1' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -Workflow $workflow -Mode ''
-        if (-not $round1Ok) { throw 'Claude round 1 failed' }
+        $uxDiscussionOk = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-UxDiscussion.ps1') -TaskJsonPath $taskJsonLocal -Name 'ux-discussion' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -Workflow $workflow -Mode ''
+        if (-not $uxDiscussionOk) { throw 'UX discussion workflow failed' }
 
-        Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'RUNNING' -Message 'Codex round 2 analyst' -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram UX round 2 notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
-        $round2Ok = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-CodexAnalyst.ps1') -TaskJsonPath $taskJsonLocal -Name 'codex-round1' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -Workflow $workflow -Mode ''
-        if (-not $round2Ok) { throw 'Codex round 2 failed' }
-
-        Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'RUNNING' -Message 'Claude round 3 synthesis' -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram UX round 3 notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
-        $round3Ok = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-ClaudeSynthesizer.ps1') -TaskJsonPath $taskJsonLocal -Name 'claude-round3' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -Workflow $workflow -Mode ''
-        if (-not $round3Ok) { throw 'Claude round 3 failed' }
+        $uxDiscussionResultPath = Join-Path $artifactsDir 'ux-discussion.result.json'
+        $uxDiscussionResult = Read-V7Json -Path $uxDiscussionResultPath
+        if ($uxDiscussionResult -and $uxDiscussionResult.merge_commit) {
+            $status.git.merge_commit = [string]$uxDiscussionResult.merge_commit
+        }
+        Set-V7Status -StatusPath $statusPath -Status $status
+        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'UX discussion workflow completed' -Data @{ merge_commit = $status.git.merge_commit; result_path = $uxDiscussionResultPath; output_file = $(if ($uxDiscussionResult) { $uxDiscussionResult.output_file } else { '' }); repo_output_file = $(if ($uxDiscussionResult) { $uxDiscussionResult.repo_output_file } else { '' }) }
+    } else {
+        throw ('Unsupported workflow type: ' + $workflow)
     }
 
     $success = $true

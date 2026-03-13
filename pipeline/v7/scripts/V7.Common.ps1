@@ -442,6 +442,41 @@ function Get-V7TaskImages {
     return $images | Sort-Object -Unique
 }
 
+function Get-V7ReferenceDocuments {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $referencesRoot = Join-Path $RepoRoot 'references'
+    if (-not (Test-Path -LiteralPath $referencesRoot)) {
+        return @()
+    }
+
+    $matches = New-Object System.Collections.Generic.List[object]
+    foreach ($file in Get-ChildItem -Path $referencesRoot -Recurse -File -ErrorAction SilentlyContinue) {
+        $name = $file.BaseName.ToLowerInvariant()
+        $score = $null
+        if ($name -match '(^|[-_])prd($|[-_])|product.?requirements') {
+            $score = 1
+        } elseif ($name -match 'architect') {
+            $score = 2
+        } elseif ($name -match 'glossary|terms') {
+            $score = 3
+        }
+
+        if ($null -ne $score) {
+            $matches.Add([pscustomobject]@{
+                score = $score
+                path = $file.FullName
+            })
+        }
+    }
+
+    return @(
+        $matches |
+            Sort-Object score, path |
+            Select-Object -ExpandProperty path -Unique
+    )
+}
+
 function Invoke-V7CapturedCommand {
     param(
         [Parameter(Mandatory = $true)][string[]]$CommandPrefix,
