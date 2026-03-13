@@ -65,7 +65,7 @@ function Write-SupervisorStepLog {
         $lines += @('data:', (Convert-V7StepDataToText -Data $Data))
     }
 
-    [System.IO.File]::WriteAllText($stepPath, ($lines -join "`n"), [System.Text.Encoding]::UTF8)
+    Write-V7TextFile -Path $stepPath -Content (($lines -join "`n") + "`n")
 }
 
 function Add-SupervisorStage {
@@ -123,7 +123,7 @@ function Write-SupervisorCrashLog {
         'error_record:',
         ($ErrorRecord | Out-String).TrimEnd()
     )
-    [System.IO.File]::WriteAllText($crashPath, ($lines -join "`n"), [System.Text.Encoding]::UTF8)
+    Write-V7TextFile -Path $crashPath -Content (($lines -join "`n") + "`n")
     return $crashPath
 }
 
@@ -209,7 +209,7 @@ function Write-SupervisorSummary {
         $lines += '- none'
     }
 
-    [System.IO.File]::WriteAllText($summaryPath, ($lines -join "`n"), [System.Text.Encoding]::UTF8)
+    Write-V7TextFile -Path $summaryPath -Content (($lines -join "`n") + "`n")
 }
 function Start-V7WorkerLauncher {
     param(

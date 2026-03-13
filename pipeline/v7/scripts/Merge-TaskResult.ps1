@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory = $true)][string]$TaskJsonPath
 )
 
@@ -27,7 +27,7 @@ if (-not $writerCommit) {
 }
 
 $mergeOutput = & git -C $mergeWorktree cherry-pick $writerCommit 2>&1
-$mergeOutput | Set-Content -LiteralPath (Join-Path $logsDir 'merge-cherry-pick.log') -Encoding UTF8
+Write-V7TextFile -Path (Join-Path $logsDir 'merge-cherry-pick.log') -Content ((($mergeOutput | Out-String).TrimEnd()) + "`n")
 if ($LASTEXITCODE -ne 0) {
     throw 'Cherry-pick failed during merge.'
 }
@@ -67,7 +67,7 @@ $reportLines = @(
     'Changed files:',
     ($changedFiles | ForEach-Object { "- $_" })
 )
-[System.IO.File]::WriteAllText($mergeReportPath, ($reportLines -join "`n"), [System.Text.Encoding]::UTF8)
+Write-V7TextFile -Path $mergeReportPath -Content (($reportLines -join "`n") + "`n")
 
 $result = [ordered]@{
     status = 'completed'

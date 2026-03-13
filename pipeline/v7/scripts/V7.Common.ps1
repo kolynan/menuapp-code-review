@@ -109,6 +109,43 @@ function ConvertTo-V7Slug {
     return $slug
 }
 
+function Get-V7Utf8NoBomEncoding {
+    return [System.Text.UTF8Encoding]::new($false)
+}
+
+function Write-V7TextFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Content
+    )
+
+    $parent = Split-Path -Parent $Path
+    if ($parent) {
+        Ensure-V7Directory -Path $parent | Out-Null
+    }
+
+    [System.IO.File]::WriteAllText($Path, $Content, (Get-V7Utf8NoBomEncoding))
+}
+
+function Append-V7TextFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Content
+    )
+
+    $parent = Split-Path -Parent $Path
+    if ($parent) {
+        Ensure-V7Directory -Path $parent | Out-Null
+    }
+
+    $writer = New-Object System.IO.StreamWriter($Path, $true, (Get-V7Utf8NoBomEncoding))
+    try {
+        $writer.Write($Content)
+    } finally {
+        $writer.Dispose()
+    }
+}
+
 function Write-V7Json {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -120,7 +157,7 @@ function Write-V7Json {
         Ensure-V7Directory -Path $parent | Out-Null
     }
     $json = $Data | ConvertTo-Json -Depth 12
-    [System.IO.File]::WriteAllText($Path, $json, [System.Text.Encoding]::UTF8)
+    Write-V7TextFile -Path $Path -Content $json
 }
 
 function Read-V7TextFile {
@@ -160,7 +197,7 @@ function Add-V7Event {
         $entry.data = $Data
     }
     $line = $entry | ConvertTo-Json -Compress -Depth 10
-    Add-Content -LiteralPath $EventsPath -Value $line -Encoding UTF8
+    Append-V7TextFile -Path $EventsPath -Content ($line + [Environment]::NewLine)
 }
 
 function Set-V7Status {
@@ -505,7 +542,7 @@ function Write-V7TelegramDiagnostic {
     }
     $lines += ''
 
-    Add-Content -LiteralPath $path -Value ($lines -join "`n") -Encoding UTF8
+    Append-V7TextFile -Path $path -Content (($lines -join "`n") + "`n")
 }
 
 function Send-V7Telegram {

@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory = $true)][string]$TaskJsonPath,
     [ValidateSet('writer', 'reconcile')][string]$Mode = 'writer'
 )
@@ -47,7 +47,7 @@ You are the $modeLabel for MenuApp pipeline V7.
 Task ID: $($task.task_id)
 Workflow: $($task.workflow)
 Page: $($task.metadata.page)
-Budget: $$budget
+Budget: $($budget) USD
 Repository: $($task.paths.repo_root)
 Working tree: $worktree
 Target code file: $($task.paths.code_file)
@@ -68,7 +68,7 @@ Rules:
 "@
 
 if ($Mode -eq 'reconcile' -and (Test-Path -LiteralPath $reviewFindingsPath)) {
-    $reviewJson = Get-Content -LiteralPath $reviewFindingsPath -Raw -Encoding UTF8
+    $reviewJson = Read-V7TextFile -Path $reviewFindingsPath
     $prompt += @"
 
 Reviewer findings to address:
@@ -78,9 +78,9 @@ For reconcile mode, focus only on applying the reviewer findings that are suppor
 "@
 }
 
-[System.IO.File]::WriteAllText($promptPath, $prompt, [System.Text.Encoding]::UTF8)
+Write-V7TextFile -Path $promptPath -Content $prompt
 
-$args = @('-p', $prompt, '--allowedTools', 'Bash,Read,Edit,Write', '--max-cost-dollars', $budget)
+$args = @('-p', $prompt, '--allowedTools', 'Bash,Read,Edit,Write', '--max-budget-usd', $budget)
 if (Test-Path -LiteralPath $rulesPath) {
     $args += @('--append-system-prompt-file', $rulesPath)
 }

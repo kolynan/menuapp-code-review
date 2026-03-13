@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory = $true)][string]$TaskJsonPath
 )
 
@@ -44,8 +44,8 @@ Rules:
 - If screenshots are referenced but not directly inspectable in your tool context, say so explicitly and reason from the task materials you can read.
 "@
 
-[System.IO.File]::WriteAllText($promptPath, $prompt, [System.Text.Encoding]::UTF8)
-$args = @('-p', $prompt, '--allowedTools', 'Bash,Read,Edit,Write', '--max-cost-dollars', $budget)
+Write-V7TextFile -Path $promptPath -Content $prompt
+$args = @('-p', $prompt, '--allowedTools', 'Bash,Read,Edit,Write', '--max-budget-usd', $budget)
 if (Test-Path -LiteralPath $task.paths.cc_rules_path) {
     $args += @('--append-system-prompt-file', $task.paths.cc_rules_path)
 }

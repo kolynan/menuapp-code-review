@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory = $true)][string]$TaskJsonPath
 )
 
@@ -41,7 +41,7 @@ Your job:
 - Return JSON that matches the provided schema.
 "@
 
-[System.IO.File]::WriteAllText($promptPath, $prompt, [System.Text.Encoding]::UTF8)
+Write-V7TextFile -Path $promptPath -Content $prompt
 
 $args = @('exec', '-C', $worktree, '--full-auto', '--json', '-o', $resultPath, '--output-schema', $schemaPath, '-')
 $startedAt = Get-V7Timestamp

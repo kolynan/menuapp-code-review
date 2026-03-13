@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory = $true)][string]$TaskJsonPath
 )
 
@@ -18,7 +18,7 @@ $workerResultPath = Join-Path $artifactsDir 'codex-round1.result.json'
 $ccRound1Path = Join-Path $artifactsDir 'cc-round1-discussion.md'
 $codexPrefix = @($config.paths.codex_cli)
 
-$ccRound1 = if (Test-Path -LiteralPath $ccRound1Path) { Get-Content -LiteralPath $ccRound1Path -Raw -Encoding UTF8 } else { 'Claude round 1 analysis was not found.' }
+$ccRound1 = if (Test-Path -LiteralPath $ccRound1Path) { Read-V7TextFile -Path $ccRound1Path } else { 'Claude round 1 analysis was not found.' }
 $imageList = if ($task.task.images.Count -gt 0) { ($task.task.images -join "`n- ") } else { 'None attached.' }
 $prompt = @"
 You are Codex Round 2 analyst for a MenuApp UX discussion.
@@ -45,7 +45,7 @@ Write a structured counter-analysis in markdown with these sections:
 Be specific. If images are attached, use them directly in your analysis.
 "@
 
-[System.IO.File]::WriteAllText($promptPath, $prompt, [System.Text.Encoding]::UTF8)
+Write-V7TextFile -Path $promptPath -Content $prompt
 $args = @('exec', '-C', $task.paths.repo_root, '--full-auto', '--json', '-o', $resultPath)
 foreach ($imagePath in $task.task.images) {
     $args += @('--image', [string]$imagePath)

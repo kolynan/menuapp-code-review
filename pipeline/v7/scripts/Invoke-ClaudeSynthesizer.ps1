@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory = $true)][string]$TaskJsonPath
 )
 
@@ -22,8 +22,8 @@ $resultPath = Join-Path $artifactsDir ("UX_Discussion_{0}_{1}.md" -f $slug, $ses
 $workerResultPath = Join-Path $artifactsDir 'claude-round3.result.json'
 $budget = [string]$task.metadata.budget
 
-$ccRound1 = if (Test-Path -LiteralPath $ccRound1Path) { Get-Content -LiteralPath $ccRound1Path -Raw -Encoding UTF8 } else { 'Claude round 1 analysis missing.' }
-$codexRound1 = if (Test-Path -LiteralPath $codexRound1Path) { Get-Content -LiteralPath $codexRound1Path -Raw -Encoding UTF8 } else { 'Codex round 2 analysis missing.' }
+$ccRound1 = if (Test-Path -LiteralPath $ccRound1Path) { Read-V7TextFile -Path $ccRound1Path } else { 'Claude round 1 analysis missing.' }
+$codexRound1 = if (Test-Path -LiteralPath $codexRound1Path) { Read-V7TextFile -Path $codexRound1Path } else { 'Codex round 2 analysis missing.' }
 
 $prompt = @"
 You are Claude Round 3 synthesizer for a MenuApp UX discussion.
@@ -54,8 +54,8 @@ Write the final decision document to $resultPath using this structure:
 Do not call Codex. This is the final synthesis only.
 "@
 
-[System.IO.File]::WriteAllText($promptPath, $prompt, [System.Text.Encoding]::UTF8)
-$args = @('-p', $prompt, '--allowedTools', 'Bash,Read,Edit,Write', '--max-cost-dollars', $budget)
+Write-V7TextFile -Path $promptPath -Content $prompt
+$args = @('-p', $prompt, '--allowedTools', 'Bash,Read,Edit,Write', '--max-budget-usd', $budget)
 if (Test-Path -LiteralPath $task.paths.cc_rules_path) {
     $args += @('--append-system-prompt-file', $task.paths.cc_rules_path)
 }
