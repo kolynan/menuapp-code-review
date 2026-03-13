@@ -1,7 +1,7 @@
 ---
-version: "21.0"
-updated: "2026-03-12"
-session: 116
+version: "22.0"
+updated: "2026-03-14"
+session: 121
 ---
 
 # PublicMenu — Bug Registry
@@ -13,15 +13,7 @@ session: 116
 
 ## Active Bugs (не исправлены)
 
-*14 active bugs found by Codex in S116 review (regressions + new findings).*
-
-### BUG-PM-026: tableCodeLength default regressed to 5 (P1)
-- **Приоритет:** P1
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:101
-- **Симптом:** Default table code length is 5, but BUG-PM-S81-02 fixed it to 4. With partner config unset, guests enter wrong number of digits.
-- **Фикс:** Change fallback from `return 5` to `return 4`.
-- **Регрессия:** BUG-PM-S81-02
+*10 active bugs remaining (4 fixed in S121 TASK-260303-01).*
 
 ### BUG-PM-027: Loyalty/discount UI hidden for normal checkout (P1)
 - **Приоритет:** P1
@@ -44,13 +36,7 @@ session: 116
 - **Симптом:** `lastSentVerifyCodeRef` never cleared on error or after cooldown unlock. Transient API failure forces guest to change digits to retry.
 - **Фикс:** Clear `lastSentVerifyCodeRef` on failed verification, on unlock, and when input becomes incomplete.
 
-### BUG-PM-030: Review-reward banner shows before any dish is reviewable (P1)
-- **Приоритет:** P1
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:386
-- **Симптом:** "За отзыв +N" hint shows when `myOrders.length > 0` regardless of order status. Guests see reward prompt before anything is ready/served.
-- **Фикс:** Gate banner on ready/served statuses + `reviewableItems.length > 0`.
-- **Регрессия:** BUG-PM-021
+### ~~BUG-PM-030: Review-reward banner shows before any dish is reviewable (P1) — FIXED S121~~
 
 ### BUG-PM-031: Cart can still be closed during order submission (P1)
 - **Приоритет:** P1
@@ -60,13 +46,7 @@ session: 116
 - **Фикс:** Disable close button and block drawer close while `isSubmitting`.
 - **Регрессия:** BUG-PM-034 (S85)
 
-### BUG-PM-032: Order-status differentiation regressed (P2)
-- **Приоритет:** P2
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:240
-- **Симптом:** `getSafeStatus()` missing `accepted` fallback. Render paths ignore `status.icon`. Sent/accepted/cooking/ready collapse into near-identical text.
-- **Фикс:** Add `accepted` to fallback map. Render `{icon} {label}` in all badge locations.
-- **Регрессия:** BUG-PM-019
+### ~~BUG-PM-032: Order-status differentiation regressed (P2) — FIXED S121~~
 
 ### BUG-PM-033: Scroll position not reset after table verification (P2)
 - **Приоритет:** P2
@@ -76,13 +56,7 @@ session: 116
 - **Фикс:** Restore scroll reset using `prevTableVerifiedRef` and nearest scrollable ancestor.
 - **Регрессия:** BUG-PM-S81-03
 
-### BUG-PM-034-R: Guest code leaked back into drawer header (P2)
-- **Приоритет:** P2
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:274,281
-- **Симптом:** `#guestCode` appended to "Вы:" label, exposing internal identifier even when `hallGuestCodeEnabled` is off.
-- **Фикс:** Show code only in dedicated waiter-code block.
-- **Регрессия:** BUG-PM-020
+### ~~BUG-PM-034-R: Guest code leaked back into drawer header (P2) — FIXED S121~~
 
 ### BUG-PM-035: Verified-table block regresses mobile UX (P2)
 - **Приоритет:** P2
@@ -123,6 +97,32 @@ session: 116
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-026: tableCodeLength default regressed to 5 (P1) — FIXED S121
+- **Когда:** S116 (Codex review), fixed S121 (TASK-260303-01)
+- **Файл:** CartView.jsx:101
+- **Симптом:** Default table code length 5, but BUG-PM-S81-02 fixed it to 4.
+- **Фикс:** Changed fallback from `return 5` to `return 4`.
+- **Регрессия:** BUG-PM-S81-02
+
+### BUG-PM-030: Review-reward banner shows before any dish is reviewable (P1) — FIXED S121
+- **Когда:** S116 (Codex review), fixed S121 (TASK-260303-01)
+- **Файл:** CartView.jsx:386
+- **Симптом:** "За отзыв +N" hint shows when `myOrders.length > 0` regardless of order status.
+- **Фикс:** Added `hasReadyOrders` check via `isOrderReady()` helper + `reviewableItems.length > 0` gate. Rating stars now only show for ready/served orders.
+- **Регрессия:** BUG-PM-021
+
+### BUG-PM-032: Order-status differentiation regressed (P2) — FIXED S121
+- **Когда:** S116 (Codex review), fixed S121 (TASK-260303-01)
+- **Файл:** CartView.jsx:240
+- **Симптом:** `getSafeStatus()` missing `accepted` fallback. Render paths ignore `status.icon`.
+- **Фикс:** Full STATUS_MAP with 14 status codes. `accepted` mapped to green. All 3 badge locations now render `{icon} {label}`. New default status is yellow "Отправлен" instead of blue "Заказано".
+
+### BUG-PM-034-R: Guest code leaked back into drawer header (P2) — FIXED S121
+- **Когда:** S116 (Codex review), fixed S121 (TASK-260303-01)
+- **Файл:** CartView.jsx:276-283
+- **Симптом:** `#guestCode` appended to "Вы:" label in drawer header.
+- **Фикс:** `guestDisplay` now uses only `guestBaseName`. Guest code logged to `console.debug` for debugging only. Code still shown in dedicated waiter-code block when `hallGuestCodeEnabled`.
 
 ### BUG-PM-023: reviewedItems.has() without null guard (P0) — FIXED S116
 - **Когда:** S79 review (pre-existing from S74), fixed S116

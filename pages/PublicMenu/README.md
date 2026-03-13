@@ -1,7 +1,7 @@
 ---
-version: "6.0"
-updated: "2026-03-12"
-session: 116
+version: "7.0"
+updated: "2026-03-14"
+session: 121
 ---
 
 # PublicMenu — README
@@ -20,12 +20,23 @@ session: 116
 
 ## Активные баги
 
-3 pre-existing бага (BUG-PM-023, BUG-PM-024, BUG-PM-025) исправлены в S116.
-14 новых багов найдено Codex (BUG-PM-026 -- BUG-PM-039): 6x P1 + 8x P2. Подробности в BUGS.md.
+3 pre-existing бага (BUG-PM-023..025) исправлены в S116.
+4 бага исправлены в S121 (BUG-PM-026, 030, 032, 034-R).
+10 активных багов (5x P1 + 5x P2). Подробности в BUGS.md.
 
 ---
 
 ## Changelog (UX/UI решения)
+
+### Session 121 — 14 мар 2026 (TASK-260303-01: Guest UX Quick Fixes)
+
+- Confirmation screen: hall mode now shows "Заказ отправлен официанту" + waiter status hint
+- Status badges: full STATUS_MAP (sent/accepted/cooking/ready) with distinct colors and icons in all badge locations
+- Guest header: removed raw session/guest code (#1313) from drawer header, code stays in console.debug
+- Rating prompt: stars only appear for ready/served orders; inline "Спасибо! +NБ" after rating when loyalty active
+- Review reward hint: gated on `hasReadyOrders && reviewableItems.length > 0`
+- Table code length: default restored to 4 (BUG-PM-026 regression fix)
+- All new strings use tr()/trFormat() with i18n keys (order.status.*, order.rating.*, confirmation.*)
 
 ### Session 116 — 12 мар 2026
 

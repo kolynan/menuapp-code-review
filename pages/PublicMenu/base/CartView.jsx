@@ -98,7 +98,7 @@ export default function CartView({
   const tableCodeLength = React.useMemo(() => {
     const n = Number(partner?.table_code_length);
     if (Number.isFinite(n) && n > 0) return Math.max(3, Math.min(8, Math.round(n)));
-    return 5;
+    return 4;
   }, [partner?.table_code_length]);
 
   const maxCodeAttempts = React.useMemo(() => {
@@ -222,41 +222,63 @@ export default function CartView({
     return norm;
   };
 
+  // Status map: icon + label + color for each known status code
+  const STATUS_MAP = {
+    'new':       { icon: '\uD83D\uDFE1', label: tr('order.status.sent', 'Отправлен'), color: '#EAB308' },
+    'sent':      { icon: '\uD83D\uDFE1', label: tr('order.status.sent', 'Отправлен'), color: '#EAB308' },
+    'accepted':  { icon: '\uD83D\uDFE2', label: tr('order.status.accepted', 'Принят'), color: '#22C55E' },
+    'start':     { icon: '\uD83D\uDD35', label: tr('order.status.cooking', 'Готовится'), color: '#3B82F6' },
+    'cook':      { icon: '\uD83D\uDD35', label: tr('order.status.cooking', 'Готовится'), color: '#3B82F6' },
+    'cooking':   { icon: '\uD83D\uDD35', label: tr('order.status.cooking', 'Готовится'), color: '#3B82F6' },
+    'in_progress': { icon: '\uD83D\uDD35', label: tr('order.status.cooking', 'Готовится'), color: '#3B82F6' },
+    'middle':    { icon: '\uD83D\uDD35', label: tr('order.status.cooking', 'Готовится'), color: '#3B82F6' },
+    'finish':    { icon: '✅', label: tr('order.status.ready', 'Готов'), color: '#16A34A' },
+    'ready':     { icon: '✅', label: tr('order.status.ready', 'Готов'), color: '#16A34A' },
+    'done':      { icon: '✅', label: tr('order.status.ready', 'Готов'), color: '#16A34A' },
+    'served':    { icon: '✅', label: tr('order.status.ready', 'Готов'), color: '#16A34A' },
+    'cancel':    { icon: '❌', label: tr('order.status.cancelled', 'Отменён'), color: '#EF4444' },
+    'cancelled': { icon: '❌', label: tr('order.status.cancelled', 'Отменён'), color: '#EF4444' },
+  };
+  const DEFAULT_STATUS = { icon: '\uD83D\uDFE1', label: tr('order.status.sent', 'Отправлен'), color: '#EAB308' };
+
   // Safe status label - prevents showing raw translation keys like "orderprocess.default.new"
   const getSafeStatus = (status) => {
-    if (!status) {
-      return { icon: '🔵', label: tr('status.new', 'Заказано'), color: '#3B82F6' };
-    }
+    if (!status) return DEFAULT_STATUS;
 
     let label = status.label || '';
 
     // Check if label is a raw translation key (contains dots and looks like a key)
     if (label.includes('.') && (label.startsWith('orderprocess') || label.startsWith('status'))) {
-      // Extract code from key like "orderprocess.default.new" → "new"
       const parts = label.split('.');
       const code = parts[parts.length - 1];
-
-      // Use human-readable fallbacks based on code
-      const fallbacks = {
-        'new': tr('status.new', 'Заказано'),
-        'start': tr('status.cooking', 'Готовится'),
-        'cook': tr('status.cooking', 'Готовится'),
-        'cooking': tr('status.cooking', 'Готовится'),
-        'finish': tr('status.ready', 'Готово'),
-        'ready': tr('status.ready', 'Готово'),
-        'done': tr('status.ready', 'Готово'),
-        'cancel': tr('status.cancelled', 'Отменён'),
-        'cancelled': tr('status.cancelled', 'Отменён'),
-      };
-
-      label = fallbacks[code] || tr('status.new', 'Заказано');
+      const mapped = STATUS_MAP[code];
+      return mapped || DEFAULT_STATUS;
     }
 
+    // Try to match by icon/label to a known status for consistent coloring
+    const statusByIcon = Object.values(STATUS_MAP).find(s => s.label === label);
+    if (statusByIcon) return statusByIcon;
+
     return {
-      icon: status.icon || '🔵',
-      label: label,
-      color: status.color || '#3B82F6'
+      icon: status.icon || DEFAULT_STATUS.icon,
+      label: label || DEFAULT_STATUS.label,
+      color: status.color || DEFAULT_STATUS.color
     };
+  };
+
+  // Check if an order has a "ready" status (for gating review prompts)
+  const isOrderReady = (order) => {
+    const rawStatus = getOrderStatus(order);
+    const safeStatus = getSafeStatus(rawStatus);
+    const readyCodes = ['finish', 'ready', 'done', 'served'];
+    // Check raw label from getOrderStatus
+    const rawLabel = rawStatus?.label || '';
+    if (rawLabel.includes('.')) {
+      const code = rawLabel.split('.').pop();
+      return readyCodes.includes(code);
+    }
+    // Check icon as fallback
+    return safeStatus.icon === '✅';
   };
 
   // Guest code from localStorage (e.g., "#6475")
@@ -273,14 +295,17 @@ export default function CartView({
   // Effective guest code: prop takes priority, fallback to localStorage
   const effectiveGuestCode = guestCode || guestCodeFromStorage;
 
-  // Guest display: "Имя #6475" or "Гость #6475"
+  // Guest display: name only, no session/guest code (BUG-PM-034-R)
   const guestBaseName = currentGuest
     ? (currentGuest.name || getGuestDisplayName(currentGuest))
     : tr("cart.guest", "Гость");
 
-  const guestDisplay = effectiveGuestCode 
-    ? `${guestBaseName} #${effectiveGuestCode}` 
-    : guestBaseName;
+  // Session code logged for debug only, not shown to guest
+  if (effectiveGuestCode) {
+    console.debug('[CartView] guestCode:', effectiveGuestCode);
+  }
+
+  const guestDisplay = guestBaseName;
 
   // Table label: avoid "Стол Стол 3"
   const tablePrefix = tr("form.table", "Стол");
@@ -382,8 +407,9 @@ export default function CartView({
     loyaltyAccount?.id || loyaltyAccount?._id || loyaltyAccount?.email || (customerEmail && String(customerEmail).trim())
   );
 
-  // Показывать hint "За отзыв +N бонусов" сразу
-  const shouldShowReviewRewardHint = isReviewRewardActive && (myOrders?.length > 0);
+  // Gate review reward hint on: has ready/served orders AND has reviewable items (BUG-PM-030)
+  const hasReadyOrders = (myOrders || []).some(order => isOrderReady(order));
+  const shouldShowReviewRewardHint = isReviewRewardActive && hasReadyOrders && (reviewableItems?.length > 0);
 
   // Показывать nudge "Введите email" после первой оценки
   const shouldShowReviewRewardNudge = isReviewRewardActive && hasAnyRating && !isCustomerIdentified;
@@ -589,7 +615,7 @@ export default function CartView({
                                   <span className="text-slate-600">
                                     {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(order.total_amount)}
                                   </span>
-                                  <span className="text-xs" style={{ color: status.color }}>{status.label}</span>
+                                  <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
                                 </div>
                               );
                             }
@@ -597,7 +623,7 @@ export default function CartView({
                             return items.map((item, idx) => (
                               <div key={`${order.id}-${idx}`} className="flex justify-between items-center text-xs">
                                 <span className="text-slate-600">{item.dish_name} × {item.quantity}</span>
-                                <span className="text-xs" style={{ color: status.color }}>{status.label}</span>
+                                <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
                               </div>
                             ));
                           })}
@@ -672,6 +698,7 @@ export default function CartView({
                   const orderItems = itemsByOrder.get(order.id) || [];
                   const rawStatus = getOrderStatus(order);
                   const status = getSafeStatus(rawStatus);
+                  const orderReady = isOrderReady(order);
 
                   return (
                     <div key={order.id} className="border-b pb-3 last:border-0 last:pb-0">
@@ -679,8 +706,8 @@ export default function CartView({
                         <span className="text-xs text-slate-400">
                           {formatOrderTime(order)}
                         </span>
-                        <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${status.color}15`, color: status.color }}>
-                          {status.label}
+                        <span className="text-xs px-2 py-1 rounded-full inline-flex items-center gap-1" style={{ backgroundColor: `${status.color}15`, color: status.color }}>
+                          {status.icon} {status.label}
                         </span>
                       </div>
                       {/* Order items with draft rating stars */}
@@ -698,8 +725,8 @@ export default function CartView({
                                   <span className="text-slate-600">{formatPrice(item.line_total ?? (item.dish_price * item.quantity))}</span>
                                 </div>
 
-                                {/* Draft rating stars - show always if reviews enabled */}
-                                {reviewsEnabled && (
+                                {/* Rating stars - show only for ready/served orders or already-rated items */}
+                                {reviewsEnabled && (orderReady || hasReview || draftRating > 0) && (
                                   <div className="flex items-center gap-2 pl-2">
                                     <Rating
                                       value={draftRating}
@@ -723,7 +750,11 @@ export default function CartView({
                                       <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
                                     )}
                                     {(draftRating > 0 || hasReview) && !ratingSavingByItemId?.[itemId] && (
-                                      <span className="text-xs text-green-600">✓</span>
+                                      <span className="text-xs text-green-600">
+                                        {isReviewRewardActive
+                                          ? trFormat('order.rating.thank_you_bonus', { points: reviewRewardPoints }, `Спасибо! +${reviewRewardPoints}Б`)
+                                          : '✓'}
+                                      </span>
                                     )}
                                   </div>
                                 )}

@@ -675,8 +675,15 @@ function OrderConfirmationScreen({
 
       {/* Title */}
       <h2 className="text-xl font-semibold text-center text-slate-800 mb-6">
-        {tr("confirmation.title", "Заказ отправлен!")}
+        {orderMode === "hall"
+          ? tr("confirmation.title_hall", "Заказ отправлен официанту")
+          : tr("confirmation.title", "Заказ отправлен!")}
       </h2>
+      {orderMode === "hall" && (
+        <p className="text-sm text-center text-slate-500 -mt-4 mb-6">
+          {tr("confirmation.waiting_for_waiter", "Статус обновится, когда официант примет заказ")}
+        </p>
+      )}
 
       {/* Order summary card */}
       <Card className="mb-6">
