@@ -1,7 +1,7 @@
 ---
-version: "6.0"
-updated: "2026-03-12"
-session: 116
+version: "8.0"
+updated: "2026-03-14"
+session: 121
 ---
 
 # PublicMenu — README
@@ -26,6 +26,10 @@ session: 116
 ---
 
 ## Changelog (UX/UI решения)
+
+### Session 121 — 14 мар 2026
+
+- AC-09 (P2): Confirmed "Add to cart" toast already implemented in x.jsx:2236. Documented in BUGS.md as fixed.
 
 ### Session 116 — 12 мар 2026
 

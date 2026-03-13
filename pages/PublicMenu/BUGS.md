@@ -1,7 +1,7 @@
 ---
-version: "21.0"
-updated: "2026-03-12"
-session: 116
+version: "23.0"
+updated: "2026-03-14"
+session: 121
 ---
 
 # PublicMenu — Bug Registry
@@ -123,6 +123,14 @@ session: 116
 ---
 
 ## Fixed Bugs (исправлены)
+
+### AC-09: No toast when adding dish to cart (P2) — FIXED S87 (confirmed S121)
+- **Приоритет:** P2
+- **Когда:** S87 (implemented), S121 (confirmed)
+- **Файл:** x.jsx:2236 (addToCart function), x.jsx:404 (i18n key)
+- **Симптом:** When user taps "Add to cart" on a dish, the dish is added but no visual feedback is shown. User cannot tell if the action was successful.
+- **Фикс:** Added `toast.success(t('cart.item_added'), { id: 'cart-add', duration: 2000 })` after cart state update. Uses sonner toast (imported at x.jsx:20). i18n key `cart.item_added` = "Добавлено" added to I18N_FALLBACKS. The `id: 'cart-add'` deduplicates rapid taps.
+- **Коммит:** `be74e0d` (S87)
 
 ### BUG-PM-023: reviewedItems.has() without null guard (P0) — FIXED S116
 - **Когда:** S79 review (pre-existing from S74), fixed S116
