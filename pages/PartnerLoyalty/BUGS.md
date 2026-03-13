@@ -1,8 +1,14 @@
 # PartnerLoyalty — Bug Tracker
 
-**Last updated:** 2026-03-06
+**Last updated:** 2026-03-14
 
 ---
+
+## Fixed (in RELEASE 260314-00)
+
+| ID | Priority | Description | Commit |
+|----|----------|-------------|--------|
+| BUG-PM-040 | P0 | Loyalty points lost on Order.create failure — points deducted before order creation were not restored on failure. Added rollback pattern (restore balance + rollback transaction) in both hall and pickup/delivery flows in PublicMenu/base/x.jsx | S121 |
 
 ## Fixed (in RELEASE 260306-01)
 

@@ -2439,7 +2439,8 @@ export default function X() {
         }
       }
 
-      // Process points redemption BEFORE creating order
+      // BUG-PM-040: Process points redemption BEFORE creating order, with rollback on failure
+      let pointsDeducted = false;
       if (loyaltyAccountToUse && redeemedPoints > 0) {
         await base44.entities.LoyaltyTransaction.create({
           account: loyaltyAccountToUse.id,
@@ -2447,16 +2448,17 @@ export default function X() {
           amount: -redeemedPoints,
           description: t('loyalty.transaction.redeem')
         });
-        
+
         await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
           balance: loyaltyAccountToUse.balance - redeemedPoints,
           total_spent: (loyaltyAccountToUse.total_spent || 0) + redeemedPoints
         });
+        pointsDeducted = true;
       }
 
       // Get start stage for this order type
       const startStage = getStartStage(orderStages, orderMode);
-      
+
       // Generate order number (for staff, not shown to guest)
       const { orderNumber, updatedCounters } = getNextOrderNumber(partner, 'hall');
 
@@ -2482,7 +2484,29 @@ export default function X() {
 
       if (partner?.id && orderData.table) saveTableSelection(partner.id, orderData.table);
 
-      const order = await base44.entities.Order.create(orderData);
+      let order;
+      try {
+        order = await base44.entities.Order.create(orderData);
+      } catch (orderErr) {
+        // BUG-PM-040: Restore loyalty points if Order.create fails
+        if (pointsDeducted) {
+          try {
+            await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
+              balance: loyaltyAccountToUse.balance,
+              total_spent: loyaltyAccountToUse.total_spent || 0
+            });
+            await base44.entities.LoyaltyTransaction.create({
+              account: loyaltyAccountToUse.id,
+              type: 'rollback',
+              amount: redeemedPoints,
+              description: 'Rollback: order creation failed'
+            });
+          } catch (rollbackErr) {
+            console.error('BUG-PM-040: Failed to restore loyalty points:', rollbackErr);
+          }
+        }
+        throw orderErr;
+      }
 
       // Create order items with split_type
       const newItems = cart.map((item) => ({
@@ -2813,7 +2837,8 @@ export default function X() {
           }
         }
 
-        // Process points redemption BEFORE creating order
+        // BUG-PM-040: Process points redemption BEFORE creating order, with rollback on failure
+        let pointsDeducted = false;
         if (loyaltyAccountToUse && redeemedPoints > 0) {
           await base44.entities.LoyaltyTransaction.create({
             account: loyaltyAccountToUse.id,
@@ -2821,11 +2846,12 @@ export default function X() {
             amount: -redeemedPoints,
             description: t('loyalty.transaction.redeem')
           });
-          
+
           await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
             balance: loyaltyAccountToUse.balance - redeemedPoints,
             total_spent: (loyaltyAccountToUse.total_spent || 0) + redeemedPoints
           });
+          pointsDeducted = true;
         }
 
         // Get start stage for this order type
@@ -2849,7 +2875,29 @@ export default function X() {
           discount_amount: discountAmount + pointsDiscountAmount,
         };
 
-        const order = await base44.entities.Order.create(orderData);
+        let order;
+        try {
+          order = await base44.entities.Order.create(orderData);
+        } catch (orderErr) {
+          // BUG-PM-040: Restore loyalty points if Order.create fails
+          if (pointsDeducted) {
+            try {
+              await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
+                balance: loyaltyAccountToUse.balance,
+                total_spent: loyaltyAccountToUse.total_spent || 0
+              });
+              await base44.entities.LoyaltyTransaction.create({
+                account: loyaltyAccountToUse.id,
+                type: 'rollback',
+                amount: redeemedPoints,
+                description: 'Rollback: order creation failed'
+              });
+            } catch (rollbackErr) {
+              console.error('BUG-PM-040: Failed to restore loyalty points:', rollbackErr);
+            }
+          }
+          throw orderErr;
+        }
 
         const orderItemsData = cart.map((item) => ({
           order: order.id,

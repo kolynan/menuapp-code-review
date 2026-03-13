@@ -16,6 +16,7 @@ Loyalty program configuration: bonus point earn rates, review rewards, redemptio
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 260314-00 | 2026-03-14 | BUG-PM-040 (P0): Added loyalty points rollback on Order.create failure in PublicMenu/base/x.jsx — both hall and pickup/delivery flows. |
 | 260306-01 | 2026-03-06 | pluralPoints() — correct Russian declension for points (1 Балл, 2 Балла, 5 Баллов). CC+Codex reviewed. |
 | 260305-00 | 2026-03-05 | 5-state sticky save bar (idle/dirty/saving/saved/error), cancel/discard, snapshot dirty tracking, financial confirm dialog, beforeunload guard. CC+Codex reviewed. |
 | 260301-00 | 2026-03-01 | Phase 1v2: sticky save bar visual active state (shadow when unsaved changes), horizontal padding, all 6 Input fields raised to 44px. CC+Codex verified. |
