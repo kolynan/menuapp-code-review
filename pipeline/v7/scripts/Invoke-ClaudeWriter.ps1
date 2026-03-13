@@ -89,18 +89,27 @@ $startedAt = Get-V7Timestamp
 $exitCode = Invoke-V7CommandToFiles -CommandPrefix $claudePrefix -Arguments $args -WorkingDirectory $worktree -StdOutPath $stdoutPath -StdErrPath $stderrPath
 $endedAt = Get-V7Timestamp
 
-$headCommit = (git -C $worktree rev-parse HEAD).Trim()
-$dirty = @(git -C $worktree status --porcelain)
+$headCommit = (Invoke-V7Git -RepoRoot $worktree -Arguments @('rev-parse', 'HEAD') -FailureMessage 'Unable to resolve Claude writer HEAD').stdout.Trim()
+$dirtyStatus = Invoke-V7Git -RepoRoot $worktree -Arguments @('status', '--porcelain') -FailureMessage 'Unable to inspect Claude writer worktree status'
+$dirty = if ([string]::IsNullOrWhiteSpace([string]$dirtyStatus.stdout)) {
+    @()
+} else {
+    @(
+        ($dirtyStatus.stdout -split "`r?`n") |
+            Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
+    )
+}
 $autoCommitted = $false
 
-if ($headCommit -eq $baseCommit -and $dirty.Count -gt 0) {
-    git -C $worktree add -A | Out-Null
-    git -C $worktree commit -m $commitMessage | Out-Null
-    $headCommit = (git -C $worktree rev-parse HEAD).Trim()
+if (($headCommit -eq $baseCommit -or [string]::IsNullOrWhiteSpace($baseCommit)) -and $dirty.Count -gt 0) {
+    Invoke-V7Git -RepoRoot $worktree -Arguments @('add', '-A') -FailureMessage 'Unable to stage Claude writer changes' | Out-Null
+    Invoke-V7Git -RepoRoot $worktree -Arguments @('commit', '-m', $commitMessage) -FailureMessage 'Unable to auto-commit Claude writer changes' | Out-Null
+    $headCommit = (Invoke-V7Git -RepoRoot $worktree -Arguments @('rev-parse', 'HEAD') -FailureMessage 'Unable to resolve Claude writer HEAD after auto-commit').stdout.Trim()
     $autoCommitted = $true
 }
 
-$changedFiles = @(git -C $worktree diff --name-only $baseCommit..HEAD)
+$changedFiles = @(Get-V7ChangedFiles -RepoRoot $worktree -BaseCommit $baseCommit)
+$hasWriterCommit = -not [string]::IsNullOrWhiteSpace($headCommit) -and ($autoCommitted -or (-not [string]::IsNullOrWhiteSpace($baseCommit) -and $headCommit -ne $baseCommit))
 $result = [ordered]@{
     worker = if ($Mode -eq 'writer') { 'claude-writer' } else { 'claude-reconcile' }
     mode = $Mode
@@ -113,7 +122,7 @@ $result = [ordered]@{
     stdout_log = $stdoutPath
     stderr_log = $stderrPath
     prompt_file = $promptPath
-    commit_hash = if ($headCommit -ne $baseCommit) { $headCommit } else { '' }
+    commit_hash = if ($hasWriterCommit) { $headCommit } else { '' }
     auto_committed = $autoCommitted
     changed_files = $changedFiles
 }

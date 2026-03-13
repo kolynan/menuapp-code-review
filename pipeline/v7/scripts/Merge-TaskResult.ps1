@@ -15,21 +15,38 @@ $writerResultPath = Join-Path $artifactsDir 'claude-writer.result.json'
 $reviewResultPath = Join-Path $artifactsDir 'codex-review-findings.json'
 $reconcileResultPath = Join-Path $artifactsDir 'claude-reconcile.result.json'
 $mergeWorktree = $task.paths.merge_worktree
-$baseCommit = $task.git.base_commit
+$baseCommit = [string]$task.git.base_commit
 $writerResult = Read-V7Json -Path $writerResultPath
 $writerCommit = ''
 if ($writerResult -and $writerResult.commit_hash) {
     $writerCommit = [string]$writerResult.commit_hash
 }
 
-if (-not $writerCommit) {
+if ([string]::IsNullOrWhiteSpace($writerCommit) -and -not [string]::IsNullOrWhiteSpace([string]$task.paths.writer_worktree) -and (Test-Path -LiteralPath $task.paths.writer_worktree)) {
+    $writerHead = (Invoke-V7Git -RepoRoot $task.paths.writer_worktree -Arguments @('rev-parse', 'HEAD') -FailureMessage 'Unable to resolve Claude writer worktree HEAD').stdout.Trim()
+    if (-not [string]::IsNullOrWhiteSpace($writerHead) -and ([string]::IsNullOrWhiteSpace($baseCommit) -or $writerHead -ne $baseCommit)) {
+        $writerCommit = $writerHead
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($writerCommit)) {
     throw 'Claude writer did not produce a commit hash.'
 }
 
-$mergeOutput = & git -C $mergeWorktree cherry-pick $writerCommit 2>&1
-Write-V7TextFile -Path (Join-Path $logsDir 'merge-cherry-pick.log') -Content ((($mergeOutput | Out-String).TrimEnd()) + "`n")
-if ($LASTEXITCODE -ne 0) {
-    throw 'Cherry-pick failed during merge.'
+$mergeCommand = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C', $mergeWorktree, 'cherry-pick', $writerCommit) -WorkingDirectory $mergeWorktree
+$mergeOutputParts = @()
+if (-not [string]::IsNullOrWhiteSpace([string]$mergeCommand.stdout)) {
+    $mergeOutputParts += [string]$mergeCommand.stdout
+}
+if (-not [string]::IsNullOrWhiteSpace([string]$mergeCommand.stderr)) {
+    $mergeOutputParts += [string]$mergeCommand.stderr
+}
+$mergeLogContent = if ($mergeOutputParts.Count -gt 0) { (($mergeOutputParts -join "`n").TrimEnd() + "`n") } else { '' }
+Write-V7TextFile -Path (Join-Path $logsDir 'merge-cherry-pick.log') -Content $mergeLogContent
+if ($mergeCommand.exit_code -ne 0) {
+    $mergeFailureDetails = @($mergeCommand.stderr, $mergeCommand.stdout) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
+    $mergeFailureSuffix = if ($mergeFailureDetails.Count -gt 0) { ': ' + (($mergeFailureDetails -join [Environment]::NewLine).Trim()) } else { '' }
+    throw ('Cherry-pick failed during merge' + $mergeFailureSuffix)
 }
 
 $reviewJson = $null
@@ -48,15 +65,19 @@ if ($needsReconcile -and $config.pipeline.auto_reconcile) {
     }
 }
 
-$mergeCommit = (git -C $mergeWorktree rev-parse HEAD).Trim()
-$changedFiles = @(git -C $mergeWorktree diff --name-only $baseCommit..HEAD)
+$mergeCommit = (Invoke-V7Git -RepoRoot $mergeWorktree -Arguments @('rev-parse', 'HEAD') -FailureMessage 'Unable to resolve merge worktree HEAD').stdout.Trim()
+if ([string]::IsNullOrWhiteSpace($baseCommit)) {
+    $changedFiles = @()
+} else {
+    $changedFiles = @(Get-V7ChangedFiles -RepoRoot $mergeWorktree -BaseCommit $baseCommit)
+}
 $reviewCount = 0
 if ($reviewJson -and $reviewJson.findings) {
     $reviewCount = $reviewJson.findings.Count
 }
 
 $reportLines = @(
-    "# Merge Report",
+    '# Merge Report',
     '',
     "Task: $($task.task_id)",
     "Workflow: $($task.workflow)",

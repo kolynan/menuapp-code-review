@@ -308,9 +308,82 @@ function Get-V7TaskImages {
     return $images | Sort-Object -Unique
 }
 
+function Invoke-V7CapturedCommand {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$CommandPrefix,
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [string]$InputText
+    )
+
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("v7-cmd-" + [guid]::NewGuid().ToString("N"))
+    Ensure-V7Directory -Path $tempRoot | Out-Null
+    $stdoutPath = Join-Path $tempRoot 'stdout.log'
+    $stderrPath = Join-Path $tempRoot 'stderr.log'
+
+    try {
+        $exitCode = Invoke-V7CommandToFiles -CommandPrefix $CommandPrefix -Arguments $Arguments -WorkingDirectory $WorkingDirectory -StdOutPath $stdoutPath -StdErrPath $stderrPath -InputText $InputText
+        $stdout = if (Test-Path -LiteralPath $stdoutPath) { (Read-V7TextFile -Path $stdoutPath).TrimEnd([char[]]"`r`n") } else { '' }
+        $stderr = if (Test-Path -LiteralPath $stderrPath) { (Read-V7TextFile -Path $stderrPath).TrimEnd([char[]]"`r`n") } else { '' }
+
+        return [ordered]@{
+            exit_code = $exitCode
+            stdout = $stdout
+            stderr = $stderr
+        }
+    } finally {
+        if (Test-Path -LiteralPath $tempRoot) {
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Invoke-V7Git {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [string]$FailureMessage = 'Git command failed'
+    )
+
+    $result = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments (@('-C', $RepoRoot) + $Arguments) -WorkingDirectory $RepoRoot
+    if ($result.exit_code -ne 0) {
+        $details = @()
+        if (-not [string]::IsNullOrWhiteSpace([string]$result.stderr)) {
+            $details += [string]$result.stderr
+        }
+        if (-not [string]::IsNullOrWhiteSpace([string]$result.stdout)) {
+            $details += [string]$result.stdout
+        }
+        $suffix = if ($details.Count -gt 0) { ': ' + (($details -join [Environment]::NewLine).Trim()) } else { '' }
+        throw ($FailureMessage + $suffix)
+    }
+    return $result
+}
+
+function Get-V7ChangedFiles {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [string]$BaseCommit,
+        [string]$HeadRef = 'HEAD'
+    )
+
+    if ([string]::IsNullOrWhiteSpace([string]$BaseCommit)) {
+        return @()
+    }
+
+    $result = Invoke-V7Git -RepoRoot $RepoRoot -Arguments @('diff', '--name-only', "$BaseCommit..$HeadRef") -FailureMessage 'Unable to list changed files'
+    if ([string]::IsNullOrWhiteSpace([string]$result.stdout)) {
+        return @()
+    }
+
+    return @(
+        ($result.stdout -split "`r?`n") |
+            Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
+    )
+}
 function Get-V7RepoHead {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
-    return (git -C $RepoRoot rev-parse HEAD).Trim()
+    return (Invoke-V7Git -RepoRoot $RepoRoot -Arguments @('rev-parse', 'HEAD') -FailureMessage 'Unable to resolve repository HEAD').stdout.Trim()
 }
 
 function New-V7Worktree {
@@ -329,9 +402,9 @@ function New-V7Worktree {
         Ensure-V7Directory -Path $parent | Out-Null
     }
     if ($BranchName) {
-        & git -C $RepoRoot worktree add $Path -b $BranchName $BaseCommit | Out-Null
+        Invoke-V7Git -RepoRoot $RepoRoot -Arguments @('worktree', 'add', $Path, '-b', $BranchName, $BaseCommit) -FailureMessage 'Unable to create worktree' | Out-Null
     } else {
-        & git -C $RepoRoot worktree add --detach $Path $BaseCommit | Out-Null
+        Invoke-V7Git -RepoRoot $RepoRoot -Arguments @('worktree', 'add', '--detach', $Path, $BaseCommit) -FailureMessage 'Unable to create detached worktree' | Out-Null
     }
 }
 
@@ -343,7 +416,7 @@ function Remove-V7Worktree {
 
     if (Test-Path -LiteralPath $Path) {
         try {
-            & git -C $RepoRoot worktree remove --force $Path | Out-Null
+            Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C', $RepoRoot, 'worktree', 'remove', '--force', $Path) -WorkingDirectory $RepoRoot | Out-Null
         } catch {
         }
     }
