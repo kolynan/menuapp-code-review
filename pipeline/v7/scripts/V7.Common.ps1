@@ -967,6 +967,130 @@ function Write-V7TelegramDiagnostic {
     Append-V7TextFile -Path $path -Content (($lines -join "`n") + "`n")
 }
 
+function Get-V7TelegramSettings {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$Config
+    )
+
+    $telegramConfig = $null
+    if ($Config.Contains('telegram') -and $Config['telegram'] -is [System.Collections.IDictionary]) {
+        $telegramConfig = $Config['telegram']
+    }
+
+    $botToken = ''
+    if ($telegramConfig -and $telegramConfig.Contains('bot_token') -and -not [string]::IsNullOrWhiteSpace([string]$telegramConfig['bot_token'])) {
+        $botToken = [string]$telegramConfig['bot_token']
+    } elseif ($Config.Contains('telegram_bot_token') -and -not [string]::IsNullOrWhiteSpace([string]$Config['telegram_bot_token'])) {
+        $botToken = [string]$Config['telegram_bot_token']
+    }
+
+    $chatId = ''
+    if ($telegramConfig -and $telegramConfig.Contains('chat_id') -and -not [string]::IsNullOrWhiteSpace([string]$telegramConfig['chat_id'])) {
+        $chatId = [string]$telegramConfig['chat_id']
+    } elseif ($Config.Contains('telegram_chat_id') -and -not [string]::IsNullOrWhiteSpace([string]$Config['telegram_chat_id'])) {
+        $chatId = [string]$Config['telegram_chat_id']
+    }
+
+    return [ordered]@{
+        bot_token = $botToken
+        chat_id = $chatId
+    }
+}
+
+function Invoke-V7TelegramApi {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$Config,
+        [Parameter(Mandatory = $true)][string]$MethodName,
+        [Parameter(Mandatory = $true)][hashtable]$Payload,
+        [Parameter(Mandatory = $true)][string]$Text,
+        [string]$EventsPath,
+        [string]$DiagnosticsPath,
+        [string]$FailureMessage
+    )
+
+    $telegramSettings = Get-V7TelegramSettings -Config $Config
+    $token = [string]$telegramSettings.bot_token
+    $chatId = [string]$telegramSettings.chat_id
+    $uri = if ([string]::IsNullOrWhiteSpace($token)) { "https://api.telegram.org/bot<missing>/$MethodName" } else { "https://api.telegram.org/bot$token/$MethodName" }
+    if ([string]::IsNullOrWhiteSpace($token) -or [string]::IsNullOrWhiteSpace($chatId)) {
+        Write-V7TelegramDiagnostic -EventsPath $EventsPath -DiagnosticsPath $DiagnosticsPath -Text $Text -Message 'Telegram credentials missing' -Uri $uri -ErrorRecord $null
+        return [ordered]@{
+            ok = $false
+            message_id = ''
+            response = $null
+        }
+    }
+
+    if (-not $Payload.Contains('chat_id')) {
+        $Payload['chat_id'] = $chatId
+    }
+    $body = $Payload | ConvertTo-Json -Depth 10
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+    try {
+        $response = Invoke-RestMethod -Uri $uri -Method Post -ContentType "application/json" -Body $body
+        $messageId = ''
+        if ($response -and $response.result -and $response.result.message_id) {
+            $messageId = [string]$response.result.message_id
+        } elseif ($Payload.Contains('message_id') -and -not [string]::IsNullOrWhiteSpace([string]$Payload['message_id'])) {
+            $messageId = [string]$Payload['message_id']
+        }
+        return [ordered]@{
+            ok = $true
+            message_id = $messageId
+            response = $response
+        }
+    } catch {
+        $diagnosticMessage = if ([string]::IsNullOrWhiteSpace($FailureMessage)) { "Invoke-RestMethod failed for Telegram $MethodName" } else { $FailureMessage }
+        Write-V7TelegramDiagnostic -EventsPath $EventsPath -DiagnosticsPath $DiagnosticsPath -Text $Text -Message $diagnosticMessage -Uri $uri -ErrorRecord $_
+        return [ordered]@{
+            ok = $false
+            message_id = ''
+            response = $null
+        }
+    }
+}
+
+function Send-V7TelegramMessage {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$Config,
+        [Parameter(Mandatory = $true)][string]$Text,
+        [string]$EventsPath,
+        [string]$DiagnosticsPath
+    )
+
+    return Invoke-V7TelegramApi -Config $Config -MethodName 'sendMessage' -Payload ([ordered]@{ text = $Text }) -Text $Text -EventsPath $EventsPath -DiagnosticsPath $DiagnosticsPath -FailureMessage 'Invoke-RestMethod failed while sending Telegram message'
+}
+
+function Edit-V7TelegramMessage {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$Config,
+        [Parameter(Mandatory = $true)][string]$MessageId,
+        [Parameter(Mandatory = $true)][string]$Text,
+        [string]$EventsPath,
+        [string]$DiagnosticsPath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($MessageId)) {
+        return [ordered]@{
+            ok = $false
+            message_id = ''
+            response = $null
+        }
+    }
+
+    $messageIdValue = 0
+    if (-not [int]::TryParse($MessageId, [ref]$messageIdValue)) {
+        return [ordered]@{
+            ok = $false
+            message_id = ''
+            response = $null
+        }
+    }
+
+    return Invoke-V7TelegramApi -Config $Config -MethodName 'editMessageText' -Payload ([ordered]@{ message_id = $messageIdValue; text = $Text }) -Text $Text -EventsPath $EventsPath -DiagnosticsPath $DiagnosticsPath -FailureMessage 'Invoke-RestMethod failed while editing Telegram message'
+}
+
 function Send-V7Telegram {
     param(
         [Parameter(Mandatory = $true)][hashtable]$Config,
@@ -975,25 +1099,10 @@ function Send-V7Telegram {
         [string]$DiagnosticsPath
     )
 
-    $token = $Config.telegram.bot_token
-    $chatId = $Config.telegram.chat_id
-    $uri = if ([string]::IsNullOrWhiteSpace($token)) { 'https://api.telegram.org/bot<missing>/sendMessage' } else { "https://api.telegram.org/bot$token/sendMessage" }
-    if ([string]::IsNullOrWhiteSpace($token) -or [string]::IsNullOrWhiteSpace($chatId)) {
-        Write-V7TelegramDiagnostic -EventsPath $EventsPath -DiagnosticsPath $DiagnosticsPath -Text $Text -Message 'Telegram credentials missing' -Uri $uri -ErrorRecord $null
-        return $false
-    }
-
-    $body = @{ chat_id = $chatId; text = $Text } | ConvertTo-Json
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-    try {
-        Invoke-RestMethod -Uri $uri -Method Post -ContentType "application/json" -Body $body | Out-Null
-        return $true
-    } catch {
-        Write-V7TelegramDiagnostic -EventsPath $EventsPath -DiagnosticsPath $DiagnosticsPath -Text $Text -Message 'Invoke-RestMethod failed while sending Telegram message' -Uri $uri -ErrorRecord $_
-        return $false
-    }
+    $result = Send-V7TelegramMessage -Config $Config -Text $Text -EventsPath $EventsPath -DiagnosticsPath $DiagnosticsPath
+    return [bool]$result.ok
 }
+
 function New-V7StatusObject {
     param(
         [Parameter(Mandatory = $true)][string]$TaskId,
@@ -1027,6 +1136,14 @@ function New-V7StatusObject {
             base_commit = $null
             merge_commit = $null
             writer_commit = $null
+        }
+        telegram = [ordered]@{
+            message_id = ''
+            status_segments = @()
+            current_message = ''
+            last_text = ''
+            last_delivery = ''
+            fallback_count = 0
         }
     }
 }

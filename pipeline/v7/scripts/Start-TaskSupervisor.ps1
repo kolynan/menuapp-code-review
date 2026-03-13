@@ -82,17 +82,294 @@ function Add-SupervisorStage {
     }
     Write-SupervisorStepLog -QueueRunDir $QueueRunDir -State $State -Message $Message -Data $Data
 }
+function Ensure-V7TelegramState {
+    param([hashtable]$Status)
+
+    if ($null -eq $Status) {
+        return $null
+    }
+
+    if (-not $Status.Contains('telegram') -or -not ($Status['telegram'] -is [System.Collections.IDictionary])) {
+        $Status['telegram'] = [ordered]@{}
+    }
+
+    $telegramState = $Status['telegram']
+    if (-not $telegramState.Contains('message_id') -or $null -eq $telegramState['message_id']) {
+        $telegramState['message_id'] = ''
+    }
+    if (-not $telegramState.Contains('status_segments') -or $null -eq $telegramState['status_segments']) {
+        $telegramState['status_segments'] = @()
+    }
+    if (-not $telegramState.Contains('current_message') -or $null -eq $telegramState['current_message']) {
+        $telegramState['current_message'] = ''
+    }
+    if (-not $telegramState.Contains('last_text') -or $null -eq $telegramState['last_text']) {
+        $telegramState['last_text'] = ''
+    }
+    if (-not $telegramState.Contains('last_delivery') -or $null -eq $telegramState['last_delivery']) {
+        $telegramState['last_delivery'] = ''
+    }
+    if (-not $telegramState.Contains('fallback_count') -or $null -eq $telegramState['fallback_count']) {
+        $telegramState['fallback_count'] = 0
+    }
+    return $telegramState
+}
+
+function Get-V7TelegramDisplayTitle {
+    param(
+        [hashtable]$Status,
+        [string]$TaskId,
+        [string]$Workflow
+    )
+
+    $resolvedTaskId = ''
+    if (-not [string]::IsNullOrWhiteSpace($TaskId)) {
+        $resolvedTaskId = $TaskId
+    } elseif ($Status -and $Status.Contains('task_id') -and -not [string]::IsNullOrWhiteSpace([string]$Status['task_id'])) {
+        $resolvedTaskId = [string]$Status['task_id']
+    }
+
+    $resolvedWorkflow = ''
+    if (-not [string]::IsNullOrWhiteSpace($Workflow)) {
+        $resolvedWorkflow = $Workflow
+    } elseif ($Status -and $Status.Contains('workflow') -and -not [string]::IsNullOrWhiteSpace([string]$Status['workflow'])) {
+        $resolvedWorkflow = [string]$Status['workflow']
+    }
+
+    $resolvedPage = $resolvedTaskId
+    if ($Status -and $Status.Contains('page') -and -not [string]::IsNullOrWhiteSpace([string]$Status['page'])) {
+        $resolvedPage = [string]$Status['page']
+    }
+
+    $parts = @()
+    if (-not [string]::IsNullOrWhiteSpace($resolvedWorkflow)) {
+        $parts += ('[' + $resolvedWorkflow + ']')
+    }
+    if (-not [string]::IsNullOrWhiteSpace($resolvedPage)) {
+        $parts += $resolvedPage
+    }
+    return ($parts -join ' ').Trim()
+}
+
+function Get-V7TelegramDurationText {
+    param([hashtable]$Status)
+
+    if ($null -eq $Status -or -not $Status.Contains('started_at') -or [string]::IsNullOrWhiteSpace([string]$Status['started_at'])) {
+        return 'n/a'
+    }
+
+    try {
+        $startedAt = [DateTimeOffset]::Parse([string]$Status['started_at']).LocalDateTime
+    } catch {
+        return 'n/a'
+    }
+
+    $durationMinutes = [int][Math]::Max(0, [Math]::Round(((Get-Date) - $startedAt).TotalMinutes))
+    return ($durationMinutes.ToString() + ' min')
+}
+
+function Get-V7TelegramCommitText {
+    param([hashtable]$Status)
+
+    $commit = ''
+    if ($Status -and $Status.Contains('git') -and $Status['git'] -is [System.Collections.IDictionary]) {
+        $gitState = $Status['git']
+        foreach ($key in @('merge_commit', 'writer_commit', 'base_commit')) {
+            if ($gitState.Contains($key) -and -not [string]::IsNullOrWhiteSpace([string]$gitState[$key])) {
+                $commit = [string]$gitState[$key]
+                break
+            }
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($commit)) {
+        return 'n/a'
+    }
+    if ($commit.Length -gt 7) {
+        return $commit.Substring(0, 7)
+    }
+    return $commit
+}
+
+function Set-V7TelegramSegment {
+    param(
+        [object[]]$Segments,
+        [string]$Value,
+        [string]$MatchPrefix
+    )
+
+    $items = @($Segments)
+    if ($items.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace($MatchPrefix) -and [string]$items[$items.Count - 1] -like ($MatchPrefix + '*')) {
+        $items[$items.Count - 1] = $Value
+    } elseif ($items.Count -eq 0 -or [string]$items[$items.Count - 1] -ne $Value) {
+        $items += $Value
+    }
+    return @($items)
+}
+
+function Update-V7TelegramProgress {
+    param(
+        [hashtable]$Status,
+        [string]$State,
+        [string]$Message
+    )
+
+    $telegramState = Ensure-V7TelegramState -Status $Status
+    if ($null -eq $telegramState) {
+        return
+    }
+
+    $segments = @($telegramState['status_segments'])
+    $normalizedState = if ([string]::IsNullOrWhiteSpace($State)) { '' } else { $State.ToUpperInvariant() }
+    $normalizedMessage = if ([string]::IsNullOrWhiteSpace($Message)) { '' } else { $Message.Trim() }
+
+    switch ($normalizedState) {
+        'CLAIMED' {
+            if ($segments.Count -eq 0) {
+                $segments = @('Claimed')
+            } else {
+                $segments[0] = 'Claimed'
+            }
+        }
+        'PREPARING' {
+            $segments = Set-V7TelegramSegment -Segments $segments -Value 'Preparing' -MatchPrefix 'Preparing'
+        }
+        'RUNNING' {
+            $segments = Set-V7TelegramSegment -Segments $segments -Value 'Running' -MatchPrefix 'Running'
+        }
+        'HEARTBEAT' {
+            $runningSegment = 'Running'
+            if ($normalizedMessage -match '\((\d+)m elapsed\)') {
+                $runningSegment = ('Running (' + $matches[1] + 'm)')
+            }
+            $segments = Set-V7TelegramSegment -Segments $segments -Value $runningSegment -MatchPrefix 'Running'
+        }
+        'MERGING' {
+            $segments = Set-V7TelegramSegment -Segments $segments -Value 'Merging' -MatchPrefix 'Merging'
+        }
+        'DONE' {
+            $segments = Set-V7TelegramSegment -Segments $segments -Value (([string][char]0x2705) + ' DONE') -MatchPrefix ([string][char]0x2705)
+        }
+        'FAILED' {
+            $segments = Set-V7TelegramSegment -Segments $segments -Value (([string][char]0x274C) + ' FAILED') -MatchPrefix ([string][char]0x274C)
+        }
+    }
+
+    $telegramState['status_segments'] = @($segments)
+    if ($normalizedState -eq 'DONE' -or $normalizedState -eq 'FAILED') {
+        $telegramState['current_message'] = ''
+    } elseif (-not [string]::IsNullOrWhiteSpace($normalizedMessage)) {
+        $telegramState['current_message'] = $normalizedMessage
+    }
+}
+
+function New-V7TelegramMessageText {
+    param(
+        [hashtable]$Status,
+        [string]$TaskId,
+        [string]$Workflow,
+        [string]$State,
+        [string]$Message,
+        [string]$ArtifactsDir
+    )
+
+    $telegramState = Ensure-V7TelegramState -Status $Status
+    $title = Get-V7TelegramDisplayTitle -Status $Status -TaskId $TaskId -Workflow $Workflow
+    $arrow = [string][char]0x2192
+    $hourglass = [string][char]0x23F3
+    $segments = @()
+    if ($telegramState -and $telegramState.Contains('status_segments') -and $null -ne $telegramState['status_segments']) {
+        $segments = @($telegramState['status_segments'])
+    }
+
+    $lines = @()
+    if (-not [string]::IsNullOrWhiteSpace($title)) {
+        $lines += $title
+    }
+    if ($segments.Count -gt 0) {
+        $lines += ($hourglass + ' ' + (($segments | ForEach-Object { [string]$_ }) -join (' ' + $arrow + ' ')))
+    }
+
+    $normalizedState = if ([string]::IsNullOrWhiteSpace($State)) { '' } else { $State.ToUpperInvariant() }
+    if ($normalizedState -eq 'DONE' -or $normalizedState -eq 'FAILED') {
+        $changedFiles = @(Get-SupervisorChangedFiles -ArtifactsDir $ArtifactsDir)
+        $lines += ('Commit: ' + (Get-V7TelegramCommitText -Status $Status))
+        $lines += ('Files: ' + $changedFiles.Count + ' changed')
+        $lines += ('Duration: ' + (Get-V7TelegramDurationText -Status $Status))
+        if ($normalizedState -eq 'FAILED' -and -not [string]::IsNullOrWhiteSpace($Message)) {
+            $lines += ('Error: ' + $Message.Trim())
+        }
+    } elseif ($telegramState -and $telegramState.Contains('current_message')) {
+        $currentMessage = [string]$telegramState['current_message']
+        if (-not [string]::IsNullOrWhiteSpace($currentMessage)) {
+            $titleText = if ([string]::IsNullOrWhiteSpace($title)) { '' } else { $title.Trim() }
+            if ($currentMessage.Trim() -ne $titleText) {
+                $lines += ('Current: ' + $currentMessage.Trim())
+            }
+        }
+    }
+
+    return (($lines | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join "`n")
+}
+
 function Invoke-V7TelegramScript {
     param(
         [Parameter(Mandatory = $true)][hashtable]$Config,
-        [Parameter(Mandatory = $true)][string]$Text,
+        [hashtable]$Status,
+        [string]$StatusPath,
+        [string]$State,
+        [string]$Message,
         [string]$EventsPath,
         [string]$QueueRunDir,
+        [string]$ArtifactsDir,
+        [string]$TaskId,
+        [string]$Workflow,
         [string]$WarningMessage,
         $WarningData
     )
 
-    $ok = Send-V7Telegram -Config $Config -Text $Text -EventsPath $EventsPath
+    $telegramState = $null
+    $text = if ([string]::IsNullOrWhiteSpace($Message)) { '' } else { $Message }
+    if ($Status) {
+        $telegramState = Ensure-V7TelegramState -Status $Status
+        Update-V7TelegramProgress -Status $Status -State $State -Message $Message
+        $text = New-V7TelegramMessageText -Status $Status -TaskId $TaskId -Workflow $Workflow -State $State -Message $Message -ArtifactsDir $ArtifactsDir
+    }
+
+    $previousMessageId = ''
+    if ($telegramState -and $telegramState.Contains('message_id') -and -not [string]::IsNullOrWhiteSpace([string]$telegramState['message_id'])) {
+        $previousMessageId = [string]$telegramState['message_id']
+    }
+
+    $result = $null
+    if (-not [string]::IsNullOrWhiteSpace($previousMessageId)) {
+        $result = Edit-V7TelegramMessage -Config $Config -MessageId $previousMessageId -Text $text -EventsPath $EventsPath
+        if (-not $result.ok) {
+            $result = Send-V7TelegramMessage -Config $Config -Text $text -EventsPath $EventsPath
+            if ($result.ok -and $telegramState) {
+                $telegramState['fallback_count'] = [int]$telegramState['fallback_count'] + 1
+                $telegramState['last_delivery'] = 'fallback_send'
+            }
+        } elseif ($telegramState) {
+            $telegramState['last_delivery'] = 'edit'
+        }
+    } else {
+        $result = Send-V7TelegramMessage -Config $Config -Text $text -EventsPath $EventsPath
+        if ($result.ok -and $telegramState) {
+            $telegramState['last_delivery'] = 'send'
+        }
+    }
+
+    $ok = ($result -and $result.ok)
+    if ($ok -and $telegramState) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$result.message_id)) {
+            $telegramState['message_id'] = [string]$result.message_id
+        }
+        $telegramState['last_text'] = $text
+        if ($StatusPath) {
+            Set-V7Status -StatusPath $StatusPath -Status $Status
+        }
+    }
     if (-not $ok -and $WarningMessage) {
         Add-SupervisorStage -QueueRunDir $QueueRunDir -EventsPath $EventsPath -State 'WARNING' -Message $WarningMessage -Data $WarningData
     }
@@ -276,7 +553,7 @@ function Wait-V7Launchers {
             $elapsedMinutes = [int][Math]::Floor(((Get-Date) - $startedAt).TotalMinutes)
             $heartbeatText = "$([char]0x23F3) [$stageName] running... (${elapsedMinutes}m elapsed)"
             Add-SupervisorStage -QueueRunDir $QueueRunDir -EventsPath $EventsPath -State 'HEARTBEAT' -Message $heartbeatText -Data @{ stage = $stageName; pids = $alivePids; elapsed_minutes = $elapsedMinutes }
-            Invoke-V7TelegramScript -Config $Config -Text $heartbeatText -EventsPath $EventsPath -QueueRunDir $QueueRunDir -WarningMessage 'Telegram heartbeat failed' -WarningData @{ stage = $stageName; elapsed_minutes = $elapsedMinutes; pids = $alivePids } | Out-Null
+            Invoke-V7TelegramScript -Config $Config -Status $Status -StatusPath $StatusPath -State 'HEARTBEAT' -Message $heartbeatText -EventsPath $EventsPath -QueueRunDir $QueueRunDir -WarningMessage 'Telegram heartbeat failed' -WarningData @{ stage = $stageName; elapsed_minutes = $elapsedMinutes; pids = $alivePids } | Out-Null
             $nextHeartbeat = $nextHeartbeat.AddMinutes(5)
         }
 
@@ -406,7 +683,7 @@ try {
     $status.artifacts.task_json = $taskJsonQueue
     Set-V7Status -StatusPath $statusPath -Status $status
     Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'CLAIMED' -Message 'Task claimed by V7 supervisor' -Data @{ task_file = $TaskFile; queue_run_dir = $queueRunDir; local_run_dir = $localRunDir; config_path = $resolvedConfigPath }
-    Invoke-V7TelegramScript -Config $config -Text (New-StageSummary -TaskId $TaskId -Workflow $workflow -State 'CLAIMED' -Message (($taskPage + ' ' + $taskTopic).Trim())) -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram claim notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
+    Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'CLAIMED' -Message (($taskPage + ' ' + $taskTopic).Trim()) -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram claim notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
 
     $taskManifest = [ordered]@{
         task_id = $TaskId
@@ -447,7 +724,7 @@ try {
     $status.current_step = 'prepare'
     Set-V7Status -StatusPath $statusPath -Status $status
     Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'PREPARING' -Message 'Preparing task context' -Data @{ workflow = $workflow; page = $taskPage; topic = $taskTopic; results_dir = $resultsDir }
-    Invoke-V7TelegramScript -Config $config -Text (New-StageSummary -TaskId $TaskId -Workflow $workflow -State 'PREPARING' -Message 'Preparing task context') -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram preparing notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
+    Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'PREPARING' -Message 'Preparing task context' -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram preparing notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
 
     if ($workflow -eq 'code-review') {
         $baseCommit = Get-V7RepoHead -RepoRoot $repoRootPath
@@ -480,7 +757,7 @@ try {
         $status.current_step = 'parallel-review-and-fix'
         Set-V7Status -StatusPath $statusPath -Status $status
         Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Starting Claude writer and Codex reviewer' -Data @{ task_json = $taskJsonLocal; logs_dir = $logsDir; timeout_minutes = $codeReviewTimeout }
-        Invoke-V7TelegramScript -Config $config -Text (New-StageSummary -TaskId $TaskId -Workflow $workflow -State 'RUNNING' -Message 'Claude writer + Codex reviewer') -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram parallel stage notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
+        Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'RUNNING' -Message 'Claude writer + Codex reviewer' -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram parallel stage notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
 
         $writerProc = Start-V7WorkerLauncher -ScriptPath (Join-Path $workerRoot 'Invoke-ClaudeWriter.ps1') -TaskJsonPath $taskJsonLocal -Name 'claude-writer' -LogsDir $logsDir -Mode 'writer'
         $reviewerProc = Start-V7WorkerLauncher -ScriptPath (Join-Path $workerRoot 'Invoke-CodexReviewer.ps1') -TaskJsonPath $taskJsonLocal -Name 'codex-reviewer' -LogsDir $logsDir -Mode ''
@@ -504,7 +781,7 @@ try {
         $status.current_step = 'merge'
         Set-V7Status -StatusPath $statusPath -Status $status
         Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'MERGING' -Message 'Running merge step' -Data @{ task_json = $taskJsonLocal; logs_dir = $logsDir }
-        Invoke-V7TelegramScript -Config $config -Text (New-StageSummary -TaskId $TaskId -Workflow $workflow -State 'MERGING' -Message 'Integrating writer and reviewer results') -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram merge notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
+        Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'MERGING' -Message 'Integrating writer and reviewer results' -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram merge notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
 
         $mergeStdout = Join-Path $logsDir 'merge.stdout.log'
         $mergeStderr = Join-Path $logsDir 'merge.stderr.log'
@@ -529,16 +806,16 @@ try {
         $status.current_step = 'claude-round1'
         Set-V7Status -StatusPath $statusPath -Status $status
         Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Starting UX discussion rounds' -Data @{ task_json = $taskJsonLocal; logs_dir = $logsDir; timeout_minutes = $uxTimeout }
-        Invoke-V7TelegramScript -Config $config -Text (New-StageSummary -TaskId $TaskId -Workflow $workflow -State 'RUNNING' -Message 'Claude round 1 analyst') -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram UX round 1 notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
+        Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'RUNNING' -Message 'Claude round 1 analyst' -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram UX round 1 notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
 
         $round1Ok = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-ClaudeAnalyst.ps1') -TaskJsonPath $taskJsonLocal -Name 'claude-round1' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -Workflow $workflow -Mode ''
         if (-not $round1Ok) { throw 'Claude round 1 failed' }
 
-        Invoke-V7TelegramScript -Config $config -Text (New-StageSummary -TaskId $TaskId -Workflow $workflow -State 'RUNNING' -Message 'Codex round 2 analyst') -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram UX round 2 notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
+        Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'RUNNING' -Message 'Codex round 2 analyst' -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram UX round 2 notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
         $round2Ok = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-CodexAnalyst.ps1') -TaskJsonPath $taskJsonLocal -Name 'codex-round1' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -Workflow $workflow -Mode ''
         if (-not $round2Ok) { throw 'Codex round 2 failed' }
 
-        Invoke-V7TelegramScript -Config $config -Text (New-StageSummary -TaskId $TaskId -Workflow $workflow -State 'RUNNING' -Message 'Claude round 3 synthesis') -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram UX round 3 notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
+        Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'RUNNING' -Message 'Claude round 3 synthesis' -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram UX round 3 notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
         $round3Ok = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-ClaudeSynthesizer.ps1') -TaskJsonPath $taskJsonLocal -Name 'claude-round3' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -Workflow $workflow -Mode ''
         if (-not $round3Ok) { throw 'Claude round 3 failed' }
     }
@@ -550,7 +827,7 @@ try {
     Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'DONE' -Message 'Task completed' -Data @{ merge_commit = $status.git.merge_commit; results_dir = $resultsDir; local_run_dir = $localRunDir }
     Copy-V7ArtifactsToResults -LocalRunDir $localRunDir -ResultsDir $resultsDir
     $finalCommit = if ([string]::IsNullOrWhiteSpace([string]$status.git.merge_commit)) { 'n/a' } else { [string]$status.git.merge_commit }
-    Invoke-V7TelegramScript -Config $config -Text (New-StageSummary -TaskId $TaskId -Workflow $workflow -State 'DONE' -Message ("Completed. Commit: " + $finalCommit)) -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram completion notification failed' -WarningData @{ task_id = $TaskId; merge_commit = $finalCommit } | Out-Null
+    Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'DONE' -Message ('Completed. Commit: ' + $finalCommit) -EventsPath $eventsPath -QueueRunDir $queueRunDir -ArtifactsDir $artifactsDir -WarningMessage 'Telegram completion notification failed' -WarningData @{ task_id = $TaskId; merge_commit = $finalCommit } | Out-Null
 } catch {
     $supervisorError = $_.Exception.Message
     $crashPath = Write-SupervisorCrashLog -QueueRunDir $queueRunDir -TaskId $TaskId -TaskFile $TaskFile -ErrorRecord $_
@@ -566,7 +843,7 @@ try {
     }
     $failureWorkflow = if ($workflow) { $workflow } else { 'unknown' }
     $failureTaskId = if ($TaskId) { $TaskId } else { [System.IO.Path]::GetFileNameWithoutExtension($TaskFile) }
-    Invoke-V7TelegramScript -Config $config -Text (New-StageSummary -TaskId $failureTaskId -Workflow $failureWorkflow -State 'FAILED' -Message $supervisorError) -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram failure notification failed' -WarningData @{ task_id = $failureTaskId; error = $supervisorError } | Out-Null
+    Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'FAILED' -Message $supervisorError -EventsPath $eventsPath -QueueRunDir $queueRunDir -ArtifactsDir $artifactsDir -TaskId $failureTaskId -Workflow $failureWorkflow -WarningMessage 'Telegram failure notification failed' -WarningData @{ task_id = $failureTaskId; error = $supervisorError } | Out-Null
 } finally {
     $finalState = if ($success) { 'done' } else { 'failed' }
     if ($queueRunDir -and (Test-Path -LiteralPath $queueRunDir)) {
