@@ -51,9 +51,6 @@ function Write-SupervisorStepLog {
 
     if ($null -eq $script:SupervisorStepCounter) {
         $script:SupervisorStepCounter = 0
-$script:V7UxRound1Key = 'ux_' + 'round1'
-$script:V7UxRound2Key = 'ux_' + 'round2'
-$script:V7UxRound3Key = 'ux_' + 'round3'
     }
     $script:SupervisorStepCounter++
 

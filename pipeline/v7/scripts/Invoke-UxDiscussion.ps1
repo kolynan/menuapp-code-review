@@ -136,7 +136,7 @@ if ([string]::IsNullOrWhiteSpace($topic)) {
     throw 'UX discussion tasks require metadata.topic.'
 }
 
-$topicSlug = ConvertTo-V7Slug -Value $topic
+$topicSlug = ConvertTo-V7Slug -Value $topic -MaxLength 80
 $sessionCore = ConvertTo-V7Slug -Value ($task.task_id -replace '^task-', '')
 if ([string]::IsNullOrWhiteSpace($sessionCore)) {
     $sessionCore = Get-Date -Format 'yyyyMMdd-HHmmss'

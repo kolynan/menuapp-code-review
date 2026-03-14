@@ -4,7 +4,7 @@ $ErrorActionPreference = "Stop"
 function Get-V7DefaultConfig {
     return [ordered]@{
         paths = [ordered]@{
-            onedrive_root = "C:\Users\ASUS\OneDrive\002 Menu\Claude AI Cowork"
+            onedrive_root = "C:\Users\ASUS\Dev\Claude AI Cowork"
             repo_dir = "C:\Dev\menuapp-code-review"
             claude_cli = "C:\Users\ASUS\AppData\Roaming\npm\claude"
             codex_cli = "codex"
@@ -31,7 +31,7 @@ function Get-V7DefaultConfig {
 
 function Test-V7HasProperty {
     param(
-        [Parameter(Mandatory = $true)]$InputObject,
+        [AllowNull()]$InputObject,
         [Parameter(Mandatory = $true)][string]$Name
     )
 
@@ -116,7 +116,10 @@ function Get-V7Timestamp {
 }
 
 function ConvertTo-V7Slug {
-    param([string]$Value)
+    param(
+        [string]$Value,
+        [int]$MaxLength = 0
+    )
 
     if ([string]::IsNullOrWhiteSpace($Value)) {
         return "task"
@@ -125,6 +128,9 @@ function ConvertTo-V7Slug {
     $slug = $Value.ToLowerInvariant()
     $slug = [regex]::Replace($slug, "[^a-z0-9]+", "-")
     $slug = $slug.Trim("-")
+    if ($MaxLength -gt 0 -and $slug.Length -gt $MaxLength) {
+        $slug = $slug.Substring(0, $MaxLength).TrimEnd([char[]]'-')
+    }
     if ([string]::IsNullOrWhiteSpace($slug)) {
         return "task"
     }
@@ -133,6 +139,143 @@ function ConvertTo-V7Slug {
 
 function Get-V7Utf8NoBomEncoding {
     return [System.Text.UTF8Encoding]::new($false)
+}
+
+function Get-V7SafePathLimit {
+    return 240
+}
+
+function Get-V7HashFragment {
+    param(
+        [string]$Value,
+        [int]$Length = 8
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        $Value = 'v7'
+    }
+    $bytes = (Get-V7Utf8NoBomEncoding).GetBytes($Value)
+    $sha1 = [System.Security.Cryptography.SHA1]::Create()
+    try {
+        $hashBytes = $sha1.ComputeHash($bytes)
+    } finally {
+        $sha1.Dispose()
+    }
+    $hash = -join ($hashBytes | ForEach-Object { $_.ToString('x2') })
+    if ($Length -gt 0 -and $hash.Length -gt $Length) {
+        return $hash.Substring(0, $Length)
+    }
+    return $hash
+}
+
+function Get-V7PathLengthSafeLeafName {
+    param(
+        [string]$ParentPath,
+        [string]$LeafName,
+        [int]$MaxPathLength = 240
+    )
+
+    if ([string]::IsNullOrWhiteSpace($LeafName)) {
+        return $LeafName
+    }
+
+    $candidate = if ([string]::IsNullOrWhiteSpace($ParentPath)) { $LeafName } else { Join-Path $ParentPath $LeafName }
+    if ($candidate.Length -le $MaxPathLength) {
+        return $LeafName
+    }
+
+    $extension = [System.IO.Path]::GetExtension($LeafName)
+    $stem = [System.IO.Path]::GetFileNameWithoutExtension($LeafName)
+    if ([string]::IsNullOrWhiteSpace($stem)) {
+        $stem = 'file'
+    }
+    $hash = Get-V7HashFragment -Value $LeafName -Length 8
+    $suffix = if ([string]::IsNullOrWhiteSpace($extension)) { '-' + $hash } else { '-' + $hash + $extension }
+    $parentLength = if ([string]::IsNullOrWhiteSpace($ParentPath)) { 0 } else { $ParentPath.Length + 1 }
+    $availableStemLength = $MaxPathLength - $parentLength - $suffix.Length
+
+    if ($availableStemLength -lt 1) {
+        $availableLeafLength = $MaxPathLength - $parentLength
+        if ($availableLeafLength -lt 1) {
+            return $hash.Substring(0, 1)
+        }
+        if (-not [string]::IsNullOrWhiteSpace($extension) -and $availableLeafLength -gt $extension.Length) {
+            $hashLength = [Math]::Max(1, [Math]::Min($hash.Length, $availableLeafLength - $extension.Length))
+            return $hash.Substring(0, $hashLength) + $extension
+        }
+        return $hash.Substring(0, [Math]::Max(1, [Math]::Min($hash.Length, $availableLeafLength)))
+    }
+
+    $trimmedStem = $stem
+    if ($trimmedStem.Length -gt $availableStemLength) {
+        $trimmedStem = $trimmedStem.Substring(0, $availableStemLength)
+    }
+    $trimmedStem = $trimmedStem.TrimEnd([char[]]'-_. ')
+    if ([string]::IsNullOrWhiteSpace($trimmedStem)) {
+        $trimmedStem = 'file'
+    }
+
+    $safeLeaf = $trimmedStem + $suffix
+    $candidateLength = if ([string]::IsNullOrWhiteSpace($ParentPath)) { $safeLeaf.Length } else { (Join-Path $ParentPath $safeLeaf).Length }
+    while ($candidateLength -gt $MaxPathLength -and $trimmedStem.Length -gt 1) {
+        $trimmedStem = $trimmedStem.Substring(0, $trimmedStem.Length - 1).TrimEnd([char[]]'-_. ')
+        if ([string]::IsNullOrWhiteSpace($trimmedStem)) {
+            $trimmedStem = 'file'
+        }
+        $safeLeaf = $trimmedStem + $suffix
+        $candidateLength = if ([string]::IsNullOrWhiteSpace($ParentPath)) { $safeLeaf.Length } else { (Join-Path $ParentPath $safeLeaf).Length }
+    }
+
+    return $safeLeaf
+}
+
+function Get-V7PathLengthSafeDestination {
+    param(
+        [Parameter(Mandatory = $true)][string]$DestinationPath,
+        [int]$MaxPathLength = 240
+    )
+
+    if ([string]::IsNullOrWhiteSpace($DestinationPath) -or $DestinationPath.Length -le $MaxPathLength) {
+        return $DestinationPath
+    }
+
+    $parent = Split-Path -Parent $DestinationPath
+    $leaf = Split-Path -Leaf $DestinationPath
+    $safeLeaf = Get-V7PathLengthSafeLeafName -ParentPath $parent -LeafName $leaf -MaxPathLength $MaxPathLength
+    if ($leaf -ne $safeLeaf) {
+        Write-Warning ("Truncated long destination leaf '{0}' -> '{1}'" -f $leaf, $safeLeaf)
+    }
+    return Join-Path $parent $safeLeaf
+}
+
+function Get-V7RetryTempPath {
+    param(
+        [Parameter(Mandatory = $true)][string]$DestinationPath,
+        [int]$MaxPathLength = 240
+    )
+
+    $parent = Split-Path -Parent $DestinationPath
+    if (-not $parent) {
+        $parent = (Get-Location).Path
+    }
+    $leaf = Split-Path -Leaf $DestinationPath
+    if ([string]::IsNullOrWhiteSpace($leaf)) {
+        $leaf = 'file'
+    }
+
+    $tempId = Get-V7HashFragment -Value ([guid]::NewGuid().ToString('N')) -Length 8
+    $guidCandidate = Join-Path $parent ($leaf + '.tmp-' + $tempId)
+    if ($guidCandidate.Length -le $MaxPathLength) {
+        return $guidCandidate
+    }
+
+    $shortCandidate = Join-Path $parent ($leaf + '.tmp')
+    if ($shortCandidate.Length -le $MaxPathLength) {
+        return $shortCandidate
+    }
+
+    $tempRoot = Ensure-V7Directory -Path (Join-Path ([System.IO.Path]::GetTempPath()) 'v7-tmp')
+    return Join-Path $tempRoot ($tempId + '.tmp')
 }
 
 function Test-V7RetryableFileException {
@@ -205,10 +348,10 @@ function Write-V7FileWithRetry {
     Ensure-V7Directory -Path $parent | Out-Null
 
     Invoke-V7RetryableFileOperation -Path $Path -Action 'Write file' -Operation {
-        $tempPath = Join-Path $parent ((Split-Path -Leaf $Path) + '.tmp-' + [guid]::NewGuid().ToString('N'))
+        $tempPath = Get-V7RetryTempPath -DestinationPath $Path -MaxPathLength (Get-V7SafePathLimit)
         try {
             [System.IO.File]::WriteAllText($tempPath, $Content, (Get-V7Utf8NoBomEncoding))
-            Move-Item -LiteralPath $tempPath -Destination $Path -Force
+            Move-Item -LiteralPath $tempPath -Destination $Path -Force -ErrorAction Stop
         } finally {
             if (Test-Path -LiteralPath $tempPath) {
                 Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
@@ -251,10 +394,10 @@ function Copy-V7FileWithRetry {
     Ensure-V7Directory -Path $destinationParent | Out-Null
 
     Invoke-V7RetryableFileOperation -Path $DestinationPath -Action 'Copy file' -Operation {
-        $tempPath = Join-Path $destinationParent ((Split-Path -Leaf $DestinationPath) + '.tmp-' + [guid]::NewGuid().ToString('N'))
+        $tempPath = Get-V7RetryTempPath -DestinationPath $DestinationPath -MaxPathLength (Get-V7SafePathLimit)
         try {
-            Copy-Item -LiteralPath $SourcePath -Destination $tempPath -Force
-            Move-Item -LiteralPath $tempPath -Destination $DestinationPath -Force
+            Copy-Item -LiteralPath $SourcePath -Destination $tempPath -Force -ErrorAction Stop
+            Move-Item -LiteralPath $tempPath -Destination $DestinationPath -Force -ErrorAction Stop
         } finally {
             if (Test-Path -LiteralPath $tempPath) {
                 Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
@@ -270,7 +413,7 @@ function Move-V7PathWithRetry {
     )
 
     Invoke-V7RetryableFileOperation -Path $DestinationPath -Action 'Move path' -Operation {
-        Move-Item -LiteralPath $SourcePath -Destination $DestinationPath -Force
+        Move-Item -LiteralPath $SourcePath -Destination $DestinationPath -Force -ErrorAction Stop
     }
 }
 
@@ -731,7 +874,7 @@ function New-V7Worktree {
     }
 
     if (Test-Path -LiteralPath $Path) {
-        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
     }
 
     $parent = Split-Path -Parent $Path
@@ -767,7 +910,7 @@ function Remove-V7Worktree {
     }
 
     if (Test-Path -LiteralPath $removePath) {
-        Remove-Item -LiteralPath $removePath -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $removePath -Recurse -Force -ErrorAction Stop
     }
 
     if (-not [string]::IsNullOrWhiteSpace($branchName) -and $branchName.StartsWith('task/')) {
@@ -1002,7 +1145,7 @@ function Copy-V7ArtifactsToResults {
     Ensure-V7Directory -Path $ResultsDir | Out-Null
     foreach ($item in Get-ChildItem -Path $LocalRunDir -Recurse -File -ErrorAction SilentlyContinue) {
         $relative = $item.FullName.Substring($LocalRunDir.Length).TrimStart("\\")
-        $destination = Join-Path $ResultsDir $relative
+        $destination = Get-V7PathLengthSafeDestination -DestinationPath (Join-Path $ResultsDir $relative) -MaxPathLength (Get-V7SafePathLimit)
         $destinationParent = Split-Path -Parent $destination
         if ($destinationParent) {
             Ensure-V7Directory -Path $destinationParent | Out-Null
@@ -1025,9 +1168,9 @@ function Move-V7QueueRunDir {
     $destination = Join-Path $targetRoot (Split-Path -Leaf $QueueRunDir)
     Invoke-V7RetryableFileOperation -Path $destination -Action 'Move queue run directory' -Operation {
         if (Test-Path -LiteralPath $destination) {
-            Remove-Item -LiteralPath $destination -Recurse -Force
+            Remove-Item -LiteralPath $destination -Recurse -Force -ErrorAction Stop
         }
-        Move-Item -LiteralPath $QueueRunDir -Destination $destination -Force
+        Move-Item -LiteralPath $QueueRunDir -Destination $destination -Force -ErrorAction Stop
     }
     return $destination
 }
