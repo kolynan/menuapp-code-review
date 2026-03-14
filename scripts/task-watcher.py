@@ -28,11 +28,12 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 CONFIG_PATH = Path(__file__).parent / "task-watcher-config.json"
-EXAMPLE_CONFIG_PATH = Path(__file__).parent / "task-watcher-config.example.json"
+MASTER_CONFIG_PATH = Path(r"C:/Users/ASUS/Dev/Claude AI Cowork/scripts/task-watcher-config.json")
+WATCHER_CONFIG_ENV = "WATCHER_CONFIG_PATH"
 V3_LEGACY_PATH = Path(__file__).parent / "task-watcher-v3-legacy.py"
 DEFAULTS = {
     "paths": {
-        "onedrive_root": r"C:/Users/ASUS/OneDrive/002 Menu/Claude AI Cowork",
+        "onedrive_root": r"C:/Users/ASUS/Dev/Claude AI Cowork",
         "repo_dir": r"C:/Dev/menuapp-code-review",
         "powershell_exe": r"C:/WINDOWS/System32/WindowsPowerShell/v1.0/powershell.exe",
     },
@@ -54,13 +55,25 @@ def merge_dict(base: dict, override: dict) -> dict:
     return base
 
 
-def load_config() -> dict:
+def resolve_config_path() -> Path | None:
+    env_path = os.environ.get(WATCHER_CONFIG_ENV, "").strip()
+    candidates: list[Path] = []
+    if env_path:
+        candidates.append(Path(env_path))
+    candidates.extend((MASTER_CONFIG_PATH, CONFIG_PATH))
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def load_config() -> tuple[dict, Path | None]:
     cfg = json.loads(json.dumps(DEFAULTS))
-    source = CONFIG_PATH if CONFIG_PATH.exists() else EXAMPLE_CONFIG_PATH
-    if source.exists():
+    source = resolve_config_path()
+    if source is not None:
         with source.open(encoding="utf-8-sig") as handle:
             merge_dict(cfg, json.load(handle))
-    return cfg
+    return cfg, source
 
 
 def setup_logging(pipeline_dir: Path) -> logging.Logger:
@@ -158,7 +171,7 @@ def claim_v7_task(task_file: Path, queue_dir: Path, meta: dict) -> tuple[str, Pa
     return task_id, dest
 
 
-def launch_v7_supervisor(task_id: str, task_file: Path, meta: dict, cfg: dict, logger: logging.Logger) -> int:
+def launch_v7_supervisor(task_id: str, task_file: Path, meta: dict, cfg: dict, config_path: Path | None, logger: logging.Logger) -> int:
     repo_dir = Path(cfg["paths"]["repo_dir"])
     supervisor = repo_dir / "pipeline" / "v7" / "scripts" / "Start-TaskSupervisor.ps1"
     if not supervisor.exists():
@@ -190,8 +203,8 @@ def launch_v7_supervisor(task_id: str, task_file: Path, meta: dict, cfg: dict, l
         value = str(meta.get(key, "")).strip()
         if value:
             args.extend([flag, value])
-    if CONFIG_PATH.exists():
-        args.extend(["-ConfigPath", str(CONFIG_PATH)])
+    if config_path is not None:
+        args.extend(["-ConfigPath", str(config_path)])
 
     timeout_minutes = int(cfg.get("watcher", {}).get("supervisor_timeout_minutes", 180))
     logger.info("Launching V7 supervisor for %s", task_id)
@@ -204,14 +217,14 @@ def launch_v7_supervisor(task_id: str, task_file: Path, meta: dict, cfg: dict, l
     return proc.returncode
 
 
-def launch_legacy_task(task_file: Path, logger: logging.Logger) -> int:
+def launch_legacy_task(task_file: Path, config_path: Path | None, logger: logging.Logger) -> int:
     if not V3_LEGACY_PATH.exists():
         logger.error("Legacy watcher not found: %s", V3_LEGACY_PATH)
         return 1
 
     args = [sys.executable, str(V3_LEGACY_PATH), "--single-task", str(task_file)]
-    if CONFIG_PATH.exists():
-        args.extend(["--config", str(CONFIG_PATH)])
+    if config_path is not None:
+        args.extend(["--config", str(config_path)])
 
     logger.info("Launching legacy v3 watcher for %s", task_file.name)
     proc = subprocess.run(args, cwd=str(Path(__file__).parent.parent), check=False)
@@ -226,7 +239,7 @@ def inspect_task(task_file: Path) -> tuple[dict, str]:
 
 
 def main() -> None:
-    cfg = load_config()
+    cfg, config_path = load_config()
     onedrive_root = Path(cfg["paths"]["onedrive_root"])
     pipeline_dir = onedrive_root / "pipeline"
     queue_dir = pipeline_dir / "queue"
@@ -237,6 +250,10 @@ def main() -> None:
     (pipeline_dir / "results").mkdir(parents=True, exist_ok=True)
 
     logger = setup_logging(pipeline_dir)
+    if config_path is not None:
+        logger.info("Config loaded from: %s", config_path)
+    else:
+        logger.warning("Config file not found. Using built-in defaults.")
     pid_file = pipeline_dir / ".task-watcher.pid"
 
     if check_pid_running(pid_file):
@@ -288,10 +305,10 @@ def main() -> None:
                 if pipeline_name == "v7":
                     task_id, claimed_task = claim_v7_task(task_file, queue_dir, meta)
                     logger.info("Claimed %s as V7 task %s", task_file.name, task_id)
-                    launch_v7_supervisor(task_id, claimed_task, meta, cfg, logger)
+                    launch_v7_supervisor(task_id, claimed_task, meta, cfg, config_path, logger)
                 else:
                     logger.info("Dispatching %s via legacy v3 path", task_file.name)
-                    launch_legacy_task(task_file, logger)
+                    launch_legacy_task(task_file, config_path, logger)
 
             if not stop:
                 logger.info("Queue drained. Waiting for next task.")
