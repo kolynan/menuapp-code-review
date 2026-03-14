@@ -800,6 +800,82 @@ function Get-V7ClaudeCommandPrefix {
     return @($RawPath)
 }
 
+function Convert-V7CodexPathToCommandPrefix {
+    param([Parameter(Mandatory = $true)][string]$ResolvedPath)
+
+    if ($ResolvedPath.EndsWith('.cmd', [System.StringComparison]::OrdinalIgnoreCase) -or $ResolvedPath.EndsWith('.bat', [System.StringComparison]::OrdinalIgnoreCase)) {
+        return @($env:ComSpec, '/d', '/s', '/c', $ResolvedPath)
+    }
+    if ($ResolvedPath.EndsWith('.ps1', [System.StringComparison]::OrdinalIgnoreCase)) {
+        return @((Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'), '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ResolvedPath)
+    }
+    return @($ResolvedPath)
+}
+
+function Get-V7CodexCommandPrefix {
+    param([Parameter(Mandatory = $true)][string]$RawPath)
+
+    $absoluteCandidates = @()
+    if (-not [string]::IsNullOrWhiteSpace($RawPath) -and [System.IO.Path]::IsPathRooted($RawPath)) {
+        $absoluteCandidates += $RawPath
+        if ([string]::IsNullOrWhiteSpace([System.IO.Path]::GetExtension($RawPath))) {
+            $absoluteCandidates += @($RawPath + '.exe', $RawPath + '.cmd', $RawPath + '.ps1')
+        }
+    }
+
+    foreach ($candidate in @($absoluteCandidates | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)) {
+        if (-not (Test-Path -LiteralPath $candidate)) {
+            continue
+        }
+        $resolvedCandidate = (Resolve-Path -LiteralPath $candidate).Path
+        if ($resolvedCandidate.EndsWith('.ps1', [System.StringComparison]::OrdinalIgnoreCase)) {
+            $cmdSibling = [System.IO.Path]::ChangeExtension($resolvedCandidate, '.cmd')
+            if (Test-Path -LiteralPath $cmdSibling) {
+                return @(Convert-V7CodexPathToCommandPrefix -ResolvedPath (Resolve-Path -LiteralPath $cmdSibling).Path)
+            }
+        }
+        return @(Convert-V7CodexPathToCommandPrefix -ResolvedPath $resolvedCandidate)
+    }
+
+    $commandNames = @()
+    if (-not [string]::IsNullOrWhiteSpace($RawPath)) {
+        $commandNames += $RawPath
+    }
+    $commandNames += @('codex.cmd', 'codex.exe', 'codex')
+
+    foreach ($name in @($commandNames | Select-Object -Unique)) {
+        $command = Get-Command $name -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($null -eq $command) {
+            continue
+        }
+
+        $source = ''
+        if ($command.Source) {
+            $source = [string]$command.Source
+        } elseif ($command.Path) {
+            $source = [string]$command.Path
+        }
+        if ([string]::IsNullOrWhiteSpace($source)) {
+            continue
+        }
+
+        if ($source.EndsWith('.ps1', [System.StringComparison]::OrdinalIgnoreCase)) {
+            $cmdSibling = [System.IO.Path]::ChangeExtension($source, '.cmd')
+            if (Test-Path -LiteralPath $cmdSibling) {
+                return @(Convert-V7CodexPathToCommandPrefix -ResolvedPath (Resolve-Path -LiteralPath $cmdSibling).Path)
+            }
+        }
+        return @(Convert-V7CodexPathToCommandPrefix -ResolvedPath $source)
+    }
+
+    $defaultExe = 'C:\Users\ASUS\AppData\Local\Programs\codex-cli\codex.exe'
+    if (Test-Path -LiteralPath $defaultExe) {
+        return @(Convert-V7CodexPathToCommandPrefix -ResolvedPath (Resolve-Path -LiteralPath $defaultExe).Path)
+    }
+
+    return @($RawPath)
+}
+
 function ConvertTo-V7ProcessArgument {
     param([AllowEmptyString()][string]$Value)
 

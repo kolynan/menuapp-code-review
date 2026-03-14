@@ -115,6 +115,27 @@ function Ensure-V7TelegramState {
     if (-not $telegramState.Contains('worker_lines') -or $null -eq $telegramState['worker_lines']) {
         $telegramState['worker_lines'] = @()
     }
+    if (-not $telegramState.Contains('workers') -or -not ($telegramState['workers'] -is [System.Collections.IDictionary])) {
+        $telegramState['workers'] = [ordered]@{}
+    }
+    if (-not $telegramState.Contains('item_order') -or $null -eq $telegramState['item_order']) {
+        $telegramState['item_order'] = @()
+    }
+    if (-not $telegramState.Contains('section_label') -or $null -eq $telegramState['section_label']) {
+        $telegramState['section_label'] = ''
+    }
+    if (-not $telegramState.Contains('result_lines') -or $null -eq $telegramState['result_lines']) {
+        $telegramState['result_lines'] = @()
+    }
+    if (-not $telegramState.Contains('include_result_header') -or $null -eq $telegramState['include_result_header']) {
+        $telegramState['include_result_header'] = $false
+    }
+    if (-not $telegramState.Contains('title_override') -or $null -eq $telegramState['title_override']) {
+        $telegramState['title_override'] = ''
+    }
+    if (-not $telegramState.Contains('start_time') -or $null -eq $telegramState['start_time']) {
+        $telegramState['start_time'] = ''
+    }
     return $telegramState
 }
 
@@ -418,7 +439,9 @@ function Set-V7TelegramWorkerLine {
         [hashtable]$Status,
         [string]$WorkerKey,
         [string]$State,
-        [string]$Text
+        [string]$Text,
+        [string]$StartedAt,
+        [string]$EndedAt
     )
 
     $telegramState = Ensure-V7TelegramState -Status $Status
@@ -443,6 +466,8 @@ function Set-V7TelegramWorkerLine {
             sort_order = Get-V7TelegramWorkerSortOrder -WorkerKey $WorkerKey
             state = ''
             text = ''
+            started_at = ''
+            ended_at = ''
         }
     }
 
@@ -453,6 +478,12 @@ function Set-V7TelegramWorkerLine {
     }
     if ($PSBoundParameters.ContainsKey('Text')) {
         $entry['text'] = if ([string]::IsNullOrWhiteSpace($Text)) { '' } else { $Text.Trim() }
+    }
+    if ($PSBoundParameters.ContainsKey('StartedAt')) {
+        $entry['started_at'] = if ([string]::IsNullOrWhiteSpace($StartedAt)) { '' } else { $StartedAt }
+    }
+    if ($PSBoundParameters.ContainsKey('EndedAt')) {
+        $entry['ended_at'] = if ([string]::IsNullOrWhiteSpace($EndedAt)) { '' } else { $EndedAt }
     }
 
     $updated += $entry
@@ -465,6 +496,10 @@ function Set-V7TelegramWorkerLine {
             }
         }
     )
+    $telegramState['workers'][$WorkerKey] = $entry
+    if ($telegramState['item_order'] -notcontains $WorkerKey) {
+        $telegramState['item_order'] += $WorkerKey
+    }
 }
 
 function Get-V7TelegramFirstLogLine {
@@ -731,6 +766,484 @@ function Finalize-CodeReviewTelegramFailure {
     }
 }
 
+function Get-V7TelegramWorkflowSpec {
+    param(
+        [string]$Workflow,
+        [hashtable]$Status
+    )
+
+    $page = if ($Status -and $Status.Contains('page')) { [string]$Status['page'] } else { '' }
+    $topic = if ($Status -and $Status.Contains('topic')) { [string]$Status['topic'] } else { '' }
+
+        $normalizedWorkflow = if ([string]::IsNullOrWhiteSpace($Workflow)) { '' } else { $Workflow.ToLowerInvariant() }
+    switch ($normalizedWorkflow) {
+        'code-review' {
+            return [ordered]@{
+                title = ('[code-review] ' + $page).Trim()
+                section_label = 'Workers'
+                include_result_header = $true
+                items = @(
+                    [ordered]@{ key = 'claude_writer'; label = 'CC Writer'; waiting = 'waiting' },
+                    [ordered]@{ key = 'codex_reviewer'; label = 'Codex Reviewer'; waiting = 'waiting' },
+                    [ordered]@{ key = 'merge'; label = 'Merge'; waiting = 'waiting' }
+                )
+            }
+        }
+        'parallel-write' {
+            return [ordered]@{
+                title = ('[parallel-write] ' + $page).Trim()
+                section_label = 'Writers'
+                include_result_header = $true
+                items = @(
+                    [ordered]@{ key = 'claude_writer'; label = 'CC Writer'; waiting = 'waiting' },
+                    [ordered]@{ key = 'codex_writer'; label = 'Codex Writer'; waiting = 'waiting' },
+                    [ordered]@{ key = 'reconciler'; label = 'Reconciler'; waiting = 'waiting' }
+                )
+            }
+        }
+        'ux-discussion' {
+            $title = ('[ux-discussion] ' + $page).Trim()
+            if (-not [string]::IsNullOrWhiteSpace($topic)) {
+                $title += ' - ' + $topic.Trim()
+            }
+            return [ordered]@{
+                title = $title
+                section_label = 'Rounds'
+                include_result_header = $false
+                items = @(
+                    [ordered]@{ key = 'ux_round1'; label = 'Round 1 (CC)'; waiting = 'waiting' },
+                    [ordered]@{ key = 'ux_round2'; label = 'Round 2 (Codex)'; waiting = 'waiting' },
+                    [ordered]@{ key = 'ux_round3'; label = 'Round 3 (Synthesis)'; waiting = 'waiting' }
+                )
+            }
+        }
+        default {
+            return $null
+        }
+    }
+}
+
+function Get-V7TelegramTotalMinutes {
+    param(
+        [string]$StartedAt,
+        [string]$EndedAt
+    )
+
+    $startTime = Get-V7TelegramLocalDateTime -Timestamp $StartedAt
+    if ($null -eq $startTime) {
+        return 0
+    }
+    $endTime = Get-V7TelegramLocalDateTime -Timestamp $EndedAt
+    if ($null -eq $endTime) {
+        $endTime = Get-Date
+    }
+    return [int][Math]::Max(0, [Math]::Round(($endTime - $startTime).TotalMinutes))
+}
+
+function Get-V7TelegramReasonText {
+    param([string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return ''
+    }
+    $firstLine = (($Text -split "`r?`n") | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -First 1)
+    if ([string]::IsNullOrWhiteSpace($firstLine)) {
+        return ''
+    }
+    return $firstLine.Trim()
+}
+
+function Ensure-V7TelegramWorkflowLayout {
+    param(
+        [hashtable]$Status,
+        [string]$Workflow
+    )
+
+    $spec = Get-V7TelegramWorkflowSpec -Workflow $Workflow -Status $Status
+    if ($null -eq $spec) {
+        return $null
+    }
+
+    $telegramState = Ensure-V7TelegramState -Status $Status
+    $telegramState['title_override'] = [string]$spec.title
+    $telegramState['section_label'] = [string]$spec.section_label
+    $telegramState['include_result_header'] = [bool]$spec.include_result_header
+    if ([string]::IsNullOrWhiteSpace([string]$telegramState['start_time'])) {
+        $telegramState['start_time'] = if ($Status -and $Status.Contains('started_at')) { [string]$Status['started_at'] } else { '' }
+    }
+
+    foreach ($item in @($spec.items)) {
+        $key = [string]$item.key
+        $entry = Get-V7TelegramWorkerEntry -Status $Status -WorkerKey $key
+        if ($null -eq $entry) {
+            Set-V7TelegramWorkerLine -Status $Status -WorkerKey $key -State 'WAITING' -Text ([string]$item.waiting) -StartedAt '' -EndedAt ''
+            $entry = Get-V7TelegramWorkerEntry -Status $Status -WorkerKey $key
+        }
+        if ($entry -and $entry.Contains('name')) {
+            $entry['name'] = [string]$item.label
+        }
+    }
+    $telegramState['item_order'] = @($spec.items | ForEach-Object { [string]$_.key })
+    return $telegramState
+}
+
+function Set-V7TelegramResultLines {
+    param(
+        [hashtable]$Status,
+        [string[]]$Lines
+    )
+
+    $telegramState = Ensure-V7TelegramState -Status $Status
+    if ($null -eq $telegramState) {
+        return
+    }
+    $telegramState['result_lines'] = @($Lines | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+}
+
+function Update-V7TelegramCodeReviewStateFromArtifacts {
+    param(
+        [hashtable]$Status,
+        [string]$ArtifactsDir,
+        [string]$OverallState,
+        [string]$ErrorMessage
+    )
+
+    Ensure-V7TelegramWorkflowLayout -Status $Status -Workflow 'code-review' | Out-Null
+    $writerResult = Read-V7Json -Path (Join-Path $ArtifactsDir 'claude-writer.result.json')
+    $reviewerResult = Read-V7Json -Path (Join-Path $ArtifactsDir 'codex-reviewer.result.json')
+    $mergeResult = Read-V7Json -Path (Join-Path $ArtifactsDir 'merge.result.json')
+
+    $writerProcess = Get-V7CodeReviewProcessInfo -Status $Status -WorkerKey 'claude_writer'
+    $reviewerProcess = Get-V7CodeReviewProcessInfo -Status $Status -WorkerKey 'codex_reviewer'
+    $mergeProcess = Get-V7CodeReviewProcessInfo -Status $Status -WorkerKey 'merge'
+
+    if ($writerResult) {
+        $writerDuration = Get-V7TelegramDurationBetween -StartedAt ([string](Get-V7TelegramValue -Object $writerResult -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $writerResult -Name 'ended_at'))
+        $writerFiles = @(Get-V7TelegramValue -Object $writerResult -Name 'changed_files').Count
+        $writerText = "$writerFiles files, commit $(Get-V7TelegramShortCommit -Commit ([string](Get-V7TelegramValue -Object $writerResult -Name 'commit_hash')))"
+        if (-not [string]::IsNullOrWhiteSpace($writerDuration)) { $writerText += ' (' + $writerDuration + ')' }
+        $writerState = if ((Get-V7TelegramResultState -StatusText ([string](Get-V7TelegramValue -Object $writerResult -Name 'status'))) -eq 'success') { 'OK' } else { 'FAILED' }
+        if ($writerState -eq 'FAILED') { $writerText = Get-V7TelegramReasonText -Text (Get-V7TelegramWorkerErrorText -Status $Status -WorkerKey 'claude_writer' -Result $writerResult -FallbackMessage 'writer failed') }
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'claude_writer' -State $writerState -Text $writerText -StartedAt ([string](Get-V7TelegramValue -Object $writerResult -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $writerResult -Name 'ended_at'))
+    } elseif ($writerProcess -and ([string](Get-V7TelegramValue -Object $writerProcess -Name 'state')) -eq 'running') {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'claude_writer' -State 'RUNNING' -Text '' -StartedAt ([string](Get-V7TelegramValue -Object $writerProcess -Name 'started_at')) -EndedAt ''
+    } elseif ($writerProcess -and ([string](Get-V7TelegramValue -Object $writerProcess -Name 'state')) -eq 'failed') {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'claude_writer' -State 'FAILED' -Text (Get-V7TelegramReasonText -Text (Get-V7TelegramWorkerErrorText -Status $Status -WorkerKey 'claude_writer' -Result $null -FallbackMessage 'writer failed')) -StartedAt ([string](Get-V7TelegramValue -Object $writerProcess -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $writerProcess -Name 'ended_at'))
+    }
+
+    if ($reviewerResult) {
+        $reviewerResultState = Get-V7TelegramResultState -StatusText ([string](Get-V7TelegramValue -Object $reviewerResult -Name 'status'))
+        $reviewerDuration = Get-V7TelegramDurationBetween -StartedAt ([string](Get-V7TelegramValue -Object $reviewerResult -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $reviewerResult -Name 'ended_at'))
+        if ($reviewerResultState -eq 'success') {
+            $reviewerText = "$([int](Get-V7TelegramValue -Object $reviewerResult -Name 'findings_count')) findings"
+            if (-not [string]::IsNullOrWhiteSpace($reviewerDuration)) { $reviewerText += ' (' + $reviewerDuration + ')' }
+            Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'codex_reviewer' -State 'OK' -Text $reviewerText -StartedAt ([string](Get-V7TelegramValue -Object $reviewerResult -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $reviewerResult -Name 'ended_at'))
+        } elseif ($reviewerResultState -eq 'skipped') {
+            Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'codex_reviewer' -State 'SKIPPED' -Text (Get-V7TelegramReasonText -Text (Get-V7TelegramWorkerErrorText -Status $Status -WorkerKey 'codex_reviewer' -Result $reviewerResult -FallbackMessage 'review skipped')) -StartedAt ([string](Get-V7TelegramValue -Object $reviewerResult -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $reviewerResult -Name 'ended_at'))
+        } else {
+            Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'codex_reviewer' -State 'FAILED' -Text (Get-V7TelegramReasonText -Text (Get-V7TelegramWorkerErrorText -Status $Status -WorkerKey 'codex_reviewer' -Result $reviewerResult -FallbackMessage 'review failed')) -StartedAt ([string](Get-V7TelegramValue -Object $reviewerResult -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $reviewerResult -Name 'ended_at'))
+        }
+    } elseif ($reviewerProcess -and ([string](Get-V7TelegramValue -Object $reviewerProcess -Name 'state')) -eq 'running') {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'codex_reviewer' -State 'RUNNING' -Text '' -StartedAt ([string](Get-V7TelegramValue -Object $reviewerProcess -Name 'started_at')) -EndedAt ''
+    } elseif ($reviewerProcess -and ([string](Get-V7TelegramValue -Object $reviewerProcess -Name 'state')) -eq 'failed') {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'codex_reviewer' -State 'FAILED' -Text (Get-V7TelegramReasonText -Text (Get-V7TelegramWorkerErrorText -Status $Status -WorkerKey 'codex_reviewer' -Result $null -FallbackMessage 'review failed')) -StartedAt ([string](Get-V7TelegramValue -Object $reviewerProcess -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $reviewerProcess -Name 'ended_at'))
+    }
+
+    if ($mergeResult) {
+        $mergeDuration = Get-V7TelegramDurationBetween -StartedAt ([string](Get-V7TelegramValue -Object $mergeProcess -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $mergeProcess -Name 'ended_at'))
+        $mergeText = 'commit ' + (Get-V7TelegramShortCommit -Commit ([string](Get-V7TelegramValue -Object $mergeResult -Name 'merge_commit')))
+        $reviewerEntry = Get-V7TelegramWorkerEntry -Status $Status -WorkerKey 'codex_reviewer'
+        if ($reviewerEntry -and @('FAILED', 'SKIPPED') -contains ([string]$reviewerEntry['state']).ToUpperInvariant()) {
+            $mergeText += ' (no review'
+            if (-not [string]::IsNullOrWhiteSpace($mergeDuration)) { $mergeText += ', ' + $mergeDuration }
+            $mergeText += ')'
+        } elseif (-not [string]::IsNullOrWhiteSpace($mergeDuration)) {
+            $mergeText += ' (' + $mergeDuration + ')'
+        }
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'merge' -State 'OK' -Text $mergeText -StartedAt ([string](Get-V7TelegramValue -Object $mergeProcess -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $mergeProcess -Name 'ended_at'))
+    } elseif ($mergeProcess -and ([string](Get-V7TelegramValue -Object $mergeProcess -Name 'state')) -eq 'running') {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'merge' -State 'RUNNING' -Text '' -StartedAt ([string](Get-V7TelegramValue -Object $mergeProcess -Name 'started_at')) -EndedAt ''
+    } elseif ($mergeProcess -and ([string](Get-V7TelegramValue -Object $mergeProcess -Name 'state')) -eq 'failed') {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'merge' -State 'FAILED' -Text (Get-V7TelegramReasonText -Text $ErrorMessage) -StartedAt ([string](Get-V7TelegramValue -Object $mergeProcess -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $mergeProcess -Name 'ended_at'))
+    } else {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'merge' -State 'WAITING' -Text 'waiting' -StartedAt '' -EndedAt ''
+    }
+
+    if ($OverallState -eq 'DONE') {
+        $agreement = 'N/A'
+        if ($reviewerResult) {
+            $reviewerState = Get-V7TelegramResultState -StatusText ([string](Get-V7TelegramValue -Object $reviewerResult -Name 'status'))
+            if ($reviewerState -eq 'success') {
+                $findingsCount = [int](Get-V7TelegramValue -Object $reviewerResult -Name 'findings_count')
+                if ($findingsCount -eq 0) {
+                    $agreement = 'YES'
+                } elseif ($mergeResult -and -not [string]::IsNullOrWhiteSpace([string](Get-V7TelegramValue -Object $mergeResult -Name 'reconcile_result'))) {
+                    $agreement = 'YES'
+                } else {
+                    $agreement = 'PARTIAL'
+                }
+            }
+        }
+        Set-V7TelegramResultLines -Status $Status -Lines @('Agreement: ' + $agreement, 'DONE')
+    } elseif ($OverallState -eq 'FAILED') {
+        foreach ($key in @('claude_writer', 'codex_reviewer', 'merge')) {
+            $entry = Get-V7TelegramWorkerEntry -Status $Status -WorkerKey $key
+            if ($entry -and ([string]$entry['state']).ToUpperInvariant() -eq 'WAITING') {
+                Set-V7TelegramWorkerLine -Status $Status -WorkerKey $key -State 'SKIPPED' -Text 'not started' -StartedAt ([string]$entry['started_at']) -EndedAt ([string]$entry['ended_at'])
+            }
+        }
+        Set-V7TelegramResultLines -Status $Status -Lines @('FAILED: ' + (Get-V7TelegramReasonText -Text $ErrorMessage))
+    } else {
+        Set-V7TelegramResultLines -Status $Status -Lines @()
+    }
+}
+
+function Update-V7TelegramParallelWriteStateFromArtifacts {
+    param(
+        [hashtable]$Status,
+        [string]$ArtifactsDir,
+        [string]$OverallState,
+        [string]$ErrorMessage
+    )
+
+    Ensure-V7TelegramWorkflowLayout -Status $Status -Workflow 'parallel-write' | Out-Null
+    $claudeResult = Read-V7Json -Path (Join-Path $ArtifactsDir 'claude-writer.result.json')
+    $codexResult = Read-V7Json -Path (Join-Path $ArtifactsDir 'codex-writer.result.json')
+    $mergeResult = Read-V7Json -Path (Join-Path $ArtifactsDir 'merge.result.json')
+
+    $claudeProcess = Get-V7CodeReviewProcessInfo -Status $Status -WorkerKey 'claude_writer'
+    $codexProcess = Get-V7CodeReviewProcessInfo -Status $Status -WorkerKey 'codex_writer'
+    $reconcilerProcess = Get-V7CodeReviewProcessInfo -Status $Status -WorkerKey 'reconciler'
+
+    foreach ($tuple in @(
+        [ordered]@{ key = 'claude_writer'; result = $claudeResult; process = $claudeProcess },
+        [ordered]@{ key = 'codex_writer'; result = $codexResult; process = $codexProcess }
+    )) {
+        $key = [string]$tuple.key
+        $result = $tuple.result
+        $process = $tuple.process
+        if ($result) {
+            $duration = Get-V7TelegramDurationBetween -StartedAt ([string](Get-V7TelegramValue -Object $result -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $result -Name 'ended_at'))
+            $text = "$(@(Get-V7TelegramValue -Object $result -Name 'changed_files').Count) files, commit $(Get-V7TelegramShortCommit -Commit ([string](Get-V7TelegramValue -Object $result -Name 'commit_hash')))"
+            if (-not [string]::IsNullOrWhiteSpace($duration)) { $text += ' (' + $duration + ')' }
+            $state = if ((Get-V7TelegramResultState -StatusText ([string](Get-V7TelegramValue -Object $result -Name 'status'))) -eq 'success') { 'OK' } else { 'FAILED' }
+            if ($state -eq 'FAILED') { $text = Get-V7TelegramReasonText -Text (Get-V7TelegramWorkerErrorText -Status $Status -WorkerKey $key -Result $result -FallbackMessage 'writer failed') }
+            Set-V7TelegramWorkerLine -Status $Status -WorkerKey $key -State $state -Text $text -StartedAt ([string](Get-V7TelegramValue -Object $result -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $result -Name 'ended_at'))
+        } elseif ($process -and ([string](Get-V7TelegramValue -Object $process -Name 'state')) -eq 'running') {
+            Set-V7TelegramWorkerLine -Status $Status -WorkerKey $key -State 'RUNNING' -Text '' -StartedAt ([string](Get-V7TelegramValue -Object $process -Name 'started_at')) -EndedAt ''
+        } elseif ($process -and ([string](Get-V7TelegramValue -Object $process -Name 'state')) -eq 'failed') {
+            Set-V7TelegramWorkerLine -Status $Status -WorkerKey $key -State 'FAILED' -Text (Get-V7TelegramReasonText -Text (Get-V7TelegramWorkerErrorText -Status $Status -WorkerKey $key -Result $null -FallbackMessage 'writer failed')) -StartedAt ([string](Get-V7TelegramValue -Object $process -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $process -Name 'ended_at'))
+        }
+    }
+
+    if ($mergeResult) {
+        $duration = Get-V7TelegramDurationBetween -StartedAt ([string](Get-V7TelegramValue -Object $reconcilerProcess -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $reconcilerProcess -Name 'ended_at'))
+        $text = 'used ' + ([string](Get-V7TelegramValue -Object $mergeResult -Name 'used_source')) + ', commit ' + (Get-V7TelegramShortCommit -Commit ([string](Get-V7TelegramValue -Object $mergeResult -Name 'merge_commit')))
+        if (-not [string]::IsNullOrWhiteSpace($duration)) { $text += ' (' + $duration + ')' }
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'reconciler' -State 'OK' -Text $text -StartedAt ([string](Get-V7TelegramValue -Object $reconcilerProcess -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $reconcilerProcess -Name 'ended_at'))
+    } elseif ($reconcilerProcess -and ([string](Get-V7TelegramValue -Object $reconcilerProcess -Name 'state')) -eq 'running') {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'reconciler' -State 'RUNNING' -Text '' -StartedAt ([string](Get-V7TelegramValue -Object $reconcilerProcess -Name 'started_at')) -EndedAt ''
+    } elseif ($reconcilerProcess -and ([string](Get-V7TelegramValue -Object $reconcilerProcess -Name 'state')) -eq 'failed') {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'reconciler' -State 'FAILED' -Text (Get-V7TelegramReasonText -Text $ErrorMessage) -StartedAt ([string](Get-V7TelegramValue -Object $reconcilerProcess -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $reconcilerProcess -Name 'ended_at'))
+    } else {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'reconciler' -State 'WAITING' -Text 'waiting' -StartedAt '' -EndedAt ''
+    }
+
+    if ($OverallState -eq 'DONE') {
+        $source = if ($mergeResult) { [string](Get-V7TelegramValue -Object $mergeResult -Name 'source') } else { 'merged from both' }
+        Set-V7TelegramResultLines -Status $Status -Lines @('Source: ' + $source, 'DONE')
+    } elseif ($OverallState -eq 'FAILED') {
+        foreach ($key in @('claude_writer', 'codex_writer', 'reconciler')) {
+            $entry = Get-V7TelegramWorkerEntry -Status $Status -WorkerKey $key
+            if ($entry -and ([string]$entry['state']).ToUpperInvariant() -eq 'WAITING') {
+                Set-V7TelegramWorkerLine -Status $Status -WorkerKey $key -State 'SKIPPED' -Text 'not started' -StartedAt ([string]$entry['started_at']) -EndedAt ([string]$entry['ended_at'])
+            }
+        }
+        Set-V7TelegramResultLines -Status $Status -Lines @('FAILED: ' + (Get-V7TelegramReasonText -Text $ErrorMessage))
+    } else {
+        Set-V7TelegramResultLines -Status $Status -Lines @()
+    }
+}
+
+function Update-V7TelegramUxDiscussionStateFromArtifacts {
+    param(
+        [hashtable]$Status,
+        [string]$ArtifactsDir,
+        [string]$OverallState,
+        [string]$ErrorMessage
+    )
+
+    Ensure-V7TelegramWorkflowLayout -Status $Status -Workflow 'ux-discussion' | Out-Null
+    $round1 = Read-V7Json -Path (Join-Path $ArtifactsDir 'claude-ux-round1.result.json')
+    $round2 = Read-V7Json -Path (Join-Path $ArtifactsDir 'codex-ux-round2.result.json')
+    $round3 = Read-V7Json -Path (Join-Path $ArtifactsDir 'claude-ux-round3.result.json')
+    $uxProcess = Get-V7CodeReviewProcessInfo -Status $Status -WorkerKey 'ux-discussion'
+
+    if ($round1) {
+        $text = if (-not [string]::IsNullOrWhiteSpace((Get-V7TelegramDurationBetween -StartedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'ended_at'))))) { (Get-V7TelegramDurationBetween -StartedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'ended_at'))) } else { '' }
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round1' -State 'OK' -Text $text -StartedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'ended_at'))
+    } elseif ($uxProcess -and ([string](Get-V7TelegramValue -Object $uxProcess -Name 'state')) -eq 'running') {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round1' -State 'RUNNING' -Text '' -StartedAt ([string](Get-V7TelegramValue -Object $uxProcess -Name 'started_at')) -EndedAt ''
+    } elseif ($uxProcess -and ([string](Get-V7TelegramValue -Object $uxProcess -Name 'state')) -eq 'failed') {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round1' -State 'FAILED' -Text (Get-V7TelegramReasonText -Text $ErrorMessage) -StartedAt ([string](Get-V7TelegramValue -Object $uxProcess -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $uxProcess -Name 'ended_at'))
+    }
+
+    if ($round2) {
+        $text = Get-V7TelegramDurationBetween -StartedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'ended_at'))
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round2' -State 'OK' -Text $text -StartedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'ended_at'))
+    } elseif ($round1 -and $uxProcess -and ([string](Get-V7TelegramValue -Object $uxProcess -Name 'state')) -eq 'running') {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round2' -State 'RUNNING' -Text '' -StartedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'ended_at')) -EndedAt ''
+    } elseif ($round1 -and $uxProcess -and ([string](Get-V7TelegramValue -Object $uxProcess -Name 'state')) -eq 'failed') {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round2' -State 'FAILED' -Text (Get-V7TelegramReasonText -Text $ErrorMessage) -StartedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'ended_at')) -EndedAt ([string](Get-V7TelegramValue -Object $uxProcess -Name 'ended_at'))
+    } else {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round2' -State 'WAITING' -Text 'waiting' -StartedAt '' -EndedAt ''
+    }
+
+    if ($round3) {
+        $text = Get-V7TelegramDurationBetween -StartedAt ([string](Get-V7TelegramValue -Object $round3 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round3 -Name 'ended_at'))
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round3' -State 'OK' -Text $text -StartedAt ([string](Get-V7TelegramValue -Object $round3 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round3 -Name 'ended_at'))
+    } elseif ($round2 -and $uxProcess -and ([string](Get-V7TelegramValue -Object $uxProcess -Name 'state')) -eq 'running') {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round3' -State 'RUNNING' -Text '' -StartedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'ended_at')) -EndedAt ''
+    } elseif ($round2 -and $uxProcess -and ([string](Get-V7TelegramValue -Object $uxProcess -Name 'state')) -eq 'failed') {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round3' -State 'FAILED' -Text (Get-V7TelegramReasonText -Text $ErrorMessage) -StartedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'ended_at')) -EndedAt ([string](Get-V7TelegramValue -Object $uxProcess -Name 'ended_at'))
+    } else {
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round3' -State 'WAITING' -Text 'waiting' -StartedAt '' -EndedAt ''
+    }
+
+    if ($OverallState -eq 'DONE') {
+        Set-V7TelegramResultLines -Status $Status -Lines @('DONE')
+    } elseif ($OverallState -eq 'FAILED') {
+        foreach ($key in @('ux_round1', 'ux_round2', 'ux_round3')) {
+            $entry = Get-V7TelegramWorkerEntry -Status $Status -WorkerKey $key
+            if ($entry -and ([string]$entry['state']).ToUpperInvariant() -eq 'WAITING') {
+                Set-V7TelegramWorkerLine -Status $Status -WorkerKey $key -State 'SKIPPED' -Text 'not started' -StartedAt ([string]$entry['started_at']) -EndedAt ([string]$entry['ended_at'])
+            }
+        }
+        Set-V7TelegramResultLines -Status $Status -Lines @('FAILED: ' + (Get-V7TelegramReasonText -Text $ErrorMessage))
+    } else {
+        Set-V7TelegramResultLines -Status $Status -Lines @()
+    }
+}
+
+function Update-V7TelegramRichStateFromArtifacts {
+    param(
+        [hashtable]$Status,
+        [string]$Workflow,
+        [string]$ArtifactsDir,
+        [string]$OverallState,
+        [string]$ErrorMessage
+    )
+
+        $normalizedWorkflow = if ([string]::IsNullOrWhiteSpace($Workflow)) { '' } else { $Workflow.ToLowerInvariant() }
+    switch ($normalizedWorkflow) {
+        'code-review' { Update-V7TelegramCodeReviewStateFromArtifacts -Status $Status -ArtifactsDir $ArtifactsDir -OverallState $OverallState -ErrorMessage $ErrorMessage }
+        'parallel-write' { Update-V7TelegramParallelWriteStateFromArtifacts -Status $Status -ArtifactsDir $ArtifactsDir -OverallState $OverallState -ErrorMessage $ErrorMessage }
+        'ux-discussion' { Update-V7TelegramUxDiscussionStateFromArtifacts -Status $Status -ArtifactsDir $ArtifactsDir -OverallState $OverallState -ErrorMessage $ErrorMessage }
+    }
+}
+
+function Get-V7TelegramRenderedLineForEntry {
+    param(
+        $Entry,
+        [string]$OverallState
+    )
+
+    $name = [string]$Entry['name']
+    $state = ([string]$Entry['state']).ToUpperInvariant()
+    $detail = [string]$Entry['text']
+    $startedAt = [string]$Entry['started_at']
+    $endedAt = [string]$Entry['ended_at']
+    $duration = Get-V7TelegramDurationBetween -StartedAt $startedAt -EndedAt $endedAt
+    switch ($state) {
+        'OK' {
+            if ([string]::IsNullOrWhiteSpace($detail)) {
+                return $name + ': OK'
+            }
+            if ($detail -match '^\d+\s+min$') {
+                return $name + ': OK (' + $detail + ')'
+            }
+            return $name + ': OK, ' + $detail
+        }
+        'FAILED' {
+            $line = $name + ': FAILED'
+            if (-not [string]::IsNullOrWhiteSpace($detail)) { $line += ' (' + $detail + ')' }
+            if (-not [string]::IsNullOrWhiteSpace($duration)) { $line += ' (' + $duration + ')' }
+            return $line
+        }
+        'SKIPPED' {
+            $line = $name + ': SKIPPED'
+            if (-not [string]::IsNullOrWhiteSpace($detail)) { $line += ' (' + $detail + ')' }
+            if (-not [string]::IsNullOrWhiteSpace($duration)) { $line += ' (' + $duration + ')' }
+            return $line
+        }
+        'RUNNING' {
+            $elapsed = Get-V7TelegramTotalMinutes -StartedAt $startedAt -EndedAt ''
+            if ($elapsed -lt 1) {
+                return $name + ': started...'
+            }
+            return $name + ': running... (' + $elapsed + ' min)'
+        }
+        default {
+            if ($OverallState -eq 'FAILED') {
+                return $name + ': SKIPPED (not started)'
+            }
+            return $name + ': waiting'
+        }
+    }
+}
+
+function New-V7WorkflowTelegramMessageText {
+    param(
+        [hashtable]$Status,
+        [string]$Workflow,
+        [string]$ArtifactsDir,
+        [string]$OverallState,
+        [string]$ErrorMessage
+    )
+
+    $telegramState = Ensure-V7TelegramWorkflowLayout -Status $Status -Workflow $Workflow
+    if ($null -eq $telegramState) {
+        return ''
+    }
+    Update-V7TelegramRichStateFromArtifacts -Status $Status -Workflow $Workflow -ArtifactsDir $ArtifactsDir -OverallState $OverallState -ErrorMessage $ErrorMessage
+
+    $title = [string]$telegramState['title_override']
+    $startClock = Get-V7TelegramClockText -Timestamp ([string]$telegramState['start_time'])
+    $endClock = Get-V7TelegramClockText -Timestamp ([string](Get-V7TelegramValue -Object $Status -Name 'ended_at'))
+    $totalMinutes = Get-V7TelegramTotalMinutes -StartedAt ([string]$telegramState['start_time']) -EndedAt ([string](Get-V7TelegramValue -Object $Status -Name 'ended_at'))
+    $lines = @($title)
+
+    if ($OverallState -eq 'DONE') {
+        $lines += ('DONE | ' + $startClock + ' > ' + $endClock + ' (' + $totalMinutes + ' min)')
+    } elseif ($OverallState -eq 'FAILED') {
+        $lines += ('FAILED | ' + $startClock + ' > ' + $endClock + ' (' + $totalMinutes + ' min)')
+    } else {
+        if ($totalMinutes -gt 0) {
+            $lines += ('RUNNING | ' + $startClock + ' (' + $totalMinutes + ' min)')
+        } else {
+            $lines += ('RUNNING | ' + $startClock)
+        }
+    }
+
+    $lines += ('--- ' + [string]$telegramState['section_label'] + ' ---')
+    foreach ($key in @($telegramState['item_order'])) {
+        $entry = Get-V7TelegramWorkerEntry -Status $Status -WorkerKey ([string]$key)
+        if ($entry) {
+            $lines += (Get-V7TelegramRenderedLineForEntry -Entry $entry -OverallState $OverallState)
+        }
+    }
+
+    $resultLines = @($telegramState['result_lines'])
+    if ($resultLines.Count -gt 0) {
+        if ($telegramState['include_result_header']) {
+            $lines += '--- Result ---'
+        }
+        $lines += $resultLines
+    }
+
+    return (($lines | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join "`n")
+}
+
 function New-V7GenericTelegramMessageText {
     param(
         [hashtable]$Status,
@@ -880,9 +1393,15 @@ function New-V7TelegramMessageText {
         $resolvedWorkflow = [string]$Status['workflow']
     }
     $normalizedWorkflow = if ([string]::IsNullOrWhiteSpace($resolvedWorkflow)) { '' } else { $resolvedWorkflow.Trim().ToLowerInvariant() }
+    $overallState = if ([string]::IsNullOrWhiteSpace($State)) { [string](Get-V7TelegramValue -Object $Status -Name 'state') } else { $State.ToUpperInvariant() }
+    $errorMessage = if ($overallState -eq 'FAILED') { $Message } else { [string](Get-V7TelegramValue -Object $Status -Name 'error') }
+    $resolvedArtifactsDir = $ArtifactsDir
+    if ([string]::IsNullOrWhiteSpace($resolvedArtifactsDir)) {
+        $resolvedArtifactsDir = [string](Get-V7TelegramValue -Object (Get-V7TelegramValue -Object $Status -Name 'paths') -Name 'artifacts_dir')
+    }
 
-    if ($normalizedWorkflow -eq 'code-review') {
-        return New-V7CodeReviewTelegramMessageText -Status $Status -TaskId $TaskId -Workflow $resolvedWorkflow -State $State
+    if (@('code-review', 'ux-discussion', 'parallel-write') -contains $normalizedWorkflow) {
+        return New-V7WorkflowTelegramMessageText -Status $Status -Workflow $normalizedWorkflow -ArtifactsDir $resolvedArtifactsDir -OverallState $overallState -ErrorMessage $errorMessage
     }
     return New-V7GenericTelegramMessageText -Status $Status -TaskId $TaskId -Workflow $resolvedWorkflow -State $State -Message $Message -ArtifactsDir $ArtifactsDir
 }
@@ -909,6 +1428,9 @@ function Invoke-V7TelegramScript {
         $telegramState = Ensure-V7TelegramState -Status $Status
         Update-V7TelegramProgress -Status $Status -State $State -Message $Message
         $text = New-V7TelegramMessageText -Status $Status -TaskId $TaskId -Workflow $Workflow -State $State -Message $Message -ArtifactsDir $ArtifactsDir
+        if ($telegramState -and -not [string]::IsNullOrWhiteSpace([string]$telegramState['last_text']) -and [string]$telegramState['last_text'] -eq $text) {
+            return $true
+        }
     }
 
     $previousMessageId = ''
@@ -1090,12 +1612,15 @@ function Wait-V7Launchers {
         [string]$EventsPath,
         [string]$QueueRunDir,
         [hashtable]$Config,
-        [string]$HeartbeatLabel
+        [string]$HeartbeatLabel,
+        [string]$Workflow,
+        [string]$ArtifactsDir
     )
 
     $startedAt = Get-Date
     $deadline = $startedAt.AddMinutes($TimeoutMinutes)
     $nextHeartbeat = $startedAt.AddMinutes(5)
+    $nextProgressRefresh = $startedAt
 
     while ($true) {
         $allExited = $true
@@ -1126,10 +1651,14 @@ function Wait-V7Launchers {
         }
         if ((Get-Date) -ge $nextHeartbeat) {
             $elapsedMinutes = [int][Math]::Floor(((Get-Date) - $startedAt).TotalMinutes)
-            $heartbeatText = "$([char]0x23F3) [$stageName] running... (${elapsedMinutes}m elapsed)"
+            $heartbeatText = "[$stageName] running... (${elapsedMinutes}m elapsed)"
             Add-SupervisorStage -QueueRunDir $QueueRunDir -EventsPath $EventsPath -State 'HEARTBEAT' -Message $heartbeatText -Data @{ stage = $stageName; pids = $alivePids; elapsed_minutes = $elapsedMinutes }
-            Invoke-V7TelegramScript -Config $Config -Status $Status -StatusPath $StatusPath -State 'HEARTBEAT' -Message $heartbeatText -EventsPath $EventsPath -QueueRunDir $QueueRunDir -WarningMessage 'Telegram heartbeat failed' -WarningData @{ stage = $stageName; elapsed_minutes = $elapsedMinutes; pids = $alivePids } | Out-Null
+            Invoke-V7TelegramScript -Config $Config -Status $Status -StatusPath $StatusPath -State 'HEARTBEAT' -Message $heartbeatText -EventsPath $EventsPath -QueueRunDir $QueueRunDir -ArtifactsDir $ArtifactsDir -TaskId $Status.task_id -Workflow $Workflow -WarningMessage 'Telegram heartbeat failed' -WarningData @{ stage = $stageName; elapsed_minutes = $elapsedMinutes; pids = $alivePids } | Out-Null
             $nextHeartbeat = $nextHeartbeat.AddMinutes(5)
+        }
+        if (-not [string]::IsNullOrWhiteSpace($Workflow) -and (Get-Date) -ge $nextProgressRefresh) {
+            Invoke-V7TelegramScript -Config $Config -Status $Status -StatusPath $StatusPath -State $Status.state -Message $stageName -EventsPath $EventsPath -QueueRunDir $QueueRunDir -ArtifactsDir $ArtifactsDir -TaskId $Status.task_id -Workflow $Workflow -WarningMessage 'Telegram progress refresh failed' -WarningData @{ stage = $stageName; pids = $alivePids } | Out-Null
+            $nextProgressRefresh = (Get-Date).AddSeconds(15)
         }
 
         Start-Sleep -Seconds 5
@@ -1150,22 +1679,24 @@ function Invoke-V7Stage {
         [string]$QueueRunDir,
         [string]$Mode,
         [hashtable]$Config,
-        [string]$Workflow
+        [string]$Workflow,
+        [string]$ArtifactsDir
     )
 
     $stdoutPath = Join-Path $LogsDir "$Name.launcher.stdout.log"
     $stderrPath = Join-Path $LogsDir "$Name.launcher.stderr.log"
     $proc = Start-V7WorkerLauncher -ScriptPath $ScriptPath -TaskJsonPath $TaskJsonPath -Name $Name -LogsDir $LogsDir -Mode $Mode
-    $Status.processes[$Name] = [ordered]@{ pid = $proc.Id; state = 'running' }
+    $Status.processes[$Name] = [ordered]@{ pid = $proc.Id; state = 'running'; started_at = (Get-V7Timestamp) }
     $Status.current_step = $Name
     Set-V7Status -StatusPath $StatusPath -Status $Status
     Add-SupervisorStage -QueueRunDir $QueueRunDir -EventsPath $EventsPath -State 'RUNNING' -Message "Started $Name" -Data @{ pid = $proc.Id; workflow = $Workflow; script_path = $ScriptPath; stdout_log = $stdoutPath; stderr_log = $stderrPath; mode = $Mode }
-    $ok = Wait-V7Launchers -Processes @($proc) -TimeoutMinutes $TimeoutMinutes -StatusPath $StatusPath -Status $Status -EventsPath $EventsPath -QueueRunDir $QueueRunDir -Config $Config -HeartbeatLabel $Name
+    $ok = Wait-V7Launchers -Processes @($proc) -TimeoutMinutes $TimeoutMinutes -StatusPath $StatusPath -Status $Status -EventsPath $EventsPath -QueueRunDir $QueueRunDir -Config $Config -HeartbeatLabel $Name -Workflow $Workflow -ArtifactsDir $ArtifactsDir
     $exitCode = if ($proc.HasExited) { $proc.ExitCode } else { $null }
     $Status.processes[$Name].state = if ($proc.HasExited -and $proc.ExitCode -eq 0) { 'completed' } elseif ($proc.HasExited) { 'failed' } else { 'failed' }
     if ($null -ne $exitCode) {
         $Status.processes[$Name].exit_code = $exitCode
     }
+    $Status.processes[$Name].ended_at = Get-V7Timestamp
     Set-V7Status -StatusPath $StatusPath -Status $Status
     $stageSuccess = $ok -and $proc.HasExited -and $proc.ExitCode -eq 0
     $completionState = if ($stageSuccess) { 'RUNNING' } else { 'WARNING' }
@@ -1310,7 +1841,7 @@ try {
     Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'PREPARING' -Message 'Preparing task context' -Data @{ workflow = $workflow; page = $taskPage; topic = $taskTopic; results_dir = $resultsDir }
     Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'PREPARING' -Message 'Preparing task context' -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram preparing notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
 
-    if ($workflow -eq 'code-review') {
+    if (@('code-review', 'parallel-write') -contains $workflow) {
         $baseCommit = Get-V7RepoHead -RepoRoot $repoRootPath
         $writerWorktree = Join-Path $worktreesDir 'wt-writer'
         $reviewWorktree = Join-Path $worktreesDir 'wt-review'
@@ -1353,7 +1884,7 @@ try {
         Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Worker launchers started' -Data @{ claude_writer_pid = $writerProc.Id; codex_reviewer_pid = $reviewerProc.Id; logs_dir = $logsDir }
         Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'RUNNING' -Message 'Claude writer + Codex reviewer' -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram parallel stage notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
 
-        $parallelOk = Wait-V7Launchers -Processes @($writerProc, $reviewerProc) -TimeoutMinutes $codeReviewTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -HeartbeatLabel $status.current_step
+        $parallelOk = Wait-V7Launchers -Processes @($writerProc, $reviewerProc) -TimeoutMinutes $codeReviewTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -HeartbeatLabel $status.current_step -Workflow $workflow -ArtifactsDir $artifactsDir
         $workerEndedAt = Get-V7Timestamp
         $status.processes['claude_writer'].state = if ($writerProc.HasExited -and $writerProc.ExitCode -eq 0) { 'completed' } elseif ($writerProc.HasExited) { 'failed' } else { 'failed' }
         $status.processes['claude_writer'].exit_code = if ($writerProc.HasExited) { $writerProc.ExitCode } else { $null }
@@ -1412,6 +1943,77 @@ try {
         Update-CodeReviewWorkerLinesFromArtifacts -Status $status -ArtifactsDir $artifactsDir
         Set-V7Status -StatusPath $statusPath -Status $status
         Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'MERGING' -Message 'Merge step completed' -Data @{ merge_commit = $status.git.merge_commit; writer_commit = $status.git.writer_commit; result_path = (Join-Path $artifactsDir 'merge.result.json') }
+    } elseif ($workflow -eq 'parallel-write') {
+        $status.state = 'RUNNING'
+        $status.current_step = 'parallel-write'
+        Set-V7Status -StatusPath $statusPath -Status $status
+        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Starting Claude writer and Codex writer' -Data @{ task_json = $taskJsonLocal; logs_dir = $logsDir; timeout_minutes = $codeReviewTimeout }
+
+        $writerProc = Start-V7WorkerLauncher -ScriptPath (Join-Path $workerRoot 'Invoke-ClaudeWriter.ps1') -TaskJsonPath $taskJsonLocal -Name 'claude-writer' -LogsDir $logsDir -Mode 'writer'
+        $codexWriterProc = Start-V7WorkerLauncher -ScriptPath (Join-Path $workerRoot 'Invoke-CodexWriter.ps1') -TaskJsonPath $taskJsonLocal -Name 'codex-writer' -LogsDir $logsDir -Mode ''
+        $writerStartedAt = Get-V7Timestamp
+        $status.processes['claude_writer'] = [ordered]@{ pid = $writerProc.Id; state = 'running'; started_at = $writerStartedAt }
+        $status.processes['codex_writer'] = [ordered]@{ pid = $codexWriterProc.Id; state = 'running'; started_at = $writerStartedAt }
+        Set-V7TelegramWorkerLine -Status $status -WorkerKey 'claude_writer' -State 'RUNNING' -Text '' -StartedAt $writerStartedAt -EndedAt ''
+        Set-V7TelegramWorkerLine -Status $status -WorkerKey 'codex_writer' -State 'RUNNING' -Text '' -StartedAt $writerStartedAt -EndedAt ''
+        Set-V7TelegramWorkerLine -Status $status -WorkerKey 'reconciler' -State 'WAITING' -Text 'waiting' -StartedAt '' -EndedAt ''
+        Set-V7Status -StatusPath $statusPath -Status $status
+        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Parallel-write launchers started' -Data @{ claude_writer_pid = $writerProc.Id; codex_writer_pid = $codexWriterProc.Id; logs_dir = $logsDir }
+        Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'RUNNING' -Message 'Claude writer + Codex writer' -EventsPath $eventsPath -QueueRunDir $queueRunDir -ArtifactsDir $artifactsDir -TaskId $TaskId -Workflow $workflow -WarningMessage 'Telegram parallel-write notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
+
+        $parallelWriteOk = Wait-V7Launchers -Processes @($writerProc, $codexWriterProc) -TimeoutMinutes $codeReviewTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -HeartbeatLabel $status.current_step -Workflow $workflow -ArtifactsDir $artifactsDir
+        $writersEndedAt = Get-V7Timestamp
+        $status.processes['claude_writer'].state = if ($writerProc.HasExited -and $writerProc.ExitCode -eq 0) { 'completed' } elseif ($writerProc.HasExited) { 'failed' } else { 'failed' }
+        $status.processes['claude_writer'].exit_code = if ($writerProc.HasExited) { $writerProc.ExitCode } else { $null }
+        $status.processes['claude_writer'].ended_at = $writersEndedAt
+        $status.processes['codex_writer'].state = if ($codexWriterProc.HasExited -and $codexWriterProc.ExitCode -eq 0) { 'completed' } elseif ($codexWriterProc.HasExited) { 'failed' } else { 'failed' }
+        $status.processes['codex_writer'].exit_code = if ($codexWriterProc.HasExited) { $codexWriterProc.ExitCode } else { $null }
+        $status.processes['codex_writer'].ended_at = $writersEndedAt
+        Set-V7Status -StatusPath $statusPath -Status $status
+        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Parallel-write writer stage completed' -Data @{ parallel_ok = $parallelWriteOk; claude_writer_exit_code = $status.processes['claude_writer'].exit_code; codex_writer_exit_code = $status.processes['codex_writer'].exit_code }
+        if (-not $parallelWriteOk) {
+            throw 'Parallel-write writer timeout'
+        }
+        if ($status.processes['claude_writer'].state -ne 'completed' -or $status.processes['codex_writer'].state -ne 'completed') {
+            throw 'Parallel-write requires both writers to complete successfully'
+        }
+
+        $status.state = 'MERGING'
+        $status.current_step = 'parallel-write-reconcile'
+        $reconcileStartedAt = Get-V7Timestamp
+        $status.processes['reconciler'] = [ordered]@{ state = 'running'; started_at = $reconcileStartedAt }
+        Set-V7TelegramWorkerLine -Status $status -WorkerKey 'reconciler' -State 'RUNNING' -Text '' -StartedAt $reconcileStartedAt -EndedAt ''
+        Set-V7Status -StatusPath $statusPath -Status $status
+        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'MERGING' -Message 'Running parallel-write reconcile step' -Data @{ task_json = $taskJsonLocal; logs_dir = $logsDir }
+        Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'MERGING' -Message 'Reconciling Claude and Codex outputs' -EventsPath $eventsPath -QueueRunDir $queueRunDir -ArtifactsDir $artifactsDir -TaskId $TaskId -Workflow $workflow -WarningMessage 'Telegram parallel-write merge notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
+
+        $mergeStdout = Join-Path $logsDir 'parallel-write.stdout.log'
+        $mergeStderr = Join-Path $logsDir 'parallel-write.stderr.log'
+        & $env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $workerRoot 'Merge-ParallelWrite.ps1') -TaskJsonPath $taskJsonLocal 1> $mergeStdout 2> $mergeStderr
+        $mergeExitCode = $LASTEXITCODE
+        $reconcileEndedAt = Get-V7Timestamp
+        $status.processes['reconciler'].exit_code = $mergeExitCode
+        $status.processes['reconciler'].ended_at = $reconcileEndedAt
+        if ($mergeExitCode -ne 0) {
+            $status.processes['reconciler'].state = 'failed'
+            Set-V7Status -StatusPath $statusPath -Status $status
+            Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'WARNING' -Message 'Parallel-write reconcile step failed' -Data @{ exit_code = $mergeExitCode; stdout_log = $mergeStdout; stderr_log = $mergeStderr }
+            throw 'Parallel-write reconcile step failed'
+        }
+
+        $mergeResult = Read-V7Json -Path (Join-Path $artifactsDir 'merge.result.json')
+        if ($mergeResult -and $mergeResult.merge_commit) {
+            $status.git.merge_commit = $mergeResult.merge_commit
+        }
+        if ($mergeResult -and $mergeResult.writer_commit) {
+            $status.git.writer_commit = $mergeResult.writer_commit
+        }
+        if ($mergeResult -and $mergeResult.codex_commit) {
+            $status.git.codex_commit = $mergeResult.codex_commit
+        }
+        $status.processes['reconciler'].state = 'completed'
+        Set-V7Status -StatusPath $statusPath -Status $status
+        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'MERGING' -Message 'Parallel-write reconcile completed' -Data @{ merge_commit = $status.git.merge_commit; writer_commit = $status.git.writer_commit; codex_commit = $status.git.codex_commit; result_path = (Join-Path $artifactsDir 'merge.result.json') }
     } elseif ($workflow -eq 'ux-discussion') {
         $status.state = 'RUNNING'
         $status.current_step = 'ux-discussion'
@@ -1419,7 +2021,7 @@ try {
         Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Starting UX discussion workflow' -Data @{ task_json = $taskJsonLocal; logs_dir = $logsDir; timeout_minutes = $uxTimeout; topic = $taskTopic }
         Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'RUNNING' -Message 'Claude + Codex + Claude synthesis' -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram UX discussion notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
 
-        $uxDiscussionOk = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-UxDiscussion.ps1') -TaskJsonPath $taskJsonLocal -Name 'ux-discussion' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -Workflow $workflow -Mode ''
+        $uxDiscussionOk = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-UxDiscussion.ps1') -TaskJsonPath $taskJsonLocal -Name 'ux-discussion' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -Workflow $workflow -ArtifactsDir $artifactsDir -Mode ''
         if (-not $uxDiscussionOk) { throw 'UX discussion workflow failed' }
 
         $uxDiscussionResultPath = Join-Path $artifactsDir 'ux-discussion.result.json'
@@ -1485,6 +2087,24 @@ try {
                 Add-SupervisorStage -QueueRunDir $finalQueueDir -EventsPath $finalEventsPath -State 'WARNING' -Message 'Task cleanup failed' -Data @{ task_json = $taskJsonLocal; exit_code = $cleanupExitCode; stdout_log = $cleanupStdout; stderr_log = $cleanupStderr }
                 if (-not $supervisorError) {
                     $supervisorError = 'Cleanup failed with exit code ' + $cleanupExitCode
+                }
+            }
+
+            if ($workflow -eq 'parallel-write') {
+                foreach ($pathKey in @('writer_worktree', 'review_worktree', 'merge_worktree')) {
+                    $worktreePath = [string](Get-V7TelegramValue -Object $status.paths -Name $pathKey)
+                    if ([string]::IsNullOrWhiteSpace($worktreePath)) {
+                        continue
+                    }
+                    try {
+                        Remove-V7Worktree -RepoRoot $repoRootPath -Path $worktreePath
+                        Add-SupervisorStage -QueueRunDir $finalQueueDir -EventsPath $finalEventsPath -State 'CLEANUP' -Message 'Parallel-write worktree removed' -Data @{ path_key = $pathKey; worktree = $worktreePath }
+                    } catch {
+                        Add-SupervisorStage -QueueRunDir $finalQueueDir -EventsPath $finalEventsPath -State 'WARNING' -Message 'Parallel-write worktree cleanup failed' -Data @{ path_key = $pathKey; worktree = $worktreePath; error = $_.Exception.Message }
+                        if (-not $supervisorError) {
+                            $supervisorError = $_.Exception.Message
+                        }
+                    }
                 }
             }
         } else {
