@@ -25,8 +25,8 @@ $diffPath = Join-Path $artifactsDir 'parallel-write-codex.diff'
 
 $writerResult = Read-V7Json -Path (Join-Path $artifactsDir 'claude-writer.result.json')
 $codexResult = Read-V7Json -Path (Join-Path $artifactsDir 'codex-writer.result.json')
-$writerCommit = [string]$writerResult.commit_hash
-$codexCommit = [string]$codexResult.commit_hash
+$writerCommit = Get-V7StateText -Object $writerResult -Name 'commit_hash'
+$codexCommit = Get-V7StateText -Object $codexResult -Name 'commit_hash'
 
 if ([string]::IsNullOrWhiteSpace($writerCommit) -and (Test-Path -LiteralPath $writerWorktree)) {
     $candidate = (Invoke-V7Git -RepoRoot $writerWorktree -Arguments @('rev-parse', 'HEAD') -FailureMessage 'Unable to resolve CC writer HEAD').stdout.Trim()

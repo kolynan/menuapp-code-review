@@ -514,13 +514,13 @@ function Set-V7TelegramWorkerLine {
     if (-not [string]::IsNullOrWhiteSpace($State)) {
         $entry['state'] = $State
     }
-    if ($PSBoundParameters.ContainsKey('Text')) {
+    if ($PSBoundParameters.Contains('Text')) {
         $entry['text'] = if ([string]::IsNullOrWhiteSpace($Text)) { '' } else { $Text.Trim() }
     }
-    if ($PSBoundParameters.ContainsKey('StartedAt')) {
+    if ($PSBoundParameters.Contains('StartedAt')) {
         $entry['started_at'] = if ([string]::IsNullOrWhiteSpace($StartedAt)) { '' } else { $StartedAt }
     }
-    if ($PSBoundParameters.ContainsKey('EndedAt')) {
+    if ($PSBoundParameters.Contains('EndedAt')) {
         $entry['ended_at'] = if ([string]::IsNullOrWhiteSpace($EndedAt)) { '' } else { $EndedAt }
     }
 

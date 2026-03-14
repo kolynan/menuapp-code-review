@@ -928,7 +928,7 @@ function Invoke-V7CommandToFiles {
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
 
-    $hasInput = $PSBoundParameters.ContainsKey('InputText') -and $null -ne $InputText
+    $hasInput = $PSBoundParameters.Contains('InputText') -and $null -ne $InputText
     $psi.RedirectStandardInput = $hasInput
 
     $process = New-Object System.Diagnostics.Process
