@@ -344,6 +344,38 @@ function Get-V7TelegramLocalDateTime {
     }
 }
 
+function Get-V7StateValue {
+    param(
+        $Object,
+        [string]$Name,
+        $Default = $null
+    )
+
+    $value = Get-V7TelegramValue -Object $Object -Name $Name
+    if ($null -eq $value) {
+        return $Default
+    }
+    return $value
+}
+
+function Get-V7StateText {
+    param(
+        $Object,
+        [string]$Name,
+        [string]$Default = ''
+    )
+
+    $value = Get-V7StateValue -Object $Object -Name $Name
+    if ($null -eq $value) {
+        return $Default
+    }
+    $text = [string]$value
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return $Default
+    }
+    return $text
+}
+
 function Get-V7TelegramClockText {
     param([string]$Timestamp)
 
@@ -1559,16 +1591,16 @@ function Write-SupervisorSummary {
     $lines += @(
         '',
         '## Git Commits',
-        ('- base_commit: ' + $(if ($Status -and $Status.git -and $Status.git.base_commit) { $Status.git.base_commit } else { 'n/a' })),
-        ('- writer_commit: ' + $(if ($Status -and $Status.git -and $Status.git.writer_commit) { $Status.git.writer_commit } else { 'n/a' })),
-        ('- merge_commit: ' + $(if ($Status -and $Status.git -and $Status.git.merge_commit) { $Status.git.merge_commit } else { 'n/a' }))
+        ('- base_commit: ' + (Get-V7StateText -Object (Get-V7StateValue -Object $Status -Name 'git') -Name 'base_commit' -Default 'n/a')),
+        ('- writer_commit: ' + (Get-V7StateText -Object (Get-V7StateValue -Object $Status -Name 'git') -Name 'writer_commit' -Default 'n/a')),
+        ('- merge_commit: ' + (Get-V7StateText -Object (Get-V7StateValue -Object $Status -Name 'git') -Name 'merge_commit' -Default 'n/a'))
     )
     $lines += @('', '## Exit Codes')
     if ($Status -and $Status.processes -and $Status.processes.Count -gt 0) {
         foreach ($name in @($Status.processes.Keys)) {
             $processInfo = $Status.processes[$name]
-            $exitCode = if ($processInfo -and $null -ne $processInfo.exit_code) { $processInfo.exit_code } else { 'n/a' }
-            $state = if ($processInfo -and $processInfo.state) { $processInfo.state } else { 'unknown' }
+            $exitCode = Get-V7StateValue -Object $processInfo -Name 'exit_code' -Default 'n/a'
+            $state = Get-V7StateText -Object $processInfo -Name 'state' -Default 'unknown'
             $lines += ('- {0}: state={1}, exit_code={2}' -f $name, $state, $exitCode)
         }
     } else {
@@ -1577,8 +1609,13 @@ function Write-SupervisorSummary {
     $lines += @('', '## Errors')
     if ($ErrorMessage) {
         $lines += $ErrorMessage
-    } elseif ($Status -and $Status.error) {
-        $lines += $Status.error
+    } elseif ($Status) {
+        $statusError = Get-V7StateText -Object $Status -Name 'error'
+        if (-not [string]::IsNullOrWhiteSpace($statusError)) {
+            $lines += $statusError
+        } else {
+            $lines += 'none'
+        }
     } else {
         $lines += 'none'
     }
@@ -1602,11 +1639,41 @@ function Start-V7WorkerLauncher {
 
     $stdoutPath = Join-Path $LogsDir "$Name.launcher.stdout.log"
     $stderrPath = Join-Path $LogsDir "$Name.launcher.stderr.log"
-    $args = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath, '-TaskJsonPath', $TaskJsonPath)
+    $launcherArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath, '-TaskJsonPath', $TaskJsonPath)
     if ($Mode) {
-        $args += @('-Mode', $Mode)
+        $launcherArgs += @('-Mode', $Mode)
     }
-    return Start-Process -FilePath $env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe -ArgumentList $args -WorkingDirectory (Split-Path -Parent $TaskJsonPath) -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru -WindowStyle Hidden
+    return Start-Process -FilePath $env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe -ArgumentList $launcherArgs -WorkingDirectory (Split-Path -Parent $TaskJsonPath) -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru -WindowStyle Hidden
+}
+
+function Test-V7WorkerProcessAlive {
+    param([System.Diagnostics.Process]$Process)
+
+    if ($null -eq $Process) {
+        return $false
+    }
+
+    try {
+        $null = $Process.WaitForExit(0)
+    } catch {
+    }
+
+    try {
+        $Process.Refresh()
+    } catch {
+        return $false
+    }
+
+    try {
+        if ($Process.HasExited) {
+            return $false
+        }
+    } catch {
+        return $false
+    }
+
+    $liveProcess = Get-Process -Id $Process.Id -ErrorAction SilentlyContinue
+    return $null -ne $liveProcess
 }
 
 function Wait-V7Launchers {
@@ -1632,7 +1699,7 @@ function Wait-V7Launchers {
         $allExited = $true
         $alivePids = @()
         foreach ($proc in $Processes) {
-            if (-not $proc.HasExited) {
+            if (Test-V7WorkerProcessAlive -Process $proc) {
                 $allExited = $false
                 $alivePids += $proc.Id
             }
@@ -1645,7 +1712,7 @@ function Wait-V7Launchers {
         }
         if ((Get-Date) -gt $deadline) {
             foreach ($proc in $Processes) {
-                if (-not $proc.HasExited) {
+                if (Test-V7WorkerProcessAlive -Process $proc) {
                     Stop-V7ProcessTree -ProcessId $proc.Id
                 }
             }
@@ -1700,7 +1767,7 @@ function Invoke-V7Stage {
     $exitCode = if ($proc.HasExited) { $proc.ExitCode } else { $null }
     $Status.processes[$Name].state = if ($proc.HasExited -and $proc.ExitCode -eq 0) { 'completed' } elseif ($proc.HasExited) { 'failed' } else { 'failed' }
     if ($null -ne $exitCode) {
-        $Status.processes[$Name].exit_code = $exitCode
+        $Status.processes[$Name]['exit_code'] = $exitCode
     }
     $Status.processes[$Name].ended_at = Get-V7Timestamp
     Set-V7Status -StatusPath $StatusPath -Status $Status
@@ -1893,10 +1960,10 @@ try {
         $parallelOk = Wait-V7Launchers -Processes @($writerProc, $reviewerProc) -TimeoutMinutes $codeReviewTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -HeartbeatLabel $status.current_step -Workflow $workflow -ArtifactsDir $artifactsDir
         $workerEndedAt = Get-V7Timestamp
         $status.processes['claude_writer'].state = if ($writerProc.HasExited -and $writerProc.ExitCode -eq 0) { 'completed' } elseif ($writerProc.HasExited) { 'failed' } else { 'failed' }
-        $status.processes['claude_writer'].exit_code = if ($writerProc.HasExited) { $writerProc.ExitCode } else { $null }
+        $status.processes['claude_writer']['exit_code'] = if ($writerProc.HasExited) { $writerProc.ExitCode } else { $null }
         $status.processes['claude_writer'].ended_at = $workerEndedAt
         $status.processes['codex_reviewer'].state = if ($reviewerProc.HasExited -and $reviewerProc.ExitCode -eq 0) { 'completed' } elseif ($reviewerProc.HasExited) { 'failed' } else { 'failed' }
-        $status.processes['codex_reviewer'].exit_code = if ($reviewerProc.HasExited) { $reviewerProc.ExitCode } else { $null }
+        $status.processes['codex_reviewer']['exit_code'] = if ($reviewerProc.HasExited) { $reviewerProc.ExitCode } else { $null }
         $status.processes['codex_reviewer'].ended_at = $workerEndedAt
 
         $writerResult = Read-V7Json -Path (Join-Path $artifactsDir 'claude-writer.result.json')
@@ -1910,7 +1977,7 @@ try {
 
         Update-CodeReviewWorkerLinesFromArtifacts -Status $status -ArtifactsDir $artifactsDir
         Set-V7Status -StatusPath $statusPath -Status $status
-        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Parallel review stage completed' -Data @{ parallel_ok = $parallelOk; claude_writer_exit_code = $status.processes['claude_writer'].exit_code; codex_reviewer_exit_code = $status.processes['codex_reviewer'].exit_code; claude_writer_state = $status.processes['claude_writer'].state; codex_reviewer_state = $status.processes['codex_reviewer'].state }
+        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Parallel review stage completed' -Data @{ parallel_ok = $parallelOk; claude_writer_exit_code = (Get-V7StateValue -Object $status.processes['claude_writer'] -Name 'exit_code'); codex_reviewer_exit_code = (Get-V7StateValue -Object $status.processes['codex_reviewer'] -Name 'exit_code'); claude_writer_state = (Get-V7StateText -Object $status.processes['claude_writer'] -Name 'state'); codex_reviewer_state = (Get-V7StateText -Object $status.processes['codex_reviewer'] -Name 'state') }
         if (-not $parallelOk) {
             throw 'Parallel worker timeout'
         }
@@ -1929,7 +1996,7 @@ try {
         & $env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $workerRoot 'Merge-TaskResult.ps1') -TaskJsonPath $taskJsonLocal 1> $mergeStdout 2> $mergeStderr
         $mergeExitCode = $LASTEXITCODE
         $mergeEndedAt = Get-V7Timestamp
-        $status.processes['merge'].exit_code = $mergeExitCode
+        $status.processes['merge']['exit_code'] = $mergeExitCode
         $status.processes['merge'].ended_at = $mergeEndedAt
         if ($mergeExitCode -ne 0) {
             $status.processes['merge'].state = 'failed'
@@ -1939,16 +2006,22 @@ try {
         }
 
         $mergeResult = Read-V7Json -Path (Join-Path $artifactsDir 'merge.result.json')
-        if ($mergeResult -and $mergeResult.merge_commit) {
-            $status.git.merge_commit = $mergeResult.merge_commit
+        if ($mergeResult) {
+            $mergeCommit = Get-V7StateText -Object $mergeResult -Name 'merge_commit'
+            if (-not [string]::IsNullOrWhiteSpace($mergeCommit)) {
+                $status.git['merge_commit'] = $mergeCommit
+            }
         }
-        if ($mergeResult -and $mergeResult.writer_commit) {
-            $status.git.writer_commit = $mergeResult.writer_commit
+        if ($mergeResult) {
+            $writerCommit = Get-V7StateText -Object $mergeResult -Name 'writer_commit'
+            if (-not [string]::IsNullOrWhiteSpace($writerCommit)) {
+                $status.git['writer_commit'] = $writerCommit
+            }
         }
         $status.processes['merge'].state = 'completed'
         Update-CodeReviewWorkerLinesFromArtifacts -Status $status -ArtifactsDir $artifactsDir
         Set-V7Status -StatusPath $statusPath -Status $status
-        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'MERGING' -Message 'Merge step completed' -Data @{ merge_commit = $status.git.merge_commit; writer_commit = $status.git.writer_commit; result_path = (Join-Path $artifactsDir 'merge.result.json') }
+        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'MERGING' -Message 'Merge step completed' -Data @{ merge_commit = (Get-V7StateText -Object $status.git -Name 'merge_commit'); writer_commit = (Get-V7StateText -Object $status.git -Name 'writer_commit'); result_path = (Join-Path $artifactsDir 'merge.result.json') }
     } elseif ($workflow -eq 'parallel-write') {
         $status.state = 'RUNNING'
         $status.current_step = 'parallel-write'
@@ -1970,17 +2043,17 @@ try {
         $parallelWriteOk = Wait-V7Launchers -Processes @($writerProc, $codexWriterProc) -TimeoutMinutes $codeReviewTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -HeartbeatLabel $status.current_step -Workflow $workflow -ArtifactsDir $artifactsDir
         $writersEndedAt = Get-V7Timestamp
         $status.processes['claude_writer'].state = if ($writerProc.HasExited -and $writerProc.ExitCode -eq 0) { 'completed' } elseif ($writerProc.HasExited) { 'failed' } else { 'failed' }
-        $status.processes['claude_writer'].exit_code = if ($writerProc.HasExited) { $writerProc.ExitCode } else { $null }
+        $status.processes['claude_writer']['exit_code'] = if ($writerProc.HasExited) { $writerProc.ExitCode } else { $null }
         $status.processes['claude_writer'].ended_at = $writersEndedAt
         $status.processes['codex_writer'].state = if ($codexWriterProc.HasExited -and $codexWriterProc.ExitCode -eq 0) { 'completed' } elseif ($codexWriterProc.HasExited) { 'failed' } else { 'failed' }
-        $status.processes['codex_writer'].exit_code = if ($codexWriterProc.HasExited) { $codexWriterProc.ExitCode } else { $null }
+        $status.processes['codex_writer']['exit_code'] = if ($codexWriterProc.HasExited) { $codexWriterProc.ExitCode } else { $null }
         $status.processes['codex_writer'].ended_at = $writersEndedAt
         Set-V7Status -StatusPath $statusPath -Status $status
-        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Parallel-write writer stage completed' -Data @{ parallel_ok = $parallelWriteOk; claude_writer_exit_code = $status.processes['claude_writer'].exit_code; codex_writer_exit_code = $status.processes['codex_writer'].exit_code }
+        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Parallel-write writer stage completed' -Data @{ parallel_ok = $parallelWriteOk; claude_writer_exit_code = (Get-V7StateValue -Object $status.processes['claude_writer'] -Name 'exit_code'); codex_writer_exit_code = (Get-V7StateValue -Object $status.processes['codex_writer'] -Name 'exit_code') }
         if (-not $parallelWriteOk) {
             throw 'Parallel-write writer timeout'
         }
-        if ($status.processes['claude_writer'].state -ne 'completed' -or $status.processes['codex_writer'].state -ne 'completed') {
+        if ((Get-V7StateText -Object $status.processes['claude_writer'] -Name 'state') -ne 'completed' -or (Get-V7StateText -Object $status.processes['codex_writer'] -Name 'state') -ne 'completed') {
             throw 'Parallel-write requires both writers to complete successfully'
         }
 
@@ -1998,7 +2071,7 @@ try {
         & $env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $workerRoot 'Merge-ParallelWrite.ps1') -TaskJsonPath $taskJsonLocal 1> $mergeStdout 2> $mergeStderr
         $mergeExitCode = $LASTEXITCODE
         $reconcileEndedAt = Get-V7Timestamp
-        $status.processes['reconciler'].exit_code = $mergeExitCode
+        $status.processes['reconciler']['exit_code'] = $mergeExitCode
         $status.processes['reconciler'].ended_at = $reconcileEndedAt
         if ($mergeExitCode -ne 0) {
             $status.processes['reconciler'].state = 'failed'
@@ -2008,18 +2081,27 @@ try {
         }
 
         $mergeResult = Read-V7Json -Path (Join-Path $artifactsDir 'merge.result.json')
-        if ($mergeResult -and $mergeResult.merge_commit) {
-            $status.git.merge_commit = $mergeResult.merge_commit
+        if ($mergeResult) {
+            $mergeCommit = Get-V7StateText -Object $mergeResult -Name 'merge_commit'
+            if (-not [string]::IsNullOrWhiteSpace($mergeCommit)) {
+                $status.git['merge_commit'] = $mergeCommit
+            }
         }
-        if ($mergeResult -and $mergeResult.writer_commit) {
-            $status.git.writer_commit = $mergeResult.writer_commit
+        if ($mergeResult) {
+            $writerCommit = Get-V7StateText -Object $mergeResult -Name 'writer_commit'
+            if (-not [string]::IsNullOrWhiteSpace($writerCommit)) {
+                $status.git['writer_commit'] = $writerCommit
+            }
         }
-        if ($mergeResult -and $mergeResult.codex_commit) {
-            $status.git.codex_commit = $mergeResult.codex_commit
+        if ($mergeResult) {
+            $codexCommit = Get-V7StateText -Object $mergeResult -Name 'codex_commit'
+            if (-not [string]::IsNullOrWhiteSpace($codexCommit)) {
+                $status.git['codex_commit'] = $codexCommit
+            }
         }
         $status.processes['reconciler'].state = 'completed'
         Set-V7Status -StatusPath $statusPath -Status $status
-        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'MERGING' -Message 'Parallel-write reconcile completed' -Data @{ merge_commit = $status.git.merge_commit; writer_commit = $status.git.writer_commit; codex_commit = $status.git.codex_commit; result_path = (Join-Path $artifactsDir 'merge.result.json') }
+        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'MERGING' -Message 'Parallel-write reconcile completed' -Data @{ merge_commit = (Get-V7StateText -Object $status.git -Name 'merge_commit'); writer_commit = (Get-V7StateText -Object $status.git -Name 'writer_commit'); codex_commit = (Get-V7StateText -Object $status.git -Name 'codex_commit'); result_path = (Join-Path $artifactsDir 'merge.result.json') }
     } elseif ($workflow -eq 'ux-discussion') {
         $status.state = 'RUNNING'
         $status.current_step = 'ux-discussion'
@@ -2032,11 +2114,14 @@ try {
 
         $uxDiscussionResultPath = Join-Path $artifactsDir 'ux-discussion.result.json'
         $uxDiscussionResult = Read-V7Json -Path $uxDiscussionResultPath
-        if ($uxDiscussionResult -and $uxDiscussionResult.merge_commit) {
-            $status.git.merge_commit = [string]$uxDiscussionResult.merge_commit
+        if ($uxDiscussionResult) {
+            $uxMergeCommit = Get-V7StateText -Object $uxDiscussionResult -Name 'merge_commit'
+            if (-not [string]::IsNullOrWhiteSpace($uxMergeCommit)) {
+                $status.git['merge_commit'] = $uxMergeCommit
+            }
         }
         Set-V7Status -StatusPath $statusPath -Status $status
-        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'UX discussion workflow completed' -Data @{ merge_commit = $status.git.merge_commit; result_path = $uxDiscussionResultPath; output_file = $(if ($uxDiscussionResult) { $uxDiscussionResult.output_file } else { '' }); repo_output_file = $(if ($uxDiscussionResult) { $uxDiscussionResult.repo_output_file } else { '' }) }
+        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'UX discussion workflow completed' -Data @{ merge_commit = (Get-V7StateText -Object $status.git -Name 'merge_commit'); result_path = $uxDiscussionResultPath; output_file = (Get-V7StateText -Object $uxDiscussionResult -Name 'output_file'); repo_output_file = (Get-V7StateText -Object $uxDiscussionResult -Name 'repo_output_file') }
     } else {
         throw ('Unsupported workflow type: ' + $workflow)
     }
@@ -2049,9 +2134,9 @@ try {
     $status.state = 'DONE'
     $status.current_step = 'done'
     Set-V7Status -StatusPath $statusPath -Status $status
-    Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'DONE' -Message 'Task completed' -Data @{ merge_commit = $status.git.merge_commit; results_dir = $resultsDir; local_run_dir = $localRunDir }
+    Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'DONE' -Message 'Task completed' -Data @{ merge_commit = (Get-V7StateText -Object $status.git -Name 'merge_commit'); results_dir = $resultsDir; local_run_dir = $localRunDir }
     Copy-V7ArtifactsToResults -LocalRunDir $localRunDir -ResultsDir $resultsDir
-    $finalCommit = if ([string]::IsNullOrWhiteSpace([string]$status.git.merge_commit)) { 'n/a' } else { [string]$status.git.merge_commit }
+    $finalCommit = Get-V7StateText -Object $status.git -Name 'merge_commit' -Default 'n/a'
     Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'DONE' -Message ('Completed. Commit: ' + $finalCommit) -EventsPath $eventsPath -QueueRunDir $queueRunDir -ArtifactsDir $artifactsDir -WarningMessage 'Telegram completion notification failed' -WarningData @{ task_id = $TaskId; merge_commit = $finalCommit } | Out-Null
 } catch {
     $supervisorError = $_.Exception.Message
@@ -2063,7 +2148,7 @@ try {
         $status.ended_at = Get-V7Timestamp
         $status.state = 'FAILED'
         $status.current_step = 'failed'
-        $status.error = $supervisorError
+        $status['error'] = $supervisorError
         Set-V7Status -StatusPath $statusPath -Status $status
     }
     Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'FAILED' -Message $supervisorError -Data @{ crash_log = $crashPath; task_json = $taskJsonLocal; stack_trace = $_.ScriptStackTrace }

@@ -37,13 +37,13 @@ function Invoke-UxClaudeRound {
     )
 
     Write-V7TextFile -Path $PromptPath -Content $Prompt
-    $args = @('-p', $Prompt, '--allowedTools', 'Bash,Read,Edit,Write', '--max-budget-usd', $Budget, '--agent', $AgentName)
+    $claudeArgs = @('-p', $Prompt, '--allowedTools', 'Bash,Read,Edit,Write', '--max-budget-usd', $Budget, '--agent', $AgentName)
     if (-not [string]::IsNullOrWhiteSpace($RulesPath) -and (Test-Path -LiteralPath $RulesPath)) {
-        $args += @('--append-system-prompt-file', $RulesPath)
+        $claudeArgs += @('--append-system-prompt-file', $RulesPath)
     }
 
     $startedAt = Get-V7Timestamp
-    $exitCode = Invoke-V7CommandToFiles -CommandPrefix $ClaudePrefix -Arguments $args -WorkingDirectory $WorkingDirectory -StdOutPath $StdoutPath -StdErrPath $StderrPath
+    $exitCode = Invoke-V7CommandToFiles -CommandPrefix $ClaudePrefix -Arguments $claudeArgs -WorkingDirectory $WorkingDirectory -StdOutPath $StdoutPath -StdErrPath $StderrPath
     $endedAt = Get-V7Timestamp
 
     $result = [ordered]@{
@@ -84,16 +84,16 @@ function Invoke-UxCodexRound {
     )
 
     Write-V7TextFile -Path $PromptPath -Content $Prompt
-    $args = @('exec', '-C', $WorkingDirectory, '--full-auto', '-o', $OutputFile)
+    $codexArgs = @('exec', '-C', $WorkingDirectory, '--full-auto', '-o', $OutputFile)
     foreach ($imagePath in @($ImagePaths)) {
         if (-not [string]::IsNullOrWhiteSpace([string]$imagePath)) {
-            $args += @('--image', [string]$imagePath)
+            $codexArgs += @('--image', [string]$imagePath)
         }
     }
-    `$args += `$Prompt
+    $codexArgs += '-'
 
     $startedAt = Get-V7Timestamp
-    $exitCode = Invoke-V7CommandToFiles -CommandPrefix $CodexPrefix -Arguments $args -WorkingDirectory $WorkingDirectory -StdOutPath $StdoutPath -StdErrPath $StderrPath
+    $exitCode = Invoke-V7CommandToFiles -CommandPrefix $CodexPrefix -Arguments $codexArgs -WorkingDirectory $WorkingDirectory -StdOutPath $StdoutPath -StdErrPath $StderrPath -InputText $Prompt
     $endedAt = Get-V7Timestamp
 
     $result = [ordered]@{

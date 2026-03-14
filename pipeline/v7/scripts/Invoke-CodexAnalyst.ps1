@@ -46,13 +46,13 @@ Be specific. If images are attached, use them directly in your analysis.
 "@
 
 Write-V7TextFile -Path $promptPath -Content $prompt
-$args = @('exec', '-C', $task.paths.repo_root, '--full-auto', '--json', '-o', $resultPath)
+$codexArgs = @('exec', '-C', $task.paths.repo_root, '--full-auto', '--json', '-o', $resultPath)
 foreach ($imagePath in $task.task.images) {
-    $args += @('--image', [string]$imagePath)
+    $codexArgs += @('--image', [string]$imagePath)
 }
-`$args += `$prompt
+$codexArgs += '-'
 $startedAt = Get-V7Timestamp
-$exitCode = Invoke-V7CommandToFiles -CommandPrefix $codexPrefix -Arguments $args -WorkingDirectory $task.paths.repo_root -StdOutPath $stdoutPath -StdErrPath $stderrPath
+$exitCode = Invoke-V7CommandToFiles -CommandPrefix $codexPrefix -Arguments $codexArgs -WorkingDirectory $task.paths.repo_root -StdOutPath $stdoutPath -StdErrPath $stderrPath -InputText $prompt
 $endedAt = Get-V7Timestamp
 
 $result = [ordered]@{

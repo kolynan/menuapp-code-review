@@ -149,13 +149,13 @@ if ($codexPrefix.Count -eq 0) {
     exit 0
 }
 
-$args = @('exec', '-C', $worktree, '--full-auto', '--json', '-o', $resultPath, '--output-schema', $schemaPath, $prompt)
+$codexArgs = @('exec', '-C', $worktree, '--full-auto', '--json', '-o', $resultPath, '--output-schema', $schemaPath, '-')
 $startedAt = Get-V7Timestamp
 $exitCode = 1
 $errorMessage = ''
 
 try {
-    $exitCode = Invoke-V7CommandToFiles -CommandPrefix $codexPrefix -Arguments $args -WorkingDirectory $worktree -StdOutPath $stdoutPath -StdErrPath $stderrPath
+    $exitCode = Invoke-V7CommandToFiles -CommandPrefix $codexPrefix -Arguments $codexArgs -WorkingDirectory $worktree -StdOutPath $stdoutPath -StdErrPath $stderrPath -InputText $prompt
 } catch {
     $errorMessage = $_.Exception.Message
     Write-V7TextFile -Path $stderrPath -Content ($errorMessage + "`n")

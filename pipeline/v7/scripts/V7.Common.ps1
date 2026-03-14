@@ -943,7 +943,9 @@ function Invoke-V7CommandToFiles {
         $stderrTask = $process.StandardError.ReadToEndAsync()
 
         if ($hasInput) {
-            $process.StandardInput.Write($InputText)
+            $inputBytes = (Get-V7Utf8NoBomEncoding).GetBytes([string]$InputText)
+            $process.StandardInput.BaseStream.Write($inputBytes, 0, $inputBytes.Length)
+            $process.StandardInput.BaseStream.Flush()
             $process.StandardInput.Close()
         }
 

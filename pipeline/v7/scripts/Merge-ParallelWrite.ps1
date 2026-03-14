@@ -97,11 +97,11 @@ Your job:
 Write-V7TextFile -Path $promptPath -Content $prompt
 
 $claudePrefix = Get-V7ClaudeCommandPrefix -RawPath $config.paths.claude_cli
-$args = @('-p', $prompt, '--allowedTools', 'Bash,Read,Edit,Write', '--max-budget-usd', $budget)
+$claudeArgs = @('-p', $prompt, '--allowedTools', 'Bash,Read,Edit,Write', '--max-budget-usd', $budget)
 if (-not [string]::IsNullOrWhiteSpace($RulesPath) -and (Test-Path -LiteralPath $RulesPath)) {
-    $args += @('--append-system-prompt-file', $RulesPath)
+    $claudeArgs += @('--append-system-prompt-file', $RulesPath)
 }
-$exitCode = Invoke-V7CommandToFiles -CommandPrefix $claudePrefix -Arguments $args -WorkingDirectory $mergeWorktree -StdOutPath $stdoutPath -StdErrPath $stderrPath
+$exitCode = Invoke-V7CommandToFiles -CommandPrefix $claudePrefix -Arguments $claudeArgs -WorkingDirectory $mergeWorktree -StdOutPath $stdoutPath -StdErrPath $stderrPath
 if ($exitCode -ne 0) {
     throw 'Parallel-write reconcile pass failed.'
 }

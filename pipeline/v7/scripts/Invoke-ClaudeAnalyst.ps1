@@ -45,15 +45,15 @@ Rules:
 "@
 
 Write-V7TextFile -Path $promptPath -Content $prompt
-$args = @('-p', $prompt, '--allowedTools', 'Bash,Read,Edit,Write', '--max-budget-usd', $budget)
+$claudeArgs = @('-p', $prompt, '--allowedTools', 'Bash,Read,Edit,Write', '--max-budget-usd', $budget)
 if (Test-Path -LiteralPath $task.paths.cc_rules_path) {
-    $args += @('--append-system-prompt-file', $task.paths.cc_rules_path)
+    $claudeArgs += @('--append-system-prompt-file', $task.paths.cc_rules_path)
 }
 if ($task.metadata.agent) {
-    $args += @('--agent', [string]$task.metadata.agent)
+    $claudeArgs += @('--agent', [string]$task.metadata.agent)
 }
 $startedAt = Get-V7Timestamp
-$exitCode = Invoke-V7CommandToFiles -CommandPrefix $claudePrefix -Arguments $args -WorkingDirectory $task.paths.repo_root -StdOutPath $stdoutPath -StdErrPath $stderrPath
+$exitCode = Invoke-V7CommandToFiles -CommandPrefix $claudePrefix -Arguments $claudeArgs -WorkingDirectory $task.paths.repo_root -StdOutPath $stdoutPath -StdErrPath $stderrPath
 $endedAt = Get-V7Timestamp
 
 $result = [ordered]@{

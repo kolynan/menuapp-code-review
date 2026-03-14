@@ -80,13 +80,13 @@ For reconcile mode, focus only on applying the reviewer findings that are suppor
 
 Write-V7TextFile -Path $promptPath -Content $prompt
 
-$args = @('-p', $prompt, '--allowedTools', 'Bash,Read,Edit,Write', '--max-budget-usd', $budget)
+$claudeArgs = @('-p', $prompt, '--allowedTools', 'Bash,Read,Edit,Write', '--max-budget-usd', $budget)
 if (Test-Path -LiteralPath $rulesPath) {
-    $args += @('--append-system-prompt-file', $rulesPath)
+    $claudeArgs += @('--append-system-prompt-file', $rulesPath)
 }
 
 $startedAt = Get-V7Timestamp
-$exitCode = Invoke-V7CommandToFiles -CommandPrefix $claudePrefix -Arguments $args -WorkingDirectory $worktree -StdOutPath $stdoutPath -StdErrPath $stderrPath
+$exitCode = Invoke-V7CommandToFiles -CommandPrefix $claudePrefix -Arguments $claudeArgs -WorkingDirectory $worktree -StdOutPath $stdoutPath -StdErrPath $stderrPath
 $endedAt = Get-V7Timestamp
 
 $headCommit = (Invoke-V7Git -RepoRoot $worktree -Arguments @('rev-parse', 'HEAD') -FailureMessage 'Unable to resolve Claude writer HEAD').stdout.Trim()

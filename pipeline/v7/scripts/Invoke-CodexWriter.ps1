@@ -58,8 +58,8 @@ if ($codexPrefix.Count -eq 0) {
     [Console]::Error.WriteLine($errorMessage)
 } else {
     try {
-        $args = @('exec', '-C', $worktree, '--full-auto', $prompt)
-        $exitCode = Invoke-V7CommandToFiles -CommandPrefix $codexPrefix -Arguments $args -WorkingDirectory $worktree -StdOutPath $stdoutPath -StdErrPath $stderrPath
+        $codexArgs = @('exec', '-C', $worktree, '--full-auto', '-')
+        $exitCode = Invoke-V7CommandToFiles -CommandPrefix $codexPrefix -Arguments $codexArgs -WorkingDirectory $worktree -StdOutPath $stdoutPath -StdErrPath $stderrPath -InputText $prompt
     } catch {
         $errorMessage = $_.Exception.Message
         Write-V7TextFile -Path $stderrPath -Content ($errorMessage + "`n")
