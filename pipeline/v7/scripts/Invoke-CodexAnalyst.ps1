@@ -16,7 +16,7 @@ $stderrPath = Join-Path $logsDir 'codex-round1.stderr.log'
 $resultPath = Join-Path $artifactsDir 'codex-round1-discussion.md'
 $workerResultPath = Join-Path $artifactsDir 'codex-round1.result.json'
 $ccRound1Path = Join-Path $artifactsDir 'cc-round1-discussion.md'
-$codexPrefix = @($config.paths.codex_cli)
+$codexPrefix = Get-V7CodexCommandPrefix -RawPath ([string]$config.paths.codex_cli)
 
 $ccRound1 = if (Test-Path -LiteralPath $ccRound1Path) { Read-V7TextFile -Path $ccRound1Path } else { 'Claude round 1 analysis was not found.' }
 $imageList = if ($task.task.images.Count -gt 0) { ($task.task.images -join "`n- ") } else { 'None attached.' }

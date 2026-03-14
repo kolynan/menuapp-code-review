@@ -121,7 +121,7 @@ function Invoke-UxCodexRound {
 $task = Read-V7Json -Path $TaskJsonPath
 $config = Get-V7Config -ConfigPath $task.paths.config_path
 $claudePrefix = Get-V7ClaudeCommandPrefix -RawPath $config.paths.claude_cli
-$codexPrefix = @($config.paths.codex_cli)
+$codexPrefix = Get-V7CodexCommandPrefix -RawPath ([string]$config.paths.codex_cli)
 $artifactsDir = $task.paths.artifacts_dir
 $promptsDir = $task.paths.prompts_dir
 $logsDir = $task.paths.logs_dir
