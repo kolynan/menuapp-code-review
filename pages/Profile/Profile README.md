@@ -24,6 +24,8 @@ Accessed by logged-in users. Wrapped in `PartnerShell` (uses `base44.auth.me()` 
 - `common.loading`, `common.saving`, `common.saved`, `common.save`, `common.back`
 - `toast.saved`, `toast.error`
 
+S126: Smoke test parallel-write — added JSDoc comments.
+
 ---
 
 ## RELEASE History

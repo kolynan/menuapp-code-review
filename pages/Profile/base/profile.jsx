@@ -29,6 +29,12 @@ const ROLE_BADGE_CLASSES = {
 // BLOCK 01 — MAIN COMPONENT
 // ============================================================
 
+/**
+ * ProfileContent — inner component rendered inside PartnerShell.
+ * Loads and displays the current user's profile (name, email, role, restaurant).
+ * Allows editing the full name field and saving changes via base44.auth.updateMe().
+ * @returns {JSX.Element} The profile editing UI.
+ */
 function ProfileContent() {
   const navigate = useNavigate();
   const { t } = useI18n();
@@ -109,6 +115,11 @@ function ProfileContent() {
   const hasChanges = fullName.trim() !== initialFullName;
   const canSave = hasChanges && fullName.trim().length > 0;
 
+  /**
+   * Persists the updated full name via base44.auth.updateMe().
+   * Shows toast feedback and transitions saveStatus through idle → saving → success → idle.
+   * @returns {Promise<void>}
+   */
   const handleSave = async () => {
     if (!canSave || saveStatus === "saving") return;
 
@@ -130,10 +141,20 @@ function ProfileContent() {
     }
   };
 
+  /**
+   * Returns a translated human-readable label for the given role key.
+   * @param {string} userRole - Role identifier (e.g. "admin", "partner_owner").
+   * @returns {string} Translated role label, or the raw role key as fallback.
+   */
   const getRoleLabel = (userRole) => {
     return tr(`profile.role.${userRole}`, userRole);
   };
 
+  /**
+   * Returns the Tailwind CSS classes for the role badge color scheme.
+   * @param {string} userRole - Role identifier.
+   * @returns {string} Tailwind class string for badge background and text color.
+   */
   const getRoleBadgeClass = (userRole) => {
     return ROLE_BADGE_CLASSES[userRole] || "bg-gray-100 text-gray-800";
   };
@@ -174,6 +195,10 @@ function ProfileContent() {
   // BLOCK 05 — SAVE BUTTON CONTENT
   // ============================================================
 
+  /**
+   * Returns the appropriate content for the save button based on current saveStatus.
+   * @returns {JSX.Element|string} Spinner + text during saving, checkmark + text on success, or label when idle.
+   */
   const getSaveButtonContent = () => {
     if (saveStatus === "saving") {
       return (
@@ -289,6 +314,11 @@ function ProfileContent() {
 // BLOCK 07 — PARTNERSHELL WRAPPER
 // ============================================================
 
+/**
+ * Profile — default export. Wraps ProfileContent in PartnerShell
+ * to provide partner context, navigation tabs, and auth gating.
+ * @returns {JSX.Element} PartnerShell-wrapped profile page.
+ */
 export default function Profile() {
   return (
     <PartnerShell>
