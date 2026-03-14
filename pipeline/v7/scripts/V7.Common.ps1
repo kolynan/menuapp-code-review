@@ -38,16 +38,17 @@ function Test-V7HasProperty {
     if ($null -eq $InputObject -or [string]::IsNullOrWhiteSpace($Name)) {
         return $false
     }
-    if ($InputObject -is [hashtable]) {
-        return $InputObject.Contains($Name)
+    try {
+        if ($null -ne $InputObject.Keys) {
+            return [bool]($InputObject.Keys -contains $Name)
+        }
+    } catch {
     }
-    if ($InputObject -is [System.Collections.Specialized.OrderedDictionary]) {
-        return $InputObject.Contains($Name)
+    try {
+        return [bool]($InputObject.PSObject.Properties.Name -contains $Name)
+    } catch {
+        return $false
     }
-    if ($InputObject -is [System.Collections.IDictionary]) {
-        return $InputObject.Contains($Name)
-    }
-    return ($null -ne $InputObject.PSObject -and $InputObject.PSObject.Properties.Name -contains $Name)
 }
 
 function Merge-V7Hashtable {
