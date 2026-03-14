@@ -95,51 +95,51 @@ function Ensure-V7TelegramState {
         return $null
     }
 
-    if (-not $Status.Contains('telegram') -or -not ($Status['telegram'] -is [System.Collections.IDictionary])) {
+    if (-not (Test-V7HasProperty -InputObject $Status -Name 'telegram') -or -not ($Status['telegram'] -is [System.Collections.IDictionary])) {
         $Status['telegram'] = [ordered]@{}
     }
 
     $telegramState = $Status['telegram']
-    if (-not $telegramState.Contains('message_id') -or $null -eq $telegramState['message_id']) {
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'message_id') -or $null -eq $telegramState['message_id']) {
         $telegramState['message_id'] = ''
     }
-    if (-not $telegramState.Contains('status_segments') -or $null -eq $telegramState['status_segments']) {
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'status_segments') -or $null -eq $telegramState['status_segments']) {
         $telegramState['status_segments'] = @()
     }
-    if (-not $telegramState.Contains('current_message') -or $null -eq $telegramState['current_message']) {
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'current_message') -or $null -eq $telegramState['current_message']) {
         $telegramState['current_message'] = ''
     }
-    if (-not $telegramState.Contains('last_text') -or $null -eq $telegramState['last_text']) {
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'last_text') -or $null -eq $telegramState['last_text']) {
         $telegramState['last_text'] = ''
     }
-    if (-not $telegramState.Contains('last_delivery') -or $null -eq $telegramState['last_delivery']) {
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'last_delivery') -or $null -eq $telegramState['last_delivery']) {
         $telegramState['last_delivery'] = ''
     }
-    if (-not $telegramState.Contains('fallback_count') -or $null -eq $telegramState['fallback_count']) {
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'fallback_count') -or $null -eq $telegramState['fallback_count']) {
         $telegramState['fallback_count'] = 0
     }
-    if (-not $telegramState.Contains('worker_lines') -or $null -eq $telegramState['worker_lines']) {
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'worker_lines') -or $null -eq $telegramState['worker_lines']) {
         $telegramState['worker_lines'] = @()
     }
-    if (-not $telegramState.Contains('workers') -or -not ($telegramState['workers'] -is [System.Collections.IDictionary])) {
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'workers') -or -not ($telegramState['workers'] -is [System.Collections.IDictionary])) {
         $telegramState['workers'] = [ordered]@{}
     }
-    if (-not $telegramState.Contains('item_order') -or $null -eq $telegramState['item_order']) {
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'item_order') -or $null -eq $telegramState['item_order']) {
         $telegramState['item_order'] = @()
     }
-    if (-not $telegramState.Contains('section_label') -or $null -eq $telegramState['section_label']) {
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'section_label') -or $null -eq $telegramState['section_label']) {
         $telegramState['section_label'] = ''
     }
-    if (-not $telegramState.Contains('result_lines') -or $null -eq $telegramState['result_lines']) {
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'result_lines') -or $null -eq $telegramState['result_lines']) {
         $telegramState['result_lines'] = @()
     }
-    if (-not $telegramState.Contains('include_result_header') -or $null -eq $telegramState['include_result_header']) {
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'include_result_header') -or $null -eq $telegramState['include_result_header']) {
         $telegramState['include_result_header'] = $false
     }
-    if (-not $telegramState.Contains('title_override') -or $null -eq $telegramState['title_override']) {
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'title_override') -or $null -eq $telegramState['title_override']) {
         $telegramState['title_override'] = ''
     }
-    if (-not $telegramState.Contains('start_time') -or $null -eq $telegramState['start_time']) {
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'start_time') -or $null -eq $telegramState['start_time']) {
         $telegramState['start_time'] = ''
     }
     return $telegramState
@@ -155,19 +155,19 @@ function Get-V7TelegramDisplayTitle {
     $resolvedTaskId = ''
     if (-not [string]::IsNullOrWhiteSpace($TaskId)) {
         $resolvedTaskId = $TaskId
-    } elseif ($Status -and $Status.Contains('task_id') -and -not [string]::IsNullOrWhiteSpace([string]$Status['task_id'])) {
+    } elseif ($Status -and (Test-V7HasProperty -InputObject $Status -Name 'task_id') -and -not [string]::IsNullOrWhiteSpace([string]$Status['task_id'])) {
         $resolvedTaskId = [string]$Status['task_id']
     }
 
     $resolvedWorkflow = ''
     if (-not [string]::IsNullOrWhiteSpace($Workflow)) {
         $resolvedWorkflow = $Workflow
-    } elseif ($Status -and $Status.Contains('workflow') -and -not [string]::IsNullOrWhiteSpace([string]$Status['workflow'])) {
+    } elseif ($Status -and (Test-V7HasProperty -InputObject $Status -Name 'workflow') -and -not [string]::IsNullOrWhiteSpace([string]$Status['workflow'])) {
         $resolvedWorkflow = [string]$Status['workflow']
     }
 
     $resolvedPage = $resolvedTaskId
-    if ($Status -and $Status.Contains('page') -and -not [string]::IsNullOrWhiteSpace([string]$Status['page'])) {
+    if ($Status -and (Test-V7HasProperty -InputObject $Status -Name 'page') -and -not [string]::IsNullOrWhiteSpace([string]$Status['page'])) {
         $resolvedPage = [string]$Status['page']
     }
 
@@ -184,7 +184,7 @@ function Get-V7TelegramDisplayTitle {
 function Get-V7TelegramDurationText {
     param([hashtable]$Status)
 
-    if ($null -eq $Status -or -not $Status.Contains('started_at') -or [string]::IsNullOrWhiteSpace([string]$Status['started_at'])) {
+    if ($null -eq $Status -or -not (Test-V7HasProperty -InputObject $Status -Name 'started_at') -or [string]::IsNullOrWhiteSpace([string]$Status['started_at'])) {
         return 'n/a'
     }
 
@@ -202,10 +202,10 @@ function Get-V7TelegramCommitText {
     param([hashtable]$Status)
 
     $commit = ''
-    if ($Status -and $Status.Contains('git') -and $Status['git'] -is [System.Collections.IDictionary]) {
+    if ($Status -and (Test-V7HasProperty -InputObject $Status -Name 'git') -and $Status['git'] -is [System.Collections.IDictionary]) {
         $gitState = $Status['git']
         foreach ($key in @('merge_commit', 'writer_commit', 'base_commit')) {
-            if ($gitState.Contains($key) -and -not [string]::IsNullOrWhiteSpace([string]$gitState[$key])) {
+            if ((Test-V7HasProperty -InputObject $gitState -Name $key) -and -not [string]::IsNullOrWhiteSpace([string]$gitState[$key])) {
                 $commit = [string]$gitState[$key]
                 break
             }
@@ -302,7 +302,7 @@ function Get-V7TelegramValue {
     if ($null -eq $Object -or [string]::IsNullOrWhiteSpace($Name)) {
         return $null
     }
-    if ($Object -is [System.Collections.IDictionary] -and $Object.Contains($Name)) {
+    if ($Object -is [System.Collections.IDictionary] -and (Test-V7HasProperty -InputObject $Object -Name $Name)) {
         return $Object[$Name]
     }
 
@@ -319,12 +319,12 @@ function Get-V7CodeReviewProcessInfo {
         [string]$WorkerKey
     )
 
-    if ($null -eq $Status -or -not $Status.Contains('processes') -or -not ($Status['processes'] -is [System.Collections.IDictionary])) {
+    if ($null -eq $Status -or -not (Test-V7HasProperty -InputObject $Status -Name 'processes') -or -not ($Status['processes'] -is [System.Collections.IDictionary])) {
         return $null
     }
 
     $processes = $Status['processes']
-    if ($processes.Contains($WorkerKey)) {
+    if ((Test-V7HasProperty -InputObject $processes -Name $WorkerKey)) {
         return $processes[$WorkerKey]
     }
     return $null
@@ -460,7 +460,7 @@ function Get-V7TelegramWorkerEntry {
     )
 
     $telegramState = Ensure-V7TelegramState -Status $Status
-    if ($null -eq $telegramState -or -not $telegramState.Contains('worker_lines')) {
+    if ($null -eq $telegramState -or -not (Test-V7HasProperty -InputObject $telegramState -Name 'worker_lines')) {
         return $null
     }
 
@@ -514,20 +514,20 @@ function Set-V7TelegramWorkerLine {
     if (-not [string]::IsNullOrWhiteSpace($State)) {
         $entry['state'] = $State
     }
-    if ($PSBoundParameters.Contains('Text')) {
+    if ((Test-V7HasProperty -InputObject $PSBoundParameters -Name 'Text')) {
         $entry['text'] = if ([string]::IsNullOrWhiteSpace($Text)) { '' } else { $Text.Trim() }
     }
-    if ($PSBoundParameters.Contains('StartedAt')) {
+    if ((Test-V7HasProperty -InputObject $PSBoundParameters -Name 'StartedAt')) {
         $entry['started_at'] = if ([string]::IsNullOrWhiteSpace($StartedAt)) { '' } else { $StartedAt }
     }
-    if ($PSBoundParameters.Contains('EndedAt')) {
+    if ((Test-V7HasProperty -InputObject $PSBoundParameters -Name 'EndedAt')) {
         $entry['ended_at'] = if ([string]::IsNullOrWhiteSpace($EndedAt)) { '' } else { $EndedAt }
     }
 
     $updated += $entry
     $telegramState['worker_lines'] = @(
         $updated | Sort-Object {
-            if ($_ -is [System.Collections.IDictionary] -and $_.Contains('sort_order')) {
+            if ($_ -is [System.Collections.IDictionary] -and (Test-V7HasProperty -InputObject $_ -Name 'sort_order')) {
                 [int]$_['sort_order']
             } else {
                 99
@@ -626,7 +626,7 @@ function Get-V7TelegramWorkerErrorText {
     }
 
     $logsDir = ''
-    if ($Status -and $Status.Contains('paths') -and $Status['paths'] -is [System.Collections.IDictionary] -and $Status['paths'].Contains('logs_dir')) {
+    if ($Status -and (Test-V7HasProperty -InputObject $Status -Name 'paths') -and $Status['paths'] -is [System.Collections.IDictionary] -and (Test-V7HasProperty -InputObject $Status['paths'] -Name 'logs_dir')) {
         $logsDir = [string]$Status['paths']['logs_dir']
     }
     if (-not [string]::IsNullOrWhiteSpace($logsDir)) {
@@ -810,8 +810,8 @@ function Get-V7TelegramWorkflowSpec {
         [hashtable]$Status
     )
 
-    $page = if ($Status -and $Status.Contains('page')) { [string]$Status['page'] } else { '' }
-    $topic = if ($Status -and $Status.Contains('topic')) { [string]$Status['topic'] } else { '' }
+    $page = if ($Status -and (Test-V7HasProperty -InputObject $Status -Name 'page')) { [string]$Status['page'] } else { '' }
+    $topic = if ($Status -and (Test-V7HasProperty -InputObject $Status -Name 'topic')) { [string]$Status['topic'] } else { '' }
 
         $normalizedWorkflow = if ([string]::IsNullOrWhiteSpace($Workflow)) { '' } else { $Workflow.ToLowerInvariant() }
     switch ($normalizedWorkflow) {
@@ -907,7 +907,7 @@ function Ensure-V7TelegramWorkflowLayout {
     $telegramState['section_label'] = [string]$spec.section_label
     $telegramState['include_result_header'] = [bool]$spec.include_result_header
     if ([string]::IsNullOrWhiteSpace([string]$telegramState['start_time'])) {
-        $telegramState['start_time'] = if ($Status -and $Status.Contains('started_at')) { [string]$Status['started_at'] } else { '' }
+        $telegramState['start_time'] = if ($Status -and (Test-V7HasProperty -InputObject $Status -Name 'started_at')) { [string]$Status['started_at'] } else { '' }
     }
 
     foreach ($item in @($spec.items)) {
@@ -917,7 +917,7 @@ function Ensure-V7TelegramWorkflowLayout {
             Set-V7TelegramWorkerLine -Status $Status -WorkerKey $key -State 'WAITING' -Text ([string]$item.waiting) -StartedAt '' -EndedAt ''
             $entry = Get-V7TelegramWorkerEntry -Status $Status -WorkerKey $key
         }
-        if ($entry -and $entry.Contains('name')) {
+        if ($entry -and (Test-V7HasProperty -InputObject $entry -Name 'name')) {
             $entry['name'] = [string]$item.label
         }
     }
@@ -1297,7 +1297,7 @@ function New-V7GenericTelegramMessageText {
     $arrow = [string][char]0x2192
     $hourglass = [string][char]0x23F3
     $segments = @()
-    if ($telegramState -and $telegramState.Contains('status_segments') -and $null -ne $telegramState['status_segments']) {
+    if ($telegramState -and (Test-V7HasProperty -InputObject $telegramState -Name 'status_segments') -and $null -ne $telegramState['status_segments']) {
         $segments = @($telegramState['status_segments'])
     }
 
@@ -1318,7 +1318,7 @@ function New-V7GenericTelegramMessageText {
         if ($normalizedState -eq 'FAILED' -and -not [string]::IsNullOrWhiteSpace($Message)) {
             $lines += ('Error: ' + $Message.Trim())
         }
-    } elseif ($telegramState -and $telegramState.Contains('current_message')) {
+    } elseif ($telegramState -and (Test-V7HasProperty -InputObject $telegramState -Name 'current_message')) {
         $currentMessage = [string]$telegramState['current_message']
         if (-not [string]::IsNullOrWhiteSpace($currentMessage)) {
             $titleText = if ([string]::IsNullOrWhiteSpace($title)) { '' } else { $title.Trim() }
@@ -1342,11 +1342,11 @@ function New-V7CodeReviewTelegramMessageText {
     $telegramState = Ensure-V7TelegramState -Status $Status
     $title = Get-V7TelegramDisplayTitle -Status $Status -TaskId $TaskId -Workflow $Workflow
     $segments = @()
-    if ($telegramState -and $telegramState.Contains('status_segments') -and $null -ne $telegramState['status_segments']) {
+    if ($telegramState -and (Test-V7HasProperty -InputObject $telegramState -Name 'status_segments') -and $null -ne $telegramState['status_segments']) {
         $segments = @($telegramState['status_segments'])
     }
     $workerEntries = @()
-    if ($telegramState -and $telegramState.Contains('worker_lines') -and $null -ne $telegramState['worker_lines']) {
+    if ($telegramState -and (Test-V7HasProperty -InputObject $telegramState -Name 'worker_lines') -and $null -ne $telegramState['worker_lines']) {
         $workerEntries = @($telegramState['worker_lines'] | Where-Object { $_ -is [System.Collections.IDictionary] })
     }
 
@@ -1399,9 +1399,9 @@ function New-V7CodeReviewTelegramMessageText {
     }
 
     foreach ($entry in $workerEntries) {
-        $workerName = if ($entry.Contains('name')) { [string]$entry['name'] } else { [string]$entry['key'] }
-        $workerState = if ($entry.Contains('state')) { [string]$entry['state'] } else { '' }
-        $workerText = if ($entry.Contains('text')) { [string]$entry['text'] } else { '' }
+        $workerName = if ((Test-V7HasProperty -InputObject $entry -Name 'name')) { [string]$entry['name'] } else { [string]$entry['key'] }
+        $workerState = if ((Test-V7HasProperty -InputObject $entry -Name 'state')) { [string]$entry['state'] } else { '' }
+        $workerText = if ((Test-V7HasProperty -InputObject $entry -Name 'text')) { [string]$entry['text'] } else { '' }
         if ([string]::IsNullOrWhiteSpace($workerText)) {
             switch ($workerState) {
                 'running' { $workerText = 'started...' }
@@ -1427,7 +1427,7 @@ function New-V7TelegramMessageText {
     )
 
     $resolvedWorkflow = $Workflow
-    if ([string]::IsNullOrWhiteSpace($resolvedWorkflow) -and $Status -and $Status.Contains('workflow')) {
+    if ([string]::IsNullOrWhiteSpace($resolvedWorkflow) -and $Status -and (Test-V7HasProperty -InputObject $Status -Name 'workflow')) {
         $resolvedWorkflow = [string]$Status['workflow']
     }
     $normalizedWorkflow = if ([string]::IsNullOrWhiteSpace($resolvedWorkflow)) { '' } else { $resolvedWorkflow.Trim().ToLowerInvariant() }
@@ -1472,7 +1472,7 @@ function Invoke-V7TelegramScript {
     }
 
     $previousMessageId = ''
-    if ($telegramState -and $telegramState.Contains('message_id') -and -not [string]::IsNullOrWhiteSpace([string]$telegramState['message_id'])) {
+    if ($telegramState -and (Test-V7HasProperty -InputObject $telegramState -Name 'message_id') -and -not [string]::IsNullOrWhiteSpace([string]$telegramState['message_id'])) {
         $previousMessageId = [string]$telegramState['message_id']
     }
 
@@ -1807,7 +1807,7 @@ try {
     $localRunRoot = Ensure-V7Directory -Path $config.pipeline.local_run_root
     $parts = Get-V7TaskParts -TaskFile $TaskFile
     $meta = $parts.metadata
-    $workflow = if ($TaskType) { $TaskType } elseif ($meta.Contains('type')) { $meta['type'] } else { 'code-review' }
+    $workflow = if ($TaskType) { $TaskType } elseif ((Test-V7HasProperty -InputObject $meta -Name 'type')) { $meta['type'] } else { 'code-review' }
     if ([string]::IsNullOrWhiteSpace([string]$workflow)) {
         $workflow = 'code-review'
     } else {
@@ -1817,14 +1817,14 @@ try {
         'bugfix' { $workflow = 'code-review' }
         'feature' { $workflow = 'code-review' }
     }
-    $taskPage = if ($TaskPage) { $TaskPage } elseif ($meta.Contains('page')) { $meta['page'] } else { '' }
-    $taskTopic = if ($TaskTopic) { $TaskTopic } elseif ($meta.Contains('topic')) { $meta['topic'] } else { '' }
-    $budgetSource = if ($TaskBudget) { $TaskBudget } elseif ($meta.Contains('budget')) { $meta['budget'] } else { '10' }
+    $taskPage = if ($TaskPage) { $TaskPage } elseif ((Test-V7HasProperty -InputObject $meta -Name 'page')) { $meta['page'] } else { '' }
+    $taskTopic = if ($TaskTopic) { $TaskTopic } elseif ((Test-V7HasProperty -InputObject $meta -Name 'topic')) { $meta['topic'] } else { '' }
+    $budgetSource = if ($TaskBudget) { $TaskBudget } elseif ((Test-V7HasProperty -InputObject $meta -Name 'budget')) { $meta['budget'] } else { '10' }
     $taskBudget = ($budgetSource -replace '[$"'']', '').Trim()
     if ([string]::IsNullOrWhiteSpace($taskBudget)) {
         $taskBudget = '10'
     }
-    $taskAgent = if ($TaskAgent) { $TaskAgent } elseif ($meta.Contains('agent')) { $meta['agent'] } else { '' }
+    $taskAgent = if ($TaskAgent) { $TaskAgent } elseif ((Test-V7HasProperty -InputObject $meta -Name 'agent')) { $meta['agent'] } else { '' }
 
     if (-not $TaskId) {
         $stem = [System.IO.Path]::GetFileNameWithoutExtension($TaskFile)
@@ -2119,7 +2119,7 @@ try {
             $uxDiscussionExitOk = $null -eq $uxDiscussionResultExitCode -or "$uxDiscussionResultExitCode" -eq '' -or [int]$uxDiscussionResultExitCode -eq 0
             if ($uxDiscussionCompleted -and $uxDiscussionExitOk) {
                 $uxDiscussionOk = $true
-                if (-not $status.processes.Contains('ux-discussion')) {
+                if (-not (Test-V7HasProperty -InputObject $status.processes -Name 'ux-discussion')) {
                     $status.processes['ux-discussion'] = [ordered]@{}
                 }
                 $status.processes['ux-discussion'].state = 'completed'

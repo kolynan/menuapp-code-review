@@ -29,6 +29,27 @@ function Get-V7DefaultConfig {
     }
 }
 
+function Test-V7HasProperty {
+    param(
+        [Parameter(Mandatory = $true)]$InputObject,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    if ($null -eq $InputObject -or [string]::IsNullOrWhiteSpace($Name)) {
+        return $false
+    }
+    if ($InputObject -is [hashtable]) {
+        return $InputObject.Contains($Name)
+    }
+    if ($InputObject -is [System.Collections.Specialized.OrderedDictionary]) {
+        return $InputObject.Contains($Name)
+    }
+    if ($InputObject -is [System.Collections.IDictionary]) {
+        return $InputObject.Contains($Name)
+    }
+    return ($null -ne $InputObject.PSObject -and $InputObject.PSObject.Properties.Name -contains $Name)
+}
+
 function Merge-V7Hashtable {
     param(
         [System.Collections.IDictionary]$Base,
@@ -38,7 +59,7 @@ function Merge-V7Hashtable {
     foreach ($key in $Override.Keys) {
         $overrideValue = $Override[$key]
         $baseValue = $Base[$key]
-        if ($Base.Contains($key) -and $baseValue -is [System.Collections.IDictionary] -and $overrideValue -is [System.Collections.IDictionary]) {
+        if ((Test-V7HasProperty -InputObject $Base -Name $key) -and $baseValue -is [System.Collections.IDictionary] -and $overrideValue -is [System.Collections.IDictionary]) {
             Merge-V7Hashtable -Base $baseValue -Override $overrideValue
             continue
         }
@@ -358,7 +379,7 @@ function Get-V7TaskParts {
             $body = $content.Substring($match.Length)
             foreach ($line in ($frontmatter -split "`r?`n")) {
                 $trimmed = $line.Trim()
-                if (-not $trimmed -or $trimmed.StartsWith("#") -or -not $trimmed.Contains(":")) {
+                if (-not $trimmed -or $trimmed.StartsWith("#") -or ($trimmed.IndexOf(":") -lt 0)) {
                     continue
                 }
                 $parts = $trimmed.Split(":", 2)
@@ -415,7 +436,7 @@ function Get-V7TaskImages {
         }
     }
 
-    if ($Metadata.Contains("images")) {
+    if ((Test-V7HasProperty -InputObject $Metadata -Name "images")) {
         foreach ($item in ($Metadata["images"] -split ",")) {
             $resolved = Resolve-V7Path -BasePath $TaskDir -Candidate $item.Trim()
             if ($resolved) {
@@ -928,7 +949,7 @@ function Invoke-V7CommandToFiles {
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
 
-    $hasInput = $PSBoundParameters.Contains('InputText') -and $null -ne $InputText
+    $hasInput = (Test-V7HasProperty -InputObject $PSBoundParameters -Name 'InputText') -and $null -ne $InputText
     $psi.RedirectStandardInput = $hasInput
 
     $process = New-Object System.Diagnostics.Process
@@ -1086,21 +1107,21 @@ function Get-V7TelegramSettings {
     )
 
     $telegramConfig = $null
-    if ($Config.Contains('telegram') -and $Config['telegram'] -is [System.Collections.IDictionary]) {
+    if ((Test-V7HasProperty -InputObject $Config -Name 'telegram') -and $Config['telegram'] -is [System.Collections.IDictionary]) {
         $telegramConfig = $Config['telegram']
     }
 
     $botToken = ''
-    if ($telegramConfig -and $telegramConfig.Contains('bot_token') -and -not [string]::IsNullOrWhiteSpace([string]$telegramConfig['bot_token'])) {
+    if ($telegramConfig -and (Test-V7HasProperty -InputObject $telegramConfig -Name 'bot_token') -and -not [string]::IsNullOrWhiteSpace([string]$telegramConfig['bot_token'])) {
         $botToken = [string]$telegramConfig['bot_token']
-    } elseif ($Config.Contains('telegram_bot_token') -and -not [string]::IsNullOrWhiteSpace([string]$Config['telegram_bot_token'])) {
+    } elseif ((Test-V7HasProperty -InputObject $Config -Name 'telegram_bot_token') -and -not [string]::IsNullOrWhiteSpace([string]$Config['telegram_bot_token'])) {
         $botToken = [string]$Config['telegram_bot_token']
     }
 
     $chatId = ''
-    if ($telegramConfig -and $telegramConfig.Contains('chat_id') -and -not [string]::IsNullOrWhiteSpace([string]$telegramConfig['chat_id'])) {
+    if ($telegramConfig -and (Test-V7HasProperty -InputObject $telegramConfig -Name 'chat_id') -and -not [string]::IsNullOrWhiteSpace([string]$telegramConfig['chat_id'])) {
         $chatId = [string]$telegramConfig['chat_id']
-    } elseif ($Config.Contains('telegram_chat_id') -and -not [string]::IsNullOrWhiteSpace([string]$Config['telegram_chat_id'])) {
+    } elseif ((Test-V7HasProperty -InputObject $Config -Name 'telegram_chat_id') -and -not [string]::IsNullOrWhiteSpace([string]$Config['telegram_chat_id'])) {
         $chatId = [string]$Config['telegram_chat_id']
     }
 
@@ -1134,7 +1155,7 @@ function Invoke-V7TelegramApi {
         }
     }
 
-    if (-not $Payload.Contains('chat_id')) {
+    if (-not (Test-V7HasProperty -InputObject $Payload -Name 'chat_id')) {
         $Payload['chat_id'] = $chatId
     }
     $body = $Payload | ConvertTo-Json -Depth 10
@@ -1145,7 +1166,7 @@ function Invoke-V7TelegramApi {
         $messageId = ''
         if ($response -and $response.result -and $response.result.message_id) {
             $messageId = [string]$response.result.message_id
-        } elseif ($Payload.Contains('message_id') -and -not [string]::IsNullOrWhiteSpace([string]$Payload['message_id'])) {
+        } elseif ((Test-V7HasProperty -InputObject $Payload -Name 'message_id') -and -not [string]::IsNullOrWhiteSpace([string]$Payload['message_id'])) {
             $messageId = [string]$Payload['message_id']
         }
         return [ordered]@{
