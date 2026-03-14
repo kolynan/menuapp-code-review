@@ -2110,10 +2110,31 @@ try {
         Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'RUNNING' -Message 'Claude + Codex + Claude synthesis' -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram UX discussion notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
 
         $uxDiscussionOk = Invoke-V7Stage -ScriptPath (Join-Path $workerRoot 'Invoke-UxDiscussion.ps1') -TaskJsonPath $taskJsonLocal -Name 'ux-discussion' -LogsDir $logsDir -TimeoutMinutes $uxTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -Workflow $workflow -ArtifactsDir $artifactsDir -Mode ''
-        if (-not $uxDiscussionOk) { throw 'UX discussion workflow failed' }
-
         $uxDiscussionResultPath = Join-Path $artifactsDir 'ux-discussion.result.json'
         $uxDiscussionResult = Read-V7Json -Path $uxDiscussionResultPath
+        if (-not $uxDiscussionOk -and $uxDiscussionResult) {
+            $uxDiscussionResultStatus = Get-V7StateText -Object $uxDiscussionResult -Name 'status'
+            $uxDiscussionResultExitCode = Get-V7StateValue -Object $uxDiscussionResult -Name 'exit_code' -Default $null
+            $uxDiscussionCompleted = $uxDiscussionResultStatus -eq 'completed'
+            $uxDiscussionExitOk = $null -eq $uxDiscussionResultExitCode -or "$uxDiscussionResultExitCode" -eq '' -or [int]$uxDiscussionResultExitCode -eq 0
+            if ($uxDiscussionCompleted -and $uxDiscussionExitOk) {
+                $uxDiscussionOk = $true
+                if (-not $status.processes.Contains('ux-discussion')) {
+                    $status.processes['ux-discussion'] = [ordered]@{}
+                }
+                $status.processes['ux-discussion'].state = 'completed'
+                if ($null -ne $uxDiscussionResultExitCode -and "$uxDiscussionResultExitCode" -ne '') {
+                    $status.processes['ux-discussion']['exit_code'] = $uxDiscussionResultExitCode
+                }
+                $uxDiscussionEndedAt = Get-V7StateText -Object $status.processes['ux-discussion'] -Name 'ended_at'
+                if ([string]::IsNullOrWhiteSpace($uxDiscussionEndedAt)) {
+                    $status.processes['ux-discussion']['ended_at'] = Get-V7Timestamp
+                }
+                Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'UX discussion marked successful from result.json fallback' -Data @{ result_path = $uxDiscussionResultPath; status = $uxDiscussionResultStatus; exit_code = $uxDiscussionResultExitCode }
+            }
+        }
+        if (-not $uxDiscussionOk) { throw 'UX discussion workflow failed' }
+
         if ($uxDiscussionResult) {
             $uxMergeCommit = Get-V7StateText -Object $uxDiscussionResult -Name 'merge_commit'
             if (-not [string]::IsNullOrWhiteSpace($uxMergeCommit)) {
