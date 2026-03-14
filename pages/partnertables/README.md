@@ -30,6 +30,7 @@ session: 52
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 260314-00 | 2026-03-14 | S123: Code quality cleanup — unused imports / JSDoc |
 | 260301-00 | 2026-03-01 | Phase 1v2 CC+Codex: zone overflow menu, reorder 48px, 8px spacing |
 | 260228-01 | 2026-02-28 | Phase 1 Touch Targets: 6 fixes, all interactive elements >= 44x44px |
 | 260228-00 | 2026-02-28 | Fix D01 (console.error dev-gate) + D02 (confirm i18n key) |
