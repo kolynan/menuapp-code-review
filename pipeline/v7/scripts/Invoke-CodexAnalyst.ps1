@@ -50,9 +50,9 @@ $args = @('exec', '-C', $task.paths.repo_root, '--full-auto', '--json', '-o', $r
 foreach ($imagePath in $task.task.images) {
     $args += @('--image', [string]$imagePath)
 }
-$args += '-'
+`$args += `$prompt
 $startedAt = Get-V7Timestamp
-$exitCode = Invoke-V7CommandToFiles -CommandPrefix $codexPrefix -Arguments $args -WorkingDirectory $task.paths.repo_root -StdOutPath $stdoutPath -StdErrPath $stderrPath -InputText $prompt
+$exitCode = Invoke-V7CommandToFiles -CommandPrefix $codexPrefix -Arguments $args -WorkingDirectory $task.paths.repo_root -StdOutPath $stdoutPath -StdErrPath $stderrPath
 $endedAt = Get-V7Timestamp
 
 $result = [ordered]@{

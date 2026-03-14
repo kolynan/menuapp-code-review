@@ -13,6 +13,9 @@ param(
 $commonPath = Join-Path $PSScriptRoot 'V7.Common.ps1'
 . $commonPath
 $script:SupervisorStepCounter = 0
+$script:V7UxRound1Key = 'ux_' + 'round1'
+$script:V7UxRound2Key = 'ux_' + 'round2'
+$script:V7UxRound3Key = 'ux_' + 'round3'
 
 function New-StageSummary {
     param([string]$TaskId, [string]$Workflow, [string]$State, [string]$Message)
@@ -48,6 +51,9 @@ function Write-SupervisorStepLog {
 
     if ($null -eq $script:SupervisorStepCounter) {
         $script:SupervisorStepCounter = 0
+$script:V7UxRound1Key = 'ux_' + 'round1'
+$script:V7UxRound2Key = 'ux_' + 'round2'
+$script:V7UxRound3Key = 'ux_' + 'round3'
     }
     $script:SupervisorStepCounter++
 
@@ -811,9 +817,9 @@ function Get-V7TelegramWorkflowSpec {
                 section_label = 'Rounds'
                 include_result_header = $false
                 items = @(
-                    [ordered]@{ key = 'ux_round1'; label = 'Round 1 (CC)'; waiting = 'waiting' },
-                    [ordered]@{ key = 'ux_round2'; label = 'Round 2 (Codex)'; waiting = 'waiting' },
-                    [ordered]@{ key = 'ux_round3'; label = 'Round 3 (Synthesis)'; waiting = 'waiting' }
+                    [ordered]@{ key = $script:V7UxRound1Key; label = 'Round 1 (CC)'; waiting = 'waiting' },
+                    [ordered]@{ key = $script:V7UxRound2Key; label = 'Round 2 (Codex)'; waiting = 'waiting' },
+                    [ordered]@{ key = $script:V7UxRound3Key; label = 'Round 3 (Synthesis)'; waiting = 'waiting' }
                 )
             }
         }
@@ -1081,39 +1087,39 @@ function Update-V7TelegramUxDiscussionStateFromArtifacts {
 
     if ($round1) {
         $text = if (-not [string]::IsNullOrWhiteSpace((Get-V7TelegramDurationBetween -StartedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'ended_at'))))) { (Get-V7TelegramDurationBetween -StartedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'ended_at'))) } else { '' }
-        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round1' -State 'OK' -Text $text -StartedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'ended_at'))
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey $script:V7UxRound1Key -State 'OK' -Text $text -StartedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'ended_at'))
     } elseif ($uxProcess -and ([string](Get-V7TelegramValue -Object $uxProcess -Name 'state')) -eq 'running') {
-        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round1' -State 'RUNNING' -Text '' -StartedAt ([string](Get-V7TelegramValue -Object $uxProcess -Name 'started_at')) -EndedAt ''
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey $script:V7UxRound1Key -State 'RUNNING' -Text '' -StartedAt ([string](Get-V7TelegramValue -Object $uxProcess -Name 'started_at')) -EndedAt ''
     } elseif ($uxProcess -and ([string](Get-V7TelegramValue -Object $uxProcess -Name 'state')) -eq 'failed') {
-        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round1' -State 'FAILED' -Text (Get-V7TelegramReasonText -Text $ErrorMessage) -StartedAt ([string](Get-V7TelegramValue -Object $uxProcess -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $uxProcess -Name 'ended_at'))
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey $script:V7UxRound1Key -State 'FAILED' -Text (Get-V7TelegramReasonText -Text $ErrorMessage) -StartedAt ([string](Get-V7TelegramValue -Object $uxProcess -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $uxProcess -Name 'ended_at'))
     }
 
     if ($round2) {
         $text = Get-V7TelegramDurationBetween -StartedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'ended_at'))
-        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round2' -State 'OK' -Text $text -StartedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'ended_at'))
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey $script:V7UxRound2Key -State 'OK' -Text $text -StartedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'ended_at'))
     } elseif ($round1 -and $uxProcess -and ([string](Get-V7TelegramValue -Object $uxProcess -Name 'state')) -eq 'running') {
-        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round2' -State 'RUNNING' -Text '' -StartedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'ended_at')) -EndedAt ''
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey $script:V7UxRound2Key -State 'RUNNING' -Text '' -StartedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'ended_at')) -EndedAt ''
     } elseif ($round1 -and $uxProcess -and ([string](Get-V7TelegramValue -Object $uxProcess -Name 'state')) -eq 'failed') {
-        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round2' -State 'FAILED' -Text (Get-V7TelegramReasonText -Text $ErrorMessage) -StartedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'ended_at')) -EndedAt ([string](Get-V7TelegramValue -Object $uxProcess -Name 'ended_at'))
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey $script:V7UxRound2Key -State 'FAILED' -Text (Get-V7TelegramReasonText -Text $ErrorMessage) -StartedAt ([string](Get-V7TelegramValue -Object $round1 -Name 'ended_at')) -EndedAt ([string](Get-V7TelegramValue -Object $uxProcess -Name 'ended_at'))
     } else {
-        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round2' -State 'WAITING' -Text 'waiting' -StartedAt '' -EndedAt ''
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey $script:V7UxRound2Key -State 'WAITING' -Text 'waiting' -StartedAt '' -EndedAt ''
     }
 
     if ($round3) {
         $text = Get-V7TelegramDurationBetween -StartedAt ([string](Get-V7TelegramValue -Object $round3 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round3 -Name 'ended_at'))
-        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round3' -State 'OK' -Text $text -StartedAt ([string](Get-V7TelegramValue -Object $round3 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round3 -Name 'ended_at'))
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey $script:V7UxRound3Key -State 'OK' -Text $text -StartedAt ([string](Get-V7TelegramValue -Object $round3 -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $round3 -Name 'ended_at'))
     } elseif ($round2 -and $uxProcess -and ([string](Get-V7TelegramValue -Object $uxProcess -Name 'state')) -eq 'running') {
-        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round3' -State 'RUNNING' -Text '' -StartedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'ended_at')) -EndedAt ''
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey $script:V7UxRound3Key -State 'RUNNING' -Text '' -StartedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'ended_at')) -EndedAt ''
     } elseif ($round2 -and $uxProcess -and ([string](Get-V7TelegramValue -Object $uxProcess -Name 'state')) -eq 'failed') {
-        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round3' -State 'FAILED' -Text (Get-V7TelegramReasonText -Text $ErrorMessage) -StartedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'ended_at')) -EndedAt ([string](Get-V7TelegramValue -Object $uxProcess -Name 'ended_at'))
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey $script:V7UxRound3Key -State 'FAILED' -Text (Get-V7TelegramReasonText -Text $ErrorMessage) -StartedAt ([string](Get-V7TelegramValue -Object $round2 -Name 'ended_at')) -EndedAt ([string](Get-V7TelegramValue -Object $uxProcess -Name 'ended_at'))
     } else {
-        Set-V7TelegramWorkerLine -Status $Status -WorkerKey 'ux_round3' -State 'WAITING' -Text 'waiting' -StartedAt '' -EndedAt ''
+        Set-V7TelegramWorkerLine -Status $Status -WorkerKey $script:V7UxRound3Key -State 'WAITING' -Text 'waiting' -StartedAt '' -EndedAt ''
     }
 
     if ($OverallState -eq 'DONE') {
         Set-V7TelegramResultLines -Status $Status -Lines @('DONE')
     } elseif ($OverallState -eq 'FAILED') {
-        foreach ($key in @('ux_round1', 'ux_round2', 'ux_round3')) {
+        foreach ($key in @($script:V7UxRound1Key, $script:V7UxRound2Key, $script:V7UxRound3Key)) {
             $entry = Get-V7TelegramWorkerEntry -Status $Status -WorkerKey $key
             if ($entry -and ([string]$entry['state']).ToUpperInvariant() -eq 'WAITING') {
                 Set-V7TelegramWorkerLine -Status $Status -WorkerKey $key -State 'SKIPPED' -Text 'not started' -StartedAt ([string]$entry['started_at']) -EndedAt ([string]$entry['ended_at'])

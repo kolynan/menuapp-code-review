@@ -90,10 +90,10 @@ function Invoke-UxCodexRound {
             $args += @('--image', [string]$imagePath)
         }
     }
-    $args += '-'
+    `$args += `$Prompt
 
     $startedAt = Get-V7Timestamp
-    $exitCode = Invoke-V7CommandToFiles -CommandPrefix $CodexPrefix -Arguments $args -WorkingDirectory $WorkingDirectory -StdOutPath $StdoutPath -StdErrPath $StderrPath -InputText $Prompt
+    $exitCode = Invoke-V7CommandToFiles -CommandPrefix $CodexPrefix -Arguments $args -WorkingDirectory $WorkingDirectory -StdOutPath $StdoutPath -StdErrPath $StderrPath
     $endedAt = Get-V7Timestamp
 
     $result = [ordered]@{
