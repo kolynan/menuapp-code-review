@@ -669,11 +669,13 @@ function Invoke-V7CapturedCommand {
 
     try {
         $exitCode = Invoke-V7CommandToFiles -CommandPrefix $CommandPrefix -Arguments $Arguments -WorkingDirectory $WorkingDirectory -StdOutPath $stdoutPath -StdErrPath $stderrPath -InputText $InputText
+        $normalizedExitCode = Get-V7NormalizedExitCode $exitCode
         $stdout = if (Test-Path -LiteralPath $stdoutPath) { (Read-V7TextFile -Path $stdoutPath).TrimEnd([char[]]"`r`n") } else { '' }
         $stderr = if (Test-Path -LiteralPath $stderrPath) { (Read-V7TextFile -Path $stderrPath).TrimEnd([char[]]"`r`n") } else { '' }
 
         return [ordered]@{
-            exit_code = (Get-V7NormalizedExitCode $exitCode)
+            # stderr can contain informational output; the process exit code is authoritative.
+            exit_code = $normalizedExitCode
             stdout = $stdout
             stderr = $stderr
         }
@@ -692,6 +694,8 @@ function Invoke-V7Git {
     )
 
     $result = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments (@('-C', $RepoRoot) + $Arguments) -WorkingDirectory $RepoRoot
+    # Git writes progress and branch/worktree notices to stderr on success, so only the exit code
+    # determines whether the command failed.
     if (-not (Test-V7ExitSuccess $result.exit_code)) {
         $details = @()
         if (-not [string]::IsNullOrWhiteSpace([string]$result.stderr)) {

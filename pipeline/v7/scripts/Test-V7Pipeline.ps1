@@ -206,6 +206,36 @@ try {
         Assert-V7True -Value $threw -Message 'Invoke-V7Git should throw on invalid git commands.'
     }
 
+    Invoke-V7TestCase -Name 'Invoke-V7CapturedCommand allows stderr when exit code is 0' -Action {
+        $commandPrefix = @((Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'), '-NoProfile', '-Command')
+        $result = Invoke-V7CapturedCommand -CommandPrefix $commandPrefix -Arguments @("[Console]::Error.WriteLine('informational stderr'); Write-Output 'ok'; exit 0") -WorkingDirectory $repoRoot
+        Assert-V7Equal -Actual ([int]$result.exit_code) -Expected 0 -Message 'Captured command should normalize exit code 0.'
+        Assert-V7Equal -Actual ([string]$result.stdout) -Expected 'ok' -Message 'Captured command should preserve stdout on success.'
+        Assert-V7Equal -Actual ([string]$result.stderr) -Expected 'informational stderr' -Message 'Captured command should preserve stderr on success.'
+    }
+
+    Invoke-V7TestCase -Name 'Invoke-V7Git allows informational stderr from worktree add' -Action {
+        if (Test-Path -LiteralPath $worktreeRepoRoot) {
+            Remove-Item -LiteralPath $worktreeRepoRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Ensure-V7Directory -Path $worktreeRepoRoot | Out-Null
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('init') -FailureMessage 'Unable to initialize git stderr test repo' | Out-Null
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('config', 'user.email', 'v7-git-stderr-test@example.com') -FailureMessage 'Unable to configure git stderr test repo email' | Out-Null
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('config', 'user.name', 'V7 Git Stderr Test') -FailureMessage 'Unable to configure git stderr test repo user' | Out-Null
+        Write-V7TextFile -Path (Join-Path $worktreeRepoRoot 'README.md') -Content 'git stderr test'
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('add', 'README.md') -FailureMessage 'Unable to stage git stderr test file' | Out-Null
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('commit', '-m', 'initial git stderr test commit') -FailureMessage 'Unable to commit git stderr test file' | Out-Null
+        $baseCommit = Get-V7RepoHead -RepoRoot $worktreeRepoRoot
+        if (Test-Path -LiteralPath $worktreePath) {
+            Remove-Item -LiteralPath $worktreePath -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        $result = Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('worktree', 'add', '--force', '-B', $worktreeBranch, $worktreePath, $baseCommit) -FailureMessage 'Unable to create informational stderr worktree'
+        Assert-V7Equal -Actual ([int]$result.exit_code) -Expected 0 -Message 'git worktree add should succeed.'
+        Assert-V7True -Value (Test-Path -LiteralPath $worktreePath) -Message 'git worktree add should create the worktree path.'
+        Assert-V7True -Value (-not [string]::IsNullOrWhiteSpace([string]$result.stderr)) -Message 'git worktree add should surface informational stderr.'
+        Remove-V7Worktree -RepoRoot $worktreeRepoRoot -Path $worktreePath
+    }
+
     Invoke-V7TestCase -Name 'New-V7Worktree handles pre-existing branch and Remove-V7Worktree cleans it up' -Action {
         if (Test-Path -LiteralPath $worktreeRepoRoot) {
             Remove-Item -LiteralPath $worktreeRepoRoot -Recurse -Force -ErrorAction SilentlyContinue
