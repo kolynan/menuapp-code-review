@@ -59,3 +59,6 @@ session: 52
 4. Нет confirm dialog для деструктивных действий (кроме контактов)
 5. Нет валидации времени (close < open)
 6. Logo save state отличается от других секций
+
+## S128
+S128: Added JSDoc comments, minor cleanup (parallel-write smoke test)

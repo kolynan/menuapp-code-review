@@ -94,6 +94,8 @@ const DEFAULT_HOURS = {
 };
 
 // Dynamic constants (translation functions)
+
+/** @param {Function} t - i18n translation function */
 function getChannels(t) {
   return [
     { key: "hall", label: t("settings.channels.hall"), Icon: Store, description: t("settings.channels.hallDesc") },
@@ -102,6 +104,7 @@ function getChannels(t) {
   ];
 }
 
+/** @param {Function} t - i18n translation function */
 function getContactTypes(t) {
   return [
     { value: "phone", label: t("settings.contacts.types.phone"), Icon: Phone },
@@ -115,6 +118,7 @@ function getContactTypes(t) {
   ];
 }
 
+/** @param {Function} t - i18n translation function */
 function getWeekdays(t) {
   return [
     { key: "mon", label: t("settings.hours.weekdays.monShort"), full: t("settings.hours.weekdays.mon") },
@@ -127,6 +131,7 @@ function getWeekdays(t) {
   ];
 }
 
+/** @param {Function} t - i18n translation function */
 function getContactViewModes(t) {
   return [
     { value: "icons", label: t("settings.contacts.viewMode.iconsOnly"), Icon: Eye },
@@ -134,6 +139,7 @@ function getContactViewModes(t) {
   ];
 }
 
+/** @param {Function} t - i18n translation function */
 function getSectionTabs(t) {
   return [
     { id: "profile", label: t("settings.tabs.profile"), Icon: Building2 },
@@ -151,10 +157,12 @@ function getSectionTabs(t) {
    HELPERS
    ============================================================ */
 
+/** Normalize a value to a trimmed string, treating null/undefined as empty. */
 function normStr(s) {
   return (s ?? "").toString().trim();
 }
 
+/** Sort an array of objects by sort_order, then alphabetically by name/label. */
 function sortByOrder(arr) {
   return [...(arr || [])].sort((a, b) => {
     const ao = Number.isFinite(+a?.sort_order) ? +a.sort_order : 1e9;
@@ -164,12 +172,14 @@ function sortByOrder(arr) {
   });
 }
 
+/** Return the Lucide icon component for a given contact type. */
 function getContactIcon(type, t) {
   const CONTACT_TYPES = getContactTypes(t);
   const found = CONTACT_TYPES.find((ct) => ct.value === type);
   return found ? found.Icon : LinkIcon;
 }
 
+/** Parse a raw working_hours value (string or object) into a normalized weekday map. */
 function parseWorkingHours(raw) {
   const WEEKDAYS_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
   if (!raw || typeof raw === "string") {
@@ -193,6 +203,13 @@ function parseWorkingHours(raw) {
    DEBOUNCE HOOK (P1-2: исправленный с cleanup внутри)
    ============================================================ */
 
+/**
+ * Custom hook that returns a debounced version of the provided callback.
+ * Automatically cleans up pending timeouts on unmount.
+ * @param {Function} callback - Function to debounce
+ * @param {number} delay - Debounce delay in milliseconds
+ * @returns {Function} Debounced callback
+ */
 function useDebouncedCallback(callback, delay) {
   const timeoutRef = useRef(null);
   const callbackRef = useRef(callback);
@@ -225,12 +242,14 @@ function useDebouncedCallback(callback, delay) {
    API HELPERS (P1-1: проброс rate limit ошибок)
    ============================================================ */
 
+/** Check whether an error represents a rate-limit (429/503) response. */
 function isRateLimitError(error) {
   if (!error) return false;
   const msg = (error.message || error.toString() || "").toLowerCase();
   return msg.includes("rate limit") || msg.includes("429") || msg.includes("503");
 }
 
+/** Fetch the current authenticated user; re-throws rate-limit errors. */
 async function getUser() {
   try { 
     return await base44.auth.me(); 
@@ -241,6 +260,7 @@ async function getUser() {
   }
 }
 
+/** List records of the given entity filtered by partner ID. */
 async function listFor(entity, pid) {
   if (!pid) return [];
   try {
@@ -254,7 +274,7 @@ async function listFor(entity, pid) {
   }
 }
 
-// P0-1: Убран Partner.list() fallback — если нет pid, возвращаем null
+/** Load a single Partner record by ID; returns null if not found. */
 async function loadPartner(pid) {
   if (!pid) return null;
   try {
@@ -268,6 +288,7 @@ async function loadPartner(pid) {
   }
 }
 
+/** Load the first PartnerContacts record (settings) for a partner. */
 async function loadPartnerContacts(pid) {
   if (!pid) return null;
   try {
@@ -281,6 +302,7 @@ async function loadPartnerContacts(pid) {
   }
 }
 
+/** Load the first WiFiConfig record for a partner. */
 async function loadWifiConfig(pid) {
   if (!pid) return null;
   try {
@@ -293,18 +315,22 @@ async function loadWifiConfig(pid) {
   }
 }
 
+/** Create a new record in the given Base44 entity. */
 async function createRec(entity, data) {
   return await base44.entities[entity].create(data);
 }
 
+/** Update an existing record by ID in the given Base44 entity. */
 async function updateRec(entity, id, data) {
   return await base44.entities[entity].update(id, data);
 }
 
+/** Delete a record by ID from the given Base44 entity. */
 async function deleteRec(entity, id) {
   return await base44.entities[entity].delete(id);
 }
 
+/** Create a record in the given entity with partner ID injected. */
 async function createWithPartner(entity, data, pid) {
   return await createRec(entity, { ...data, partner: pid });
 }
@@ -313,10 +339,12 @@ async function createWithPartner(entity, data, pid) {
    TOAST HELPERS (P0-2: id = "mm1" — LOCKED)
    ============================================================ */
 
+/** Show a success toast notification with a fixed ID to prevent stacking. */
 function showToast(title) {
   toast.success(title, { id: "mm1", duration: 2500 });
 }
 
+/** Show an error toast notification with a fixed ID to prevent stacking. */
 function showError(title, description) {
   toast.error(description ? `${title}: ${description}` : title, { id: "mm1", duration: 4000 });
 }
@@ -325,6 +353,7 @@ function showError(title, description) {
    RATE LIMIT SCREEN
    ============================================================ */
 
+/** Full-screen prompt shown when the API returns a rate-limit error. */
 function RateLimitScreen({ onRetry, t }) {
   return (
     <div className="mx-auto max-w-md px-4 py-12">
@@ -347,6 +376,7 @@ function RateLimitScreen({ onRetry, t }) {
    NO PARTNER ACCESS SCREEN (P0-1: показываем если нет partner)
    ============================================================ */
 
+/** Screen displayed when the current user has no partner association. */
 function NoPartnerAccessScreen({ t }) {
   const handleLogin = () => {
     base44.auth.redirectToLogin(window.location.pathname + window.location.search);
@@ -372,6 +402,7 @@ function NoPartnerAccessScreen({ t }) {
    SECTION COMPONENTS
    ============================================================ */
 
+/** Section for editing restaurant name, address, logo, and map link. */
 function ProfileSection({ partner, setPartner, onSave, saving, saved, logoSaved, onLogoChange, apiReady, t }) {
   return (
     <div id="section-profile" className="rounded-xl border bg-white p-4 sm:p-6 space-y-4 scroll-mt-20">
@@ -464,6 +495,7 @@ function ProfileSection({ partner, setPartner, onSave, saving, saved, logoSaved,
   );
 }
 
+/** Section for configuring per-day working hours with debounced auto-save. */
 function WorkingHoursSection({ partner, onSave, saving, t }) {
   const WEEKDAYS = useMemo(() => getWeekdays(t), [t]);
   const [hours, setHours] = useState(() => parseWorkingHours(partner?.working_hours));
@@ -620,6 +652,7 @@ function WorkingHoursSection({ partner, onSave, saving, t }) {
   );
 }
 
+/** Section for toggling ordering channels (hall, pickup, delivery). */
 function ChannelsSection({ partner, onSave, saving, t }) {
   const CHANNELS = useMemo(() => getChannels(t), [t]);
   const [channels, setChannels] = useState({
@@ -695,7 +728,7 @@ function ChannelsSection({ partner, onSave, saving, t }) {
   );
 }
 
-// HallOrderingSection — Hall variant C (HALL-017) + Table Code Settings
+/** Section for hall ordering: guest code toggle and table code verification settings (HALL-017). */
 function HallOrderingSection({ partner, onSave, saving, t }) {
   const [guestCodeEnabled, setGuestCodeEnabled] = useState(!!partner?.hall_guest_code_enabled);
   const [codeLength, setCodeLength] = useState(partner?.table_code_length || 5);
@@ -876,7 +909,7 @@ function HallOrderingSection({ partner, onSave, saving, t }) {
   );
 }
 
-// WifiSection — Wi-Fi verification and plan display
+/** Section for Wi-Fi configuration (SSID, password, security type) and plan display. */
 function WifiSection({ partner, wifiConfig, onSave, saving, t }) {
   const [enabled, setEnabled] = useState(wifiConfig?.enabled ?? false);
   const [ssid, setSsid] = useState(wifiConfig?.ssid || "");
@@ -1068,6 +1101,7 @@ function WifiSection({ partner, wifiConfig, onSave, saving, t }) {
   );
 }
 
+/** Section for selecting default and enabled menu languages. */
 function LanguagesSection({ partner, onSave, saving, t }) {
   const [defaultLang, setDefaultLang] = useState(partner?.default_language || "RU");
   const [enabledLangs, setEnabledLangs] = useState(() => {
@@ -1176,6 +1210,7 @@ function LanguagesSection({ partner, onSave, saving, t }) {
   );
 }
 
+/** Section for managing currencies with exchange rates relative to the default. */
 function CurrenciesSection({ partner, onSave, saving, t }) {
   const [defaultCurrency, setDefaultCurrency] = useState(partner?.default_currency || "KZT");
   const [enabledCurrencies, setEnabledCurrencies] = useState(() => {
@@ -1352,7 +1387,8 @@ function CurrenciesSection({ partner, onSave, saving, t }) {
   );
 }
 
-function ContactsSection({ 
+/** Section for managing partner contact links with display-mode toggle and preview. */
+function ContactsSection({
   contacts, 
   contactSettings, 
   onAdd, 
@@ -1480,6 +1516,7 @@ function ContactsSection({
    SECTION NAVIGATION (P1-3: useMemo для стабилизации)
    ============================================================ */
 
+/** Sticky horizontal tab bar for scrolling between settings sections. */
 function SectionNav({ activeSection, t }) {
   // P1-3: useMemo для стабильного массива
   const SECTION_TABS = useMemo(() => getSectionTabs(t), [t]);
@@ -1615,6 +1652,12 @@ function SectionNav({ activeSection, t }) {
    MAIN COMPONENT
    ============================================================ */
 
+/**
+ * PartnerSettings — Partner admin page for configuring restaurant profile,
+ * working hours, ordering channels, hall settings, Wi-Fi, languages,
+ * currencies, and contact links. Wrapped in PartnerShell.
+ * @module PartnerSettings
+ */
 export default function PartnerSettings() {
   const { t } = useI18n();
   
