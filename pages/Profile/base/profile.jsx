@@ -90,7 +90,7 @@ function ProfileContent() {
             if (isMounted && partner) {
               setPartnerName(partner.name);
             }
-          } catch (err) {
+          } catch {
             // Partner load failed — user sees "Не привязан"
           } finally {
             if (isMounted) setIsPartnerLoading(false);
@@ -136,6 +136,7 @@ function ProfileContent() {
   };
 
   const getRoleLabel = (userRole) => {
+    if (!userRole) return tr("profile.role.unknown", "Неизвестная роль");
     return tr(`profile.role.${userRole}`, userRole);
   };
 

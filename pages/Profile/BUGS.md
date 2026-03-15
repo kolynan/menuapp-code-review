@@ -6,6 +6,21 @@ RELEASE: 260301-01 profile RELEASE.jsx
 
 ---
 
+## S132 Session (2026-03-16) — KB-044 v3 smoke test
+
+CC writer review of profile.jsx. 2 issues fixed:
+
+### BUG-S106-02 (P3) — getRoleLabel null guard missing [FIXED]
+- **Problem:** `getRoleLabel(undefined)` returns `undefined` — empty role badge text.
+- **Fix:** Added null guard returning `tr("profile.role.unknown", "Неизвестная роль")`.
+
+### BUG-S132-01 (P3) — Unused `err` variable in partner catch block
+- **Line:** 93
+- **Problem:** `catch (err)` declares unused variable. Lint warning / dead code.
+- **Fix:** Changed to bare `catch` (no binding).
+
+---
+
 ## S101 Session (2026-03-09) — 12 bugs applied from S100 analysis
 
 All 6 P1 and 6 P2 bugs from S100 (cc-analysis-task-260308-114704) were verified applied.
@@ -204,11 +219,12 @@ Fixed bugs: BUG-PF-002, BUG-PF-004, BUG-PF-005, BUG-PF-007, BUG-PF-008,
 - **Problem:** `<PartnerShell>` called without `activeTab` prop. CLAUDE.md pattern requires `<PartnerShell activeTab="tabname">`. Navigation tabs may show no active state.
 - **Fix:** Determine correct activeTab value for Profile (likely "profile" or omit if Profile is not in partner nav).
 
-### BUG-S106-02 (P3) — getRoleLabel null guard missing
-- **Lines:** 133–135 (`getRoleLabel`)
-- **Session:** S106 smoke test v6.2
+### ~~BUG-S106-02 (P3) — getRoleLabel null guard missing~~ → FIXED S132
+- **Lines:** 138–141 (`getRoleLabel`)
+- **Session:** S106 smoke test v6.2, fixed S132
 - **Problem:** `getRoleLabel(undefined)` returns `undefined` because `tr("profile.role.undefined", undefined)` returns `undefined` as fallback. Badge renders with correct CSS but no text. i18n key `profile.role.unknown` listed in README but never used. Regression from BUG-PF-003.
-- **Fix:** Add null guard: `if (!userRole) return tr("profile.role.unknown", "Неизвестная роль");` at start of getRoleLabel.
+- **Fix:** Added null guard: `if (!userRole) return tr("profile.role.unknown", "Неизвестная роль");` at start of getRoleLabel.
+- **Status:** FIXED (S132 KB-044 v3 smoke test)
 
 ### BUG-PF-010 (P3) — Decorative icons missing aria-hidden
 - **Lines:** 150, 179, 187, 212
