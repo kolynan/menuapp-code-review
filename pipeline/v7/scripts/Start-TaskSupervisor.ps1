@@ -1761,14 +1761,14 @@ function Invoke-V7Stage {
     Set-V7Status -StatusPath $StatusPath -Status $Status
     Add-SupervisorStage -QueueRunDir $QueueRunDir -EventsPath $EventsPath -State 'RUNNING' -Message "Started $Name" -Data @{ pid = $proc.Id; workflow = $Workflow; script_path = $ScriptPath; stdout_log = $stdoutPath; stderr_log = $stderrPath; mode = $Mode }
     $ok = Wait-V7Launchers -Processes @($proc) -TimeoutMinutes $TimeoutMinutes -StatusPath $StatusPath -Status $Status -EventsPath $EventsPath -QueueRunDir $QueueRunDir -Config $Config -HeartbeatLabel $Name -Workflow $Workflow -ArtifactsDir $ArtifactsDir
-    $exitCode = if ($proc.HasExited) { $proc.ExitCode } else { $null }
-    $Status.processes[$Name].state = if ($proc.HasExited -and $proc.ExitCode -eq 0) { 'completed' } elseif ($proc.HasExited) { 'failed' } else { 'failed' }
+    $exitCode = if ($proc.HasExited) { Get-V7NormalizedExitCode $proc.ExitCode } else { $null }
+    $Status.processes[$Name].state = if ($proc.HasExited -and (Get-V7NormalizedExitCode $proc.ExitCode) -eq 0) { 'completed' } elseif ($proc.HasExited) { 'failed' } else { 'failed' }
     if ($null -ne $exitCode) {
         $Status.processes[$Name]['exit_code'] = $exitCode
     }
     $Status.processes[$Name].ended_at = Get-V7Timestamp
     Set-V7Status -StatusPath $StatusPath -Status $Status
-    $stageSuccess = $ok -and $proc.HasExited -and $proc.ExitCode -eq 0
+    $stageSuccess = $ok -and $proc.HasExited -and (Get-V7NormalizedExitCode $proc.ExitCode) -eq 0
     $completionState = if ($stageSuccess) { 'RUNNING' } else { 'WARNING' }
     Add-SupervisorStage -QueueRunDir $QueueRunDir -EventsPath $EventsPath -State $completionState -Message "$Name completed" -Data @{ pid = $proc.Id; exit_code = $exitCode; success = $stageSuccess; stdout_log = $stdoutPath; stderr_log = $stderrPath }
     return $stageSuccess
@@ -1956,11 +1956,11 @@ try {
 
         $parallelOk = Wait-V7Launchers -Processes @($writerProc, $reviewerProc) -TimeoutMinutes $codeReviewTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -HeartbeatLabel $status.current_step -Workflow $workflow -ArtifactsDir $artifactsDir
         $workerEndedAt = Get-V7Timestamp
-        $status.processes['claude_writer'].state = if ($writerProc.HasExited -and $writerProc.ExitCode -eq 0) { 'completed' } elseif ($writerProc.HasExited) { 'failed' } else { 'failed' }
-        $status.processes['claude_writer']['exit_code'] = if ($writerProc.HasExited) { $writerProc.ExitCode } else { $null }
+        $status.processes['claude_writer'].state = if ($writerProc.HasExited -and (Get-V7NormalizedExitCode $writerProc.ExitCode) -eq 0) { 'completed' } elseif ($writerProc.HasExited) { 'failed' } else { 'failed' }
+        $status.processes['claude_writer']['exit_code'] = if ($writerProc.HasExited) { Get-V7NormalizedExitCode $writerProc.ExitCode } else { $null }
         $status.processes['claude_writer'].ended_at = $workerEndedAt
-        $status.processes['codex_reviewer'].state = if ($reviewerProc.HasExited -and $reviewerProc.ExitCode -eq 0) { 'completed' } elseif ($reviewerProc.HasExited) { 'failed' } else { 'failed' }
-        $status.processes['codex_reviewer']['exit_code'] = if ($reviewerProc.HasExited) { $reviewerProc.ExitCode } else { $null }
+        $status.processes['codex_reviewer'].state = if ($reviewerProc.HasExited -and (Get-V7NormalizedExitCode $reviewerProc.ExitCode) -eq 0) { 'completed' } elseif ($reviewerProc.HasExited) { 'failed' } else { 'failed' }
+        $status.processes['codex_reviewer']['exit_code'] = if ($reviewerProc.HasExited) { Get-V7NormalizedExitCode $reviewerProc.ExitCode } else { $null }
         $status.processes['codex_reviewer'].ended_at = $workerEndedAt
 
         $writerResult = Read-V7Json -Path (Join-Path $artifactsDir 'claude-writer.result.json')
@@ -1991,7 +1991,7 @@ try {
         $mergeStdout = Join-Path $logsDir 'merge.stdout.log'
         $mergeStderr = Join-Path $logsDir 'merge.stderr.log'
         & $env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $workerRoot 'Merge-TaskResult.ps1') -TaskJsonPath $taskJsonLocal 1> $mergeStdout 2> $mergeStderr
-        $mergeExitCode = $LASTEXITCODE
+        $mergeExitCode = Get-V7NormalizedExitCode $LASTEXITCODE
         $mergeEndedAt = Get-V7Timestamp
         $status.processes['merge']['exit_code'] = $mergeExitCode
         $status.processes['merge'].ended_at = $mergeEndedAt
@@ -2039,11 +2039,11 @@ try {
 
         $parallelWriteOk = Wait-V7Launchers -Processes @($writerProc, $codexWriterProc) -TimeoutMinutes $codeReviewTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -HeartbeatLabel $status.current_step -Workflow $workflow -ArtifactsDir $artifactsDir
         $writersEndedAt = Get-V7Timestamp
-        $status.processes['claude_writer'].state = if ($writerProc.HasExited -and $writerProc.ExitCode -eq 0) { 'completed' } elseif ($writerProc.HasExited) { 'failed' } else { 'failed' }
-        $status.processes['claude_writer']['exit_code'] = if ($writerProc.HasExited) { $writerProc.ExitCode } else { $null }
+        $status.processes['claude_writer'].state = if ($writerProc.HasExited -and (Get-V7NormalizedExitCode $writerProc.ExitCode) -eq 0) { 'completed' } elseif ($writerProc.HasExited) { 'failed' } else { 'failed' }
+        $status.processes['claude_writer']['exit_code'] = if ($writerProc.HasExited) { Get-V7NormalizedExitCode $writerProc.ExitCode } else { $null }
         $status.processes['claude_writer'].ended_at = $writersEndedAt
-        $status.processes['codex_writer'].state = if ($codexWriterProc.HasExited -and $codexWriterProc.ExitCode -eq 0) { 'completed' } elseif ($codexWriterProc.HasExited) { 'failed' } else { 'failed' }
-        $status.processes['codex_writer']['exit_code'] = if ($codexWriterProc.HasExited) { $codexWriterProc.ExitCode } else { $null }
+        $status.processes['codex_writer'].state = if ($codexWriterProc.HasExited -and (Get-V7NormalizedExitCode $codexWriterProc.ExitCode) -eq 0) { 'completed' } elseif ($codexWriterProc.HasExited) { 'failed' } else { 'failed' }
+        $status.processes['codex_writer']['exit_code'] = if ($codexWriterProc.HasExited) { Get-V7NormalizedExitCode $codexWriterProc.ExitCode } else { $null }
         $status.processes['codex_writer'].ended_at = $writersEndedAt
         Set-V7Status -StatusPath $statusPath -Status $status
         Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Parallel-write writer stage completed' -Data @{ parallel_ok = $parallelWriteOk; claude_writer_exit_code = (Get-V7StateValue -Object $status.processes['claude_writer'] -Name 'exit_code'); codex_writer_exit_code = (Get-V7StateValue -Object $status.processes['codex_writer'] -Name 'exit_code') }
@@ -2066,7 +2066,7 @@ try {
         $mergeStdout = Join-Path $logsDir 'parallel-write.stdout.log'
         $mergeStderr = Join-Path $logsDir 'parallel-write.stderr.log'
         & $env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $workerRoot 'Merge-ParallelWrite.ps1') -TaskJsonPath $taskJsonLocal 1> $mergeStdout 2> $mergeStderr
-        $mergeExitCode = $LASTEXITCODE
+        $mergeExitCode = Get-V7NormalizedExitCode $LASTEXITCODE
         $reconcileEndedAt = Get-V7Timestamp
         $status.processes['reconciler']['exit_code'] = $mergeExitCode
         $status.processes['reconciler'].ended_at = $reconcileEndedAt
@@ -2189,7 +2189,7 @@ try {
             $cleanupStderr = Join-Path $logsDir 'cleanup.stderr.log'
             Add-SupervisorStage -QueueRunDir $finalQueueDir -EventsPath $finalEventsPath -State 'CLEANUP' -Message 'Starting task cleanup' -Data @{ task_json = $taskJsonLocal; local_run_dir = $localRunDir; worktrees_dir = $worktreesDir }
             & $env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $workerRoot 'Cleanup-TaskRun.ps1') -TaskJsonPath $taskJsonLocal 1> $cleanupStdout 2> $cleanupStderr
-            $cleanupExitCode = $LASTEXITCODE
+            $cleanupExitCode = Get-V7NormalizedExitCode $LASTEXITCODE
             if ($cleanupExitCode -eq 0) {
                 Add-SupervisorStage -QueueRunDir $finalQueueDir -EventsPath $finalEventsPath -State 'CLEANUP' -Message 'Task cleanup completed' -Data @{ task_json = $taskJsonLocal; exit_code = 0; stdout_log = $cleanupStdout; stderr_log = $cleanupStderr }
             } else {

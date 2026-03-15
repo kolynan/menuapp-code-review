@@ -221,6 +221,31 @@ try {
         Assert-V7Equal -Actual (Read-V7TextFile -Path $copiedFiles[0].FullName) -Expected 'long file payload' -Message 'Copied file content mismatch.'
     }
 
+    Invoke-V7TestCase -Name 'Get-V7NormalizedExitCode null returns 0' -Action {
+        $result = Get-V7NormalizedExitCode $null
+        Assert-V7Equal -Actual $result -Expected 0 -Message 'Null exit code should normalize to 0.'
+    }
+
+    Invoke-V7TestCase -Name 'Get-V7NormalizedExitCode 0 returns 0' -Action {
+        $result = Get-V7NormalizedExitCode 0
+        Assert-V7Equal -Actual $result -Expected 0 -Message 'Zero exit code should remain 0.'
+    }
+
+    Invoke-V7TestCase -Name 'Get-V7NormalizedExitCode 1 returns 1' -Action {
+        $result = Get-V7NormalizedExitCode 1
+        Assert-V7Equal -Actual $result -Expected 1 -Message 'Non-zero exit code should be preserved.'
+    }
+
+    Invoke-V7TestCase -Name 'Get-V7NormalizedExitCode negative returns negative' -Action {
+        $result = Get-V7NormalizedExitCode (-1)
+        Assert-V7Equal -Actual $result -Expected (-1) -Message 'Negative exit code should be preserved.'
+    }
+
+    Invoke-V7TestCase -Name 'PS 5.1 null-as-int equals 0 (exit code pattern)' -Action {
+        # Verifies the underlying PS behavior that makes Get-V7NormalizedExitCode work
+        Assert-V7Equal -Actual ($null -as [int]) -Expected 0 -Message '$null -as [int] should be 0 in PS 5.1.'
+    }
+
     Invoke-V7TestCase -Name 'Static analysis no property Contains or ContainsKey usage remains' -Action {
         $containsPattern = '\.Con' + 'tains\(|\.Con' + 'tainsKey\('
         $matches = Select-String -Path (Join-Path $repoRoot 'pipeline/v7/scripts/*.ps1') -Pattern $containsPattern -SimpleMatch:$false | Where-Object { $_.Line -notmatch '^\s*#' }

@@ -51,6 +51,13 @@ function Test-V7HasProperty {
     }
 }
 
+function Get-V7NormalizedExitCode {
+    param([AllowNull()]$ExitCode)
+    # PS 5.1: Process.ExitCode and $LASTEXITCODE can be $null on normal completion.
+    # Treat $null as 0 (success).
+    return ($ExitCode -as [int])
+}
+
 function Merge-V7Hashtable {
     param(
         [System.Collections.IDictionary]$Base,
@@ -661,7 +668,7 @@ function Invoke-V7CapturedCommand {
         $stderr = if (Test-Path -LiteralPath $stderrPath) { (Read-V7TextFile -Path $stderrPath).TrimEnd([char[]]"`r`n") } else { '' }
 
         return [ordered]@{
-            exit_code = $exitCode
+            exit_code = (Get-V7NormalizedExitCode $exitCode)
             stdout = $stdout
             stderr = $stderr
         }
@@ -680,7 +687,7 @@ function Invoke-V7Git {
     )
 
     $result = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments (@('-C', $RepoRoot) + $Arguments) -WorkingDirectory $RepoRoot
-    if ($result.exit_code -ne 0) {
+    if ((Get-V7NormalizedExitCode $result.exit_code) -ne 0) {
         $details = @()
         if (-not [string]::IsNullOrWhiteSpace([string]$result.stderr)) {
             $details += [string]$result.stderr
@@ -823,7 +830,7 @@ function Test-V7BranchExists {
     }
 
     $result = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C', $RepoRoot, 'show-ref', '--verify', '--quiet', ('refs/heads/' + $BranchName)) -WorkingDirectory $RepoRoot
-    return $result.exit_code -eq 0
+    return (Get-V7NormalizedExitCode $result.exit_code) -eq 0
 }
 
 function Remove-V7Branch {
@@ -837,7 +844,7 @@ function Remove-V7Branch {
     }
 
     $result = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C', $RepoRoot, 'branch', '-D', $BranchName) -WorkingDirectory $RepoRoot
-    if ($result.exit_code -ne 0) {
+    if ((Get-V7NormalizedExitCode $result.exit_code) -ne 0) {
         $details = @($result.stderr, $result.stdout) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
         $suffix = if ($details.Count -gt 0) { ': ' + (($details -join [Environment]::NewLine).Trim()) } else { '' }
         throw ('Unable to delete existing branch ' + $BranchName + $suffix)
@@ -902,7 +909,7 @@ function Remove-V7Worktree {
     $shouldAttemptRemove = $record -or (Test-Path -LiteralPath $removePath)
     if ($shouldAttemptRemove) {
         $result = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C', $RepoRoot, 'worktree', 'remove', '--force', $removePath) -WorkingDirectory $RepoRoot
-        if ($result.exit_code -ne 0) {
+        if ((Get-V7NormalizedExitCode $result.exit_code) -ne 0) {
             $details = @($result.stderr, $result.stdout) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
             $suffix = if ($details.Count -gt 0) { ': ' + (($details -join [Environment]::NewLine).Trim()) } else { '' }
             throw ('Unable to remove worktree ' + $removePath + $suffix)
