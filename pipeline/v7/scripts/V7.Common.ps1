@@ -861,6 +861,44 @@ function Get-V7RepoHead {
     return (Invoke-V7Git -RepoRoot $RepoRoot -Arguments @('rev-parse', 'HEAD') -FailureMessage 'Unable to resolve repository HEAD').stdout.Trim()
 }
 
+function Clear-V7StaleWorktrees {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $pruneResult = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C', $RepoRoot, 'worktree', 'prune') -WorkingDirectory $RepoRoot
+    if (-not (Test-V7ExitSuccess $pruneResult.exit_code)) {
+        $details = @($pruneResult.stderr, $pruneResult.stdout) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
+        $suffix = if ($details.Count -gt 0) { ': ' + (($details -join [Environment]::NewLine).Trim()) } else { '' }
+        throw ('Unable to prune stale worktrees' + $suffix)
+    }
+
+    foreach ($record in (Get-V7WorktreeRecords -RepoRoot $RepoRoot)) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$record.branch) -and $record.branch.StartsWith('task/')) {
+            Remove-V7Worktree -RepoRoot $RepoRoot -Path $record.path
+        }
+    }
+
+    $branchListResult = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C', $RepoRoot, 'branch', '--list', 'task/*') -WorkingDirectory $RepoRoot
+    if (-not (Test-V7ExitSuccess $branchListResult.exit_code)) {
+        $details = @($branchListResult.stderr, $branchListResult.stdout) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
+        $suffix = if ($details.Count -gt 0) { ': ' + (($details -join [Environment]::NewLine).Trim()) } else { '' }
+        throw ('Unable to enumerate stale task branches' + $suffix)
+    }
+
+    $staleBranches = @()
+    foreach ($rawLine in (@([string]$branchListResult.stdout -split "`r?`n"))) {
+        $branchName = ([string]$rawLine).Trim().TrimStart('*').Trim()
+        if (-not [string]::IsNullOrWhiteSpace($branchName) -and $branchName.StartsWith('task/')) {
+            $staleBranches += $branchName
+        }
+    }
+
+    foreach ($branchName in $staleBranches) {
+        if (Test-V7BranchExists -RepoRoot $RepoRoot -BranchName $branchName) {
+            Remove-V7Branch -RepoRoot $RepoRoot -BranchName $branchName
+        }
+    }
+}
+
 function New-V7Worktree {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,

@@ -233,6 +233,27 @@ try {
         }
     }
 
+    Invoke-V7TestCase -Name 'Clear-V7StaleWorktrees removes stale task branches' -Action {
+        if (Test-Path -LiteralPath $worktreeRepoRoot) {
+            Remove-Item -LiteralPath $worktreeRepoRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Ensure-V7Directory -Path $worktreeRepoRoot | Out-Null
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('init') -FailureMessage 'Unable to initialize stale-cleanup test repo' | Out-Null
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('config', 'user.email', 'v7-stale-test@example.com') -FailureMessage 'Unable to configure stale-cleanup test repo email' | Out-Null
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('config', 'user.name', 'V7 Stale Cleanup Test') -FailureMessage 'Unable to configure stale-cleanup test repo user' | Out-Null
+        Write-V7TextFile -Path (Join-Path $worktreeRepoRoot 'README.md') -Content 'stale cleanup test'
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('add', 'README.md') -FailureMessage 'Unable to stage stale-cleanup test file' | Out-Null
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('commit', '-m', 'initial stale-cleanup test commit') -FailureMessage 'Unable to commit stale-cleanup test file' | Out-Null
+        $baseCommit = Get-V7RepoHead -RepoRoot $worktreeRepoRoot
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('branch', 'task/test-stale-branch-1', $baseCommit) -FailureMessage 'Unable to create stale branch 1' | Out-Null
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('branch', 'task/test-stale-branch-2', $baseCommit) -FailureMessage 'Unable to create stale branch 2' | Out-Null
+        Assert-V7True -Value (Test-V7BranchExists -RepoRoot $worktreeRepoRoot -BranchName 'task/test-stale-branch-1') -Message 'Stale branch 1 should exist before cleanup.'
+        Assert-V7True -Value (Test-V7BranchExists -RepoRoot $worktreeRepoRoot -BranchName 'task/test-stale-branch-2') -Message 'Stale branch 2 should exist before cleanup.'
+        Clear-V7StaleWorktrees -RepoRoot $worktreeRepoRoot
+        Assert-V7False -Value (Test-V7BranchExists -RepoRoot $worktreeRepoRoot -BranchName 'task/test-stale-branch-1') -Message 'Stale branch 1 should be removed.'
+        Assert-V7False -Value (Test-V7BranchExists -RepoRoot $worktreeRepoRoot -BranchName 'task/test-stale-branch-2') -Message 'Stale branch 2 should be removed.'
+    }
+
     Invoke-V7TestCase -Name 'Copy-V7ArtifactsToResults truncates long destination leaf safely' -Action {
         $localRunDir = Ensure-V7Directory -Path $copySourceRoot
         $resultsDir = Join-Path $workspaceTestRoot 'results-root\task-260314-194301-pipeline\worktrees\wt-merge\pages\_ux-discussions'

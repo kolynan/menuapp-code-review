@@ -2061,6 +2061,7 @@ try {
     Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'PREPARING' -Message 'Preparing task context' -EventsPath $eventsPath -QueueRunDir $queueRunDir -WarningMessage 'Telegram preparing notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
 
     if (@('code-review', 'parallel-write') -contains $workflow) {
+        Clear-V7StaleWorktrees -RepoRoot $repoRootPath
         $baseCommit = Get-V7RepoHead -RepoRoot $repoRootPath
         $writerWorktree = Join-Path $worktreesDir 'wt-writer'
         $reviewWorktree = Join-Path $worktreesDir 'wt-review'
