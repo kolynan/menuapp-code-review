@@ -39,14 +39,27 @@ function Assert-ParallelWriteCondition {
     Write-ParallelTestResult -Name $Name -Passed $true
 }
 
+function Get-MockResultValue {
+    param(
+        $Result,
+        [string]$Name,
+        $Default = $null
+    )
+
+    if (Test-V7HasProperty -InputObject $Result -Name $Name) {
+        return $Result[$Name]
+    }
+    return $Default
+}
+
 function Resolve-MockWriterState {
     param($Result)
 
-    $statusText = [string](Get-V7StateValue -Object $Result -Name 'status' -Default '')
+    $statusText = [string](Get-MockResultValue -Result $Result -Name 'status' -Default '')
     if ($statusText -eq 'skipped') {
         return 'skipped'
     }
-    if (($statusText -eq 'completed' -or $statusText -eq 'success') -and (Test-V7ExitSuccess (Get-V7StateValue -Object $Result -Name 'exit_code' -Default $null))) {
+    if (($statusText -eq 'completed' -or $statusText -eq 'success') -and (Test-V7ExitSuccess (Get-MockResultValue -Result $Result -Name 'exit_code' -Default $null))) {
         return 'completed'
     }
     return 'failed'

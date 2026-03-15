@@ -4,7 +4,7 @@ $commonPath = Join-Path $PSScriptRoot 'V7.Common.ps1'
 . $commonPath
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
-$workspaceTestRoot = Join-Path $repoRoot '.pipeline\test-v7pipeline'
+$workspaceTestRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('v7pipeline-test-' + $PID)
 $script:V7TestFailures = New-Object System.Collections.Generic.List[string]
 
 function Write-TestResult {
@@ -99,6 +99,7 @@ if (Test-Path -LiteralPath $workspaceTestRoot) {
 }
 Ensure-V7Directory -Path $workspaceTestRoot | Out-Null
 
+$worktreeRepoRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('v7worktree-' + $PID)
 $worktreePath = Join-Path $workspaceTestRoot 'worktree'
 $worktreeBranch = 'task/test-v7pipeline-' + (Get-Date -Format 'yyyyMMddHHmmss') + '-' + $PID
 $copySourceRoot = Join-Path $repoRoot ('.p7-' + $PID)
@@ -207,16 +208,26 @@ try {
     }
 
     Invoke-V7TestCase -Name 'New-V7Worktree and Remove-V7Worktree round-trip' -Action {
-        $baseCommit = Get-V7RepoHead -RepoRoot $repoRoot
+        if (Test-Path -LiteralPath $worktreeRepoRoot) {
+            Remove-Item -LiteralPath $worktreeRepoRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Ensure-V7Directory -Path $worktreeRepoRoot | Out-Null
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('init') -FailureMessage 'Unable to initialize worktree test repo' | Out-Null
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('config', 'user.email', 'v7-worktree-test@example.com') -FailureMessage 'Unable to configure worktree test repo email' | Out-Null
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('config', 'user.name', 'V7 Worktree Test') -FailureMessage 'Unable to configure worktree test repo user' | Out-Null
+        Write-V7TextFile -Path (Join-Path $worktreeRepoRoot 'README.md') -Content 'worktree test'
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('add', 'README.md') -FailureMessage 'Unable to stage worktree test file' | Out-Null
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('commit', '-m', 'initial worktree test commit') -FailureMessage 'Unable to commit worktree test file' | Out-Null
+        $baseCommit = Get-V7RepoHead -RepoRoot $worktreeRepoRoot
         if (Test-Path -LiteralPath $worktreePath) {
             Remove-Item -LiteralPath $worktreePath -Recurse -Force -ErrorAction SilentlyContinue
         }
-        New-V7Worktree -RepoRoot $repoRoot -Path $worktreePath -BaseCommit $baseCommit -BranchName $worktreeBranch
+        New-V7Worktree -RepoRoot $worktreeRepoRoot -Path $worktreePath -BaseCommit $baseCommit -BranchName $worktreeBranch
         Assert-V7True -Value (Test-Path -LiteralPath $worktreePath) -Message 'Worktree path should be created.'
-        Remove-V7Worktree -RepoRoot $repoRoot -Path $worktreePath
+        Remove-V7Worktree -RepoRoot $worktreeRepoRoot -Path $worktreePath
         Assert-V7False -Value (Test-Path -LiteralPath $worktreePath) -Message 'Worktree path should be removed.'
-        if (Test-V7BranchExists -RepoRoot $repoRoot -BranchName $worktreeBranch) {
-            Remove-V7Branch -RepoRoot $repoRoot -BranchName $worktreeBranch
+        if (Test-V7BranchExists -RepoRoot $worktreeRepoRoot -BranchName $worktreeBranch) {
+            Remove-V7Branch -RepoRoot $worktreeRepoRoot -BranchName $worktreeBranch
             throw 'Remove-V7Worktree left the test branch behind.'
         }
     }
@@ -274,18 +285,21 @@ try {
         Assert-V7Equal -Actual @($matches).Count -Expected 0 -Message 'BOM-producing UTF8 encoding calls should be absent.'
     }
 } finally {
-    if (Test-V7BranchExists -RepoRoot $repoRoot -BranchName $worktreeBranch) {
+    if (Test-V7BranchExists -RepoRoot $worktreeRepoRoot -BranchName $worktreeBranch) {
         try {
-            Remove-V7Branch -RepoRoot $repoRoot -BranchName $worktreeBranch
+            Remove-V7Branch -RepoRoot $worktreeRepoRoot -BranchName $worktreeBranch
         } catch {
         }
     }
     if (Test-Path -LiteralPath $worktreePath) {
         try {
-            Remove-V7Worktree -RepoRoot $repoRoot -Path $worktreePath
+            Remove-V7Worktree -RepoRoot $worktreeRepoRoot -Path $worktreePath
         } catch {
             Remove-Item -LiteralPath $worktreePath -Recurse -Force -ErrorAction SilentlyContinue
         }
+    }
+    if (Test-Path -LiteralPath $worktreeRepoRoot) {
+        Remove-Item -LiteralPath $worktreeRepoRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
     if (Test-Path -LiteralPath $copySourceRoot) {
         Remove-Item -LiteralPath $copySourceRoot -Recurse -Force -ErrorAction SilentlyContinue
