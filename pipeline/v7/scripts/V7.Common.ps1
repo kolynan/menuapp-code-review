@@ -697,14 +697,17 @@ function Invoke-V7Git {
     # Git writes progress and branch/worktree notices to stderr on success, so only the exit code
     # determines whether the command failed.
     if (-not (Test-V7ExitSuccess $result.exit_code)) {
-        $details = @()
-        if (-not [string]::IsNullOrWhiteSpace([string]$result.stderr)) {
-            $details += [string]$result.stderr
+        $detailLines = @()
+        foreach ($streamText in @($result.stderr, $result.stdout)) {
+            if (-not [string]::IsNullOrWhiteSpace([string]$streamText)) {
+                $detailLines += (($streamText -split "`r?`n") | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+            }
         }
-        if (-not [string]::IsNullOrWhiteSpace([string]$result.stdout)) {
-            $details += [string]$result.stdout
+        $preferredLines = @($detailLines | Where-Object { $_ -match '^(fatal|error):' })
+        if ($preferredLines.Count -eq 0) {
+            $preferredLines = @($detailLines)
         }
-        $suffix = if ($details.Count -gt 0) { ': ' + (($details -join [Environment]::NewLine).Trim()) } else { '' }
+        $suffix = if ($preferredLines.Count -gt 0) { ': ' + (($preferredLines -join [Environment]::NewLine).Trim()) } else { '' }
         throw ($FailureMessage + $suffix)
     }
     return $result

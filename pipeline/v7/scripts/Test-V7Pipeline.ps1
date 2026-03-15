@@ -8,7 +8,7 @@ $workspaceTestRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('v7pipeline-te
 $worktreeRepoRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('v7worktree-' + $PID)
 $worktreePath = Join-Path $workspaceTestRoot 'worktree'
 $worktreeBranch = 'task/test-kb040-cleanup-' + $PID
-$copySourceRoot = Join-Path $repoRoot ('.p7-' + $PID)
+$copySourceRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('v7copy-' + $PID)
 $script:V7TestFailures = New-Object System.Collections.Generic.List[string]
 
 function Write-TestResult {
@@ -212,6 +212,11 @@ try {
         Assert-V7Equal -Actual ([int]$result.exit_code) -Expected 0 -Message 'Captured command should normalize exit code 0.'
         Assert-V7Equal -Actual ([string]$result.stdout) -Expected 'ok' -Message 'Captured command should preserve stdout on success.'
         Assert-V7Equal -Actual ([string]$result.stderr) -Expected 'informational stderr' -Message 'Captured command should preserve stderr on success.'
+    }
+
+    Invoke-V7TestCase -Name 'Repository has no tracked long-path V7 worktree fixtures' -Action {
+        $trackedFixtures = (Invoke-V7Git -RepoRoot $repoRoot -Arguments @('ls-files', '--', '.pipeline/test-v7pipeline') -FailureMessage 'Unable to inspect tracked V7 test fixtures').stdout.Trim()
+        Assert-V7True -Value ([string]::IsNullOrWhiteSpace([string]$trackedFixtures)) -Message 'Tracked .pipeline/test-v7pipeline files will break Windows worktree checkout.'
     }
 
     Invoke-V7TestCase -Name 'Invoke-V7Git allows informational stderr from worktree add' -Action {
