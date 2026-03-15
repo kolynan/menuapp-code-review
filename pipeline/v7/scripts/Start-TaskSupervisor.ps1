@@ -1065,7 +1065,7 @@ function Update-V7TelegramParallelWriteStateFromArtifacts {
             if ($state -eq 'FAILED') { $text = Get-V7TelegramReasonText -Text (Get-V7TelegramWorkerErrorText -Status $Status -WorkerKey $key -Result $result -FallbackMessage 'writer failed') }
             Set-V7TelegramWorkerLine -Status $Status -WorkerKey $key -State $state -Text $text -StartedAt ([string](Get-V7TelegramValue -Object $result -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $result -Name 'ended_at'))
         } elseif ($process -and ([string](Get-V7TelegramValue -Object $process -Name 'state')) -eq 'running') {
-            Set-V7TelegramWorkerLine -Status $Status -WorkerKey $key -State 'RUNNING' -Text '' -StartedAt ([string](Get-V7TelegramValue -Object $process -Name 'started_at')) -EndedAt ''
+            Set-V7TelegramWorkerLine -Status $Status -WorkerKey $key -State 'RUNNING' -Text (Get-V7StateText -Object $process -Name 'progress_text' -Default '') -StartedAt ([string](Get-V7TelegramValue -Object $process -Name 'started_at')) -EndedAt ''
         } elseif ($process -and ([string](Get-V7TelegramValue -Object $process -Name 'state')) -eq 'failed') {
             Set-V7TelegramWorkerLine -Status $Status -WorkerKey $key -State 'FAILED' -Text (Get-V7TelegramReasonText -Text (Get-V7TelegramWorkerErrorText -Status $Status -WorkerKey $key -Result $null -FallbackMessage 'writer failed')) -StartedAt ([string](Get-V7TelegramValue -Object $process -Name 'started_at')) -EndedAt ([string](Get-V7TelegramValue -Object $process -Name 'ended_at'))
         }
@@ -1214,7 +1214,13 @@ function Get-V7TelegramRenderedLineForEntry {
         'RUNNING' {
             $elapsed = Get-V7TelegramTotalMinutes -StartedAt $startedAt -EndedAt ''
             if ($elapsed -lt 1) {
+                if (-not [string]::IsNullOrWhiteSpace($detail)) {
+                    return $name + ': started... (' + $detail + ')'
+                }
                 return $name + ': started...'
+            }
+            if (-not [string]::IsNullOrWhiteSpace($detail)) {
+                return $name + ': running... (' + $elapsed + ' min, ' + $detail + ')'
             }
             return $name + ': running... (' + $elapsed + ' min)'
         }
@@ -1673,6 +1679,139 @@ function Test-V7WorkerProcessAlive {
     return $null -ne $liveProcess
 }
 
+function Get-V7ProcessCompletionInfo {
+    param([System.Diagnostics.Process]$Process)
+
+    $result = [ordered]@{
+        has_exited = $false
+        exit_code = $null
+        success = $false
+    }
+    if ($null -eq $Process) {
+        return [pscustomobject]$result
+    }
+
+    $isAlive = Test-V7WorkerProcessAlive -Process $Process
+    if (-not $isAlive) {
+        $result.has_exited = $true
+        try {
+            $result.exit_code = Get-V7NormalizedExitCode $Process.ExitCode
+        } catch {
+            $result.exit_code = $null
+        }
+        $result.success = Test-V7ExitSuccess $result.exit_code
+    }
+
+    return [pscustomobject]$result
+}
+
+function Update-V7ProcessInfoFromResult {
+    param(
+        [hashtable]$ProcessInfo,
+        $Result
+    )
+
+    if ($null -eq $ProcessInfo -or $null -eq $Result) {
+        return
+    }
+
+    $resultState = Get-V7TelegramResultState -StatusText ([string](Get-V7TelegramValue -Object $Result -Name 'status'))
+    switch ($resultState) {
+        'success' { $ProcessInfo.state = 'completed' }
+        'skipped' { $ProcessInfo.state = 'skipped' }
+        'failed' { $ProcessInfo.state = 'failed' }
+    }
+
+    if (Test-V7HasProperty -InputObject $Result -Name 'exit_code') {
+        $ProcessInfo['exit_code'] = Get-V7NormalizedExitCode (Get-V7StateValue -Object $Result -Name 'exit_code' -Default $null)
+    }
+
+    $resultStartedAt = Get-V7StateText -Object $Result -Name 'started_at'
+    if (-not [string]::IsNullOrWhiteSpace($resultStartedAt)) {
+        $ProcessInfo.started_at = $resultStartedAt
+    }
+    $resultEndedAt = Get-V7StateText -Object $Result -Name 'ended_at'
+    if (-not [string]::IsNullOrWhiteSpace($resultEndedAt)) {
+        $ProcessInfo.ended_at = $resultEndedAt
+    }
+}
+
+function Get-V7ParallelWriteHeartbeatProgressText {
+    param(
+        [hashtable]$Status,
+        [string]$WorkerKey
+    )
+
+    try {
+        $pathsState = Get-V7StateValue -Object $Status -Name 'paths' -Default $null
+        $localRunDir = Get-V7StateText -Object $pathsState -Name 'local_run_dir'
+        if ([string]::IsNullOrWhiteSpace($localRunDir)) {
+            return ''
+        }
+
+        $worktreesRoot = Join-Path $localRunDir 'worktrees'
+        $worktreeLeaf = switch ($WorkerKey) {
+            'claude_writer' { 'wt-writer' }
+            'codex_writer' { 'wt-review' }
+            default { '' }
+        }
+        if ([string]::IsNullOrWhiteSpace($worktreeLeaf)) {
+            return ''
+        }
+
+        $worktreePath = Join-Path $worktreesRoot $worktreeLeaf
+        if (-not (Test-Path -LiteralPath $worktreePath)) {
+            return ''
+        }
+
+        $gitState = Get-V7StateValue -Object $Status -Name 'git' -Default $null
+        $baseCommit = Get-V7StateText -Object $gitState -Name 'base_commit'
+        $allFiles = @()
+
+        if (-not [string]::IsNullOrWhiteSpace($baseCommit)) {
+            try {
+                $headCommit = (Invoke-V7Git -RepoRoot $worktreePath -Arguments @('rev-parse', 'HEAD') -FailureMessage 'Unable to resolve heartbeat HEAD').stdout.Trim()
+                if (-not [string]::IsNullOrWhiteSpace($headCommit) -and $headCommit -ne $baseCommit) {
+                    $allFiles += @(Get-V7ChangedFiles -RepoRoot $worktreePath -BaseCommit $baseCommit)
+                }
+            } catch {
+            }
+        }
+
+        foreach ($gitArgs in @(@('diff', '--name-only', '--cached'), @('diff', '--name-only'))) {
+            try {
+                $result = Invoke-V7Git -RepoRoot $worktreePath -Arguments $gitArgs -FailureMessage 'Unable to inspect parallel-write heartbeat progress'
+                if (-not [string]::IsNullOrWhiteSpace([string]$result.stdout)) {
+                    $allFiles += @(
+                        ($result.stdout -split "`r?`n") |
+                            Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
+                    )
+                }
+            } catch {
+            }
+        }
+
+        $fileCount = @($allFiles | Sort-Object -Unique).Count
+        if ($fileCount -gt 0) {
+            return $fileCount.ToString() + ' files touched'
+        }
+    } catch {
+    }
+
+    return 'no changes yet'
+}
+
+function Update-V7ParallelWriteHeartbeatProgress {
+    param([hashtable]$Status)
+
+    foreach ($workerKey in @('claude_writer', 'codex_writer')) {
+        $processInfo = Get-V7CodeReviewProcessInfo -Status $Status -WorkerKey $workerKey
+        if ($processInfo -and ([string](Get-V7TelegramValue -Object $processInfo -Name 'state')) -eq 'running') {
+            $processInfo['progress_text'] = Get-V7ParallelWriteHeartbeatProgressText -Status $Status -WorkerKey $workerKey
+        }
+    }
+}
+
 function Wait-V7Launchers {
     param(
         [System.Diagnostics.Process[]]$Processes,
@@ -1721,9 +1860,18 @@ function Wait-V7Launchers {
         }
         if ((Get-Date) -ge $nextHeartbeat) {
             $elapsedMinutes = [int][Math]::Floor(((Get-Date) - $startedAt).TotalMinutes)
+            if ($Workflow -eq 'parallel-write') {
+                Update-V7ParallelWriteHeartbeatProgress -Status $Status
+                Set-V7Status -StatusPath $StatusPath -Status $Status
+            }
             $heartbeatText = "[$stageName] running... (${elapsedMinutes}m elapsed)"
-            Add-SupervisorStage -QueueRunDir $QueueRunDir -EventsPath $EventsPath -State 'HEARTBEAT' -Message $heartbeatText -Data @{ stage = $stageName; pids = $alivePids; elapsed_minutes = $elapsedMinutes }
-            Invoke-V7TelegramScript -Config $Config -Status $Status -StatusPath $StatusPath -State 'HEARTBEAT' -Message $heartbeatText -EventsPath $EventsPath -QueueRunDir $QueueRunDir -ArtifactsDir $ArtifactsDir -TaskId $Status.task_id -Workflow $Workflow -WarningMessage 'Telegram heartbeat failed' -WarningData @{ stage = $stageName; elapsed_minutes = $elapsedMinutes; pids = $alivePids } | Out-Null
+            $heartbeatData = [ordered]@{ stage = $stageName; pids = $alivePids; elapsed_minutes = $elapsedMinutes }
+            if ($Workflow -eq 'parallel-write') {
+                $heartbeatData['claude_writer'] = Get-V7StateText -Object (Get-V7CodeReviewProcessInfo -Status $Status -WorkerKey 'claude_writer') -Name 'progress_text' -Default 'no changes yet'
+                $heartbeatData['codex_writer'] = Get-V7StateText -Object (Get-V7CodeReviewProcessInfo -Status $Status -WorkerKey 'codex_writer') -Name 'progress_text' -Default 'no changes yet'
+            }
+            Add-SupervisorStage -QueueRunDir $QueueRunDir -EventsPath $EventsPath -State 'HEARTBEAT' -Message $heartbeatText -Data $heartbeatData
+            Invoke-V7TelegramScript -Config $Config -Status $Status -StatusPath $StatusPath -State 'HEARTBEAT' -Message $heartbeatText -EventsPath $EventsPath -QueueRunDir $QueueRunDir -ArtifactsDir $ArtifactsDir -TaskId $Status.task_id -Workflow $Workflow -WarningMessage 'Telegram heartbeat failed' -WarningData $heartbeatData | Out-Null
             $nextHeartbeat = $nextHeartbeat.AddMinutes(5)
         }
         if (-not [string]::IsNullOrWhiteSpace($Workflow) -and (Get-Date) -ge $nextProgressRefresh) {
@@ -1761,14 +1909,15 @@ function Invoke-V7Stage {
     Set-V7Status -StatusPath $StatusPath -Status $Status
     Add-SupervisorStage -QueueRunDir $QueueRunDir -EventsPath $EventsPath -State 'RUNNING' -Message "Started $Name" -Data @{ pid = $proc.Id; workflow = $Workflow; script_path = $ScriptPath; stdout_log = $stdoutPath; stderr_log = $stderrPath; mode = $Mode }
     $ok = Wait-V7Launchers -Processes @($proc) -TimeoutMinutes $TimeoutMinutes -StatusPath $StatusPath -Status $Status -EventsPath $EventsPath -QueueRunDir $QueueRunDir -Config $Config -HeartbeatLabel $Name -Workflow $Workflow -ArtifactsDir $ArtifactsDir
-    $exitCode = if ($proc.HasExited) { Get-V7NormalizedExitCode $proc.ExitCode } else { $null }
-    $Status.processes[$Name].state = if ($proc.HasExited -and (Get-V7NormalizedExitCode $proc.ExitCode) -eq 0) { 'completed' } elseif ($proc.HasExited) { 'failed' } else { 'failed' }
-    if ($null -ne $exitCode) {
+    $completionInfo = Get-V7ProcessCompletionInfo -Process $proc
+    $exitCode = if ($completionInfo.has_exited) { $completionInfo.exit_code } else { $null }
+    $Status.processes[$Name].state = if ($completionInfo.has_exited -and $completionInfo.success) { 'completed' } elseif ($completionInfo.has_exited) { 'failed' } else { 'failed' }
+    if ($completionInfo.has_exited) {
         $Status.processes[$Name]['exit_code'] = $exitCode
     }
     $Status.processes[$Name].ended_at = Get-V7Timestamp
     Set-V7Status -StatusPath $StatusPath -Status $Status
-    $stageSuccess = $ok -and $proc.HasExited -and (Get-V7NormalizedExitCode $proc.ExitCode) -eq 0
+    $stageSuccess = $ok -and $completionInfo.has_exited -and $completionInfo.success
     $completionState = if ($stageSuccess) { 'RUNNING' } else { 'WARNING' }
     Add-SupervisorStage -QueueRunDir $QueueRunDir -EventsPath $EventsPath -State $completionState -Message "$Name completed" -Data @{ pid = $proc.Id; exit_code = $exitCode; success = $stageSuccess; stdout_log = $stdoutPath; stderr_log = $stderrPath }
     return $stageSuccess
@@ -1956,21 +2105,19 @@ try {
 
         $parallelOk = Wait-V7Launchers -Processes @($writerProc, $reviewerProc) -TimeoutMinutes $codeReviewTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -HeartbeatLabel $status.current_step -Workflow $workflow -ArtifactsDir $artifactsDir
         $workerEndedAt = Get-V7Timestamp
-        $status.processes['claude_writer'].state = if ($writerProc.HasExited -and (Get-V7NormalizedExitCode $writerProc.ExitCode) -eq 0) { 'completed' } elseif ($writerProc.HasExited) { 'failed' } else { 'failed' }
-        $status.processes['claude_writer']['exit_code'] = if ($writerProc.HasExited) { Get-V7NormalizedExitCode $writerProc.ExitCode } else { $null }
+        $writerInfo = Get-V7ProcessCompletionInfo -Process $writerProc
+        $reviewerInfo = Get-V7ProcessCompletionInfo -Process $reviewerProc
+        $status.processes['claude_writer'].state = if ($writerInfo.has_exited -and $writerInfo.success) { 'completed' } elseif ($writerInfo.has_exited) { 'failed' } else { 'failed' }
+        $status.processes['claude_writer']['exit_code'] = if ($writerInfo.has_exited) { $writerInfo.exit_code } else { $null }
         $status.processes['claude_writer'].ended_at = $workerEndedAt
-        $status.processes['codex_reviewer'].state = if ($reviewerProc.HasExited -and (Get-V7NormalizedExitCode $reviewerProc.ExitCode) -eq 0) { 'completed' } elseif ($reviewerProc.HasExited) { 'failed' } else { 'failed' }
-        $status.processes['codex_reviewer']['exit_code'] = if ($reviewerProc.HasExited) { Get-V7NormalizedExitCode $reviewerProc.ExitCode } else { $null }
+        $status.processes['codex_reviewer'].state = if ($reviewerInfo.has_exited -and $reviewerInfo.success) { 'completed' } elseif ($reviewerInfo.has_exited) { 'failed' } else { 'failed' }
+        $status.processes['codex_reviewer']['exit_code'] = if ($reviewerInfo.has_exited) { $reviewerInfo.exit_code } else { $null }
         $status.processes['codex_reviewer'].ended_at = $workerEndedAt
 
         $writerResult = Read-V7Json -Path (Join-Path $artifactsDir 'claude-writer.result.json')
-        if ((Get-V7TelegramResultState -StatusText ([string](Get-V7TelegramValue -Object $writerResult -Name 'status'))) -eq 'skipped') {
-            $status.processes['claude_writer'].state = 'skipped'
-        }
+        Update-V7ProcessInfoFromResult -ProcessInfo $status.processes['claude_writer'] -Result $writerResult
         $reviewerResult = Read-V7Json -Path (Join-Path $artifactsDir 'codex-reviewer.result.json')
-        if ((Get-V7TelegramResultState -StatusText ([string](Get-V7TelegramValue -Object $reviewerResult -Name 'status'))) -eq 'skipped') {
-            $status.processes['codex_reviewer'].state = 'skipped'
-        }
+        Update-V7ProcessInfoFromResult -ProcessInfo $status.processes['codex_reviewer'] -Result $reviewerResult
 
         Update-CodeReviewWorkerLinesFromArtifacts -Status $status -ArtifactsDir $artifactsDir
         Set-V7Status -StatusPath $statusPath -Status $status
@@ -1995,7 +2142,7 @@ try {
         $mergeEndedAt = Get-V7Timestamp
         $status.processes['merge']['exit_code'] = $mergeExitCode
         $status.processes['merge'].ended_at = $mergeEndedAt
-        if ($mergeExitCode -ne 0) {
+        if (-not (Test-V7ExitSuccess $mergeExitCode)) {
             $status.processes['merge'].state = 'failed'
             Set-V7Status -StatusPath $statusPath -Status $status
             Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'WARNING' -Message 'Merge step failed' -Data @{ exit_code = $mergeExitCode; stdout_log = $mergeStdout; stderr_log = $mergeStderr }
@@ -2039,14 +2186,33 @@ try {
 
         $parallelWriteOk = Wait-V7Launchers -Processes @($writerProc, $codexWriterProc) -TimeoutMinutes $codeReviewTimeout -StatusPath $statusPath -Status $status -EventsPath $eventsPath -QueueRunDir $queueRunDir -Config $config -HeartbeatLabel $status.current_step -Workflow $workflow -ArtifactsDir $artifactsDir
         $writersEndedAt = Get-V7Timestamp
-        $status.processes['claude_writer'].state = if ($writerProc.HasExited -and (Get-V7NormalizedExitCode $writerProc.ExitCode) -eq 0) { 'completed' } elseif ($writerProc.HasExited) { 'failed' } else { 'failed' }
-        $status.processes['claude_writer']['exit_code'] = if ($writerProc.HasExited) { Get-V7NormalizedExitCode $writerProc.ExitCode } else { $null }
+        $claudeWriterInfo = Get-V7ProcessCompletionInfo -Process $writerProc
+        $codexWriterInfo = Get-V7ProcessCompletionInfo -Process $codexWriterProc
+        $status.processes['claude_writer'].state = if ($claudeWriterInfo.has_exited -and $claudeWriterInfo.success) { 'completed' } elseif ($claudeWriterInfo.has_exited) { 'failed' } else { 'failed' }
+        $status.processes['claude_writer']['exit_code'] = if ($claudeWriterInfo.has_exited) { $claudeWriterInfo.exit_code } else { $null }
         $status.processes['claude_writer'].ended_at = $writersEndedAt
-        $status.processes['codex_writer'].state = if ($codexWriterProc.HasExited -and (Get-V7NormalizedExitCode $codexWriterProc.ExitCode) -eq 0) { 'completed' } elseif ($codexWriterProc.HasExited) { 'failed' } else { 'failed' }
-        $status.processes['codex_writer']['exit_code'] = if ($codexWriterProc.HasExited) { Get-V7NormalizedExitCode $codexWriterProc.ExitCode } else { $null }
+        $status.processes['codex_writer'].state = if ($codexWriterInfo.has_exited -and $codexWriterInfo.success) { 'completed' } elseif ($codexWriterInfo.has_exited) { 'failed' } else { 'failed' }
+        $status.processes['codex_writer']['exit_code'] = if ($codexWriterInfo.has_exited) { $codexWriterInfo.exit_code } else { $null }
         $status.processes['codex_writer'].ended_at = $writersEndedAt
+
+        $claudeWriterResult = Read-V7Json -Path (Join-Path $artifactsDir 'claude-writer.result.json')
+        Update-V7ProcessInfoFromResult -ProcessInfo $status.processes['claude_writer'] -Result $claudeWriterResult
+        $codexWriterResult = Read-V7Json -Path (Join-Path $artifactsDir 'codex-writer.result.json')
+        Update-V7ProcessInfoFromResult -ProcessInfo $status.processes['codex_writer'] -Result $codexWriterResult
+        if ($claudeWriterResult) {
+            $writerCommit = Get-V7StateText -Object $claudeWriterResult -Name 'commit_hash'
+            if (-not [string]::IsNullOrWhiteSpace($writerCommit)) {
+                $status.git['writer_commit'] = $writerCommit
+            }
+        }
+        if ($codexWriterResult) {
+            $codexCommit = Get-V7StateText -Object $codexWriterResult -Name 'commit_hash'
+            if (-not [string]::IsNullOrWhiteSpace($codexCommit)) {
+                $status.git['codex_commit'] = $codexCommit
+            }
+        }
         Set-V7Status -StatusPath $statusPath -Status $status
-        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Parallel-write writer stage completed' -Data @{ parallel_ok = $parallelWriteOk; claude_writer_exit_code = (Get-V7StateValue -Object $status.processes['claude_writer'] -Name 'exit_code'); codex_writer_exit_code = (Get-V7StateValue -Object $status.processes['codex_writer'] -Name 'exit_code') }
+        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message 'Parallel-write writer stage completed' -Data @{ parallel_ok = $parallelWriteOk; claude_writer_exit_code = (Get-V7StateValue -Object $status.processes['claude_writer'] -Name 'exit_code'); codex_writer_exit_code = (Get-V7StateValue -Object $status.processes['codex_writer'] -Name 'exit_code'); claude_writer_state = (Get-V7StateText -Object $status.processes['claude_writer'] -Name 'state'); codex_writer_state = (Get-V7StateText -Object $status.processes['codex_writer'] -Name 'state') }
         if (-not $parallelWriteOk) {
             throw 'Parallel-write writer timeout'
         }
@@ -2070,7 +2236,7 @@ try {
         $reconcileEndedAt = Get-V7Timestamp
         $status.processes['reconciler']['exit_code'] = $mergeExitCode
         $status.processes['reconciler'].ended_at = $reconcileEndedAt
-        if ($mergeExitCode -ne 0) {
+        if (-not (Test-V7ExitSuccess $mergeExitCode)) {
             $status.processes['reconciler'].state = 'failed'
             Set-V7Status -StatusPath $statusPath -Status $status
             Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'WARNING' -Message 'Parallel-write reconcile step failed' -Data @{ exit_code = $mergeExitCode; stdout_log = $mergeStdout; stderr_log = $mergeStderr }
@@ -2113,7 +2279,7 @@ try {
             $uxDiscussionResultStatus = Get-V7StateText -Object $uxDiscussionResult -Name 'status'
             $uxDiscussionResultExitCode = Get-V7StateValue -Object $uxDiscussionResult -Name 'exit_code' -Default $null
             $uxDiscussionCompleted = $uxDiscussionResultStatus -eq 'completed'
-            $uxDiscussionExitOk = $null -eq $uxDiscussionResultExitCode -or "$uxDiscussionResultExitCode" -eq '' -or [int]$uxDiscussionResultExitCode -eq 0
+            $uxDiscussionExitOk = Test-V7ExitSuccess $uxDiscussionResultExitCode
             if ($uxDiscussionCompleted -and $uxDiscussionExitOk) {
                 $uxDiscussionOk = $true
                 if (-not (Test-V7HasProperty -InputObject $status.processes -Name 'ux-discussion')) {
@@ -2190,7 +2356,7 @@ try {
             Add-SupervisorStage -QueueRunDir $finalQueueDir -EventsPath $finalEventsPath -State 'CLEANUP' -Message 'Starting task cleanup' -Data @{ task_json = $taskJsonLocal; local_run_dir = $localRunDir; worktrees_dir = $worktreesDir }
             & $env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $workerRoot 'Cleanup-TaskRun.ps1') -TaskJsonPath $taskJsonLocal 1> $cleanupStdout 2> $cleanupStderr
             $cleanupExitCode = Get-V7NormalizedExitCode $LASTEXITCODE
-            if ($cleanupExitCode -eq 0) {
+            if (Test-V7ExitSuccess $cleanupExitCode) {
                 Add-SupervisorStage -QueueRunDir $finalQueueDir -EventsPath $finalEventsPath -State 'CLEANUP' -Message 'Task cleanup completed' -Data @{ task_json = $taskJsonLocal; exit_code = 0; stdout_log = $cleanupStdout; stderr_log = $cleanupStderr }
             } else {
                 Add-SupervisorStage -QueueRunDir $finalQueueDir -EventsPath $finalEventsPath -State 'WARNING' -Message 'Task cleanup failed' -Data @{ task_json = $taskJsonLocal; exit_code = $cleanupExitCode; stdout_log = $cleanupStdout; stderr_log = $cleanupStderr }

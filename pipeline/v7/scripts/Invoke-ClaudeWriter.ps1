@@ -113,7 +113,7 @@ $hasWriterCommit = -not [string]::IsNullOrWhiteSpace($headCommit) -and ($autoCom
 $result = [ordered]@{
     worker = if ($Mode -eq 'writer') { 'claude-writer' } else { 'claude-reconcile' }
     mode = $Mode
-    status = if ($exitCode -eq 0) { 'completed' } else { 'failed' }
+    status = if (Test-V7ExitSuccess $exitCode) { 'completed' } else { 'failed' }
     exit_code = $exitCode
     started_at = $startedAt
     ended_at = $endedAt
@@ -128,6 +128,6 @@ $result = [ordered]@{
 }
 Write-V7Json -Path $resultPath -Data $result
 
-if ($exitCode -ne 0) {
+if (-not (Test-V7ExitSuccess $exitCode)) {
     exit $exitCode
 }

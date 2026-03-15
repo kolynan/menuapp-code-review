@@ -155,6 +155,22 @@ try {
         Assert-V7True -Value ($slug.Length -le 80) -Message 'Slug should be capped at 80 characters.'
     }
 
+    Invoke-V7TestCase -Name 'Test-V7ExitSuccess exit code 0' -Action {
+        Assert-V7True -Value (Test-V7ExitSuccess 0) -Message 'Exit code 0 should be successful.'
+    }
+
+    Invoke-V7TestCase -Name 'Test-V7ExitSuccess null exit code' -Action {
+        Assert-V7True -Value (Test-V7ExitSuccess $null) -Message 'Null exit code should normalize to success.'
+    }
+
+    Invoke-V7TestCase -Name 'Test-V7ExitSuccess empty-string exit code' -Action {
+        Assert-V7True -Value (Test-V7ExitSuccess '') -Message 'Empty-string exit code should normalize to success.'
+    }
+
+    Invoke-V7TestCase -Name 'Test-V7ExitSuccess nonzero exit code' -Action {
+        Assert-V7False -Value (Test-V7ExitSuccess 7) -Message 'Nonzero exit code should fail.'
+    }
+
     Invoke-V7TestCase -Name 'Write-V7Json writes BOM-free valid JSON' -Action {
         $jsonPath = Join-Path $workspaceTestRoot 'sample.json'
         Write-V7Json -Path $jsonPath -Data ([ordered]@{ a = 1; nested = [ordered]@{ b = 2 } })

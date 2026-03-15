@@ -53,7 +53,7 @@ $cherryLines = @()
 if (-not [string]::IsNullOrWhiteSpace([string]$cherryPick.stdout)) { $cherryLines += [string]$cherryPick.stdout }
 if (-not [string]::IsNullOrWhiteSpace([string]$cherryPick.stderr)) { $cherryLines += [string]$cherryPick.stderr }
 Write-V7TextFile -Path (Join-Path $logsDir 'parallel-write-cherry-pick.log') -Content (if ($cherryLines.Count -gt 0) { (($cherryLines -join "`n").TrimEnd() + "`n") } else { '' })
-if ((Get-V7NormalizedExitCode $cherryPick.exit_code) -ne 0) {
+if (-not (Test-V7ExitSuccess $cherryPick.exit_code)) {
     throw 'Unable to cherry-pick CC writer commit into merge worktree.'
 }
 
@@ -102,7 +102,7 @@ if (-not [string]::IsNullOrWhiteSpace($RulesPath) -and (Test-Path -LiteralPath $
     $claudeArgs += @('--append-system-prompt-file', $RulesPath)
 }
 $exitCode = Invoke-V7CommandToFiles -CommandPrefix $claudePrefix -Arguments $claudeArgs -WorkingDirectory $mergeWorktree -StdOutPath $stdoutPath -StdErrPath $stderrPath
-if ((Get-V7NormalizedExitCode $exitCode) -ne 0) {
+if (-not (Test-V7ExitSuccess $exitCode)) {
     throw 'Parallel-write reconcile pass failed.'
 }
 if (-not (Test-Path -LiteralPath $reportPath)) {

@@ -58,6 +58,11 @@ function Get-V7NormalizedExitCode {
     return ($ExitCode -as [int])
 }
 
+function Test-V7ExitSuccess {
+    param([AllowNull()]$ExitCode)
+    return (Get-V7NormalizedExitCode $ExitCode) -eq 0
+}
+
 function Merge-V7Hashtable {
     param(
         [System.Collections.IDictionary]$Base,
@@ -687,7 +692,7 @@ function Invoke-V7Git {
     )
 
     $result = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments (@('-C', $RepoRoot) + $Arguments) -WorkingDirectory $RepoRoot
-    if ((Get-V7NormalizedExitCode $result.exit_code) -ne 0) {
+    if (-not (Test-V7ExitSuccess $result.exit_code)) {
         $details = @()
         if (-not [string]::IsNullOrWhiteSpace([string]$result.stderr)) {
             $details += [string]$result.stderr
@@ -830,7 +835,7 @@ function Test-V7BranchExists {
     }
 
     $result = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C', $RepoRoot, 'show-ref', '--verify', '--quiet', ('refs/heads/' + $BranchName)) -WorkingDirectory $RepoRoot
-    return (Get-V7NormalizedExitCode $result.exit_code) -eq 0
+    return (Test-V7ExitSuccess $result.exit_code)
 }
 
 function Remove-V7Branch {
@@ -844,7 +849,7 @@ function Remove-V7Branch {
     }
 
     $result = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C', $RepoRoot, 'branch', '-D', $BranchName) -WorkingDirectory $RepoRoot
-    if ((Get-V7NormalizedExitCode $result.exit_code) -ne 0) {
+    if (-not (Test-V7ExitSuccess $result.exit_code)) {
         $details = @($result.stderr, $result.stdout) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
         $suffix = if ($details.Count -gt 0) { ': ' + (($details -join [Environment]::NewLine).Trim()) } else { '' }
         throw ('Unable to delete existing branch ' + $BranchName + $suffix)
@@ -909,7 +914,7 @@ function Remove-V7Worktree {
     $shouldAttemptRemove = $record -or (Test-Path -LiteralPath $removePath)
     if ($shouldAttemptRemove) {
         $result = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C', $RepoRoot, 'worktree', 'remove', '--force', $removePath) -WorkingDirectory $RepoRoot
-        if ((Get-V7NormalizedExitCode $result.exit_code) -ne 0) {
+        if (-not (Test-V7ExitSuccess $result.exit_code)) {
             $details = @($result.stderr, $result.stdout) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
             $suffix = if ($details.Count -gt 0) { ': ' + (($details -join [Environment]::NewLine).Trim()) } else { '' }
             throw ('Unable to remove worktree ' + $removePath + $suffix)

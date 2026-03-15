@@ -94,19 +94,19 @@ if (($headCommit -eq $baseCommit -or [string]::IsNullOrWhiteSpace($baseCommit)) 
 
 $changedFiles = @(Get-V7ChangedFiles -RepoRoot $worktree -BaseCommit $baseCommit)
 $hasCommit = -not [string]::IsNullOrWhiteSpace($headCommit) -and ($autoCommitted -or (-not [string]::IsNullOrWhiteSpace($baseCommit) -and $headCommit -ne $baseCommit))
-if ([string]::IsNullOrWhiteSpace($errorMessage) -and (Get-V7NormalizedExitCode $exitCode) -ne 0 -and (Test-Path -LiteralPath $stderrPath)) {
+if ([string]::IsNullOrWhiteSpace($errorMessage) -and (-not (Test-V7ExitSuccess $exitCode)) -and (Test-Path -LiteralPath $stderrPath)) {
     $stderrText = (Read-V7TextFile -Path $stderrPath).Trim()
     if (-not [string]::IsNullOrWhiteSpace($stderrText)) {
         $errorMessage = (($stderrText -split "`r?`n") | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -First 1)
     }
 }
-if ([string]::IsNullOrWhiteSpace($errorMessage) -and (Get-V7NormalizedExitCode $exitCode) -ne 0) {
+if ([string]::IsNullOrWhiteSpace($errorMessage) -and (-not (Test-V7ExitSuccess $exitCode))) {
     $errorMessage = 'Codex writer exited with code ' + $exitCode
 }
 
 $result = [ordered]@{
     worker = 'codex-writer'
-    status = if ((Get-V7NormalizedExitCode $exitCode) -eq 0) { 'completed' } else { 'failed' }
+    status = if (Test-V7ExitSuccess $exitCode) { 'completed' } else { 'failed' }
     exit_code = (Get-V7NormalizedExitCode $exitCode)
     started_at = $startedAt
     ended_at = $endedAt
@@ -123,6 +123,6 @@ $result = [ordered]@{
 }
 Write-V7Json -Path $resultPath -Data $result
 
-if ((Get-V7NormalizedExitCode $exitCode) -ne 0) {
+if (-not (Test-V7ExitSuccess $exitCode)) {
     exit $exitCode
 }
