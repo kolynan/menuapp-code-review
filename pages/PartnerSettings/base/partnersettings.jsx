@@ -1615,6 +1615,13 @@ function SectionNav({ activeSection, t }) {
    MAIN COMPONENT
    ============================================================ */
 
+/**
+ * PartnerSettings — Partner cabinet settings page.
+ * Manages restaurant profile, working hours, ordering channels, hall settings,
+ * Wi-Fi configuration, languages, currencies, and contact links.
+ * Must be rendered inside PartnerShell (provides partner context via usePartnerAccess).
+ * @returns {JSX.Element}
+ */
 export default function PartnerSettings() {
   const { t } = useI18n();
   
