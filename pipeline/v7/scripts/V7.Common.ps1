@@ -895,6 +895,7 @@ function New-V7Worktree {
     }
 
     if ($BranchName) {
+        # KB-040: failed runs can leave task/* branches behind, so recreate them forcefully.
         Invoke-V7Git -RepoRoot $RepoRoot -Arguments @('worktree', 'add', '--force', '-B', $BranchName, $Path, $BaseCommit) -FailureMessage 'Unable to create worktree' | Out-Null
     } else {
         Invoke-V7Git -RepoRoot $RepoRoot -Arguments @('worktree', 'add', '--force', '--detach', $Path, $BaseCommit) -FailureMessage 'Unable to create detached worktree' | Out-Null
@@ -926,6 +927,7 @@ function Remove-V7Worktree {
     }
 
     if (-not [string]::IsNullOrWhiteSpace($branchName) -and $branchName.StartsWith('task/')) {
+        # KB-040: remove stale task branches so the next run can recreate the worktree cleanly.
         Remove-V7Branch -RepoRoot $RepoRoot -BranchName $branchName
     }
 }

@@ -5,6 +5,10 @@ $commonPath = Join-Path $PSScriptRoot 'V7.Common.ps1'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 $workspaceTestRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('v7pipeline-test-' + $PID)
+$worktreeRepoRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('v7worktree-' + $PID)
+$worktreePath = Join-Path $workspaceTestRoot 'worktree'
+$worktreeBranch = 'task/test-kb040-cleanup-' + $PID
+$copySourceRoot = Join-Path $repoRoot ('.p7-' + $PID)
 $script:V7TestFailures = New-Object System.Collections.Generic.List[string]
 
 function Write-TestResult {
@@ -98,11 +102,6 @@ if (Test-Path -LiteralPath $workspaceTestRoot) {
     Remove-Item -LiteralPath $workspaceTestRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 Ensure-V7Directory -Path $workspaceTestRoot | Out-Null
-
-$worktreeRepoRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('v7worktree-' + $PID)
-$worktreePath = Join-Path $workspaceTestRoot 'worktree'
-$worktreeBranch = 'task/test-v7pipeline-' + (Get-Date -Format 'yyyyMMddHHmmss') + '-' + $PID
-$copySourceRoot = Join-Path $repoRoot ('.p7-' + $PID)
 
 try {
     Invoke-V7TestCase -Name 'Test-V7HasProperty hashtable existing key' -Action {
@@ -207,7 +206,7 @@ try {
         Assert-V7True -Value $threw -Message 'Invoke-V7Git should throw on invalid git commands.'
     }
 
-    Invoke-V7TestCase -Name 'New-V7Worktree and Remove-V7Worktree round-trip' -Action {
+    Invoke-V7TestCase -Name 'New-V7Worktree handles pre-existing branch and Remove-V7Worktree cleans it up' -Action {
         if (Test-Path -LiteralPath $worktreeRepoRoot) {
             Remove-Item -LiteralPath $worktreeRepoRoot -Recurse -Force -ErrorAction SilentlyContinue
         }
@@ -219,6 +218,8 @@ try {
         Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('add', 'README.md') -FailureMessage 'Unable to stage worktree test file' | Out-Null
         Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('commit', '-m', 'initial worktree test commit') -FailureMessage 'Unable to commit worktree test file' | Out-Null
         $baseCommit = Get-V7RepoHead -RepoRoot $worktreeRepoRoot
+        Invoke-V7Git -RepoRoot $worktreeRepoRoot -Arguments @('branch', $worktreeBranch, $baseCommit) -FailureMessage 'Unable to create pre-existing worktree test branch' | Out-Null
+        Assert-V7True -Value (Test-V7BranchExists -RepoRoot $worktreeRepoRoot -BranchName $worktreeBranch) -Message 'The pre-existing branch should exist before New-V7Worktree runs.'
         if (Test-Path -LiteralPath $worktreePath) {
             Remove-Item -LiteralPath $worktreePath -Recurse -Force -ErrorAction SilentlyContinue
         }
