@@ -30,7 +30,7 @@ if ([string]::IsNullOrWhiteSpace($writerCommit) -and -not [string]::IsNullOrWhit
 }
 
 if ([string]::IsNullOrWhiteSpace($writerCommit)) {
-    # Writer made no changes — skip cherry-pick, produce clean merge result
+    # Writer made no changes - skip cherry-pick, produce clean merge result
     $mergeCommit = (Invoke-V7Git -RepoRoot $mergeWorktree -Arguments @('rev-parse', 'HEAD') -FailureMessage 'Unable to resolve merge worktree HEAD').stdout.Trim()
     $reportLines = @(
         '# Merge Report',
