@@ -91,7 +91,7 @@ function ProfileContent() {
               setPartnerName(partner.name);
             }
           } catch (err) {
-            // Partner load failed — user sees "Не привязан"
+            // Partner load failed — falls back to "no restaurant" label
           } finally {
             if (isMounted) setIsPartnerLoading(false);
           }
