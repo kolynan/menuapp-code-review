@@ -30,7 +30,31 @@ if ([string]::IsNullOrWhiteSpace($writerCommit) -and -not [string]::IsNullOrWhit
 }
 
 if ([string]::IsNullOrWhiteSpace($writerCommit)) {
-    throw 'Claude writer did not produce a commit hash.'
+    # Writer made no changes — skip cherry-pick, produce clean merge result
+    $mergeCommit = (Invoke-V7Git -RepoRoot $mergeWorktree -Arguments @('rev-parse', 'HEAD') -FailureMessage 'Unable to resolve merge worktree HEAD').stdout.Trim()
+    $reportLines = @(
+        '# Merge Report',
+        '',
+        "Task: $($task.task_id)",
+        "Workflow: $($task.workflow)",
+        "Writer commit: (none — no changes)",
+        "Merge commit: $mergeCommit",
+        "Reviewer findings: 0",
+        '',
+        'No writer changes to merge.'
+    )
+    Write-V7TextFile -Path $mergeReportPath -Content (($reportLines -join "`n") + "`n")
+    $result = [ordered]@{
+        status = 'completed'
+        writer_commit = ''
+        merge_commit = $mergeCommit
+        reviewer_findings = 0
+        reconcile_result = ''
+        changed_files = @()
+        report_file = $mergeReportPath
+    }
+    Write-V7Json -Path $mergeResultPath -Data $result
+    exit 0
 }
 
 $mergeCommand = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C', $mergeWorktree, 'cherry-pick', $writerCommit) -WorkingDirectory $mergeWorktree
@@ -41,11 +65,12 @@ if (-not [string]::IsNullOrWhiteSpace([string]$mergeCommand.stdout)) {
 if (-not [string]::IsNullOrWhiteSpace([string]$mergeCommand.stderr)) {
     $mergeOutputParts += [string]$mergeCommand.stderr
 }
-$mergeLogContent = if ($mergeOutputParts.Count -gt 0) { (($mergeOutputParts -join "`n").TrimEnd() + "`n") } else { '' }
-Write-V7TextFile -Path (Join-Path $logsDir 'merge-cherry-pick.log') -Content $mergeLogContent
+$mergeLogContent = @()
+if ($mergeOutputParts.Count -gt 0) { $mergeLogContent = $mergeOutputParts }
+Write-V7TextFile -Path (Join-Path $logsDir 'merge-cherry-pick.log') -Content (if ($mergeLogContent.Count -gt 0) { (($mergeLogContent -join "`n").TrimEnd() + "`n") } else { '' })
 if ($mergeCommand.exit_code -ne 0) {
     $mergeFailureDetails = @($mergeCommand.stderr, $mergeCommand.stdout) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
-    $mergeFailureSuffix = if ($mergeFailureDetails.Count -gt 0) { ': ' + (($mergeFailureDetails -join [Environment]::NewLine).Trim()) } else { '' }
+    $mergeFailureSuffix = if (@($mergeFailureDetails).Count -gt 0) { ': ' + (($mergeFailureDetails -join [Environment]::NewLine).Trim()) } else { '' }
     throw ('Cherry-pick failed during merge' + $mergeFailureSuffix)
 }
 
