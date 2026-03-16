@@ -1828,7 +1828,7 @@ function Wait-V7Launchers {
 
     $startedAt = Get-Date
     $deadline = $startedAt.AddMinutes($TimeoutMinutes)
-    $nextHeartbeat = $startedAt.AddMinutes(5)
+    $nextHeartbeat = $startedAt.AddMinutes(2)
     $nextProgressRefresh = $startedAt
 
     while ($true) {
@@ -1864,6 +1864,10 @@ function Wait-V7Launchers {
                 Update-V7ParallelWriteHeartbeatProgress -Status $Status
                 Set-V7Status -StatusPath $StatusPath -Status $Status
             }
+            if ($Workflow -eq 'code-review') {
+                Update-V7TelegramCodeReviewStateFromArtifacts -Status $Status -ArtifactsDir $ArtifactsDir -OverallState 'RUNNING' -ErrorMessage ''
+                Set-V7Status -StatusPath $StatusPath -Status $Status
+            }
             $heartbeatText = "[$stageName] running... (${elapsedMinutes}m elapsed)"
             $heartbeatData = [ordered]@{ stage = $stageName; pids = $alivePids; elapsed_minutes = $elapsedMinutes }
             if ($Workflow -eq 'parallel-write') {
@@ -1872,7 +1876,7 @@ function Wait-V7Launchers {
             }
             Add-SupervisorStage -QueueRunDir $QueueRunDir -EventsPath $EventsPath -State 'HEARTBEAT' -Message $heartbeatText -Data $heartbeatData
             Invoke-V7TelegramScript -Config $Config -Status $Status -StatusPath $StatusPath -State 'HEARTBEAT' -Message $heartbeatText -EventsPath $EventsPath -QueueRunDir $QueueRunDir -ArtifactsDir $ArtifactsDir -TaskId $Status.task_id -Workflow $Workflow -WarningMessage 'Telegram heartbeat failed' -WarningData $heartbeatData | Out-Null
-            $nextHeartbeat = $nextHeartbeat.AddMinutes(5)
+            $nextHeartbeat = $nextHeartbeat.AddMinutes(2)
         }
         if (-not [string]::IsNullOrWhiteSpace($Workflow) -and (Get-Date) -ge $nextProgressRefresh) {
             Invoke-V7TelegramScript -Config $Config -Status $Status -StatusPath $StatusPath -State $Status.state -Message $stageName -EventsPath $EventsPath -QueueRunDir $QueueRunDir -ArtifactsDir $ArtifactsDir -TaskId $Status.task_id -Workflow $Workflow -WarningMessage 'Telegram progress refresh failed' -WarningData @{ stage = $stageName; pids = $alivePids } | Out-Null
