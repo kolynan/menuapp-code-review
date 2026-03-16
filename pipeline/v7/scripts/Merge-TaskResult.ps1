@@ -37,7 +37,7 @@ if ([string]::IsNullOrWhiteSpace($writerCommit)) {
         '',
         "Task: $($task.task_id)",
         "Workflow: $($task.workflow)",
-        "Writer commit: (none — no changes)",
+        "Writer commit: (none - no changes)",
         "Merge commit: $mergeCommit",
         "Reviewer findings: 0",
         '',
