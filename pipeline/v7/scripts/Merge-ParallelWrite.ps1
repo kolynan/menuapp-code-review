@@ -111,7 +111,10 @@ if (-not (Test-Path -LiteralPath $reportPath)) {
 
 $headCommit = (Invoke-V7Git -RepoRoot $mergeWorktree -Arguments @('rev-parse', 'HEAD') -FailureMessage 'Unable to resolve parallel-write merge HEAD').stdout.Trim()
 $dirtyStatus = Invoke-V7Git -RepoRoot $mergeWorktree -Arguments @('status', '--porcelain') -FailureMessage 'Unable to inspect parallel-write merge worktree status'
-$dirty = if ([string]::IsNullOrWhiteSpace([string]$dirtyStatus.stdout)) { @() } else { @(($dirtyStatus.stdout -split "`r?`n") | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) }
+$dirty = @()
+if (-not [string]::IsNullOrWhiteSpace([string]$dirtyStatus.stdout)) {
+    $dirty = @(($dirtyStatus.stdout -split "`r?`n") | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+}
 $autoCommitted = $false
 if ($headCommit -eq $preReconcileHead -and $dirty.Count -gt 0) {
     Invoke-V7Git -RepoRoot $mergeWorktree -Arguments @('add', '-A') -FailureMessage 'Unable to stage parallel-write reconcile changes' | Out-Null

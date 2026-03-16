@@ -91,10 +91,9 @@ $endedAt = Get-V7Timestamp
 
 $headCommit = (Invoke-V7Git -RepoRoot $worktree -Arguments @('rev-parse', 'HEAD') -FailureMessage 'Unable to resolve Claude writer HEAD').stdout.Trim()
 $dirtyStatus = Invoke-V7Git -RepoRoot $worktree -Arguments @('status', '--porcelain') -FailureMessage 'Unable to inspect Claude writer worktree status'
-$dirty = if ([string]::IsNullOrWhiteSpace([string]$dirtyStatus.stdout)) {
-    @()
-} else {
-    @(
+$dirty = @()
+if (-not [string]::IsNullOrWhiteSpace([string]$dirtyStatus.stdout)) {
+    $dirty = @(
         ($dirtyStatus.stdout -split "`r?`n") |
             Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
     )
