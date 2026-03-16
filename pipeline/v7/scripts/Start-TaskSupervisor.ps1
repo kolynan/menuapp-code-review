@@ -1969,6 +1969,7 @@ try {
     }
     $taskPage = if ($TaskPage) { $TaskPage } elseif ((Test-V7HasProperty -InputObject $meta -Name 'page')) { $meta['page'] } else { '' }
     $taskTopic = if ($TaskTopic) { $TaskTopic } elseif ((Test-V7HasProperty -InputObject $meta -Name 'topic')) { $meta['topic'] } else { '' }
+    $taskCodeFile = if ((Test-V7HasProperty -InputObject $meta -Name 'code_file')) { [string]$meta['code_file'] } else { '' }
     $budgetSource = if ($TaskBudget) { $TaskBudget } elseif ((Test-V7HasProperty -InputObject $meta -Name 'budget')) { $meta['budget'] } else { '10' }
     $taskBudget = ($budgetSource -replace '[$"'']', '').Trim()
     if ([string]::IsNullOrWhiteSpace($taskBudget)) {
@@ -1997,7 +1998,13 @@ try {
     $codeFile = ''
     $bugsFile = ''
     $readmeFile = ''
-    if ($taskPage -and (Test-Path -LiteralPath $pageDir)) {
+    if (-not [string]::IsNullOrWhiteSpace($taskCodeFile)) {
+        $resolvedCodeFile = Join-Path $repoRootPath $taskCodeFile
+        if (Test-Path -LiteralPath $resolvedCodeFile) {
+            $codeFile = $resolvedCodeFile
+        }
+    }
+    if (-not $codeFile -and $taskPage -and (Test-Path -LiteralPath $pageDir)) {
         $baseDir = Join-Path $pageDir 'base'
         if (Test-Path -LiteralPath $baseDir) {
             $candidate = Get-ChildItem -Path $baseDir -Filter '*.jsx' -File | Select-Object -First 1
