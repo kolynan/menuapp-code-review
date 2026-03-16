@@ -1864,7 +1864,7 @@ function Wait-V7Launchers {
                 Update-V7ParallelWriteHeartbeatProgress -Status $Status
                 Set-V7Status -StatusPath $StatusPath -Status $Status
             }
-            if ($Workflow -eq 'code-review') {
+            if ($Workflow -eq 'code-review' -and -not [string]::IsNullOrWhiteSpace($ArtifactsDir)) {
                 Update-V7TelegramCodeReviewStateFromArtifacts -Status $Status -ArtifactsDir $ArtifactsDir -OverallState 'RUNNING' -ErrorMessage ''
                 Set-V7Status -StatusPath $StatusPath -Status $Status
             }
