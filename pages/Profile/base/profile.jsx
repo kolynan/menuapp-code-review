@@ -90,7 +90,7 @@ function ProfileContent() {
             if (isMounted && partner) {
               setPartnerName(partner.name);
             }
-          } catch (err) {
+          } catch {
             // Partner load failed — falls back to "no restaurant" label
           } finally {
             if (isMounted) setIsPartnerLoading(false);
