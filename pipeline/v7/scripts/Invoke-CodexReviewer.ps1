@@ -98,6 +98,64 @@ $stderrPath = Join-Path $logsDir 'codex-reviewer.stderr.log'
 $resultPath = Join-Path $artifactsDir 'codex-review-findings.json'
 $workerResultPath = Join-Path $artifactsDir 'codex-reviewer.result.json'
 $schemaPath = $task.paths.review_schema_path
+$bundlePath = Join-Path $promptsDir 'codex-reviewer.bundle.md'
+$preflightStartedAt = Get-V7Timestamp
+
+$codeFilePath = [string]$task.paths.code_file
+$bugsFilePath = [string]$task.paths.bugs_file
+$readmeFilePath = [string]$task.paths.readme_file
+
+if (-not (Test-Path -LiteralPath $codeFilePath)) {
+    $errorMessage = 'Codex reviewer target code file not found: ' + $codeFilePath
+    Write-V7TextFile -Path $stdoutPath -Content ''
+    Write-V7TextFile -Path $stderrPath -Content ($errorMessage + "`n")
+    [Console]::Error.WriteLine($errorMessage)
+
+    $skippedResult = [ordered]@{
+        worker = 'codex-reviewer'
+        status = 'skipped'
+        exit_code = 0
+        started_at = $preflightStartedAt
+        ended_at = Get-V7Timestamp
+        stdout_log = $stdoutPath
+        stderr_log = $stderrPath
+        prompt_file = $promptPath
+        bundle_file = $bundlePath
+        output_file = ''
+        findings_count = 0
+        resolved_command = ''
+        error_message = $errorMessage
+    }
+    Write-V7Json -Path $workerResultPath -Data $skippedResult
+    exit 0
+}
+
+$codeContent = Read-V7TextFile -Path $codeFilePath
+$bugsContent = 'No BUGS.md found'
+if (-not [string]::IsNullOrWhiteSpace($bugsFilePath) -and (Test-Path -LiteralPath $bugsFilePath)) {
+    $bugsContent = Read-V7TextFile -Path $bugsFilePath
+}
+
+$readmeContent = 'No README.md found'
+if (-not [string]::IsNullOrWhiteSpace($readmeFilePath) -and (Test-Path -LiteralPath $readmeFilePath)) {
+    $readmeContent = Read-V7TextFile -Path $readmeFilePath
+}
+
+$bundleLines = @(
+    '# Review Bundle'
+    ''
+    '## Target Code: ' + (Split-Path -Leaf $codeFilePath)
+    '```'
+    $codeContent
+    '```'
+    ''
+    '## Known Bugs (BUGS.md)'
+    $bugsContent
+    ''
+    '## Page Context (README.md)'
+    $readmeContent
+)
+Write-V7TextFile -Path $bundlePath -Content ($bundleLines -join "`n")
 
 $prompt = @"
 You are the independent reviewer in MenuApp pipeline V7.
@@ -105,25 +163,26 @@ You are the independent reviewer in MenuApp pipeline V7.
 Task ID: $($task.task_id)
 Workflow: $($task.workflow)
 Page: $($task.metadata.page)
-Code file: $($task.paths.code_file)
-BUGS.md: $($task.paths.bugs_file)
-README.md: $($task.paths.readme_file)
-Repository root: $($task.paths.repo_root)
+
+IMPORTANT: A pre-built review bundle has been prepared for you at: $bundlePath
+This bundle contains the target code, BUGS.md, and README.md already assembled.
+
+Instructions:
+1. Read the review bundle file FIRST. It contains all primary context you need.
+2. Do NOT scan the repository for files. Do NOT explore directories.
+3. You may read UP TO 5 additional files ONLY if the code imports or references them directly.
+4. Do NOT read anything in versions/, archive/, screenshots/, or .pipeline/ folders.
+5. Report only NEW issues that are NOT already listed in the Known Bugs section of the bundle.
+6. Focus on: missing error handling, i18n, mobile UX, React best practices, accessibility, performance.
+7. Do not edit any files.
+8. Return JSON that matches the provided schema.
 
 Task instructions:
 $($task.task.body)
-
-Your job:
-- Review the target page and nearby context files.
-- Report only NEW issues that are NOT already listed in BUGS.md.
-- Focus on: missing error handling, i18n, mobile UX, React best practices, accessibility, performance.
-- Do not edit files.
-- Return JSON that matches the provided schema.
 "@
 
 Write-V7TextFile -Path $promptPath -Content $prompt
 
-$preflightStartedAt = Get-V7Timestamp
 if ($codexPrefix.Count -eq 0) {
     $configuredPath = [string]$config.paths.codex_cli
     $errorMessage = 'Codex CLI not found. Checked configured path "' + $configuredPath + '" plus PATH resolution via Get-Command codex/codex.cmd.'
@@ -140,6 +199,7 @@ if ($codexPrefix.Count -eq 0) {
         stdout_log = $stdoutPath
         stderr_log = $stderrPath
         prompt_file = $promptPath
+        bundle_file = $bundlePath
         output_file = ''
         findings_count = 0
         resolved_command = ''
@@ -191,6 +251,7 @@ $result = [ordered]@{
     stdout_log = $stdoutPath
     stderr_log = $stderrPath
     prompt_file = $promptPath
+    bundle_file = $bundlePath
     output_file = if (Test-Path -LiteralPath $resultPath) { $resultPath } else { '' }
     findings_count = $findingsCount
     resolved_command = if ($codexPrefix.Count -gt 0) { ($codexPrefix -join ' ') } else { '' }
