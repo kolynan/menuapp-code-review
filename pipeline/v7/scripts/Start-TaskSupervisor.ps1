@@ -1831,6 +1831,8 @@ function Wait-V7Launchers {
     $nextHeartbeat = $startedAt.AddMinutes(2)
     $nextProgressRefresh = $startedAt
 
+    $resultFileNames = @('claude-writer.result.json', 'codex-reviewer.result.json', 'codex-writer.result.json', 'ux-discussion.result.json')
+
     while ($true) {
         $allExited = $true
         $alivePids = @()
@@ -1838,6 +1840,24 @@ function Wait-V7Launchers {
             if (Test-V7WorkerProcessAlive -Process $proc) {
                 $allExited = $false
                 $alivePids += $proc.Id
+            }
+        }
+
+        # Fallback: if all expected result files exist, treat workers as done
+        # even if launcher processes are still alive (KB-034/KB-050 fix)
+        if (-not $allExited -and -not [string]::IsNullOrWhiteSpace($ArtifactsDir) -and (Test-Path -LiteralPath $ArtifactsDir)) {
+            $expectedCount = $Processes.Count
+            $foundCount = 0
+            foreach ($rName in $resultFileNames) {
+                $rPath = Join-Path $ArtifactsDir $rName
+                if (Test-Path -LiteralPath $rPath) {
+                    $foundCount++
+                }
+            }
+            if ($foundCount -ge $expectedCount) {
+                # All workers produced results — force exit
+                Add-SupervisorStage -QueueRunDir $QueueRunDir -EventsPath $EventsPath -State 'RUNNING' -Message 'All result files found, treating workers as done (fallback)' -Data @{ found = $foundCount; expected = $expectedCount }
+                $allExited = $true
             }
         }
 
