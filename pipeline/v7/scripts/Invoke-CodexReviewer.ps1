@@ -99,6 +99,8 @@ $resultPath = Join-Path $artifactsDir 'codex-review-findings.json'
 $workerResultPath = Join-Path $artifactsDir 'codex-reviewer.result.json'
 $schemaPath = $task.paths.review_schema_path
 $bundlePath = Join-Path $promptsDir 'codex-reviewer.bundle.md'
+$findingStreamPath = Get-V7FindingStreamPath -ArtifactsDir $artifactsDir -WorkerName 'codex-reviewer'
+Write-V7TextFile -Path $findingStreamPath -Content ''
 $preflightStartedAt = Get-V7Timestamp
 
 $codeFilePath = [string]$task.paths.code_file
@@ -166,6 +168,7 @@ Page: $($task.metadata.page)
 
 IMPORTANT: A pre-built review bundle has been prepared for you at: $bundlePath
 This bundle contains the target code, BUGS.md, and README.md already assembled.
+Live findings stream: $findingStreamPath
 
 Instructions:
 1. Read the review bundle file FIRST. It contains all primary context you need.
@@ -173,9 +176,13 @@ Instructions:
 3. You may read UP TO 5 additional files ONLY if the code imports or references them directly.
 4. Do NOT read anything in versions/, archive/, screenshots/, or .pipeline/ folders.
 5. Report only NEW issues that are NOT already listed in the Known Bugs section of the bundle.
-6. Focus on: missing error handling, i18n, mobile UX, React best practices, accessibility, performance.
-7. Do not edit any files.
-8. Return JSON that matches the provided schema.
+6. Each time you confirm a NEW finding, append one JSON line to $findingStreamPath immediately.
+7. Use worker='codex-reviewer', worker_key='codex_reviewer', and sequence numbers starting at 1.
+8. Keep summary text short enough for Telegram and stream at most 8 entries total.
+9. Do not rewrite or delete earlier stream lines.
+10. Focus on: missing error handling, i18n, mobile UX, React best practices, accessibility, performance.
+11. Do not edit any files.
+12. Return JSON that matches the provided schema.
 
 Task instructions:
 $($task.task.body)
@@ -229,6 +236,9 @@ if (Test-Path -LiteralPath $resultPath) {
     $reviewPayload = Read-V7Json -Path $resultPath
     if ($reviewPayload -and $reviewPayload.findings) {
         $findingsCount = @($reviewPayload.findings).Count
+    }
+    if ($reviewPayload -and $reviewPayload.findings) {
+        Sync-V7ReviewFindingsToStream -Path $findingStreamPath -ReviewPayload $reviewPayload -TaskId $task.task_id
     }
 }
 

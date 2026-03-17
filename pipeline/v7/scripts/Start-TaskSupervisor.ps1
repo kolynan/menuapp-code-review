@@ -139,6 +139,18 @@ function Ensure-V7TelegramState {
     if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'start_time') -or $null -eq $telegramState['start_time']) {
         $telegramState['start_time'] = ''
     }
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'finding_cursors') -or -not ($telegramState['finding_cursors'] -is [System.Collections.IDictionary])) {
+        $telegramState['finding_cursors'] = [ordered]@{}
+    }
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'finding_lines') -or $null -eq $telegramState['finding_lines']) {
+        $telegramState['finding_lines'] = @()
+    }
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'finding_hidden_count') -or $null -eq $telegramState['finding_hidden_count']) {
+        $telegramState['finding_hidden_count'] = 0
+    }
+    if (-not (Test-V7HasProperty -InputObject $telegramState -Name 'finding_totals') -or -not ($telegramState['finding_totals'] -is [System.Collections.IDictionary])) {
+        $telegramState['finding_totals'] = [ordered]@{}
+    }
     return $telegramState
 }
 
@@ -1033,6 +1045,69 @@ function Update-V7TelegramCodeReviewStateFromArtifacts {
     }
 }
 
+function Update-V7TelegramFindingStreamState {
+    param(
+        [hashtable]$Status,
+        [string]$ArtifactsDir
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ArtifactsDir)) {
+        return
+    }
+
+    $telegramState = Ensure-V7TelegramState -Status $Status
+    if ($null -eq $telegramState) {
+        return
+    }
+
+    $newEntries = @()
+    foreach ($workerName in @('claude-writer', 'codex-reviewer')) {
+        $cursor = 0
+        if (Test-V7HasProperty -InputObject $telegramState['finding_cursors'] -Name $workerName) {
+            $cursor = [int]$telegramState['finding_cursors'][$workerName]
+        }
+
+        $streamResult = Read-V7FindingStreamEntries -Path (Get-V7FindingStreamPath -ArtifactsDir $ArtifactsDir -WorkerName $workerName) -SkipLines $cursor
+        $telegramState['finding_cursors'][$workerName] = [int]$streamResult.next_line
+        $newEntries += @($streamResult.entries)
+    }
+
+    if (@($newEntries).Count -eq 0) {
+        return
+    }
+
+    $allLines = @($telegramState['finding_lines'])
+    foreach ($entry in @($newEntries | Sort-Object timestamp, worker, seq)) {
+        $workerLabel = switch ([string]$entry.worker_key) {
+            'claude_writer' { 'CC Writer' }
+            'codex_reviewer' { 'Codex Reviewer' }
+            default { [string]$entry.worker }
+        }
+
+        $allLines += '[' + $workerLabel + '] Finding #' + [string]$entry.seq + ': ' + [string]$entry.summary
+
+        $workerKey = [string]$entry.worker_key
+        if ([string]::IsNullOrWhiteSpace($workerKey)) {
+            $workerKey = [string]$entry.worker
+        }
+
+        $total = 0
+        if (Test-V7HasProperty -InputObject $telegramState['finding_totals'] -Name $workerKey) {
+            $total = [int]$telegramState['finding_totals'][$workerKey]
+        }
+        $telegramState['finding_totals'][$workerKey] = $total + 1
+    }
+
+    $maxVisible = 8
+    if ($allLines.Count -gt $maxVisible) {
+        $telegramState['finding_hidden_count'] = $allLines.Count - $maxVisible
+        $telegramState['finding_lines'] = @($allLines | Select-Object -Last $maxVisible)
+    } else {
+        $telegramState['finding_hidden_count'] = 0
+        $telegramState['finding_lines'] = $allLines
+    }
+}
+
 function Update-V7TelegramParallelWriteStateFromArtifacts {
     param(
         [hashtable]$Status,
@@ -1271,6 +1346,15 @@ function New-V7WorkflowTelegramMessageText {
         $entry = Get-V7TelegramWorkerEntry -Status $Status -WorkerKey ([string]$key)
         if ($entry) {
             $lines += (Get-V7TelegramRenderedLineForEntry -Entry $entry -OverallState $OverallState)
+        }
+    }
+
+    $findingLines = @($telegramState['finding_lines'])
+    if ($findingLines.Count -gt 0) {
+        $lines += '--- Findings ---'
+        $lines += $findingLines
+        if ([int]$telegramState['finding_hidden_count'] -gt 0) {
+            $lines += '(' + [string]$telegramState['finding_hidden_count'] + ' earlier findings hidden)'
         }
     }
 
@@ -1886,6 +1970,7 @@ function Wait-V7Launchers {
             }
             if ($Workflow -eq 'code-review' -and -not [string]::IsNullOrWhiteSpace($ArtifactsDir)) {
                 Update-V7TelegramCodeReviewStateFromArtifacts -Status $Status -ArtifactsDir $ArtifactsDir -OverallState 'RUNNING' -ErrorMessage ''
+                Update-V7TelegramFindingStreamState -Status $Status -ArtifactsDir $ArtifactsDir
                 Set-V7Status -StatusPath $StatusPath -Status $Status
             }
             $heartbeatText = "[$stageName] running... (${elapsedMinutes}m elapsed)"
@@ -1899,6 +1984,10 @@ function Wait-V7Launchers {
             $nextHeartbeat = $nextHeartbeat.AddMinutes(2)
         }
         if (-not [string]::IsNullOrWhiteSpace($Workflow) -and (Get-Date) -ge $nextProgressRefresh) {
+            if ($Workflow -eq 'code-review' -and -not [string]::IsNullOrWhiteSpace($ArtifactsDir)) {
+                Update-V7TelegramFindingStreamState -Status $Status -ArtifactsDir $ArtifactsDir
+                Set-V7Status -StatusPath $StatusPath -Status $Status
+            }
             Invoke-V7TelegramScript -Config $Config -Status $Status -StatusPath $StatusPath -State $Status.state -Message $stageName -EventsPath $EventsPath -QueueRunDir $QueueRunDir -ArtifactsDir $ArtifactsDir -TaskId $Status.task_id -Workflow $Workflow -WarningMessage 'Telegram progress refresh failed' -WarningData @{ stage = $stageName; pids = $alivePids } | Out-Null
             $nextProgressRefresh = (Get-Date).AddSeconds(15)
         }

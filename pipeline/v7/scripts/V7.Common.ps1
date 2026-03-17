@@ -1484,3 +1484,117 @@ function New-V7StatusObject {
         }
     }
 }
+
+function Get-V7FindingStreamPath {
+    param(
+        [Parameter(Mandatory = $true)][string]$ArtifactsDir,
+        [Parameter(Mandatory = $true)][string]$WorkerName
+    )
+
+    $streamDir = Ensure-V7Directory -Path (Join-Path $ArtifactsDir 'streams')
+    return Join-Path $streamDir ($WorkerName + '.jsonl')
+}
+
+function Add-V7FindingStreamEntry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Worker,
+        [Parameter(Mandatory = $true)][string]$WorkerKey,
+        [Parameter(Mandatory = $true)][int]$Sequence,
+        [Parameter(Mandatory = $true)][string]$Kind,
+        [Parameter(Mandatory = $true)][string]$Summary,
+        [string]$TaskId = '',
+        [string]$Severity = '',
+        [string]$File = '',
+        [int]$Line = 0,
+        [string]$CommitHash = '',
+        [string]$Details = ''
+    )
+
+    $entry = [ordered]@{
+        version = 1
+        timestamp = Get-V7Timestamp
+        worker = $Worker
+        worker_key = $WorkerKey
+        seq = $Sequence
+        kind = $Kind
+        summary = $Summary
+        task_id = $TaskId
+        severity = $Severity
+        file = $File
+        line = $Line
+        commit_hash = $CommitHash
+        details = $Details
+    }
+
+    Append-V7TextFile -Path $Path -Content (($entry | ConvertTo-Json -Compress -Depth 6) + "`n")
+}
+
+function Read-V7FindingStreamEntries {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [int]$SkipLines = 0
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return [ordered]@{
+            entries = @()
+            next_line = $SkipLines
+        }
+    }
+
+    $lines = (Read-V7TextFile -Path $Path) -split "`r?`n"
+    if ($lines.Count -eq 1 -and [string]::IsNullOrWhiteSpace([string]$lines[0])) {
+        $lines = @()
+    } elseif ($lines.Count -gt 1 -and [string]::IsNullOrWhiteSpace([string]$lines[$lines.Count - 1])) {
+        $lines = @($lines[0..($lines.Count - 2)])
+    }
+    $entries = @()
+    $nextLine = $SkipLines
+
+    for ($i = $SkipLines; $i -lt $lines.Count; $i++) {
+        $line = [string]$lines[$i]
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            $nextLine = $i + 1
+            continue
+        }
+
+        try {
+            $entries += ,($line | ConvertFrom-Json)
+            $nextLine = $i + 1
+        } catch {
+            break
+        }
+    }
+
+    return [ordered]@{
+        entries = $entries
+        next_line = $nextLine
+    }
+}
+
+function Sync-V7ReviewFindingsToStream {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)]$ReviewPayload,
+        [string]$TaskId = ''
+    )
+
+    if ($null -eq $ReviewPayload -or $null -eq $ReviewPayload.findings) {
+        return
+    }
+
+    $existing = Read-V7FindingStreamEntries -Path $Path -SkipLines 0
+    $seen = @{}
+    foreach ($entry in @($existing.entries)) {
+        $seen[[string]$entry.seq] = $true
+    }
+
+    $sequence = 1
+    foreach ($finding in @($ReviewPayload.findings)) {
+        if (-not $seen.ContainsKey([string]$sequence)) {
+            Add-V7FindingStreamEntry -Path $Path -Worker 'codex-reviewer' -WorkerKey 'codex_reviewer' -Sequence $sequence -Kind 'finding' -Summary ([string]$finding.title) -TaskId $TaskId -Severity ([string]$finding.severity) -File ([string]$finding.file) -Line ([int]$finding.line) -Details ([string]$finding.description)
+        }
+        $sequence++
+    }
+}

@@ -63,6 +63,8 @@ if ($Mode -eq 'writer') {
 
 $reviewFindingsPath = Join-Path $artifactsDir 'codex-review-findings.json'
 $bundlePath = Join-Path $promptsDir $bundleName
+$findingStreamPath = Get-V7FindingStreamPath -ArtifactsDir $artifactsDir -WorkerName (if ($Mode -eq 'writer') { 'claude-writer' } else { 'claude-reconcile' })
+Write-V7TextFile -Path $findingStreamPath -Content ''
 $preflightStartedAt = Get-V7Timestamp
 $commitMessage = if ($Mode -eq 'writer') {
     "task($($task.metadata.page)): $($task.task_id) CC writer"
@@ -151,16 +153,24 @@ Working tree: $worktree
 Target code inside worktree: $codeWorktreePath
 Summary file to write before you finish: $summaryPath
 Bundle file: $bundlePath
+Live findings stream: $findingStreamPath
 
 Instructions:
 1. Read the bundle file FIRST. It contains the target code, BUGS.md, and README.md.
 2. Do NOT scan the repository. Do NOT explore directories.
 3. You may read UP TO 5 additional files ONLY if they are directly imported by the target code or named explicitly in the task.
 4. Do NOT read anything in versions/, archive/, screenshots/, or .pipeline/ folders.
-5. Work only inside the assigned worktree.
-6. Update the target page, BUGS.md, and README.md only when this task requires it.
-7. Keep changes scoped to the task.
-8. Before finishing, write a concise markdown summary to $summaryPath with: files changed, main fixes, tests or checks run, and any follow-up risk.
+5. Whenever you confirm a meaningful fix, blocker, or important implementation decision, append one JSON line to $findingStreamPath.
+6. Use worker='claude-writer' for writer mode or worker='claude-reconcile' for reconcile mode. Use worker_key='claude_writer' for writer mode or worker_key='claude_reconcile' for reconcile mode. Sequence numbers start at 1.
+7. Keep summary text short enough for Telegram and stream at most 8 entries total.
+8. Do not rewrite or delete earlier stream lines.
+9. Work only inside the assigned worktree.
+10. Update the target page, BUGS.md, and README.md only when this task requires it.
+11. Keep changes scoped to the task.
+12. Before finishing, write a concise markdown summary to $summaryPath with: files changed, main fixes, tests or checks run, and any follow-up risk.
+
+Example stream append:
+powershell.exe -NoProfile -Command "& { Add-Content -LiteralPath '$findingStreamPath' -Value '{""version"":1,""timestamp"":""' + (Get-Date).ToString('o') + '"",""worker"":""claude-writer"",""worker_key"":""claude_writer"",""seq"":1,""kind"":""fix"",""summary"":""Added null guard before total render"",""task_id"":""$($task.task_id)""}' }"
 
 Task instructions:
 $($task.task.body)
@@ -245,6 +255,10 @@ $result = [ordered]@{
     error_message = $errorMessage
 }
 Write-V7Json -Path $resultPath -Data $result
+
+if (Test-V7ExitSuccess $exitCode -and $hasWriterCommit) {
+    Add-V7FindingStreamEntry -Path $findingStreamPath -Worker (if ($Mode -eq 'writer') { 'claude-writer' } else { 'claude-reconcile' }) -WorkerKey (if ($Mode -eq 'writer') { 'claude_writer' } else { 'claude_reconcile' }) -Sequence 9999 -Kind 'note' -Summary ('Committed ' + $headCommit.Substring(0, 7)) -TaskId $task.task_id -CommitHash $headCommit
+}
 
 if (-not (Test-V7ExitSuccess $exitCode)) {
     exit $exitCode
