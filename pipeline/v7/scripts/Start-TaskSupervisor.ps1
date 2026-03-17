@@ -2443,11 +2443,34 @@ try {
         Set-V7Status -StatusPath $statusPath -Status $status
         Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'MERGING' -Message 'Merge step completed' -Data @{ merge_commit = (Get-V7StateText -Object $status.git -Name 'merge_commit'); writer_commit = (Get-V7StateText -Object $status.git -Name 'writer_commit'); result_path = (Join-Path $artifactsDir 'merge.result.json') }
         $reviewerResultPath = Join-Path $artifactsDir 'codex-reviewer.result.json'
+        if (-not (Test-Path -LiteralPath $reviewerResultPath)) {
+            $reviewerResultPath = Join-Path $artifactsDir 'codex-review-findings.json'
+        }
         if (Test-Path -LiteralPath $reviewerResultPath) {
             $bugsMasterPath = Join-Path (Split-Path $config.repo_path) ('BUGS' + '_MASTER.md')
             $savedCount = Append-V7FindingsToBugsMaster -ResultPath $reviewerResultPath -TaskId $TaskId -Page $status.page -BugsMasterPath $bugsMasterPath
             if ($savedCount -gt 0) {
                 Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message "Auto-saved $savedCount findings to bugs master" -Data @{ count = $savedCount; bugsMasterPath = $bugsMasterPath }
+            }
+        }
+        # Backfill streams from supervisor (Codex sandbox cannot write to streams/)
+        $streamDir = Join-Path $artifactsDir 'streams'
+        $streamFile = Join-Path $streamDir 'codex-reviewer.jsonl'
+        $findingsPath = Join-Path $artifactsDir 'codex-review-findings.json'
+        if ((Test-Path -LiteralPath $findingsPath) -and -not ((Test-Path -LiteralPath $streamFile) -and (Get-Content -LiteralPath $streamFile -Raw).Length -gt 10)) {
+            $findingsJson = Read-V7Json -Path $findingsPath
+            if ($null -ne $findingsJson -and $null -ne $findingsJson.findings) {
+                if (-not (Test-Path -LiteralPath $streamDir)) {
+                    New-Item -ItemType Directory -Path $streamDir -Force | Out-Null
+                }
+                $lines = New-Object System.Collections.Generic.List[string]
+                foreach ($f in @($findingsJson.findings)) {
+                    $entry = @{ timestamp = (Get-Date -Format 'o'); type = 'finding'; priority = $f.priority; title = $f.title; file = $f.file; line = $f.line }
+                    $lines.Add(($entry | ConvertTo-Json -Compress)) | Out-Null
+                }
+                if ($lines.Count -gt 0) {
+                    [System.IO.File]::WriteAllText($streamFile, ($lines -join "`n") + "`n", [System.Text.Encoding]::UTF8)
+                }
             }
         }
     } elseif ($workflow -eq 'parallel-write') {
@@ -2550,11 +2573,34 @@ try {
         Set-V7Status -StatusPath $statusPath -Status $status
         Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'MERGING' -Message 'Parallel-write reconcile completed' -Data @{ merge_commit = (Get-V7StateText -Object $status.git -Name 'merge_commit'); writer_commit = (Get-V7StateText -Object $status.git -Name 'writer_commit'); codex_commit = (Get-V7StateText -Object $status.git -Name 'codex_commit'); result_path = (Join-Path $artifactsDir 'merge.result.json') }
         $reviewerResultPath = Join-Path $artifactsDir 'codex-reviewer.result.json'
+        if (-not (Test-Path -LiteralPath $reviewerResultPath)) {
+            $reviewerResultPath = Join-Path $artifactsDir 'codex-review-findings.json'
+        }
         if (Test-Path -LiteralPath $reviewerResultPath) {
             $bugsMasterPath = Join-Path (Split-Path $config.repo_path) ('BUGS' + '_MASTER.md')
             $savedCount = Append-V7FindingsToBugsMaster -ResultPath $reviewerResultPath -TaskId $TaskId -Page $status.page -BugsMasterPath $bugsMasterPath
             if ($savedCount -gt 0) {
                 Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message "Auto-saved $savedCount findings to bugs master" -Data @{ count = $savedCount; bugsMasterPath = $bugsMasterPath }
+            }
+        }
+        # Backfill streams from supervisor (Codex sandbox cannot write to streams/)
+        $streamDir = Join-Path $artifactsDir 'streams'
+        $streamFile = Join-Path $streamDir 'codex-reviewer.jsonl'
+        $findingsPath = Join-Path $artifactsDir 'codex-review-findings.json'
+        if ((Test-Path -LiteralPath $findingsPath) -and -not ((Test-Path -LiteralPath $streamFile) -and (Get-Content -LiteralPath $streamFile -Raw).Length -gt 10)) {
+            $findingsJson = Read-V7Json -Path $findingsPath
+            if ($null -ne $findingsJson -and $null -ne $findingsJson.findings) {
+                if (-not (Test-Path -LiteralPath $streamDir)) {
+                    New-Item -ItemType Directory -Path $streamDir -Force | Out-Null
+                }
+                $lines = New-Object System.Collections.Generic.List[string]
+                foreach ($f in @($findingsJson.findings)) {
+                    $entry = @{ timestamp = (Get-Date -Format 'o'); type = 'finding'; priority = $f.priority; title = $f.title; file = $f.file; line = $f.line }
+                    $lines.Add(($entry | ConvertTo-Json -Compress)) | Out-Null
+                }
+                if ($lines.Count -gt 0) {
+                    [System.IO.File]::WriteAllText($streamFile, ($lines -join "`n") + "`n", [System.Text.Encoding]::UTF8)
+                }
             }
         }
     } elseif ($workflow -eq 'consensus') {
