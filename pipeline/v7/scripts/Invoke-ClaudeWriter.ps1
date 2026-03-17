@@ -63,7 +63,7 @@ if ($Mode -eq 'writer') {
 
 $reviewFindingsPath = Join-Path $artifactsDir 'codex-review-findings.json'
 $bundlePath = Join-Path $promptsDir $bundleName
-$findingStreamPath = Get-V7FindingStreamPath -ArtifactsDir $artifactsDir -WorkerName (if ($Mode -eq 'writer') { 'claude-writer' } else { 'claude-reconcile' })
+$findingStreamPath = Get-V7FindingStreamPath -ArtifactsDir $artifactsDir -WorkerName $(if ($Mode -eq 'writer') { 'claude-writer' } else { 'claude-reconcile' })
 Write-V7TextFile -Path $findingStreamPath -Content ''
 $preflightStartedAt = Get-V7Timestamp
 $commitMessage = if ($Mode -eq 'writer') {
@@ -257,7 +257,7 @@ $result = [ordered]@{
 Write-V7Json -Path $resultPath -Data $result
 
 if (Test-V7ExitSuccess $exitCode -and $hasWriterCommit) {
-    Add-V7FindingStreamEntry -Path $findingStreamPath -Worker (if ($Mode -eq 'writer') { 'claude-writer' } else { 'claude-reconcile' }) -WorkerKey (if ($Mode -eq 'writer') { 'claude_writer' } else { 'claude_reconcile' }) -Sequence 9999 -Kind 'note' -Summary ('Committed ' + $headCommit.Substring(0, 7)) -TaskId $task.task_id -CommitHash $headCommit
+    Add-V7FindingStreamEntry -Path $findingStreamPath -Worker $(if ($Mode -eq 'writer') { 'claude-writer' } else { 'claude-reconcile' }) -WorkerKey $(if ($Mode -eq 'writer') { 'claude_writer' } else { 'claude_reconcile' }) -Sequence 9999 -Kind 'note' -Summary ('Committed ' + $headCommit.Substring(0, 7)) -TaskId $task.task_id -CommitHash $headCommit
 }
 
 if (-not (Test-V7ExitSuccess $exitCode)) {

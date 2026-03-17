@@ -52,7 +52,7 @@ $cherryPick = Invoke-V7CapturedCommand -CommandPrefix @('git') -Arguments @('-C'
 $cherryLines = @()
 if (-not [string]::IsNullOrWhiteSpace([string]$cherryPick.stdout)) { $cherryLines += [string]$cherryPick.stdout }
 if (-not [string]::IsNullOrWhiteSpace([string]$cherryPick.stderr)) { $cherryLines += [string]$cherryPick.stderr }
-Write-V7TextFile -Path (Join-Path $logsDir 'parallel-write-cherry-pick.log') -Content (if ($cherryLines.Count -gt 0) { (($cherryLines -join "`n").TrimEnd() + "`n") } else { '' })
+Write-V7TextFile -Path (Join-Path $logsDir 'parallel-write-cherry-pick.log') -Content $(if ($cherryLines.Count -gt 0) { (($cherryLines -join "`n").TrimEnd() + "`n") } else { '' })
 if (-not (Test-V7ExitSuccess $cherryPick.exit_code)) {
     throw 'Unable to cherry-pick CC writer commit into merge worktree.'
 }

@@ -67,7 +67,7 @@ if (-not [string]::IsNullOrWhiteSpace([string]$mergeCommand.stderr)) {
 }
 $mergeLogContent = @()
 if ($mergeOutputParts.Count -gt 0) { $mergeLogContent = $mergeOutputParts }
-Write-V7TextFile -Path (Join-Path $logsDir 'merge-cherry-pick.log') -Content (if ($mergeLogContent.Count -gt 0) { (($mergeLogContent -join "`n").TrimEnd() + "`n") } else { '' })
+Write-V7TextFile -Path (Join-Path $logsDir 'merge-cherry-pick.log') -Content $(if ($mergeLogContent.Count -gt 0) { (($mergeLogContent -join "`n").TrimEnd() + "`n") } else { '' })
 if ($mergeCommand.exit_code -ne 0) {
     $mergeFailureDetails = @($mergeCommand.stderr, $mergeCommand.stdout) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
     $mergeFailureSuffix = if (@($mergeFailureDetails).Count -gt 0) { ': ' + (($mergeFailureDetails -join [Environment]::NewLine).Trim()) } else { '' }

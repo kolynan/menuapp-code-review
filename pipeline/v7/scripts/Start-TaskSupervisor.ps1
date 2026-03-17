@@ -2658,41 +2658,114 @@ try {
         if (-not $writersOk) {
             throw 'Consensus writers timed out'
         }
-        if ((Get-V7StateText -Object $status.processes['claude_writer'] -Name 'state') -ne 'completed' -or (Get-V7StateText -Object $status.processes['codex_writer'] -Name 'state') -ne 'completed') {
-            throw 'Consensus requires both writers to complete successfully'
-        }
-
-        $status.state = 'COMPARING'
-        $status.current_step = 'consensus-compare'
-        $compareStartedAt = Get-V7Timestamp
-        $status.processes['comparator'] = [ordered]@{ state = 'running'; started_at = $compareStartedAt }
-        Set-V7TelegramWorkerLine -Status $status -WorkerKey 'comparator' -State 'RUNNING' -Text '' -StartedAt $compareStartedAt -EndedAt ''
-        Set-V7Status -StatusPath $statusPath -Status $status
-        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'COMPARING' -Message 'Comparing writer outputs' -Data @{ task_json = $taskJsonLocal; logs_dir = $logsDir }
-        Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'COMPARING' -Message 'Comparing CC and Codex outputs' -EventsPath $eventsPath -QueueRunDir $queueRunDir -ArtifactsDir $artifactsDir -TaskId $TaskId -Workflow $workflow -WarningMessage 'Telegram consensus compare notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
-
-        $compareStdout = Join-Path $logsDir 'consensus-compare.stdout.log'
-        $compareStderr = Join-Path $logsDir 'consensus-compare.stderr.log'
-        & $env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $workerRoot 'Merge-ConsensusCompare.ps1') -TaskJsonPath $taskJsonLocal 1> $compareStdout 2> $compareStderr
-        $compareExitCode = Get-V7NormalizedExitCode $LASTEXITCODE
-        $compareEndedAt = Get-V7Timestamp
-        $status.processes['comparator']['exit_code'] = $compareExitCode
-        $status.processes['comparator'].ended_at = $compareEndedAt
-        if (-not (Test-V7ExitSuccess $compareExitCode)) {
-            $status.processes['comparator'].state = 'failed'
-            Set-V7Status -StatusPath $statusPath -Status $status
-            Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'WARNING' -Message 'Consensus compare step failed' -Data @{ exit_code = $compareExitCode; stdout_log = $compareStdout; stderr_log = $compareStderr }
-            throw 'Consensus compare step failed'
+        $ccOk = (Get-V7StateText -Object $status.processes['claude_writer'] -Name 'state') -eq 'completed'
+        $codexOk = (Get-V7StateText -Object $status.processes['codex_writer'] -Name 'state') -eq 'completed'
+        if (-not $ccOk -and -not $codexOk) {
+            throw 'Consensus failed: neither writer completed successfully'
         }
 
         $currentConsensusResultPath = Join-Path $artifactsDir 'consensus-compare.result.json'
-        $currentConsensusResult = Read-V7Json -Path $currentConsensusResultPath
-        if (-not $currentConsensusResult) {
-            throw 'Consensus compare result was not created'
+        if (-not $ccOk -or -not $codexOk) {
+            $survivorLabel = if ($ccOk) { 'CC Writer' } else { 'Codex Writer' }
+            $survivorSource = if ($ccOk) { 'cc' } else { 'codex' }
+            $survivorCommit = if ($ccOk) { Get-V7StateText -Object $status.git -Name 'writer_commit' } else { Get-V7StateText -Object $status.git -Name 'codex_commit' }
+            $survivorWorktree = if ($ccOk) { $writerWorktree } else { $reviewWorktree }
+            if ([string]::IsNullOrWhiteSpace($survivorCommit)) {
+                throw ('Consensus fallback could not resolve ' + $survivorLabel + ' commit hash')
+            }
+
+            $survivorStatusMap = @{}
+            $survivorDiff = Invoke-V7Git -RepoRoot $survivorWorktree -Arguments @('diff', '--no-renames', '--name-status', "$baseCommit..$survivorCommit") -FailureMessage ('Unable to inspect ' + $survivorLabel + ' changed files for fallback merge')
+            foreach ($line in ($survivorDiff.stdout -split "`r?`n")) {
+                if ([string]::IsNullOrWhiteSpace([string]$line)) {
+                    continue
+                }
+                $parts = $line -split "`t"
+                if ($parts.Count -lt 2) {
+                    continue
+                }
+                $statusCode = $parts[0].Trim().ToUpperInvariant()
+                $filePath = $parts[$parts.Count - 1].Trim()
+                if (-not [string]::IsNullOrWhiteSpace($filePath)) {
+                    $survivorStatusMap[$filePath] = $statusCode
+                }
+            }
+
+            $survivorChangedFiles = @($survivorStatusMap.Keys | Sort-Object)
+            if ($survivorChangedFiles.Count -eq 0) {
+                throw ('Consensus fallback found no changed files for ' + $survivorLabel)
+            }
+
+            $survivorAgreements = New-Object System.Collections.Generic.List[object]
+            foreach ($file in $survivorChangedFiles) {
+                $statusCode = [string]$survivorStatusMap[$file]
+                $survivorAgreements.Add([ordered]@{
+                    id = 'consensus-' + (Get-V7HashFragment -Value $file -Length 10)
+                    file = $file
+                    kind = if ($ccOk) { 'cc_only' } else { 'codex_only' }
+                    selected_source = $survivorSource
+                    cc_status = if ($ccOk) { $statusCode } else { '' }
+                    codex_status = if ($codexOk) { $statusCode } else { '' }
+                    summary = ('Only ' + $survivorLabel + ' completed successfully.')
+                }) | Out-Null
+            }
+
+            $compareEndedAt = Get-V7Timestamp
+            $currentConsensusResult = [ordered]@{
+                status = 'completed'
+                started_at = $writersEndedAt
+                ended_at = $compareEndedAt
+                writer_commit = (Get-V7StateText -Object $status.git -Name 'writer_commit')
+                codex_commit = (Get-V7StateText -Object $status.git -Name 'codex_commit')
+                writer_files = if ($ccOk) { $survivorChangedFiles } else { @() }
+                codex_files = if ($codexOk) { $survivorChangedFiles } else { @() }
+                compared_files = $survivorChangedFiles
+                agreements = @($survivorAgreements)
+                disagreements = @()
+                consensus_reached = $true
+                fallback_mode = 'single_writer'
+                fallback_survivor = $survivorSource
+            }
+            Write-V7Json -Path $currentConsensusResultPath -Data $currentConsensusResult
+
+            $status.state = 'COMPARING'
+            $status.current_step = 'consensus-fallback'
+            $status.processes['comparator'] = [ordered]@{ state = 'skipped'; started_at = ''; ended_at = $compareEndedAt }
+            Set-V7TelegramWorkerLine -Status $status -WorkerKey 'comparator' -State 'SKIPPED' -Text 'single-writer fallback' -StartedAt '' -EndedAt $compareEndedAt
+            Set-V7Status -StatusPath $statusPath -Status $status
+            Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'WARNING' -Message "Only $survivorLabel completed; skipping comparison and discussion" -Data @{ cc_ok = $ccOk; codex_ok = $codexOk; survivor = $survivorSource; result_path = $currentConsensusResultPath }
+        } else {
+            $status.state = 'COMPARING'
+            $status.current_step = 'consensus-compare'
+            $compareStartedAt = Get-V7Timestamp
+            $status.processes['comparator'] = [ordered]@{ state = 'running'; started_at = $compareStartedAt }
+            Set-V7TelegramWorkerLine -Status $status -WorkerKey 'comparator' -State 'RUNNING' -Text '' -StartedAt $compareStartedAt -EndedAt ''
+            Set-V7Status -StatusPath $statusPath -Status $status
+            Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'COMPARING' -Message 'Comparing writer outputs' -Data @{ task_json = $taskJsonLocal; logs_dir = $logsDir }
+            Invoke-V7TelegramScript -Config $config -Status $status -StatusPath $statusPath -State 'COMPARING' -Message 'Comparing CC and Codex outputs' -EventsPath $eventsPath -QueueRunDir $queueRunDir -ArtifactsDir $artifactsDir -TaskId $TaskId -Workflow $workflow -WarningMessage 'Telegram consensus compare notification failed' -WarningData @{ task_id = $TaskId } | Out-Null
+
+            $compareStdout = Join-Path $logsDir 'consensus-compare.stdout.log'
+            $compareStderr = Join-Path $logsDir 'consensus-compare.stderr.log'
+            & $env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $workerRoot 'Merge-ConsensusCompare.ps1') -TaskJsonPath $taskJsonLocal 1> $compareStdout 2> $compareStderr
+            $compareExitCode = Get-V7NormalizedExitCode $LASTEXITCODE
+            $compareEndedAt = Get-V7Timestamp
+            $status.processes['comparator']['exit_code'] = $compareExitCode
+            $status.processes['comparator'].ended_at = $compareEndedAt
+            if (-not (Test-V7ExitSuccess $compareExitCode)) {
+                $status.processes['comparator'].state = 'failed'
+                Set-V7Status -StatusPath $statusPath -Status $status
+                Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'WARNING' -Message 'Consensus compare step failed' -Data @{ exit_code = $compareExitCode; stdout_log = $compareStdout; stderr_log = $compareStderr }
+                throw 'Consensus compare step failed'
+            }
+
+            $currentConsensusResult = Read-V7Json -Path $currentConsensusResultPath
+            if (-not $currentConsensusResult) {
+                throw 'Consensus compare result was not created'
+            }
+            $status.processes['comparator'].state = 'completed'
+            Set-V7Status -StatusPath $statusPath -Status $status
+            Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'COMPARING' -Message 'Consensus compare completed' -Data @{ disagreements = @($currentConsensusResult.disagreements | Where-Object { $null -ne $_ }).Count; agreements = @($currentConsensusResult.agreements | Where-Object { $null -ne $_ }).Count; result_path = $currentConsensusResultPath }
         }
-        $status.processes['comparator'].state = 'completed'
-        Set-V7Status -StatusPath $statusPath -Status $status
-        Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'COMPARING' -Message 'Consensus compare completed' -Data @{ disagreements = @($currentConsensusResult.disagreements | Where-Object { $null -ne $_ }).Count; agreements = @($currentConsensusResult.agreements | Where-Object { $null -ne $_ }).Count; result_path = $currentConsensusResultPath }
 
         $discussionRoundsCompleted = 0
         $consensusReached = [bool](Get-V7StateValue -Object $currentConsensusResult -Name 'consensus_reached' -Default $false)
@@ -2828,7 +2901,7 @@ try {
 
             $mergeStdout = Join-Path $logsDir 'merge.stdout.log'
             $mergeStderr = Join-Path $logsDir 'merge.stderr.log'
-            Write-V7TextFile -Path $mergeStdout -Content (if ($mergeLogLines.Count -gt 0) { (($mergeLogLines -join "`n").TrimEnd() + "`n") } else { '' })
+            Write-V7TextFile -Path $mergeStdout -Content $(if ($mergeLogLines.Count -gt 0) { (($mergeLogLines -join "`n").TrimEnd() + "`n") } else { '' })
             Write-V7TextFile -Path $mergeStderr -Content ''
             Invoke-V7Git -RepoRoot $mergeWorktree -Arguments @('add', '-A') -FailureMessage 'Unable to stage consensus merge changes' | Out-Null
             $mergeStatus = Invoke-V7Git -RepoRoot $mergeWorktree -Arguments @('status', '--porcelain') -FailureMessage 'Unable to inspect consensus merge status'
@@ -2856,7 +2929,7 @@ try {
                 compare_result_file = $currentConsensusResultPath
                 stdout_log = $mergeStdout
                 stderr_log = $mergeStderr
-                source = 'consensus auto-merge'
+                source = if ((Get-V7StateText -Object $currentConsensusResult -Name 'fallback_mode') -eq 'single_writer') { 'single-writer fallback' } else { 'consensus auto-merge' }
             }
             Write-V7Json -Path (Join-Path $artifactsDir 'merge.result.json') -Data $mergeResult
 
