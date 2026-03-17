@@ -116,6 +116,8 @@ def determine_pipeline(meta: dict) -> str:
     pipeline_version = meta.get("pipeline", "").strip().lower()
     if pipeline_version == "v7":
         return "v7"
+    if pipeline_version == "v8":
+        return "v8"
     return "v3"
 
 
@@ -302,9 +304,9 @@ def main() -> None:
                     logger.exception("Could not read task file %s: %s", task_file.name, exc)
                     continue
 
-                if pipeline_name == "v7":
+                if pipeline_name in {"v7", "v8"}:
                     task_id, claimed_task = claim_v7_task(task_file, queue_dir, meta)
-                    logger.info("Claimed %s as V7 task %s", task_file.name, task_id)
+                    logger.info("Claimed %s as %s task %s", task_file.name, pipeline_name.upper(), task_id)
                     launch_v7_supervisor(task_id, claimed_task, meta, cfg, config_path, logger)
                 else:
                     logger.info("Dispatching %s via legacy v3 path", task_file.name)
