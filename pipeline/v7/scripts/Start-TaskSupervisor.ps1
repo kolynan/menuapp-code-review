@@ -2287,6 +2287,14 @@ try {
         Update-CodeReviewWorkerLinesFromArtifacts -Status $status -ArtifactsDir $artifactsDir
         Set-V7Status -StatusPath $statusPath -Status $status
         Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'MERGING' -Message 'Merge step completed' -Data @{ merge_commit = (Get-V7StateText -Object $status.git -Name 'merge_commit'); writer_commit = (Get-V7StateText -Object $status.git -Name 'writer_commit'); result_path = (Join-Path $artifactsDir 'merge.result.json') }
+        $reviewerResultPath = Join-Path $artifactsDir 'codex-reviewer.result.json'
+        if (Test-Path -LiteralPath $reviewerResultPath) {
+            $bugsMasterPath = Join-Path (Split-Path $config.repo_path) ('BUGS' + '_MASTER.md')
+            $savedCount = Append-V7FindingsToBugsMaster -ResultPath $reviewerResultPath -TaskId $TaskId -Page $status.page -BugsMasterPath $bugsMasterPath
+            if ($savedCount -gt 0) {
+                Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message "Auto-saved $savedCount findings to bugs master" -Data @{ count = $savedCount; bugsMasterPath = $bugsMasterPath }
+            }
+        }
     } elseif ($workflow -eq 'parallel-write') {
         $status.state = 'RUNNING'
         $status.current_step = 'parallel-write'
@@ -2386,6 +2394,14 @@ try {
         $status.processes['reconciler'].state = 'completed'
         Set-V7Status -StatusPath $statusPath -Status $status
         Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'MERGING' -Message 'Parallel-write reconcile completed' -Data @{ merge_commit = (Get-V7StateText -Object $status.git -Name 'merge_commit'); writer_commit = (Get-V7StateText -Object $status.git -Name 'writer_commit'); codex_commit = (Get-V7StateText -Object $status.git -Name 'codex_commit'); result_path = (Join-Path $artifactsDir 'merge.result.json') }
+        $reviewerResultPath = Join-Path $artifactsDir 'codex-reviewer.result.json'
+        if (Test-Path -LiteralPath $reviewerResultPath) {
+            $bugsMasterPath = Join-Path (Split-Path $config.repo_path) ('BUGS' + '_MASTER.md')
+            $savedCount = Append-V7FindingsToBugsMaster -ResultPath $reviewerResultPath -TaskId $TaskId -Page $status.page -BugsMasterPath $bugsMasterPath
+            if ($savedCount -gt 0) {
+                Add-SupervisorStage -QueueRunDir $queueRunDir -EventsPath $eventsPath -State 'RUNNING' -Message "Auto-saved $savedCount findings to bugs master" -Data @{ count = $savedCount; bugsMasterPath = $bugsMasterPath }
+            }
+        }
     } elseif ($workflow -eq 'ux-discussion') {
         $status.state = 'RUNNING'
         $status.current_step = 'ux-discussion'

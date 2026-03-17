@@ -1598,3 +1598,116 @@ function Sync-V7ReviewFindingsToStream {
         $sequence++
     }
 }
+
+function Append-V7FindingsToBugsMaster {
+    param(
+        [Parameter(Mandatory = $true)][string]$ResultPath,
+        [string]$TaskId = '',
+        [string]$Page = '',
+        [Parameter(Mandatory = $true)][string]$BugsMasterPath
+    )
+
+    if (-not (Test-Path -LiteralPath $ResultPath)) {
+        return 0
+    }
+
+    $result = Read-V7Json -Path $ResultPath
+    if ($null -eq $result) {
+        return 0
+    }
+
+    $reviewPayload = $null
+    if (Test-V7HasProperty -InputObject $result -Name 'findings') {
+        $reviewPayload = $result
+    } elseif (Test-V7HasProperty -InputObject $result -Name 'output_file') {
+        $outputFile = [string]$result.output_file
+        if (-not [string]::IsNullOrWhiteSpace($outputFile) -and -not [System.IO.Path]::IsPathRooted($outputFile)) {
+            $outputFile = Join-Path (Split-Path -Parent $ResultPath) $outputFile
+        }
+        if (-not [string]::IsNullOrWhiteSpace($outputFile) -and (Test-Path -LiteralPath $outputFile)) {
+            $reviewPayload = Read-V7Json -Path $outputFile
+        }
+    }
+
+    if ($null -eq $reviewPayload -or $null -eq $reviewPayload.findings) {
+        return 0
+    }
+
+    if (-not (Test-Path -LiteralPath $BugsMasterPath)) {
+        $header = @(
+            ('# ' + ('BUGS' + '_MASTER'))
+            ''
+            '| Added | Task | Page | Priority | Title | File | Line | Description | Suggested Fix |'
+            '| --- | --- | --- | --- | --- | --- | --- | --- | --- |'
+            ''
+        ) -join "`n"
+        Append-V7TextFile -Path $BugsMasterPath -Content ($header + "`n")
+    }
+
+    $formatCell = {
+        param([AllowNull()]$Value)
+
+        $text = [string]$Value
+        if ([string]::IsNullOrWhiteSpace($text)) {
+            return ''
+        }
+
+        $text = $text.Trim()
+        $text = $text -replace '\r?\n', '<br>'
+        return $text.Replace('|', '\|')
+    }
+
+    $allowedPriorities = @('P0', 'P1', 'P2')
+    $linesToAppend = New-Object System.Collections.Generic.List[string]
+    $seenTitles = @{}
+    $addedCount = 0
+
+    foreach ($finding in @($reviewPayload.findings)) {
+        $priority = if (Test-V7HasProperty -InputObject $finding -Name 'priority') { [string]$finding.priority } else { '' }
+        if ([string]::IsNullOrWhiteSpace($priority) -and (Test-V7HasProperty -InputObject $finding -Name 'severity')) {
+            $priority = [string]$finding.severity
+        }
+        $priority = $priority.Trim().ToUpperInvariant()
+        if ($allowedPriorities -notcontains $priority) {
+            continue
+        }
+
+        $title = if (Test-V7HasProperty -InputObject $finding -Name 'title') { [string]$finding.title } else { '' }
+        if ([string]::IsNullOrWhiteSpace($title)) {
+            continue
+        }
+
+        if (Select-String -Path $BugsMasterPath -SimpleMatch -Pattern $title -Quiet) {
+            continue
+        }
+        if ($seenTitles.ContainsKey($title)) {
+            continue
+        }
+
+        $file = if (Test-V7HasProperty -InputObject $finding -Name 'file') { [string]$finding.file } else { '' }
+        $line = if (Test-V7HasProperty -InputObject $finding -Name 'line' -and $null -ne $finding.line) { [string]$finding.line } else { '' }
+        $description = if (Test-V7HasProperty -InputObject $finding -Name 'description') { [string]$finding.description } else { '' }
+        $suggestedFix = if (Test-V7HasProperty -InputObject $finding -Name 'suggested_fix') { [string]$finding.suggested_fix } else { '' }
+        $addedOn = Get-Date -Format 'yyyy-MM-dd'
+
+        $row = '| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} |' -f `
+            (& $formatCell $addedOn), `
+            (& $formatCell $TaskId), `
+            (& $formatCell $Page), `
+            (& $formatCell $priority), `
+            (& $formatCell $title), `
+            (& $formatCell $file), `
+            (& $formatCell $line), `
+            (& $formatCell $description), `
+            (& $formatCell $suggestedFix)
+        $linesToAppend.Add($row) | Out-Null
+        $seenTitles[$title] = $true
+        $addedCount++
+    }
+
+    if ($linesToAppend.Count -gt 0) {
+        Append-V7TextFile -Path $BugsMasterPath -Content (($linesToAppend -join "`n") + "`n")
+    }
+
+    return $addedCount
+}
