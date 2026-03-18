@@ -14,7 +14,15 @@ function Get-ConsensusCommitInfo {
     )
 
     $result = Read-V7Json -Path $ResultPath
-    $commit = Get-V7StateText -Object $result -Name 'commit_hash'
+    # Extract commit_hash from JSON result (PSCustomObject) without Get-V7StateText
+    # which is only available in the parent supervisor process.
+    $commit = ''
+    if ($null -ne $result) {
+        $prop = $result.PSObject.Properties['commit_hash']
+        if ($null -ne $prop -and $null -ne $prop.Value) {
+            $commit = [string]$prop.Value
+        }
+    }
     if ([string]::IsNullOrWhiteSpace($commit) -and (Test-Path -LiteralPath $WorktreePath)) {
         $candidate = (Invoke-V7Git -RepoRoot $WorktreePath -Arguments @('rev-parse', 'HEAD') -FailureMessage ('Unable to resolve ' + $Label + ' HEAD')).stdout.Trim()
         if (-not [string]::IsNullOrWhiteSpace($candidate) -and ($candidate -ne $BaseCommit)) {
@@ -94,31 +102,18 @@ if ([string]::IsNullOrWhiteSpace($baseCommit)) {
 }
 
 # --- Single-writer fallback (KB-069): if one writer has no commit, use the other ---
-Write-Host "[Comparator] artifacts_dir = $artifactsDir"
-Write-Host "[Comparator] writerWorktree = $writerWorktree"
-Write-Host "[Comparator] codexWorktree = $codexWorktree"
-Write-Host "[Comparator] baseCommit = $baseCommit"
-
 $ccResultFile = Join-Path $artifactsDir 'claude-writer.result.json'
 $codexResultFile = Join-Path $artifactsDir 'codex-writer.result.json'
-Write-Host "[Comparator] CC result exists: $(Test-Path -LiteralPath $ccResultFile)"
-Write-Host "[Comparator] Codex result exists: $(Test-Path -LiteralPath $codexResultFile)"
 
 $writerInfo = $null
 $codexInfo = $null
 try {
     $writerInfo = Get-ConsensusCommitInfo -ResultPath $ccResultFile -WorktreePath $writerWorktree -BaseCommit $baseCommit -Label 'CC writer'
-    Write-Host "[Comparator] CC writer commit: $($writerInfo.commit)"
 } catch {
-    Write-Host "[Comparator] CC writer FAILED: $($_.Exception.Message)"
-    Write-Host "[Comparator] CC writer stack: $($_.ScriptStackTrace)"
 }
 try {
     $codexInfo = Get-ConsensusCommitInfo -ResultPath $codexResultFile -WorktreePath $codexWorktree -BaseCommit $baseCommit -Label 'Codex writer'
-    Write-Host "[Comparator] Codex writer commit: $($codexInfo.commit)"
 } catch {
-    Write-Host "[Comparator] Codex writer FAILED: $($_.Exception.Message)"
-    Write-Host "[Comparator] Codex writer stack: $($_.ScriptStackTrace)"
 }
 
 if ($null -eq $writerInfo -and $null -eq $codexInfo) {
