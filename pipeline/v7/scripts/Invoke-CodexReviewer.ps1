@@ -254,7 +254,7 @@ if ([string]::IsNullOrWhiteSpace($errorMessage) -and $exitCode -ne 0) {
 
 $result = [ordered]@{
     worker = 'codex-reviewer'
-    status = if ($exitCode -eq 0) { 'completed' } else { 'failed' }
+    status = $(if ($exitCode -eq 0) { 'completed' } else { 'failed' })
     exit_code = $exitCode
     started_at = $startedAt
     ended_at = $endedAt
@@ -262,9 +262,9 @@ $result = [ordered]@{
     stderr_log = $stderrPath
     prompt_file = $promptPath
     bundle_file = $bundlePath
-    output_file = if (Test-Path -LiteralPath $resultPath) { $resultPath } else { '' }
+    output_file = $(if (Test-Path -LiteralPath $resultPath) { $resultPath } else { '' })
     findings_count = $findingsCount
-    resolved_command = if ($codexPrefix.Count -gt 0) { ($codexPrefix -join ' ') } else { '' }
+    resolved_command = $(if ($codexPrefix.Count -gt 0) { ($codexPrefix -join ' ') } else { '' })
     error_message = $errorMessage
 }
 Write-V7Json -Path $workerResultPath -Data $result

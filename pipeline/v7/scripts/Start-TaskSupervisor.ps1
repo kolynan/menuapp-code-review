@@ -2702,10 +2702,10 @@ try {
                 $survivorAgreements.Add([ordered]@{
                     id = 'consensus-' + (Get-V7HashFragment -Value $file -Length 10)
                     file = $file
-                    kind = if ($ccOk) { 'cc_only' } else { 'codex_only' }
+                    kind = $(if ($ccOk) { 'cc_only' } else { 'codex_only' })
                     selected_source = $survivorSource
-                    cc_status = if ($ccOk) { $statusCode } else { '' }
-                    codex_status = if ($codexOk) { $statusCode } else { '' }
+                    cc_status = $(if ($ccOk) { $statusCode } else { '' })
+                    codex_status = $(if ($codexOk) { $statusCode } else { '' })
                     summary = ('Only ' + $survivorLabel + ' completed successfully.')
                 }) | Out-Null
             }
@@ -2717,8 +2717,8 @@ try {
                 ended_at = $compareEndedAt
                 writer_commit = (Get-V7StateText -Object $status.git -Name 'writer_commit')
                 codex_commit = (Get-V7StateText -Object $status.git -Name 'codex_commit')
-                writer_files = if ($ccOk) { $survivorChangedFiles } else { @() }
-                codex_files = if ($codexOk) { $survivorChangedFiles } else { @() }
+                writer_files = $(if ($ccOk) { $survivorChangedFiles } else { @() })
+                codex_files = $(if ($codexOk) { $survivorChangedFiles } else { @() })
                 compared_files = $survivorChangedFiles
                 agreements = @($survivorAgreements)
                 disagreements = @()
@@ -2853,7 +2853,7 @@ try {
                 $selectedEntries += [ordered]@{
                     file = [string](Get-V7StateText -Object $agreement -Name 'file')
                     source = [string](Get-V7StateText -Object $agreement -Name 'selected_source')
-                    status = if ((Get-V7StateText -Object $agreement -Name 'selected_source') -eq 'codex') { [string](Get-V7StateText -Object $agreement -Name 'codex_status') } else { [string](Get-V7StateText -Object $agreement -Name 'cc_status') }
+                    status = $(if ((Get-V7StateText -Object $agreement -Name 'selected_source') -eq 'codex') { [string](Get-V7StateText -Object $agreement -Name 'codex_status') } else { [string](Get-V7StateText -Object $agreement -Name 'cc_status') })
                 }
             }
             foreach ($disagreement in @($currentConsensusResult.disagreements | Where-Object { $null -ne $_ })) {
@@ -2864,7 +2864,7 @@ try {
                 $selectedEntries += [ordered]@{
                     file = [string](Get-V7StateText -Object $disagreement -Name 'file')
                     source = $resolvedSource
-                    status = if ($resolvedSource -eq 'codex') { [string](Get-V7StateText -Object $disagreement -Name 'codex_status') } else { [string](Get-V7StateText -Object $disagreement -Name 'cc_status') }
+                    status = $(if ($resolvedSource -eq 'codex') { [string](Get-V7StateText -Object $disagreement -Name 'codex_status') } else { [string](Get-V7StateText -Object $disagreement -Name 'cc_status') })
                 }
             }
 
@@ -2929,7 +2929,7 @@ try {
                 compare_result_file = $currentConsensusResultPath
                 stdout_log = $mergeStdout
                 stderr_log = $mergeStderr
-                source = if ((Get-V7StateText -Object $currentConsensusResult -Name 'fallback_mode') -eq 'single_writer') { 'single-writer fallback' } else { 'consensus auto-merge' }
+                source = $(if ((Get-V7StateText -Object $currentConsensusResult -Name 'fallback_mode') -eq 'single_writer') { 'single-writer fallback' } else { 'consensus auto-merge' })
             }
             Write-V7Json -Path (Join-Path $artifactsDir 'merge.result.json') -Data $mergeResult
 

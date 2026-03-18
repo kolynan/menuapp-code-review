@@ -68,7 +68,7 @@ $endedAt = Get-V7Timestamp
 
 $result = [ordered]@{
     worker = 'claude-round3'
-    status = if ($exitCode -eq 0) { 'completed' } else { 'failed' }
+    status = $(if ($exitCode -eq 0) { 'completed' } else { 'failed' })
     exit_code = $exitCode
     started_at = $startedAt
     ended_at = $endedAt

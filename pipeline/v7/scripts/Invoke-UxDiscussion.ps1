@@ -48,7 +48,7 @@ function Invoke-UxClaudeRound {
 
     $result = [ordered]@{
         worker = $WorkerName
-        status = if ($exitCode -eq 0) { 'completed' } else { 'failed' }
+        status = $(if ($exitCode -eq 0) { 'completed' } else { 'failed' })
         exit_code = $exitCode
         started_at = $startedAt
         ended_at = $endedAt
@@ -98,7 +98,7 @@ function Invoke-UxCodexRound {
 
     $result = [ordered]@{
         worker = $WorkerName
-        status = if ($exitCode -eq 0) { 'completed' } else { 'failed' }
+        status = $(if ($exitCode -eq 0) { 'completed' } else { 'failed' })
         exit_code = $exitCode
         started_at = $startedAt
         ended_at = $endedAt

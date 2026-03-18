@@ -259,7 +259,7 @@ foreach ($item in @($inputResult.disagreements | Where-Object { $null -ne $_ }))
         id = $id
         file = [string](Get-V7StateText -Object $item -Name 'file')
         kind = [string](Get-V7StateText -Object $item -Name 'kind')
-        status = if ([string]::IsNullOrWhiteSpace($resolvedSource)) { 'open' } else { 'resolved' }
+        status = $(if ([string]::IsNullOrWhiteSpace($resolvedSource)) { 'open' } else { 'resolved' })
         resolved_source = $resolvedSource
         cc_status = [string](Get-V7StateText -Object $item -Name 'cc_status')
         codex_status = [string](Get-V7StateText -Object $item -Name 'codex_status')

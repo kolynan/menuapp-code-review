@@ -93,13 +93,30 @@ if ([string]::IsNullOrWhiteSpace($baseCommit)) {
     throw 'Consensus compare requires git.base_commit.'
 }
 
-$writerInfo = Get-ConsensusCommitInfo -ResultPath (Join-Path $artifactsDir 'claude-writer.result.json') -WorktreePath $writerWorktree -BaseCommit $baseCommit -Label 'CC writer'
-$codexInfo = Get-ConsensusCommitInfo -ResultPath (Join-Path $artifactsDir 'codex-writer.result.json') -WorktreePath $codexWorktree -BaseCommit $baseCommit -Label 'Codex writer'
-$writerCommit = [string]$writerInfo.commit
-$codexCommit = [string]$codexInfo.commit
+# --- Single-writer fallback (KB-069): if one writer has no commit, use the other ---
+$writerInfo = $null
+$codexInfo = $null
+try {
+    $writerInfo = Get-ConsensusCommitInfo -ResultPath (Join-Path $artifactsDir 'claude-writer.result.json') -WorktreePath $writerWorktree -BaseCommit $baseCommit -Label 'CC writer'
+} catch {
+    Write-Host "[Comparator] CC writer has no commit: $_"
+}
+try {
+    $codexInfo = Get-ConsensusCommitInfo -ResultPath (Join-Path $artifactsDir 'codex-writer.result.json') -WorktreePath $codexWorktree -BaseCommit $baseCommit -Label 'Codex writer'
+} catch {
+    Write-Host "[Comparator] Codex writer has no commit: $_"
+}
 
-$writerStatusMap = Get-ConsensusStatusMap -RepoRoot $writerWorktree -BaseCommit $baseCommit -HeadRef $writerCommit
-$codexStatusMap = Get-ConsensusStatusMap -RepoRoot $codexWorktree -BaseCommit $baseCommit -HeadRef $codexCommit
+if ($null -eq $writerInfo -and $null -eq $codexInfo) {
+    throw 'Neither CC writer nor Codex writer produced a commit. Cannot compare.'
+}
+
+$writerCommit = $(if ($null -ne $writerInfo) { [string]$writerInfo.commit } else { '' })
+$codexCommit = $(if ($null -ne $codexInfo) { [string]$codexInfo.commit } else { '' })
+
+# Skip status map for writers with no commit (single-writer fallback)
+$writerStatusMap = $(if ([string]::IsNullOrWhiteSpace($writerCommit)) { @{} } else { Get-ConsensusStatusMap -RepoRoot $writerWorktree -BaseCommit $baseCommit -HeadRef $writerCommit })
+$codexStatusMap = $(if ([string]::IsNullOrWhiteSpace($codexCommit)) { @{} } else { Get-ConsensusStatusMap -RepoRoot $codexWorktree -BaseCommit $baseCommit -HeadRef $codexCommit })
 $allFiles = @((@($writerStatusMap.Keys) + @($codexStatusMap.Keys)) | Sort-Object -Unique)
 $agreements = New-Object System.Collections.Generic.List[object]
 $disagreements = New-Object System.Collections.Generic.List[object]
@@ -145,11 +162,11 @@ foreach ($file in $allFiles) {
     $agreements.Add([ordered]@{
         id = $entryId
         file = $file
-        kind = if ($ccChanged) { 'cc_only' } else { 'codex_only' }
-        selected_source = if ($ccChanged) { 'cc' } else { 'codex' }
+        kind = $(if ($ccChanged) { 'cc_only' } else { 'codex_only' })
+        selected_source = $(if ($ccChanged) { 'cc' } else { 'codex' })
         cc_status = $ccStatus
         codex_status = $codexStatus
-        summary = if ($ccChanged) { 'Only CC writer changed this file.' } else { 'Only Codex writer changed this file.' }
+        summary = $(if ($ccChanged) { 'Only CC writer changed this file.' } else { 'Only Codex writer changed this file.' })
     })
 }
 

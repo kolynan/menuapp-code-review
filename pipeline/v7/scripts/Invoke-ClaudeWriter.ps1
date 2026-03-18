@@ -84,7 +84,7 @@ if ([string]::IsNullOrWhiteSpace($codeWorktreePath) -or -not (Test-Path -Literal
     [Console]::Error.WriteLine($errorMessage)
 
     $skippedResult = [ordered]@{
-        worker = if ($Mode -eq 'writer') { 'claude-writer' } else { 'claude-reconcile' }
+        worker = $(if ($Mode -eq 'writer') { 'claude-writer' } else { 'claude-reconcile' })
         mode = $Mode
         status = 'skipped'
         exit_code = 0
@@ -237,9 +237,9 @@ if ([string]::IsNullOrWhiteSpace($errorMessage) -and (-not (Test-V7ExitSuccess $
 }
 
 $result = [ordered]@{
-    worker = if ($Mode -eq 'writer') { 'claude-writer' } else { 'claude-reconcile' }
+    worker = $(if ($Mode -eq 'writer') { 'claude-writer' } else { 'claude-reconcile' })
     mode = $Mode
-    status = if (Test-V7ExitSuccess $exitCode) { 'completed' } else { 'failed' }
+    status = $(if (Test-V7ExitSuccess $exitCode) { 'completed' } else { 'failed' })
     exit_code = (Get-V7NormalizedExitCode $exitCode)
     started_at = $startedAt
     ended_at = $endedAt
@@ -249,7 +249,7 @@ $result = [ordered]@{
     stderr_log = $stderrPath
     prompt_file = $promptPath
     bundle_file = $bundlePath
-    commit_hash = if ($hasWriterCommit) { $headCommit } else { '' }
+    commit_hash = $(if ($hasWriterCommit) { $headCommit } else { '' })
     auto_committed = $autoCommitted
     changed_files = $changedFiles
     error_message = $errorMessage

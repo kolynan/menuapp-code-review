@@ -106,7 +106,7 @@ if ([string]::IsNullOrWhiteSpace($errorMessage) -and (-not (Test-V7ExitSuccess $
 
 $result = [ordered]@{
     worker = 'codex-writer'
-    status = if (Test-V7ExitSuccess $exitCode) { 'completed' } else { 'failed' }
+    status = $(if (Test-V7ExitSuccess $exitCode) { 'completed' } else { 'failed' })
     exit_code = (Get-V7NormalizedExitCode $exitCode)
     started_at = $startedAt
     ended_at = $endedAt
@@ -115,11 +115,11 @@ $result = [ordered]@{
     stdout_log = $stdoutPath
     stderr_log = $stderrPath
     prompt_file = $promptPath
-    commit_hash = if ($hasCommit) { $headCommit } else { '' }
+    commit_hash = $(if ($hasCommit) { $headCommit } else { '' })
     auto_committed = $autoCommitted
     changed_files = $changedFiles
     error_message = $errorMessage
-    resolved_command = if ($codexPrefix.Count -gt 0) { ($codexPrefix -join ' ') } else { '' }
+    resolved_command = $(if ($codexPrefix.Count -gt 0) { ($codexPrefix -join ' ') } else { '' })
 }
 Write-V7Json -Path $resultPath -Data $result
 

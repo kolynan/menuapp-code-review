@@ -120,7 +120,7 @@ $result = [ordered]@{
     writer_commit = $writerCommit
     merge_commit = $mergeCommit
     reviewer_findings = $reviewCount
-    reconcile_result = if (Test-Path -LiteralPath $reconcileResultPath) { $reconcileResultPath } else { '' }
+    reconcile_result = $(if (Test-Path -LiteralPath $reconcileResultPath) { $reconcileResultPath } else { '' })
     changed_files = $changedFiles
     report_file = $mergeReportPath
 }
