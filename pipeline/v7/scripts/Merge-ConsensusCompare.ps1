@@ -94,17 +94,31 @@ if ([string]::IsNullOrWhiteSpace($baseCommit)) {
 }
 
 # --- Single-writer fallback (KB-069): if one writer has no commit, use the other ---
+Write-Host "[Comparator] artifacts_dir = $artifactsDir"
+Write-Host "[Comparator] writerWorktree = $writerWorktree"
+Write-Host "[Comparator] codexWorktree = $codexWorktree"
+Write-Host "[Comparator] baseCommit = $baseCommit"
+
+$ccResultFile = Join-Path $artifactsDir 'claude-writer.result.json'
+$codexResultFile = Join-Path $artifactsDir 'codex-writer.result.json'
+Write-Host "[Comparator] CC result exists: $(Test-Path -LiteralPath $ccResultFile)"
+Write-Host "[Comparator] Codex result exists: $(Test-Path -LiteralPath $codexResultFile)"
+
 $writerInfo = $null
 $codexInfo = $null
 try {
-    $writerInfo = Get-ConsensusCommitInfo -ResultPath (Join-Path $artifactsDir 'claude-writer.result.json') -WorktreePath $writerWorktree -BaseCommit $baseCommit -Label 'CC writer'
+    $writerInfo = Get-ConsensusCommitInfo -ResultPath $ccResultFile -WorktreePath $writerWorktree -BaseCommit $baseCommit -Label 'CC writer'
+    Write-Host "[Comparator] CC writer commit: $($writerInfo.commit)"
 } catch {
-    Write-Host "[Comparator] CC writer has no commit: $_"
+    Write-Host "[Comparator] CC writer FAILED: $($_.Exception.Message)"
+    Write-Host "[Comparator] CC writer stack: $($_.ScriptStackTrace)"
 }
 try {
-    $codexInfo = Get-ConsensusCommitInfo -ResultPath (Join-Path $artifactsDir 'codex-writer.result.json') -WorktreePath $codexWorktree -BaseCommit $baseCommit -Label 'Codex writer'
+    $codexInfo = Get-ConsensusCommitInfo -ResultPath $codexResultFile -WorktreePath $codexWorktree -BaseCommit $baseCommit -Label 'Codex writer'
+    Write-Host "[Comparator] Codex writer commit: $($codexInfo.commit)"
 } catch {
-    Write-Host "[Comparator] Codex writer has no commit: $_"
+    Write-Host "[Comparator] Codex writer FAILED: $($_.Exception.Message)"
+    Write-Host "[Comparator] Codex writer stack: $($_.ScriptStackTrace)"
 }
 
 if ($null -eq $writerInfo -and $null -eq $codexInfo) {
