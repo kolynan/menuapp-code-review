@@ -2,7 +2,13 @@ param(
     [Parameter(Mandatory = $true)][string]$TaskJsonPath
 )
 
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version 2
+
 $commonPath = Join-Path $PSScriptRoot 'V7.Common.ps1'
+if (-not (Test-Path -LiteralPath $commonPath)) {
+    throw ('V7.Common.ps1 not found at: ' + $commonPath + ' (PSScriptRoot=' + $PSScriptRoot + ')')
+}
 . $commonPath
 
 function Get-ConsensusCommitInfo {
@@ -13,15 +19,19 @@ function Get-ConsensusCommitInfo {
         [string]$Label
     )
 
+    if (-not (Test-Path -LiteralPath $ResultPath)) {
+        throw ($Label + ' result file not found: ' + $ResultPath)
+    }
     $result = Read-V7Json -Path $ResultPath
+    if ($null -eq $result) {
+        throw ($Label + ' result file is empty or invalid JSON: ' + $ResultPath)
+    }
     # Extract commit_hash from JSON result (PSCustomObject) without Get-V7StateText
     # which is only available in the parent supervisor process.
     $commit = ''
-    if ($null -ne $result) {
-        $prop = $result.PSObject.Properties['commit_hash']
-        if ($null -ne $prop -and $null -ne $prop.Value) {
-            $commit = [string]$prop.Value
-        }
+    $prop = $result.PSObject.Properties['commit_hash']
+    if ($null -ne $prop -and $null -ne $prop.Value) {
+        $commit = [string]$prop.Value
     }
     if ([string]::IsNullOrWhiteSpace($commit) -and (Test-Path -LiteralPath $WorktreePath)) {
         $candidate = (Invoke-V7Git -RepoRoot $WorktreePath -Arguments @('rev-parse', 'HEAD') -FailureMessage ('Unable to resolve ' + $Label + ' HEAD')).stdout.Trim()
@@ -89,7 +99,15 @@ function Get-ConsensusPatchExcerpt {
     return $trimmed.Substring(0, 2400) + "`n...[truncated]"
 }
 
+# Main body wrapped in try/catch to ensure readable error output in stderr log.
+# Without this, PS5.1 child process errors can appear as blank messages in the
+# supervisor's crash log due to stderr redirect encoding issues.
+try {
+
 $task = Read-V7Json -Path $TaskJsonPath
+if ($null -eq $task) {
+    throw ('Task JSON not found or invalid: ' + $TaskJsonPath)
+}
 $artifactsDir = $task.paths.artifacts_dir
 $writerWorktree = $task.paths.writer_worktree
 $codexWorktree = $task.paths.review_worktree
@@ -107,17 +125,22 @@ $codexResultFile = Join-Path $artifactsDir 'codex-writer.result.json'
 
 $writerInfo = $null
 $codexInfo = $null
+$writerError = $null
+$codexError = $null
 try {
     $writerInfo = Get-ConsensusCommitInfo -ResultPath $ccResultFile -WorktreePath $writerWorktree -BaseCommit $baseCommit -Label 'CC writer'
 } catch {
+    $writerError = $_.Exception.Message
 }
 try {
     $codexInfo = Get-ConsensusCommitInfo -ResultPath $codexResultFile -WorktreePath $codexWorktree -BaseCommit $baseCommit -Label 'Codex writer'
 } catch {
+    $codexError = $_.Exception.Message
 }
 
 if ($null -eq $writerInfo -and $null -eq $codexInfo) {
-    throw 'Neither CC writer nor Codex writer produced a commit. Cannot compare.'
+    $detail = 'CC: ' + $(if ($writerError) { $writerError } else { 'no result' }) + '; Codex: ' + $(if ($codexError) { $codexError } else { 'no result' })
+    throw ('Neither CC writer nor Codex writer produced a commit. ' + $detail)
 }
 
 $writerCommit = $(if ($null -ne $writerInfo) { [string]$writerInfo.commit } else { '' })
@@ -193,3 +216,13 @@ $result = [ordered]@{
     consensus_reached = ($disagreements.Count -eq 0)
 }
 Write-V7Json -Path $resultPath -Data $result
+
+} catch {
+    # Re-throw with explicit message to prevent blank errors in stderr log.
+    # PS5.1 child processes with 2> redirect can lose the original error text.
+    $msg = 'Comparator failed: ' + $_.Exception.Message
+    if ($_.ScriptStackTrace) {
+        $msg += ' | Stack: ' + ($_.ScriptStackTrace -replace "`r?`n", ' << ')
+    }
+    throw $msg
+}
