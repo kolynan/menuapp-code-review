@@ -192,11 +192,12 @@ Fixed bugs: BUG-PF-002, BUG-PF-004, BUG-PF-005, BUG-PF-007, BUG-PF-008,
 - **Problem:** Loading, error, and ready states all use `min-h-screen`. Since `PartnerShell` already provides a full-height layout with header and nav, this adds another 100vh inside the content area, producing unnecessary scroll space on mobile.
 - **Fix:** Remove inner `min-h-screen`; size the page to the shell content area with `w-full h-full` or a smaller local min-height.
 
-### BUG-S123-03 (P3) — Load error state not announced to assistive technology
+### BUG-S123-03 (P3) — Load error state not announced to assistive technology — FIXED
 - **Lines:** 158–170 (error render block)
-- **Session:** S123 code review
+- **Session:** S123 code review / Fixed: S144 quick-fix chain
 - **Problem:** When `auth.me()` fails, the error container replaces the loading region but has no `role="alert"` and focus is not moved. Screen-reader users may not be told that loading finished with an error.
-- **Fix:** Add `role="alert"` to the error container div.
+- **Fix:** Added `role="alert"` to the error container div.
+- **Status:** FIXED
 
 ### BUG-S106-01 (P3) — PartnerShell missing activeTab prop
 - **Lines:** 294 (`<PartnerShell>`)
@@ -204,20 +205,23 @@ Fixed bugs: BUG-PF-002, BUG-PF-004, BUG-PF-005, BUG-PF-007, BUG-PF-008,
 - **Problem:** `<PartnerShell>` called without `activeTab` prop. CLAUDE.md pattern requires `<PartnerShell activeTab="tabname">`. Navigation tabs may show no active state.
 - **Fix:** Determine correct activeTab value for Profile (likely "profile" or omit if Profile is not in partner nav).
 
-### BUG-S106-02 (P3) — getRoleLabel null guard missing
+### BUG-S106-02 (P3) — getRoleLabel null guard missing — FIXED
 - **Lines:** 133–135 (`getRoleLabel`)
-- **Session:** S106 smoke test v6.2
+- **Session:** S106 smoke test v6.2 / Fixed: S144 quick-fix chain
 - **Problem:** `getRoleLabel(undefined)` returns `undefined` because `tr("profile.role.undefined", undefined)` returns `undefined` as fallback. Badge renders with correct CSS but no text. i18n key `profile.role.unknown` listed in README but never used. Regression from BUG-PF-003.
-- **Fix:** Add null guard: `if (!userRole) return tr("profile.role.unknown", "Неизвестная роль");` at start of getRoleLabel.
+- **Fix:** Added null guard: `if (!userRole) return tr("profile.role.unknown", "Неизвестная роль");` at start of getRoleLabel.
+- **Status:** FIXED
 
 ### BUG-PF-010 (P3) — Decorative icons missing aria-hidden
 - **Lines:** 150, 179, 187, 212
 - **Impact:** Screen readers announce decorative SVG icons.
 
-### BUG-S105-02 (P2) — Input fields missing min-h-[44px]
+### BUG-S105-02 (P2) — Input fields missing min-h-[44px] — FIXED
 - **Lines:** ~211, ~221 (Full Name and Email inputs)
+- **Session fixed:** S144 quick-fix chain
 - **Problem:** BUG-PF-025 was fixed in RELEASE 260301-00, but current base file doesn't have `min-h-[44px]` on Input components. Touch targets below 44px minimum on mobile.
-- **Fix:** Add `className="min-h-[44px]"` to both Full Name and Email `<Input>` components.
+- **Fix:** Added `className="min-h-[44px]"` to Full Name Input; added `min-h-[44px]` to Email Input className.
+- **Status:** FIXED
 
 ### BUG-S105-03 (P2) — Save button not in fixed footer on mobile
 - **Lines:** ~255-261 (save button inside CardContent)

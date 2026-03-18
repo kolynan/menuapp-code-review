@@ -136,6 +136,7 @@ function ProfileContent() {
   };
 
   const getRoleLabel = (userRole) => {
+    if (!userRole) return tr("profile.role.unknown", "Неизвестная роль");
     return tr(`profile.role.${userRole}`, userRole);
   };
 
@@ -160,7 +161,7 @@ function ProfileContent() {
 
   if (isLoadError) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 p-4">
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 p-4" role="alert">
         <AlertCircle className="w-10 h-10 text-red-400" />
         <p className="text-gray-600 text-center">{tr("profile.load_error", "Не удалось загрузить профиль")}</p>
         <Button
@@ -235,6 +236,7 @@ function ProfileContent() {
                 id="fullName"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                className="min-h-[44px]"
               />
             </div>
 
@@ -245,7 +247,7 @@ function ProfileContent() {
                 id="email"
                 value={user?.email || ""}
                 readOnly
-                className="bg-gray-50 text-gray-600"
+                className="bg-gray-50 text-gray-600 min-h-[44px]"
               />
             </div>
 
