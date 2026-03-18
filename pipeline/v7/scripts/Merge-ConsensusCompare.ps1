@@ -211,8 +211,8 @@ $result = [ordered]@{
     writer_files = @($writerStatusMap.Keys | Sort-Object)
     codex_files = @($codexStatusMap.Keys | Sort-Object)
     compared_files = $allFiles
-    agreements = @($agreements)
-    disagreements = @($disagreements)
+    agreements = $agreements.ToArray()
+    disagreements = $disagreements.ToArray()
     consensus_reached = ($disagreements.Count -eq 0)
 }
 Write-V7Json -Path $resultPath -Data $result
