@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from "react";
 
 // TestPage — fake page for pipeline smoke testing
+// Contains 3 intentional bugs for CC to find
 
 export default function TestPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchItems();
+  }, []);
 
   const fetchItems = async () => {
     try {
@@ -13,40 +17,31 @@ export default function TestPage() {
       const data = await response.json();
       setItems(data);
     } catch (err) {
-      setError(err.message);
+      console.error("fetchItems error:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchItems();
-  }, []);
-
   const deleteItem = async (id) => {
     try {
-      await fetch(`/api/items/${id}`, { method: "DELETE" });
-      setItems((prev) => prev.filter((i) => i.id !== id));
+      const res = await fetch(`/api/items/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+      setItems(items.filter((i) => i.id !== id));
     } catch (err) {
-      setError(err.message);
+      console.error("deleteItem error:", err);
     }
   };
 
-  if (loading) return <div className="p-4">Loading...</div>;
-  if (error) return <div className="p-4 text-red-500">{error}</div>;
+  if (loading) return <div>Loading...</div>;
 
   return (
-    <div className="p-4">
-      <h1 className="text-xl font-bold mb-4">Test Page</h1>
+    <div style={{ padding: 16 }}>
+      <h1>Test Page</h1>
       {items.map((item) => (
-        <div key={item.id} className="flex items-center gap-2 py-1">
+        <div key={item.id}>
           {item.name}
-          <button
-            className="px-2 py-1 text-sm bg-red-500 text-white rounded"
-            onClick={() => deleteItem(item.id)}
-          >
-            Delete
-          </button>
+          <button onClick={() => deleteItem(item.id)}>Delete</button>
         </div>
       ))}
     </div>

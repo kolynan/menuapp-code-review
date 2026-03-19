@@ -1,13 +1,9 @@
 # TestPage — Known Bugs
 
-## Fixed (chain testpage-260318-235014)
-
-1. **[P0] Missing `await` on `response.json()`** (line 17) — returns Promise instead of data, causes `.map()` crash
-2. **[P1] No error handling on fetch calls** (lines 15-20, 23-26) — network errors crash the page silently
-3. **[P1] `fetchItems` defined after `useEffect` call** — TDZ risk moved function above useEffect
-4. **[P2] Inline styles** (line 31) — `style={{ padding: 16 }}` violates Tailwind-only rule, replaced with `className="p-4"`
-5. **[P2] Stale closure in `deleteItem`** (line 25) — `items` captured by closure, replaced with functional `setItems(prev => ...)`
+## Fixed
+- **[P0] Missing await on response.json()** (line ~17) — `response.json()` returns a Promise; without `await`, `setItems` receives a Promise object instead of data. Fixed: added `await`.
+- **[P1] No error handling in fetchItems** (line ~15) — Network errors crash silently, `loading` stays true forever. Fixed: added try/catch/finally.
+- **[P1] No error handling in deleteItem** (line ~23) — Failed DELETE removes item from UI optimistically with no rollback. Fixed: added try/catch, check `res.ok`.
 
 ## Active
-
 No active bugs.
