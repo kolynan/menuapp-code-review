@@ -44,5 +44,15 @@
 - **[P1] mountedRef never reset after StrictMode cleanup** (line 53) — React 18 StrictMode mount→cleanup→remount sets `mountedRef.current = false` permanently. Fixed: added `mountedRef.current = true` at start of useEffect body.
 - **[P2] fetchItems lacks mount guards + retry has no AbortController** (lines 20-37, 72) — setState calls after unmount, retry button had no abort capability. Fixed: added mountedRef guards to all fetchItems setState, added abortRef for per-fetch AbortController, retry uses handleRetry with proper abort.
 
+## Fixed (consensus chain testpage-260319-225437)
+- **[P1] Retry action misleading for delete failures** (line ~84) — Retry button always re-fetches even after delete failure. Fixed: added errorSource tracking, retry only shows for fetch errors.
+- **[P1] Shallow response validation** (line ~29) — Only checked Array.isArray, malformed items could crash rendering. Fixed: filter items to require valid `id`.
+- **[P2] Retry fetch not cleaned up on unmount** (line ~76) — Cleanup only aborted original controller, not retried ones. Fixed: use abortRef.current in cleanup.
+- **[P2] Delete aria-label i18n concatenation** (line ~107) — String concatenation breaks i18n word order. Fixed: use interpolated translation key.
+- **[P2] Loading state hides content on retry** (line ~79) — Early return replaced entire page on retry. Fixed: inline loading indicator when items exist.
+- **[P2] Error div missing role="alert"** (line ~88) — Screen readers won't announce errors. Fixed: added role="alert".
+- **[P3] h1 title unstyled** (line ~83) — No Tailwind classes on heading. Fixed: added text-xl font-semibold mb-4.
+- **[P3] No visual separation between list items** (line ~103) — Rows blend together. Fixed: added border-b border-gray-100.
+
 ## Active
 No active bugs.
