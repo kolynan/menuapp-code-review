@@ -3265,9 +3265,10 @@ export default function X() {
       )}
 
       {/* TASK-260203-01: Cart as Bottom Drawer */}
-      <Drawer 
-        open={drawerMode === 'cart'} 
-        onOpenChange={(open) => !open && setDrawerMode(null)}
+      <Drawer
+        open={drawerMode === 'cart'}
+        dismissible={!isSubmitting}
+        onOpenChange={(open) => { if (!open && !isSubmitting) setDrawerMode(null); }}
       >
         <DrawerContent className="max-h-[85vh] overflow-hidden">
           <DrawerHeader className="sr-only">
@@ -3429,6 +3430,7 @@ export default function X() {
                   toast.info(t('common.loading'), { id: 'mm1', duration: 1500 });
                   return;
                 }
+                if (isSubmitting && drawerMode === 'cart') return;
                 setDrawerMode(drawerMode === 'cart' ? null : 'cart');
               }}
               buttonLabel={hallStickyButtonLabel}

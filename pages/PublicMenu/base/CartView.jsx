@@ -462,8 +462,9 @@ export default function CartView({
 
           {/* Right: Close */}
           <button
-            onClick={() => onClose ? onClose() : setView("menu")}
-            className="p-2 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
+            onClick={() => { if (isSubmitting) return; onClose ? onClose() : setView("menu"); }}
+            disabled={isSubmitting}
+            className={`p-2 rounded-full ${isSubmitting ? 'bg-slate-50 text-slate-300 cursor-not-allowed' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
           >
             <X className="w-5 h-5" />
           </button>
