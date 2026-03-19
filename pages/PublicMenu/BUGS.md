@@ -1,7 +1,7 @@
 ---
-version: "22.0"
-updated: "2026-03-13"
-session: 119
+version: "23.0"
+updated: "2026-03-20"
+session: 148
 ---
 
 # PublicMenu — Bug Registry
@@ -52,13 +52,6 @@ session: 119
 - **Фикс:** Gate banner on ready/served statuses + `reviewableItems.length > 0`.
 - **Регрессия:** BUG-PM-021
 
-### BUG-PM-031: Cart can still be closed during order submission (P1)
-- **Приоритет:** P1
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:464, x.jsx:3269
-- **Симптом:** Close button active while `isSubmitting`. Drawer also closes unconditionally. Can hide in-flight errors.
-- **Фикс:** Disable close button and block drawer close while `isSubmitting`.
-- **Регрессия:** BUG-PM-034 (S85)
 
 ### BUG-PM-032: Order-status differentiation regressed (P2)
 - **Приоритет:** P2
@@ -180,6 +173,12 @@ session: 119
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-031: Cart can still be closed during order submission (P0) — FIXED S148
+- **Когда:** S116 (Codex review), fixed S148 via consensus chain publicmenu-260320-004325
+- **Файл:** CartView.jsx:464, x.jsx:3268-3270, x.jsx:3432
+- **Симптом:** Close button active while `isSubmitting`. Drawer swipe/overlay/Escape close unconditionally. StickyCartBar toggle can close. User loses submission feedback, risk of duplicate orders.
+- **Фикс:** 5 changes: (1) `dismissible={!isSubmitting}` on Drawer, (2) `onOpenChange` guard, (3) close button `isSubmitting` guard + disabled + visual state, (4) StickyCartBar toggle guard, (5) visual disabled styling.
 
 ### BUG-PM-023: reviewedItems.has() without null guard (P0) — FIXED S116
 - **Когда:** S79 review (pre-existing from S74), fixed S116
