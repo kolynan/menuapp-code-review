@@ -31,5 +31,13 @@
 - **[P2] List rows not mobile-safe** (line 55) — Long names push delete button off-screen. Fixed: added `flex-1 min-w-0 truncate` wrapper.
 - **[P3] item.name null safety** (line 55) — No fallback for null names. Fixed: added `|| t('test_page.unnamed_item')`.
 
+## Fixed (consensus chain testpage-260319-211343)
+- **[P1] Unvalidated API response can crash rendering** (line ~21) — `items.map()` crashes if backend returns non-array. Fixed: added `Array.isArray(data)` check.
+- **[P1] Error handling stores translated strings instead of keys** (lines 19,23,34,37) — Storing `t('...')` result breaks language switching. Fixed: store i18n keys, render via `t(error)` in JSX.
+- **[P2] No abort/cleanup for async requests on unmount** (lines 44-46) — Stale state updates after unmount. Fixed: added AbortController + mountedRef guard.
+- **[P2] Error banner not mobile-responsive** (line 54) — Horizontal flex overflows on mobile with long translations. Fixed: `flex-col sm:flex-row` with text wrapping.
+- **[P3] fetchItems not in useEffect dependency array** (line 46) — ESLint exhaustive-deps violation. Fixed: wrapped in useCallback, added to deps.
+- **[P3] Delete button lacks aria-label** (line 70) — No accessible label with item name. Fixed: added aria-label.
+
 ## Active
 No active bugs.

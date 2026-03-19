@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useI18n } from "@/components/i18n";
 
 // TestPage — fake page for pipeline smoke testing
@@ -10,39 +10,48 @@ export default function TestPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [deletingIds, setDeletingIds] = useState(new Set());
+  const mountedRef = useRef(true);
 
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async (signal) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/items");
-      if (!response.ok) throw new Error(t('test_page.fetch_failed'));
+      const response = await fetch("/api/items", { signal });
+      if (!response.ok) throw new Error('test_page.fetch_failed');
       const data = await response.json();
+      if (!Array.isArray(data)) throw new Error('test_page.invalid_response');
       setItems(data);
     } catch (err) {
-      setError(t('common.error'));
+      if (err.name === 'AbortError') return;
+      setError(err.message || 'common.error');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const deleteItem = async (id) => {
     setError(null);
     setDeletingIds(prev => new Set(prev).add(id));
     try {
       const res = await fetch(`/api/items/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(t('test_page.delete_failed'));
+      if (!res.ok) throw new Error('test_page.delete_failed');
+      if (!mountedRef.current) return;
       setItems(prev => prev.filter((i) => i.id !== id));
     } catch (err) {
-      setError(t('common.error'));
+      if (!mountedRef.current) return;
+      setError(err.message || 'common.error');
     } finally {
-      setDeletingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+      if (mountedRef.current) {
+        setDeletingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+      }
     }
   };
 
   useEffect(() => {
-    fetchItems();
-  }, []);
+    const controller = new AbortController();
+    fetchItems(controller.signal);
+    return () => { controller.abort(); mountedRef.current = false; };
+  }, [fetchItems]);
 
   if (loading) return <div className="flex items-center justify-center p-8">{t('common.loading')}</div>;
 
@@ -50,8 +59,8 @@ export default function TestPage() {
     <div className="p-4">
       <h1>{t('test_page.title')}</h1>
       {error && (
-        <div className="flex items-center gap-2 text-red-500">
-          <p>{error}</p>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 text-red-500">
+          <p>{t(error)}</p>
           <button
             className="min-h-[44px] min-w-[44px] px-3 py-2 rounded border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 text-sm"
             onClick={() => fetchItems()}
@@ -66,6 +75,7 @@ export default function TestPage() {
           <span className="flex-1 min-w-0 truncate">{item.name || t('test_page.unnamed_item')}</span>
           <button
             className="min-h-[44px] min-w-[44px] px-3 py-2 rounded border border-gray-300 bg-white hover:bg-gray-100 text-sm"
+            aria-label={`${t('common.delete')} ${item.name || t('test_page.unnamed_item')}`}
             disabled={deletingIds.has(item.id)}
             onClick={() => deleteItem(item.id)}
           >
