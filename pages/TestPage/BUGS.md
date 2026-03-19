@@ -39,5 +39,10 @@
 - **[P3] fetchItems not in useEffect dependency array** (line 46) — ESLint exhaustive-deps violation. Fixed: wrapped in useCallback, added to deps.
 - **[P3] Delete button lacks aria-label** (line 70) — No accessible label with item name. Fixed: added aria-label.
 
+## Fixed (consensus chain testpage-260319-213831)
+- **[P1] Raw error messages bypass i18n** (lines 26, 42) — Native fetch errors leak browser strings via `err.message`. Fixed: added `toErrorKey()` whitelist that validates known i18n keys, falls back to `common.error`.
+- **[P1] mountedRef never reset after StrictMode cleanup** (line 53) — React 18 StrictMode mount→cleanup→remount sets `mountedRef.current = false` permanently. Fixed: added `mountedRef.current = true` at start of useEffect body.
+- **[P2] fetchItems lacks mount guards + retry has no AbortController** (lines 20-37, 72) — setState calls after unmount, retry button had no abort capability. Fixed: added mountedRef guards to all fetchItems setState, added abortRef for per-fetch AbortController, retry uses handleRetry with proper abort.
+
 ## Active
 No active bugs.

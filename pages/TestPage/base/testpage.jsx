@@ -2,7 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useI18n } from "@/components/i18n";
 
 // TestPage — fake page for pipeline smoke testing
-// Contains 3 intentional bugs for CC to find
+
+const KNOWN_ERROR_KEYS = ['test_page.fetch_failed', 'test_page.invalid_response', 'test_page.delete_failed'];
+
+function toErrorKey(err) {
+  return KNOWN_ERROR_KEYS.includes(err.message) ? err.message : 'common.error';
+}
 
 export default function TestPage() {
   const { t } = useI18n();
@@ -11,6 +16,7 @@ export default function TestPage() {
   const [error, setError] = useState(null);
   const [deletingIds, setDeletingIds] = useState(new Set());
   const mountedRef = useRef(true);
+  const abortRef = useRef(null);
 
   const fetchItems = useCallback(async (signal) => {
     setLoading(true);
@@ -20,12 +26,14 @@ export default function TestPage() {
       if (!response.ok) throw new Error('test_page.fetch_failed');
       const data = await response.json();
       if (!Array.isArray(data)) throw new Error('test_page.invalid_response');
+      if (!mountedRef.current) return;
       setItems(data);
     } catch (err) {
       if (err.name === 'AbortError') return;
-      setError(err.message || 'common.error');
+      if (!mountedRef.current) return;
+      setError(toErrorKey(err));
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, []);
 
@@ -39,7 +47,7 @@ export default function TestPage() {
       setItems(prev => prev.filter((i) => i.id !== id));
     } catch (err) {
       if (!mountedRef.current) return;
-      setError(err.message || 'common.error');
+      setError(toErrorKey(err));
     } finally {
       if (mountedRef.current) {
         setDeletingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
@@ -47,8 +55,17 @@ export default function TestPage() {
     }
   };
 
-  useEffect(() => {
+  const handleRetry = useCallback(() => {
+    if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
+    abortRef.current = controller;
+    fetchItems(controller.signal);
+  }, [fetchItems]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const controller = new AbortController();
+    abortRef.current = controller;
     fetchItems(controller.signal);
     return () => { controller.abort(); mountedRef.current = false; };
   }, [fetchItems]);
@@ -63,7 +80,7 @@ export default function TestPage() {
           <p>{t(error)}</p>
           <button
             className="min-h-[44px] min-w-[44px] px-3 py-2 rounded border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 text-sm"
-            onClick={() => fetchItems()}
+            onClick={handleRetry}
           >
             {t('common.retry')}
           </button>
