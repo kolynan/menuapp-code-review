@@ -54,5 +54,15 @@
 - **[P3] h1 title unstyled** (line ~83) — No Tailwind classes on heading. Fixed: added text-xl font-semibold mb-4.
 - **[P3] No visual separation between list items** (line ~103) — Rows blend together. Fixed: added border-b border-gray-100.
 
+## Fixed (consensus chain testpage-260319-234320)
+- **[P0] Unvalidated API payload crashes page** (line ~16) — `items.map()` on non-array crashes. Fixed: `Array.isArray(data)` check + item filter for valid `id`.
+- **[P1] No response.ok check on fetch** (line ~16) — Non-2xx treated as success. Fixed: `if (!res.ok) throw`.
+- **[P1] Raw error message shown to users** (line ~26) — `err.message` bypasses i18n. Fixed: use `t('test_page.error')`.
+- **[P2] No fetch cleanup on unmount** (lines ~14-18) — No AbortController. Fixed: added AbortController + cleanup in useEffect.
+- **[P2] Delete button below minimum touch target** (line ~31) — `px-3 py-2 text-sm` too small. Fixed: added `min-h-[44px] min-w-[44px]`.
+- **[P2] No retry mechanism for errors** (line ~26) — User must refresh. Fixed: added retry button calling `fetchItems()`.
+- **[P2] List rows not mobile-safe for long names** (lines ~29-30) — Long names push delete off-screen. Fixed: `flex-1 min-w-0 truncate`.
+- **[P3] No loading spinner** (line ~21) — Bare text loading. Fixed: added Loader2 spinner.
+
 ## Active
-No active bugs.
+- **[P1] Delete action is UI-only** (line ~70) — Delete only removes from local state, no backend call. Refresh restores item. KNOWN LIMITATION: TestPage has no real backend mutation — skipped by design.
