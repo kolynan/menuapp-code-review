@@ -1,5 +1,5 @@
 ---
-version: "23.0"
+version: "24.0"
 updated: "2026-03-20"
 session: 148
 ---
@@ -23,34 +23,6 @@ session: 148
 - **Фикс:** Change fallback from `return 5` to `return 4`.
 - **Регрессия:** BUG-PM-S81-02
 
-### BUG-PM-027: Loyalty/discount UI hidden for normal checkout (P1)
-- **Приоритет:** P1
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:859, x.jsx:1937,3295
-- **Симптом:** Loyalty section gated on `showLoginPromptAfterRating` instead of `showLoyaltySection`. Email entry, balance display, and point redemption unavailable until after a dish rating exists (never for fresh cart).
-- **Фикс:** Use `showLoyaltySection` for checkout loyalty; keep `showLoginPromptAfterRating` only for review nudge.
-
-### BUG-PM-028: Failed star-rating saves leave dishes permanently locked (P1)
-- **Приоритет:** P1
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:705,720,725; x.jsx:2039
-- **Симптом:** Item marked read-only when draftRating > 0, but async save can fail. Nothing clears the draft on failure, so user cannot retry.
-- **Фикс:** Roll back draft rating on failure, or only lock from confirmed `reviewedItems`.
-
-### BUG-PM-029: Table-code auto-verify cannot retry same code after failure (P1)
-- **Приоритет:** P1
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:174,184
-- **Симптом:** `lastSentVerifyCodeRef` never cleared on error or after cooldown unlock. Transient API failure forces guest to change digits to retry.
-- **Фикс:** Clear `lastSentVerifyCodeRef` on failed verification, on unlock, and when input becomes incomplete.
-
-### BUG-PM-030: Review-reward banner shows before any dish is reviewable (P1)
-- **Приоритет:** P1
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:386
-- **Симптом:** "За отзыв +N" hint shows when `myOrders.length > 0` regardless of order status. Guests see reward prompt before anything is ready/served.
-- **Фикс:** Gate banner on ready/served statuses + `reviewableItems.length > 0`.
-- **Регрессия:** BUG-PM-021
 
 
 ### BUG-PM-032: Order-status differentiation regressed (P2)
@@ -173,6 +145,31 @@ session: 148
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-027: Loyalty/discount UI hidden for normal checkout (P1) — FIXED S148
+- **Когда:** S116 (Codex review), fixed S148 via consensus chain publicmenu-260320-010828
+- **Файл:** CartView.jsx:860, x.jsx:3296
+- **Симптом:** Loyalty section gated on `showLoginPromptAfterRating` instead of `showLoyaltySection`. Email entry, balance display, and point redemption unavailable until after a dish rating exists (never for fresh cart).
+- **Фикс:** Added `showLoyaltySection` to CartView props. Changed loyalty section gate from `showLoginPromptAfterRating` to `showLoyaltySection`.
+
+### BUG-PM-028: Failed star-rating saves leave dishes permanently locked (P1) — FIXED S148
+- **Когда:** S116 (Codex review), fixed S148 via consensus chain publicmenu-260320-010828
+- **Файл:** x.jsx:2039 (handleRateDish catch block)
+- **Симптом:** Item marked read-only when draftRating > 0, but async save can fail. Nothing clears the draft on failure, so user cannot retry.
+- **Фикс:** Added `updateDraftRating(itemId, 0)` in catch block to roll back draft rating on save failure.
+
+### BUG-PM-029: Table-code auto-verify cannot retry same code after failure (P1) — FIXED S148
+- **Когда:** S116 (Codex review), fixed S148 via consensus chain publicmenu-260320-010828
+- **Файл:** CartView.jsx:155,133
+- **Симптом:** `lastSentVerifyCodeRef` never cleared on error or after cooldown unlock. Transient API failure forces guest to change digits to retry.
+- **Фикс:** Clear `lastSentVerifyCodeRef` on failed verification (error-counting effect) and on cooldown unlock.
+
+### BUG-PM-030: Review-reward banner shows before any dish is reviewable (P1) — FIXED S148
+- **Когда:** S116 (Codex review), fixed S148 via consensus chain publicmenu-260320-010828
+- **Файл:** CartView.jsx:386
+- **Симптом:** "За отзыв +N" hint shows when `myOrders.length > 0` regardless of order status. Guests see reward prompt before anything is ready/served.
+- **Фикс:** Changed condition from `myOrders?.length > 0` to `reviewableItems?.length > 0`.
+- **Регрессия:** BUG-PM-021
 
 ### BUG-PM-031: Cart can still be closed during order submission (P0) — FIXED S148
 - **Когда:** S116 (Codex review), fixed S148 via consensus chain publicmenu-260320-004325

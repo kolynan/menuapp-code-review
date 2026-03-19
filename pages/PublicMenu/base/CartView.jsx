@@ -70,6 +70,7 @@ export default function CartView({
   codeVerificationError,
   hallGuestCodeEnabled,
   guestCode,
+  showLoyaltySection,
 }) {
   // ===== P0: Safe prop defaults (BUG-PM-023, BUG-PM-025) =====
   const safeReviewedItems = reviewedItems || new Set();
@@ -130,6 +131,8 @@ export default function CartView({
     if (nowTs < codeLockedUntil) return;
     setCodeLockedUntil(null);
     setCodeAttempts(0);
+    // BUG-PM-029: Allow retrying same code after cooldown expires
+    lastSentVerifyCodeRef.current = null;
   }, [nowTs, codeLockedUntil]);
 
   // Reset attempts on successful verification
@@ -150,6 +153,9 @@ export default function CartView({
     // Count once per verified code
     if (countedErrorForCodeRef.current === lastCode) return;
     countedErrorForCodeRef.current = lastCode;
+
+    // BUG-PM-029: Clear lastSentVerifyCodeRef so same code can be retried after failure
+    lastSentVerifyCodeRef.current = null;
 
     setCodeAttempts((prev) => {
       const next = prev + 1;
@@ -382,8 +388,8 @@ export default function CartView({
     loyaltyAccount?.id || loyaltyAccount?._id || loyaltyAccount?.email || (customerEmail && String(customerEmail).trim())
   );
 
-  // Показывать hint "За отзыв +N бонусов" сразу
-  const shouldShowReviewRewardHint = isReviewRewardActive && (myOrders?.length > 0);
+  // Показывать hint "За отзыв +N бонусов" только если есть блюда для оценки (BUG-PM-030)
+  const shouldShowReviewRewardHint = isReviewRewardActive && (reviewableItems?.length > 0);
 
   // Показывать nudge "Введите email" после первой оценки
   const shouldShowReviewRewardNudge = isReviewRewardActive && hasAnyRating && !isCustomerIdentified;
@@ -856,8 +862,8 @@ export default function CartView({
             </div>
             )}
 
-            {/* P1: Loyalty section - COLLAPSIBLE */}
-            {showLoginPromptAfterRating && (
+            {/* P1: Loyalty section - COLLAPSIBLE (BUG-PM-027: use showLoyaltySection, not showLoginPromptAfterRating) */}
+            {showLoyaltySection && (
               <div className="mt-4 pt-4 border-t">
                 <button
                   type="button"

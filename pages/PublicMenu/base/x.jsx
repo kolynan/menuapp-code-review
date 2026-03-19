@@ -2039,6 +2039,8 @@ export default function X() {
     } catch (err) {
       console.error('Failed to save rating:', err);
       toast.error(t('error.save_failed'), { id: 'mm1' });
+      // BUG-PM-028: Roll back draft rating so user can retry
+      updateDraftRating(itemId, 0);
     } finally {
       setRatingSavingByItemId(prev => ({ ...prev, [itemId]: false }));
     }
