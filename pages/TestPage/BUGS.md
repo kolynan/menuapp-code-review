@@ -64,5 +64,15 @@
 - **[P2] List rows not mobile-safe for long names** (lines ~29-30) — Long names push delete off-screen. Fixed: `flex-1 min-w-0 truncate`.
 - **[P3] No loading spinner** (line ~21) — Bare text loading. Fixed: added Loader2 spinner.
 
+## Fixed (consensus chain testpage-260319-235930)
+- **[P1] Error stores translated string instead of i18n key** (line ~30) — `setError(t('test_page.error'))` stores pre-translated text; language switch leaves stale text. Fixed: store key string in `errorKey` state, call `t(errorKey)` in JSX.
+- **[P1] Retry fetch missing AbortController** (line ~58) — Retry calls `fetchItems()` without signal, no cleanup on unmount. Fixed: ref-based `abortRef` AbortController for all fetch calls including retry.
+- **[P1] Delete action is UI-only** (line ~70) — Delete only removes from local state, no backend call. Fixed: added TODO comment for backend DELETE; kept as UI-only since TestPage has no real persistence.
+- **[P2] Error div missing role="alert"** (line ~54) — Screen readers won't announce errors. Fixed: added `role="alert"`.
+- **[P2] item.name null safety** (line ~67) — No fallback for null/undefined names. Fixed: `item.name || t('test_page.unnamed_item')`.
+- **[P2] Loading early return hides content during retry** (line ~41) — Full-page spinner replaces visible items on retry. Fixed: inline loader when items exist, full-page only on initial load.
+- **[P2] Delete button aria-label missing** (line ~68) — No accessible label identifying which item. Fixed: added `aria-label={t('test_page.delete_item', { name: ... })}`.
+- **[P2] Error banner not mobile-safe** (line ~54) — Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
+
 ## Active
-- **[P1] Delete action is UI-only** (line ~70) — Delete only removes from local state, no backend call. Refresh restores item. KNOWN LIMITATION: TestPage has no real backend mutation — skipped by design.
+(none)

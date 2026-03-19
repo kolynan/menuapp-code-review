@@ -1,20 +1,19 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useI18n } from "@/components/i18n";
 import { Loader2 } from "lucide-react";
 
 // TestPage — minimal fake page for pipeline smoke testing
-// Contains intentional patterns for reviewers to find:
-// - missing cleanup on unmount, no error i18n key validation, no loading skeleton
 
 export default function TestPage() {
   const { t } = useI18n();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [errorKey, setErrorKey] = useState(null);
+  const abortRef = useRef(null);
 
   const fetchItems = useCallback((signal) => {
     setLoading(true);
-    setError(null);
+    setErrorKey(null);
     fetch("/api/items", { signal })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -27,18 +26,31 @@ export default function TestPage() {
       })
       .catch(err => {
         if (err.name === "AbortError") return;
-        setError(t('test_page.error'));
+        setErrorKey('test_page.error');
         setLoading(false);
       });
-  }, [t]);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
+    abortRef.current = controller;
     fetchItems(controller.signal);
     return () => controller.abort();
   }, [fetchItems]);
 
-  if (loading) {
+  const handleRetry = useCallback(() => {
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    fetchItems(controller.signal);
+  }, [fetchItems]);
+
+  const handleDelete = useCallback((id) => {
+    // TODO: Add backend DELETE call when TestPage supports persistence
+    setItems(prev => prev.filter(i => i.id !== id));
+  }, []);
+
+  if (loading && items.length === 0) {
     return (
       <div className="p-8 flex items-center justify-center gap-2">
         <Loader2 className="h-5 w-5 animate-spin" />
@@ -50,24 +62,31 @@ export default function TestPage() {
   return (
     <div className="p-4">
       <h1 className="text-xl font-semibold mb-4">{t('test_page.title')}</h1>
-      {error && (
-        <div className="text-red-500 flex items-center gap-2 mb-4">
-          <p>{error}</p>
+      {loading && items.length > 0 && (
+        <div className="flex items-center gap-2 mb-4 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>{t('common.loading')}</span>
+        </div>
+      )}
+      {errorKey && (
+        <div role="alert" className="text-red-500 flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-4">
+          <p>{t(errorKey)}</p>
           <button
             className="px-3 py-2 text-sm border rounded min-h-[44px] min-w-[44px]"
-            onClick={() => fetchItems()}
+            onClick={handleRetry}
           >
             {t('common.retry')}
           </button>
         </div>
       )}
-      {items.length === 0 && !error && <p>{t('test_page.no_items')}</p>}
+      {items.length === 0 && !errorKey && <p>{t('test_page.no_items')}</p>}
       {items.map(item => (
         <div key={item.id} className="flex items-center justify-between py-2 border-b">
-          <span className="flex-1 min-w-0 truncate">{item.name}</span>
+          <span className="flex-1 min-w-0 truncate">{item.name || t('test_page.unnamed_item')}</span>
           <button
             className="px-3 py-2 text-sm border rounded min-h-[44px] min-w-[44px] ml-2"
-            onClick={() => setItems(prev => prev.filter(i => i.id !== item.id))}
+            aria-label={t('test_page.delete_item', { name: item.name || t('test_page.unnamed_item') })}
+            onClick={() => handleDelete(item.id)}
           >
             {t('common.delete')}
           </button>
