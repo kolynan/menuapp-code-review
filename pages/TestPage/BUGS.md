@@ -19,5 +19,17 @@
 - **[P2] Error state never cleared on success** (lines 24,36) — Stale error persists after successful actions. Fixed: added `setError(null)` at start of fetchItems and deleteItem.
 - **[P2] List items lack flex layout** (line 48) — Name and button stack vertically on mobile. Fixed: added `flex items-center justify-between` to item div.
 
+## Fixed (consensus chain testpage-260319-194642)
+- **[P0] Broken i18n import path** (line 2) — `@/components/useI18n` should be `@/components/i18n`. Fixed: corrected import path.
+- **[P1] Raw err.message shown to users** (lines 26,40) — Network errors leak browser strings. Fixed: replaced with `t('common.error')`.
+- **[P1] Single deletingId breaks overlapping deletes** (line 12) — Rapid taps cause state confusion. Fixed: changed to `Set`-based `deletingIds`.
+- **[P2] Error state has no retry button** (line 51) — User must refresh page. Fixed: added retry button calling `fetchItems()`.
+- **[P2] No setLoading(true) on re-fetch** (line 18) — Retry doesn't show loading indicator. Fixed: added `setLoading(true)` at start of `fetchItems`.
+- **[P2] Delete button invisible on mobile** (line 57) — No bg/border/hover styling. Fixed: added Tailwind visual classes.
+- **[P2] Loading state unstyled** (line 46) — Plain div, not centered. Fixed: added `flex items-center justify-center p-8`.
+- **[P2] useEffect TDZ order violation** (line 14) — `useEffect` called `fetchItems` before declaration. Fixed: moved `fetchItems` above `useEffect`.
+- **[P2] List rows not mobile-safe** (line 55) — Long names push delete button off-screen. Fixed: added `flex-1 min-w-0 truncate` wrapper.
+- **[P3] item.name null safety** (line 55) — No fallback for null names. Fixed: added `|| t('test_page.unnamed_item')`.
+
 ## Active
 No active bugs.
