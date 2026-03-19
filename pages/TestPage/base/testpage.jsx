@@ -9,15 +9,17 @@ export default function TestPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     fetchItems();
   }, []);
 
   const fetchItems = async () => {
+    setError(null);
     try {
       const response = await fetch("/api/items");
-      if (!response.ok) throw new Error("Fetch failed");
+      if (!response.ok) throw new Error(t('test_page.fetch_failed'));
       const data = await response.json();
       setItems(data);
     } catch (err) {
@@ -28,12 +30,16 @@ export default function TestPage() {
   };
 
   const deleteItem = async (id) => {
+    setError(null);
+    setDeletingId(id);
     try {
       const res = await fetch(`/api/items/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
+      if (!res.ok) throw new Error(t('test_page.delete_failed'));
       setItems(prev => prev.filter((i) => i.id !== id));
     } catch (err) {
       setError(err.message);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -45,13 +51,14 @@ export default function TestPage() {
       {error && <p className="text-red-500">{error}</p>}
       {items.length === 0 && !error && <p>{t('test_page.no_items')}</p>}
       {items.map((item) => (
-        <div key={item.id}>
+        <div key={item.id} className="flex items-center justify-between py-2">
           {item.name}
           <button
             className="min-h-[44px] min-w-[44px] px-3 py-2"
+            disabled={deletingId === item.id}
             onClick={() => deleteItem(item.id)}
           >
-            {t('common.delete')}
+            {deletingId === item.id ? t('common.loading') : t('common.delete')}
           </button>
         </div>
       ))}

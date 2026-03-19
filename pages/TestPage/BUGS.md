@@ -14,5 +14,10 @@
 - **[P2] No empty state** — Empty items shows nothing. Fixed: added empty state message.
 - **[P2] No user-facing error feedback** — Errors only in console. Fixed: added error state and UI display.
 
+- **[P1] Hardcoded error strings** (lines 20,33) — "Fetch failed"/"Delete failed" not using i18n. Fixed: replaced with `t('test_page.fetch_failed')` / `t('test_page.delete_failed')`.
+- **[P2] No loading/disabled state on Delete button** (lines 50-55) — Double-click causes duplicate DELETEs. Fixed: added `deletingId` state, disabled button during delete.
+- **[P2] Error state never cleared on success** (lines 24,36) — Stale error persists after successful actions. Fixed: added `setError(null)` at start of fetchItems and deleteItem.
+- **[P2] List items lack flex layout** (line 48) — Name and button stack vertically on mobile. Fixed: added `flex items-center justify-between` to item div.
+
 ## Active
 No active bugs.
