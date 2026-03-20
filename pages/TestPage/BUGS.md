@@ -1,5 +1,12 @@
 # TestPage — Known Bugs
 
+## Review 2026-03-20 (`testpage-260320-203824`)
+- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+- **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
+- **[P2] Async callbacks are not fully unmount-safe** (lines 17-31, 34-45) - `AbortController` cleanup exists, but resolved promise callbacks can still update state after unmount or after a newer request starts. Suggested fix: add a mounted or request-token guard around state updates.
+- **[P3] Silent payload filtering hides backend issues** (lines 24, 82) - Invalid rows are dropped and can fall through to the `no_items` empty state instead of surfacing bad payloads. Suggested fix: convert malformed rows into an error or warning path.
+- **[P3] Delete has no confirmation or undo** (lines 87-90) - A single tap removes an item immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
+
 ## Fixed
 - **[P0] Missing await on response.json()** (line ~17) — `response.json()` returns a Promise; without `await`, `setItems` receives a Promise object instead of data. Fixed: added `await`.
 - **[P1] No error handling in fetchItems** (line ~15) — Network errors crash silently, `loading` stays true forever. Fixed: added try/catch/finally.
