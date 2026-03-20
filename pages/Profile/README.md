@@ -8,3 +8,4 @@ Partner-area profile page for MenuApp. Displays and edits user name, email (read
 
 <!-- smoke-parallel-v3-profile -->
 <!-- smoke-parallel-v3-profile-b -->
+<!-- smoke-e-pr -->
