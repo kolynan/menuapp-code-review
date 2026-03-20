@@ -7,3 +7,4 @@ Partner-area profile page for MenuApp. Displays and edits user name, email (read
 - S123: Added JSDoc comments to main component (`ProfileContent`, `Profile`).
 
 <!-- smoke-parallel-v3-profile -->
+<!-- smoke-parallel-v3-profile-b -->
