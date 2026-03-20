@@ -35,7 +35,7 @@ export default function TestPage() {
     const controller = new AbortController();
     abortRef.current = controller;
     fetchItems(controller.signal);
-    return () => controller.abort();
+    return () => { if (abortRef.current) abortRef.current.abort(); };
   }, [fetchItems]);
 
   const handleRetry = useCallback(() => {
@@ -80,18 +80,20 @@ export default function TestPage() {
         </div>
       )}
       {items.length === 0 && !errorKey && <p>{t('test_page.no_items')}</p>}
-      {items.map(item => (
-        <div key={item.id} className="flex items-center justify-between py-2 border-b">
-          <span className="flex-1 min-w-0 truncate">{item.name || t('test_page.unnamed_item')}</span>
-          <button
-            className="px-3 py-2 text-sm border rounded min-h-[44px] min-w-[44px] ml-2"
-            aria-label={t('test_page.delete_item', { name: item.name || t('test_page.unnamed_item') })}
-            onClick={() => handleDelete(item.id)}
-          >
-            {t('common.delete')}
-          </button>
-        </div>
-      ))}
+      <ul>
+        {items.map(item => (
+          <li key={item.id} className="flex items-center justify-between py-2 border-b">
+            <span className="flex-1 min-w-0 truncate">{item.name || t('test_page.unnamed_item')}</span>
+            <button
+              className="px-3 py-2 text-sm border rounded min-h-[44px] min-w-[44px] ml-2"
+              aria-label={t('test_page.delete_item', { name: item.name || t('test_page.unnamed_item') })}
+              onClick={() => handleDelete(item.id)}
+            >
+              {t('common.delete')}
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

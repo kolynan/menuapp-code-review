@@ -74,8 +74,10 @@
 - **[P2] Delete button aria-label missing** (line ~68) — No accessible label identifying which item. Fixed: added `aria-label={t('test_page.delete_item', { name: ... })}`.
 - **[P2] Error banner not mobile-safe** (line ~54) — Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
 
-## Active
-### Review 2026-03-20 (chain `testpage-260320-200136`)
-- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) — `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
-- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) — retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
-- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) — invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+## Fixed (consensus chain testpage-260320-200136)
+- **[P1] Abort controller leak on retry** (line 38) — useEffect cleanup aborted captured `controller` variable, not `abortRef.current`; retry controllers were never aborted on unmount. Fixed: cleanup now aborts `abortRef.current`.
+- **[P2] No semantic list markup** (lines 83-94) — Items rendered as `<div>` elements, screen readers can't identify content as a list. Fixed: wrapped items in `<ul>`/`<li>`.
+
+## Active (notes only — no fix needed for test page)
+- **[P3] Silent payload filtering** (line 24) — `data.filter(item => item && item.id)` silently drops bad rows; malformed API response shows empty state instead of error. Acceptable for test page.
+- **[P3] No delete confirmation** (line 50) — Clicking delete immediately removes item with no confirmation dialog. Acceptable for test page.
