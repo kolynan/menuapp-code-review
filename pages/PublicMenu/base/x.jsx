@@ -281,15 +281,19 @@ const BILL_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 const getBillCooldownKey = (tableId) => `menuapp_bill_requested_${tableId}`;
 
 const isBillOnCooldown = (tableId) => {
-  const key = getBillCooldownKey(tableId);
-  const timestamp = localStorage.getItem(key);
-  if (!timestamp) return false;
-  return Date.now() - parseInt(timestamp, 10) < BILL_COOLDOWN_MS;
+  try {
+    const key = getBillCooldownKey(tableId);
+    const timestamp = localStorage.getItem(key);
+    if (!timestamp) return false;
+    return Date.now() - parseInt(timestamp, 10) < BILL_COOLDOWN_MS;
+  } catch { return false; }
 };
 
 const setBillCooldownStorage = (tableId) => {
-  const key = getBillCooldownKey(tableId);
-  localStorage.setItem(key, String(Date.now()));
+  try {
+    const key = getBillCooldownKey(tableId);
+    localStorage.setItem(key, String(Date.now()));
+  } catch { /* private browsing — ignore */ }
 };
 
 /**
@@ -400,7 +404,7 @@ const I18N_FALLBACKS = {
   "cta.sending": "Отправляем...",
   "cta.retry": "Повторить отправку",
   "error.send.title": "Не удалось отправить",
-  "error.send.subtitle": "Ваш заказ сохранён. Попробуйте снова",
+  "error.send.subtitle": "Попробуйте отправить ещё раз",
   "cart.item_added": "Добавлено",
   "cart.send_to_waiter": "Отправить официанту",
   "cart.send_order": "Отправить заказ",
@@ -970,7 +974,7 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
     const symbol = partner?.currency_symbol || currency;
     const num = Number(amount);
     if (isNaN(num)) return String(amount);
-    const formatted = num.toLocaleString("ru-RU");
+    const formatted = num.toLocaleString();
     return symbol ? `${formatted} ${symbol}` : formatted;
   };
 
@@ -1203,7 +1207,7 @@ function formatOrderTime(order) {
   if (!ts) return "";
   const d = new Date(ts);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
 export default function X() {
@@ -1867,8 +1871,9 @@ export default function X() {
           originalMode: modeLabels[originalMode] || originalMode,
           newMode: modeLabels[firstAvailable.id] || firstAvailable.id,
         });
-        
-        setTimeout(() => setRedirectBanner(null), 5000);
+
+        const timerId = setTimeout(() => setRedirectBanner(null), 5000);
+        return () => clearTimeout(timerId);
       }
     }
   }, [partner, loadingDishes, channels, orderMode, visibleModeTabs, t]);
@@ -2260,51 +2265,8 @@ export default function X() {
     }
   }, [currentTableId]);
 
-  // Debug mode - moved BEFORE early returns to maintain hook order
-  const isDebugGuestItems = searchParams.get('debug') === 'guestItems';
-
-  useEffect(() => {
-    if (!isDebugGuestItems) return;
-    
-    console.log('=== GUEST ITEMS DEBUG ===');
-    console.log('currentGuest:', currentGuest?.id, currentGuest);
-    console.log('sessionGuests count:', sessionGuests.length, sessionGuests.map(g => ({ id: g.id, name: g.name, guest_number: g.guest_number })));
-    console.log('sessionOrders count:', sessionOrders.length);
-    console.log('sessionItems count:', sessionItems.length);
-    console.log('itemsByOrder size:', itemsByOrder.size);
-    
-    const guestItemsMap = new Map();
-    sessionItems.forEach(item => {
-      const orderId = getLinkId(item.order);
-      const order = sessionOrders.find(o => o.id === orderId);
-      const guestId = getLinkId(order?.guest);
-      if (!guestItemsMap.has(guestId)) guestItemsMap.set(guestId, []);
-      guestItemsMap.get(guestId).push(item);
-    });
-    
-    console.log('Items per guest:', Object.fromEntries(guestItemsMap));
-    
-    const first10 = sessionItems.slice(0, 10);
-    console.log('First 10 items:', first10.map(item => {
-      const orderId = getLinkId(item.order);
-      const order = sessionOrders.find(o => o.id === orderId);
-      const guestId = getLinkId(order?.guest);
-      const stageId = typeof order?.stage_id === 'object' 
-        ? (order.stage_id?.id ?? order.stage_id?._id) 
-        : order?.stage_id;
-      const stage = stageId ? stagesMap.get(String(stageId)) : null;
-      return {
-        itemId: item.id,
-        dish: item.dish_name,
-        orderId,
-        guestId,
-        orderStatus: order?.status,
-        stageCode: stage?.internal_code,
-        visible: guestId === currentGuest?.id ? 'YES' : 'other guest'
-      };
-    }));
-    console.log('=========================');
-  }, [isDebugGuestItems, currentGuest?.id, sessionGuests, sessionOrders, sessionItems, itemsByOrder, stagesMap]);
+  // Debug hook kept as no-op to maintain hook order (BUG-PM-040: removed prod logging)
+  useEffect(() => {}, []);
 
   // P0-7: Removed handleTableSelection - no dropdown
 
@@ -2441,24 +2403,9 @@ export default function X() {
         }
       }
 
-      // Process points redemption BEFORE creating order
-      if (loyaltyAccountToUse && redeemedPoints > 0) {
-        await base44.entities.LoyaltyTransaction.create({
-          account: loyaltyAccountToUse.id,
-          type: 'redeem',
-          amount: -redeemedPoints,
-          description: t('loyalty.transaction.redeem')
-        });
-        
-        await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
-          balance: loyaltyAccountToUse.balance - redeemedPoints,
-          total_spent: (loyaltyAccountToUse.total_spent || 0) + redeemedPoints
-        });
-      }
-
       // Get start stage for this order type
       const startStage = getStartStage(orderStages, orderMode);
-      
+
       // Generate order number (for staff, not shown to guest)
       const { orderNumber, updatedCounters } = getNextOrderNumber(partner, 'hall');
 
@@ -2485,6 +2432,21 @@ export default function X() {
       if (partner?.id && orderData.table) saveTableSelection(partner.id, orderData.table);
 
       const order = await base44.entities.Order.create(orderData);
+
+      // Process points redemption AFTER order creation (BUG-PM-032)
+      if (loyaltyAccountToUse && redeemedPoints > 0) {
+        await base44.entities.LoyaltyTransaction.create({
+          account: loyaltyAccountToUse.id,
+          type: 'redeem',
+          amount: -redeemedPoints,
+          description: t('loyalty.transaction.redeem')
+        });
+
+        await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
+          balance: loyaltyAccountToUse.balance - redeemedPoints,
+          total_spent: (loyaltyAccountToUse.total_spent || 0) + redeemedPoints
+        });
+      }
 
       // Create order items with split_type
       const newItems = cart.map((item) => ({
@@ -2588,7 +2550,6 @@ export default function X() {
         clientName: null,
       });
 
-      console.log("Order created", order?.id);
       return true;
     } catch (err) {
       console.error(err);
@@ -2815,21 +2776,6 @@ export default function X() {
           }
         }
 
-        // Process points redemption BEFORE creating order
-        if (loyaltyAccountToUse && redeemedPoints > 0) {
-          await base44.entities.LoyaltyTransaction.create({
-            account: loyaltyAccountToUse.id,
-            type: 'redeem',
-            amount: -redeemedPoints,
-            description: t('loyalty.transaction.redeem')
-          });
-          
-          await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
-            balance: loyaltyAccountToUse.balance - redeemedPoints,
-            total_spent: (loyaltyAccountToUse.total_spent || 0) + redeemedPoints
-          });
-        }
-
         // Get start stage for this order type
         const startStage = getStartStage(orderStages, orderMode);
 
@@ -2852,6 +2798,21 @@ export default function X() {
         };
 
         const order = await base44.entities.Order.create(orderData);
+
+        // Process points redemption AFTER order creation (BUG-PM-032)
+        if (loyaltyAccountToUse && redeemedPoints > 0) {
+          await base44.entities.LoyaltyTransaction.create({
+            account: loyaltyAccountToUse.id,
+            type: 'redeem',
+            amount: -redeemedPoints,
+            description: t('loyalty.transaction.redeem')
+          });
+
+          await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
+            balance: loyaltyAccountToUse.balance - redeemedPoints,
+            total_spent: (loyaltyAccountToUse.total_spent || 0) + redeemedPoints
+          });
+        }
 
         const orderItemsData = cart.map((item) => ({
           order: order.id,
@@ -2916,7 +2877,6 @@ export default function X() {
           clientName: savedClientName,
         });
 
-        console.log("Order created", order?.id);
       }
     } catch (err) {
       console.error(err);

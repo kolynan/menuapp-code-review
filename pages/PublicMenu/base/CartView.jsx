@@ -406,7 +406,7 @@ export default function CartView({
   // Loyalty summary
   const loyaltySummary = React.useMemo(() => {
     if (Number(loyaltyAccount?.balance || 0) > 0) {
-      return `${Number(loyaltyAccount.balance || 0).toLocaleString('ru-RU')} ${tr('loyalty.points_short', 'баллов')}`;
+      return `${Number(loyaltyAccount.balance || 0).toLocaleString()} ${tr('loyalty.points_short', 'баллов')}`;
     }
     if (earnedPoints > 0) {
       return `+${earnedPoints}`;
@@ -430,8 +430,8 @@ export default function CartView({
           {onCallWaiter && (
             <button
               onClick={onCallWaiter}
-              className="p-2 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100"
-              title={tr('help.call_waiter', 'Позвать официанта')}
+              className="min-w-[44px] min-h-[44px] p-2 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center"
+              aria-label={tr('help.call_waiter', 'Позвать официанта')}
             >
               <Bell className="w-5 h-5" />
             </button>
@@ -456,8 +456,8 @@ export default function CartView({
                       if (e.key === 'Escape') { setIsEditingName(false); setGuestNameInput(''); }
                     }}
                   />
-                  <button onClick={handleUpdateGuestName} disabled={!guestNameInput.trim()} className="text-green-600">✓</button>
-                  <button onClick={() => { setIsEditingName(false); setGuestNameInput(''); }} className="text-slate-400">✕</button>
+                  <button onClick={handleUpdateGuestName} disabled={!guestNameInput.trim()} className="text-green-600 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label={tr('common.save', 'Сохранить')}>✓</button>
+                  <button onClick={() => { setIsEditingName(false); setGuestNameInput(''); }} className="text-slate-400 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label={tr('common.cancel', 'Отмена')}>✕</button>
                 </span>
               ) : (
                 <button 
@@ -524,6 +524,11 @@ export default function CartView({
                   disabled={!rewardEmail.trim() || rewardEmailSubmitting}
                   onClick={() => {
                     if (!rewardEmail.trim()) return;
+                    // BUG-PM-034: Validate email format before saving
+                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rewardEmail.trim())) {
+                      if (toast) toast.error(tr('loyalty.invalid_email', 'Введите корректный email'));
+                      return;
+                    }
                     setRewardEmailSubmitting(true);
                     // Используем существующий setCustomerEmail для синхронизации
                     if (setCustomerEmail) setCustomerEmail(rewardEmail);
@@ -930,10 +935,10 @@ export default function CartView({
                       <div className="space-y-2">
                         <div className="bg-indigo-50 p-2 rounded-lg text-xs">
                           <div className="text-slate-600">
-                            {trFormat('loyalty.your_balance', { points: Number(loyaltyAccount.balance || 0).toLocaleString('ru-RU') }, `Ваш баланс: ${Number(loyaltyAccount.balance || 0).toLocaleString('ru-RU')} баллов`)}
+                            {trFormat('loyalty.your_balance', { points: Number(loyaltyAccount.balance || 0).toLocaleString() }, `Ваш баланс: ${Number(loyaltyAccount.balance || 0).toLocaleString()} баллов`)}
                           </div>
                           <div className="text-slate-500">
-                            = {(Number(loyaltyAccount.balance || 0) * (partner?.loyalty_redeem_rate || 1)).toLocaleString('ru-RU')}₸
+                            = {formatPrice(Number(loyaltyAccount.balance || 0) * (partner?.loyalty_redeem_rate ?? 1))}
                           </div>
                         </div>
 
@@ -966,9 +971,9 @@ export default function CartView({
                               </Button>
                             </div>
                             <p className="text-xs text-slate-500">
-                              {trFormat('loyalty.max_redeem', { 
-                                max: maxRedeemPoints.toLocaleString('ru-RU'), 
-                                percent: partner?.loyalty_max_redeem_percent || 0 
+                              {trFormat('loyalty.max_redeem', {
+                                max: maxRedeemPoints.toLocaleString(),
+                                percent: partner?.loyalty_max_redeem_percent || 0
                               }, `Максимум ${maxRedeemPoints} баллов (${partner?.loyalty_max_redeem_percent || 0}% от заказа)`) }
                             </p>
                           </div>
@@ -997,7 +1002,7 @@ export default function CartView({
               {partner?.loyalty_enabled && earnedPoints > 0 && !loyaltyExpanded && (
                 <div className="flex justify-between text-sm text-green-600">
                   <span>{tr('loyalty.online_bonus_label', 'Бонусы за онлайн-заказ')}</span>
-                  <span>+{Number(earnedPoints || 0).toLocaleString('ru-RU')}Б</span>
+                  <span>+{Number(earnedPoints || 0).toLocaleString()}{tr('loyalty.points_suffix', 'Б')}</span>
                 </div>
               )}
 
@@ -1017,9 +1022,9 @@ export default function CartView({
                   </p>
                   <button
                     type="button"
-                    className="text-amber-700 hover:text-amber-900 text-sm px-2"
+                    className="text-amber-700 hover:text-amber-900 text-sm min-w-[44px] min-h-[44px] flex items-center justify-center"
                     onClick={() => setInfoModal('online')}
-                    title={tr('common.info', 'Информация')}
+                    aria-label={tr('common.info', 'Информация')}
                   >
                     ⓘ
                   </button>
@@ -1041,7 +1046,7 @@ export default function CartView({
                 {partner?.loyalty_enabled && earnedPoints > 0 && (
                   <div className="flex justify-between text-sm text-amber-900">
                     <span>{tr('cart.verify.bonus_label', 'Бонусы за онлайн-заказ')}</span>
-                    <span>+{Number(earnedPoints || 0).toLocaleString('ru-RU')}Б</span>
+                    <span>+{Number(earnedPoints || 0).toLocaleString()}{tr('loyalty.points_suffix', 'Б')}</span>
                   </div>
                 )}
 
@@ -1082,14 +1087,14 @@ export default function CartView({
                               className="flex items-center gap-2"
                               onClick={() => !isCodeLocked && codeInputRef.current && codeInputRef.current.focus()}
                             >
-                              <div className="flex gap-2">
+                              <div className="flex gap-1 sm:gap-2 flex-wrap justify-center">
                                 {Array.from({ length: tableCodeLength }).map((_, idx) => {
                                   const safe = String(tableCodeInput || '').replace(/\D/g, '').slice(0, tableCodeLength);
                                   const ch = safe[idx] || '_';
                                   return (
                                     <div
                                       key={idx}
-                                      className="w-9 h-11 rounded-lg border border-amber-200 bg-white flex items-center justify-center text-xl font-mono text-amber-900"
+                                      className="w-8 sm:w-9 h-11 rounded-lg border border-amber-200 bg-white flex items-center justify-center text-xl font-mono text-amber-900"
                                     >
                                       {ch}
                                     </div>

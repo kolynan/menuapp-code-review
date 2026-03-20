@@ -57,41 +57,6 @@ session: 148
 - **Фикс:** Restore `shouldShowOnlineOrderBlock` logic. Replace icon-only info controls with 44px labeled buttons.
 - **Регрессия:** BUG-PM-008, BUG-PM-S81-07
 
-### BUG-PM-036: Loyalty amounts bypass app localization (P2)
-- **Приоритет:** P2
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:398,922,925
-- **Симптом:** Hard-coded `toLocaleString('ru-RU')` and `₸` instead of `formatPrice`. Wrong currency/locale for non-Russian/non-tenge partners.
-- **Фикс:** Use same formatter/locale as rest of page.
-
-### BUG-PM-037: Reward email flow reports success without validation (P2)
-- **Приоритет:** P2
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:514,520
-- **Симптом:** Accepts any non-empty string, toasts "Email saved!" immediately. Invalid email or failed loyalty lookup still shows success.
-- **Фикс:** Validate email format, await persistence result, show error if failed.
-
-### BUG-PM-038: Submit-error copy says "order saved" when it may not be (P2)
-- **Приоритет:** P2
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:1216, x.jsx:2591,2919
-- **Симптом:** Error subtitle always says "Ваш заказ сохранен. Попробуйте снова" but submit may have failed completely. Misleads guest.
-- **Фикс:** Use neutral retry text, or pass explicit error type.
-
-### BUG-PM-039: 8-digit table codes overflow narrow phones (P2)
-- **Приоритет:** P2
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:100,1074
-- **Симптом:** Config allows up to 8 slots, but fixed `w-9` boxes + `gap-2` exceeds 320px viewport.
-- **Фикс:** Make slot width/gap responsive, or switch to single-input layout for longer codes.
-
-### BUG-PM-040: Loyalty points debited before order creation — no rollback on failure (P0)
-- **Приоритет:** P0
-- **Когда:** S119 (CC review)
-- **Файл:** x.jsx:2443-2455, x.jsx:2817-2829
-- **Симптом:** In both `processHallOrder` and pickup/delivery flow, `LoyaltyTransaction` (redeem) and `LoyaltyAccount.update` (balance decrement) execute BEFORE `Order.create`. If order creation throws, points are permanently lost — catch block only sets `submitError`, never re-credits.
-- **Фикс:** Move points deduction to after `Order.create` succeeds, or add compensating re-credit in catch block.
-
 ### BUG-PM-041: Polling timer leak in useTableSession after cleanup (P0)
 - **Приоритет:** P0
 - **Когда:** S119 (CC review)
@@ -99,52 +64,64 @@ session: 148
 - **Симптом:** `scheduleNext()` creates recursive `setTimeout` chain. Cleanup sets `cancelled=true` and `clearTimeout(intervalId)`, but if `pollSessionData()` is mid-execution during cleanup, `scheduleNext` inside the callback fires, registering a new timeout the cleanup can't clear. Orphaned polling causes spurious state updates on stale components.
 - **Фикс:** Guard `scheduleNext` with `if (cancelled) return` before scheduling next poll.
 
-### BUG-PM-042: isBillOnCooldown crashes in restricted environments (P1)
-- **Приоритет:** P1
-- **Когда:** S119 (CC review)
-- **Файл:** x.jsx:283-288
-- **Симптом:** `isBillOnCooldown()` calls `localStorage.getItem()` without try/catch. In private/incognito mode or strict security policies, `localStorage` access can throw. Called inside `useEffect` at x.jsx:2256 — unhandled exception crashes the component.
-- **Фикс:** Add try/catch with `return false` fallback inside `isBillOnCooldown`.
-
-### BUG-PM-043: formatOrderTime and OrderStatusScreen.formatPrice hardcode ru-RU locale (P2)
-- **Приоритет:** P2
-- **Когда:** S119 (CC review)
-- **Файл:** x.jsx:973, x.jsx:1206
-- **Симптом:** `formatOrderTime` uses `d.toLocaleTimeString("ru-RU", ...)` and `OrderStatusScreen.formatPrice` uses `num.toLocaleString("ru-RU")`, ignoring active `lang` state. Wrong locale for non-Russian partners.
-- **Фикс:** Pass `lang` or the parent's `formatPrice` as prop to `OrderStatusScreen`. Make `formatOrderTime` locale-aware.
-- **Связано:** BUG-PM-036 (same pattern in CartView)
-
-### BUG-PM-044: loyalty_redeem_rate falsy-coalescing shows wrong monetary value (P2)
-- **Приоритет:** P2
-- **Когда:** S119 (CC review)
-- **Файл:** CartView.jsx:925
-- **Симптом:** `(partner?.loyalty_redeem_rate || 1)` treats rate of `0` as falsy, falls back to `1`. Partner with explicit `loyalty_redeem_rate = 0` shows inflated value to guests.
-- **Фикс:** Use `??` (nullish coalescing) instead of `||`: `(partner?.loyalty_redeem_rate ?? 1)`.
-
-### BUG-PM-045: console.log left in production order submission paths (P2)
-- **Приоритет:** P2
-- **Когда:** S119 (CC review)
-- **Файл:** x.jsx:2589, x.jsx:2917
-- **Симптом:** Two `console.log("Order created", order?.id)` calls remain in successful order submission paths (hall and pickup/delivery). Minor information leak, violates no-debug-log rule.
-- **Фикс:** Remove both `console.log` calls.
-
-### BUG-PM-046: Redirect banner setTimeout not cleaned up on unmount (P2)
-- **Приоритет:** P2
-- **Когда:** S119 (CC review)
-- **Файл:** x.jsx:1871
-- **Симптом:** `setTimeout(() => setRedirectBanner(null), 5000)` inside `useEffect` with no cleanup. If component unmounts or deps change within 5s, the stale timer fires `setRedirectBanner(null)` on an unmounted component — React dev warning.
-- **Фикс:** Store timer ID and return cleanup function, same pattern as `viewTransitionTimerRef`.
-
-### BUG-PM-047: Multiple interactive elements missing aria-label (P3)
-- **Приоритет:** P3
-- **Когда:** S119 (CC review)
-- **Файл:** CartView.jsx:424,449-450,1011,1060; MenuView.jsx:104,111,117
-- **Симптом:** Icon-only buttons (call-waiter bell, name editor ✓/✕, info ⓘ buttons, list-mode add/stepper buttons) use `title` instead of `aria-label` or have no accessible label at all. Screen readers and mobile VoiceOver can't announce button purpose.
-- **Фикс:** Add `aria-label` to all icon-only interactive elements. List-mode buttons should match tile-mode which already has proper labels.
-
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-040: Loyalty points debited before order creation (P0) — FIXED S148
+- **Когда:** S119 (CC review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** x.jsx:2444-2457, x.jsx:2818-2831
+- **Фикс:** Moved `Order.create()` before loyalty transaction and balance update in both hall and pickup/delivery flows.
+
+### BUG-PM-042: isBillOnCooldown crashes in restricted environments (P1) — FIXED S148
+- **Когда:** S119 (CC review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** x.jsx:283-293
+- **Фикс:** Wrapped `isBillOnCooldown` and `setBillCooldownStorage` in try/catch.
+
+### BUG-PM-036: Loyalty amounts bypass app localization (P2) — FIXED S148
+- **Когда:** S116 (Codex review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** CartView.jsx, x.jsx
+- **Фикс:** Removed hardcoded `ru-RU` locale, replaced `₸` with `formatPrice()`, added i18n key for points suffix.
+
+### BUG-PM-037: Reward email flow reports success without validation (P2) — FIXED S148
+- **Когда:** S116 (Codex review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** CartView.jsx:524
+- **Фикс:** Added email regex validation before save, error toast on invalid format.
+
+### BUG-PM-038: Submit-error copy says "order saved" when it may not be (P2) — FIXED S148
+- **Когда:** S116 (Codex review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** x.jsx i18n key `error.send.subtitle`
+- **Фикс:** Changed to neutral retry text.
+
+### BUG-PM-039: 8-digit table codes overflow narrow phones (P2) — FIXED S148
+- **Когда:** S116 (Codex review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** CartView.jsx:1085-1092
+- **Фикс:** Made box width and gap responsive (`w-8 sm:w-9`, `gap-1 sm:gap-2`, `flex-wrap`).
+
+### BUG-PM-043: formatOrderTime and formatPrice hardcode ru-RU locale (P2) — FIXED S148
+- **Когда:** S119 (CC review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** x.jsx:973, x.jsx:1206
+- **Фикс:** Replaced `"ru-RU"` with browser default locale.
+
+### BUG-PM-044: loyalty_redeem_rate falsy-coalescing (P2) — FIXED S148
+- **Когда:** S119 (CC review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** CartView.jsx:936
+- **Фикс:** Changed `|| 1` to `?? 1`.
+
+### BUG-PM-045: console.log left in production (P2) — FIXED S148
+- **Когда:** S119 (CC review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** x.jsx
+- **Фикс:** Removed `console.log("Order created")` and debug guest items block.
+
+### BUG-PM-046: Redirect banner setTimeout leak (P2) — FIXED S148
+- **Когда:** S119 (CC review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** x.jsx:1871
+- **Фикс:** Added cleanup return in useEffect.
+
+### BUG-PM-047: Interactive elements missing aria-label (P3) — FIXED S148
+- **Когда:** S119 (CC review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** CartView.jsx
+- **Фикс:** Added `aria-label` and min 44px touch targets to bell, save/cancel, info buttons.
 
 ### BUG-PM-S140-01: customerEmail.trim() crashes if null/undefined (P2) — FIXED S148
 - **Когда:** S140, fixed S148 via consensus chain publicmenu-260320-132541
