@@ -1,5 +1,5 @@
 ---
-version: "25.0"
+version: "26.0"
 updated: "2026-03-20"
 session: 150
 ---
@@ -13,7 +13,49 @@ session: 150
 
 ## Active Bugs (не исправлены)
 
-*1 active bug remaining (1x P2).*
+*7 active bugs remaining (1x P0, 2x P1, 3x P2, 1x suggestion).*
+
+### BUG-PM-050: Order creation race — items created after loyalty redeem (P0)
+- **Приоритет:** P0
+- **Когда:** S150 (Codex review, chain publicmenu-260320-173330)
+- **Файл:** x.jsx
+- **Симптом:** Order items may be created after loyalty points are already redeemed, causing inconsistent state.
+- **Фикс:** Ensure order creation completes before loyalty side effects.
+
+### BUG-PM-051: Cart survives mode switches with invalid dishes (P1)
+- **Приоритет:** P1
+- **Когда:** S150 (Codex review, chain publicmenu-260320-173330)
+- **Файл:** x.jsx
+- **Симптом:** Switching between hall/pickup/delivery modes doesn't clear cart items that may be unavailable in the new mode.
+- **Фикс:** Validate cart contents on mode switch.
+
+### BUG-PM-052: Pickup/delivery checkout drops loyalty UI (P1)
+- **Приоритет:** P1
+- **Когда:** S150 (Codex review, chain publicmenu-260320-173330)
+- **Файл:** x.jsx / CartView.jsx
+- **Симптом:** Loyalty section not shown in pickup/delivery checkout flow.
+- **Фикс:** Enable loyalty UI for all order modes.
+
+### BUG-PM-053: Hall confirmation shows wrong total (P1)
+- **Приоритет:** P1
+- **Когда:** S150 (Codex review, chain publicmenu-260320-173330)
+- **Файл:** x.jsx
+- **Симптом:** Confirmation screen may display incorrect total after loyalty discount.
+- **Фикс:** Recalculate display total from actual order data.
+
+### BUG-PM-054: Hardcoded colors in MenuView, CheckoutView, ModeTabs (P2 — Batch 2)
+- **Приоритет:** P2
+- **Когда:** S150 (Codex review, chain publicmenu-260320-173330)
+- **Файл:** MenuView.jsx, CheckoutView.jsx, ModeTabs.jsx
+- **Симптом:** Indigo/blue hardcoded colors remain in files not covered by Batch 1.
+- **Фикс:** Apply same terracotta palette as Batch 1.
+
+### BUG-PM-055: Status new/accepted blue→amber debate (suggestion)
+- **Приоритет:** P3 (suggestion — needs Arman decision)
+- **Когда:** S150 (CC review, chain publicmenu-260320-173330)
+- **Файл:** x.jsx (OrderStatusBadge, osGetStatusConfig), CartView.jsx (getSafeStatus)
+- **Симптом:** "new" and "accepted" statuses use blue, but STYLE_GUIDE says sent/waiting=amber. Task constraint said "do NOT change status colors."
+- **Фикс:** If Arman decides to align with STYLE_GUIDE, change blue→amber for these intermediate statuses.
 
 ### BUG-PM-035: Verified-table block regresses mobile UX (P2)
 - **Приоритет:** P2
@@ -26,6 +68,13 @@ session: 150
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-PALETTE-01: Terracotta palette applied to x.jsx + CartView.jsx (17 fixes) — FIXED S150
+- **Когда:** S150, fixed via consensus chain publicmenu-260320-173330
+- **Файл:** x.jsx (11 fixes), CartView.jsx (6 fixes)
+- **Фикс:** Replaced all indigo/green hardcoded colors with terracotta (#B5543A) semantic palette. 5 indigo→terracotta, 5 bg-white→warm surface (#faf9f7), 2 edit links, 2 radio accents, 1 loyalty box→primary light (#F5E6E0), 1 submit CTA green→terracotta, 1 "Back to menu" button.
+- **Commit:** a829e02
+- **Tag:** PublicMenu-pre-publicmenu-260320-173330 (rollback point)
 
 ### BUG-PM-041: Polling timer leak in useTableSession after cleanup (P0) — FIXED S150
 - **Когда:** S119 (CC review), fixed S150 via consensus chain publicmenu-260320-171535
