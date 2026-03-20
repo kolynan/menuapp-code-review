@@ -615,7 +615,7 @@ function OrderConfirmationScreen({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-white overflow-y-auto">
+    <div className="fixed inset-0 z-[60] overflow-y-auto" style={{backgroundColor:'#faf9f7'}}>
     <div className="px-4 py-8 max-w-md mx-auto animate-[fadeInUp_0.3s_ease-out]">
       {/* CSS-only animations — respects prefers-reduced-motion */}
       <style>{`
@@ -738,7 +738,8 @@ function OrderConfirmationScreen({
       {/* Action buttons */}
       <div className="space-y-3">
         <Button
-          className="w-full h-12"
+          className="w-full h-12 text-white"
+          style={{backgroundColor:'#B5543A'}}
           onClick={onBackToMenu}
         >
           {tr("confirmation.back_to_menu", "Вернуться в меню")}
@@ -756,7 +757,8 @@ function OrderConfirmationScreen({
         {orderMode !== "hall" && publicToken && (
           <Button
             variant="ghost"
-            className="w-full h-12 text-indigo-600"
+            className="w-full h-12"
+            style={{color:'#B5543A'}}
             onClick={() => {
               onTrackOrder(publicToken);
             }}
@@ -990,7 +992,7 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
   // Invalid token
   if (!token || !OS_TOKEN_RE.test(token)) {
     return (
-      <div className="fixed inset-0 z-[60] bg-white overflow-y-auto">
+      <div className="fixed inset-0 z-[60] overflow-y-auto" style={{backgroundColor:'#faf9f7'}}>
         <div className="min-h-screen flex items-center justify-center p-4">
           <Card className="w-full max-w-md">
             <CardContent className="p-8 text-center">
@@ -1008,9 +1010,9 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
   // Loading
   if (loadingOrder) {
     return (
-      <div className="fixed inset-0 z-[60] bg-white">
+      <div className="fixed inset-0 z-[60]" style={{backgroundColor:'#faf9f7'}}>
         <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+          <Loader2 className="w-8 h-8 animate-spin" style={{color:'#B5543A'}} />
         </div>
       </div>
     );
@@ -1019,7 +1021,7 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
   // Error / not found
   if (orderError || !order) {
     return (
-      <div className="fixed inset-0 z-[60] bg-white overflow-y-auto">
+      <div className="fixed inset-0 z-[60] overflow-y-auto" style={{backgroundColor:'#faf9f7'}}>
         <div className="min-h-screen flex items-center justify-center p-4">
           <Card className="w-full max-w-md">
             <CardContent className="p-8 text-center">
@@ -1037,7 +1039,7 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
   // Expired
   if (isExpired) {
     return (
-      <div className="fixed inset-0 z-[60] bg-white overflow-y-auto">
+      <div className="fixed inset-0 z-[60] overflow-y-auto" style={{backgroundColor:'#faf9f7'}}>
         <div className="min-h-screen flex items-center justify-center p-4">
           <Card className="w-full max-w-md">
             <CardContent className="p-8 text-center">
@@ -1142,8 +1144,8 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
                 href={phoneLink.url}
                 className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors min-h-[44px]"
               >
-                <Phone className="w-5 h-5 text-indigo-500" />
-                <span className="text-sm font-medium text-indigo-600">{phoneLink.url.replace("tel:", "")}</span>
+                <Phone className="w-5 h-5" style={{color:'#B5543A'}} />
+                <span className="text-sm font-medium" style={{color:'#B5543A'}}>{phoneLink.url.replace("tel:", "")}</span>
               </a>
             </CardContent>
           </Card>
@@ -2980,7 +2982,7 @@ export default function X() {
   if (loadingPartner) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin" style={{color:'#B5543A'}} />
       </div>
     );
   }

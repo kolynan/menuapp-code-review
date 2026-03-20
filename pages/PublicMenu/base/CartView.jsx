@@ -466,7 +466,8 @@ export default function CartView({
               ) : (
                 <button 
                   onClick={() => { setGuestNameInput(currentGuest?.name || ''); setIsEditingName(true); }}
-                  className="text-indigo-600 hover:underline"
+                  className="hover:underline"
+                  style={{color:'#B5543A'}}
                 >
                   {guestDisplay} {(!currentGuest?.name) && <span className="text-xs">✏️</span>}
                 </button>
@@ -503,7 +504,8 @@ export default function CartView({
               </span>
               <button
                 type="button"
-                className="text-indigo-600 hover:underline font-medium text-sm"
+                className="hover:underline font-medium text-sm"
+                style={{color:'#B5543A'}}
                 onClick={() => setShowRewardEmailForm(true)}
               >
                 {tr('loyalty.get_bonus', 'Получить бонусы')} →
@@ -845,7 +847,7 @@ export default function CartView({
                       name="splitType"
                       checked={splitType === 'single'}
                       onChange={() => setSplitType('single')}
-                      className="w-4 h-4 text-indigo-600"
+                      className="w-4 h-4" style={{accentColor:'#B5543A'}}
                     />
                     <span className="text-sm text-slate-700">{tr('cart.only_me', 'Только я')}</span>
                   </label>
@@ -855,7 +857,7 @@ export default function CartView({
                       name="splitType"
                       checked={splitType === 'all'}
                       onChange={() => setSplitType('all')}
-                      className="w-4 h-4 text-indigo-600"
+                      className="w-4 h-4" style={{accentColor:'#B5543A'}}
                     />
                     <span className="text-sm text-slate-700">{tr('cart.for_all', 'На всех')} (÷{guestCount})</span>
                   </label>
@@ -937,7 +939,7 @@ export default function CartView({
                       )
                     ) : (
                       <div className="space-y-2">
-                        <div className="bg-indigo-50 p-2 rounded-lg text-xs">
+                        <div className="p-2 rounded-lg text-xs" style={{backgroundColor:'#F5E6E0'}}>
                           <div className="text-slate-600">
                             {trFormat('loyalty.your_balance', { points: Number(loyaltyAccount.balance || 0).toLocaleString() }, `Ваш баланс: ${Number(loyaltyAccount.balance || 0).toLocaleString()} баллов`)}
                           </div>
@@ -1244,15 +1246,16 @@ export default function CartView({
         <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 -mx-4">
           <Button
             size="lg"
-            className={`w-full ${
+            className={`w-full text-white ${
               isSubmitting
                 ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
                 : !isTableVerified
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300'
                   : submitError
                     ? 'bg-red-600 hover:bg-red-700'
-                    : 'bg-green-600 hover:bg-green-700'
+                    : ''
             }`}
+            style={(!isSubmitting && isTableVerified && !submitError) ? {backgroundColor:'#B5543A'} : undefined}
             onClick={() => {
               if (submitError && setSubmitError) setSubmitError(null);
               handleSubmitOrder();
