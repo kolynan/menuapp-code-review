@@ -6,3 +6,4 @@ Not a real MenuApp page — safe to modify/delete.
 <!-- smoke-parallel-v3-testpage-b -->
 <!-- smoke-d-tp -->
 <!-- smoke-e-tp -->
+<!-- smoke-f-tp -->
