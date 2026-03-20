@@ -185,7 +185,7 @@ const closeExpiredSessionInDB = async (sessionId) => {
       }
     }
   } catch (err) {
-    console.warn(`[P0-cleanup] Failed to close expired session ${sessionId}:`, err?.message);
+    // Silently fail — expired session cleanup is best-effort
   }
 };
 
@@ -296,7 +296,7 @@ export function useTableSession({
                 session = savedSession;
               } else if (savedSession.status === 'open' && isExpired) {
                 // P0-1: Close expired session in DB — don't leave stale open sessions
-                closeExpiredSessionInDB(savedSession.id);
+                await closeExpiredSessionInDB(savedSession.id);
                 clearSessionId(partner.id, currentTableId);
               }
             }
@@ -477,7 +477,7 @@ export function useTableSession({
         }
         
       } catch (err) {
-        didAttemptRestoreRef.current = false;
+        // Do NOT reset didAttemptRestoreRef — prevents infinite retry on persistent errors
       }
     }
     
@@ -668,9 +668,10 @@ export function useTableSession({
     };
     
     const scheduleNext = () => {
+      if (cancelled) return;
       intervalId = setTimeout(() => {
         pollSessionData();
-        scheduleNext();
+        if (!cancelled) scheduleNext();
       }, getInterval());
     };
     
@@ -683,7 +684,7 @@ export function useTableSession({
       cancelled = true;
       if (intervalId) clearTimeout(intervalId);
     };
-  }, [tableSession?.id, isHallMode, isTableVerified]);
+  }, [tableSession?.id, isHallMode, isTableVerified, partner?.id, currentTableId]);
 
   // ============================================================
   // TABLESESSION COMPUTED VALUES with SPLIT LOGIC (TASK-260126-01)

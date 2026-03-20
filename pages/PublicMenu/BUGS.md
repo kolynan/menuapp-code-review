@@ -1,7 +1,7 @@
 ---
-version: "24.0"
+version: "25.0"
 updated: "2026-03-20"
-session: 148
+session: 150
 ---
 
 # PublicMenu — Bug Registry
@@ -13,15 +13,7 @@ session: 148
 
 ## Active Bugs (не исправлены)
 
-*14 active bugs from S116 + 8 new bugs found in S119 CC review (2x P0, 1x P1, 4x P2, 1x P3).*
-
-### BUG-PM-026: tableCodeLength default regressed to 5 (P1)
-- **Приоритет:** P1
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:101
-- **Симптом:** Default table code length is 5, but BUG-PM-S81-02 fixed it to 4. With partner config unset, guests enter wrong number of digits.
-- **Фикс:** Change fallback from `return 5` to `return 4`.
-- **Регрессия:** BUG-PM-S81-02
+*1 active bug remaining (1x P2).*
 
 ### BUG-PM-035: Verified-table block regresses mobile UX (P2)
 - **Приоритет:** P2
@@ -31,16 +23,20 @@ session: 148
 - **Фикс:** Restore `shouldShowOnlineOrderBlock` logic. Replace icon-only info controls with 44px labeled buttons.
 - **Регрессия:** BUG-PM-008, BUG-PM-S81-07
 
-### BUG-PM-041: Polling timer leak in useTableSession after cleanup (P0)
-- **Приоритет:** P0
-- **Когда:** S119 (CC review)
-- **Файл:** useTableSession.jsx:670-685
-- **Симптом:** `scheduleNext()` creates recursive `setTimeout` chain. Cleanup sets `cancelled=true` and `clearTimeout(intervalId)`, but if `pollSessionData()` is mid-execution during cleanup, `scheduleNext` inside the callback fires, registering a new timeout the cleanup can't clear. Orphaned polling causes spurious state updates on stale components.
-- **Фикс:** Guard `scheduleNext` with `if (cancelled) return` before scheduling next poll.
-
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-041: Polling timer leak in useTableSession after cleanup (P0) — FIXED S150
+- **Когда:** S119 (CC review), fixed S150 via consensus chain publicmenu-260320-171535
+- **Файл:** useTableSession.jsx:670-676
+- **Фикс:** Double guard: `if (cancelled) return` at scheduleNext entry + `if (!cancelled)` before recursive call. Also fixed: stale closure deps (NEW-01), infinite retry loop (NEW-02), fire-and-forget closeExpiredSessionInDB (NEW-03), console.warn removal (NEW-04).
+
+### BUG-PM-026: tableCodeLength default regressed to 5 (P1) — FIXED (confirmed S150)
+- **Когда:** S116 (Codex review), confirmed fixed S150
+- **Файл:** CartView.jsx:101
+- **Симптом:** Default table code length is 5, but BUG-PM-S81-02 fixed it to 4.
+- **Фикс:** Input count now depends on partner config `table_code_length`. No hardcoded default needed.
 
 ### BUG-PM-048: Post-create side effects cause false retry UI (P2) — FIXED S148
 - **Когда:** S148 (Codex review), fixed S148 via consensus chain publicmenu-260320-141634
