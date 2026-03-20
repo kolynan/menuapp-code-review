@@ -23,32 +23,6 @@ session: 148
 - **Фикс:** Change fallback from `return 5` to `return 4`.
 - **Регрессия:** BUG-PM-S81-02
 
-
-
-### BUG-PM-032: Order-status differentiation regressed (P2)
-- **Приоритет:** P2
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:240
-- **Симптом:** `getSafeStatus()` missing `accepted` fallback. Render paths ignore `status.icon`. Sent/accepted/cooking/ready collapse into near-identical text.
-- **Фикс:** Add `accepted` to fallback map. Render `{icon} {label}` in all badge locations.
-- **Регрессия:** BUG-PM-019
-
-### BUG-PM-033: Scroll position not reset after table verification (P2)
-- **Приоритет:** P2
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:136
-- **Симптом:** `isTableVerified` effect only resets attempt counters, scroll-to-top fix is gone. Drawer stays stranded at bottom after code entry.
-- **Фикс:** Restore scroll reset using `prevTableVerifiedRef` and nearest scrollable ancestor.
-- **Регрессия:** BUG-PM-S81-03
-
-### BUG-PM-034-R: Guest code leaked back into drawer header (P2)
-- **Приоритет:** P2
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:274,281
-- **Симптом:** `#guestCode` appended to "Вы:" label, exposing internal identifier even when `hallGuestCodeEnabled` is off.
-- **Фикс:** Show code only in dedicated waiter-code block.
-- **Регрессия:** BUG-PM-020
-
 ### BUG-PM-035: Verified-table block regresses mobile UX (P2)
 - **Приоритет:** P2
 - **Когда:** S116 (Codex review)
@@ -67,6 +41,31 @@ session: 148
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-048: Post-create side effects cause false retry UI (P2) — FIXED S148
+- **Когда:** S148 (Codex review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** x.jsx:2434-2498, x.jsx:2800-2895
+- **Фикс:** Wrapped loyalty redeem/earn and partner counter updates in individual try/catch blocks so order is confirmed even if side effects fail.
+
+### BUG-PM-032: Order-status differentiation regressed (P2) — FIXED S148
+- **Когда:** S116 (Codex review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** CartView.jsx:236-270, CartView.jsx:608,616
+- **Фикс:** Added `accepted` fallback to getSafeStatus. Render `{icon} {label}` in all badge locations.
+
+### BUG-PM-033: Scroll position not reset after table verification (P2) — FIXED S148
+- **Когда:** S116 (Codex review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** CartView.jsx:143-148
+- **Фикс:** Added scrollTo(0) on nearest scrollable container when isTableVerified transitions to true.
+
+### BUG-PM-034-R: Guest code leaked back into drawer header (P2) — FIXED S148
+- **Когда:** S116 (Codex review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** CartView.jsx:284
+- **Фикс:** Gated localStorage guest code fallback behind `hallGuestCodeEnabled`.
+
+### BUG-PM-049: Review-reward CTA invents +10 bonus when no reward exists (P2) — FIXED S148
+- **Когда:** S148 (Codex review), fixed S148 via consensus chain publicmenu-260320-141634
+- **Файл:** CartView.jsx:639
+- **Фикс:** Changed `|| 10` to `?? 0` and gated bonus text behind `(partner?.loyalty_review_points ?? 0) > 0`.
 
 ### BUG-PM-040: Loyalty points debited before order creation (P0) — FIXED S148
 - **Когда:** S119 (CC review), fixed S148 via consensus chain publicmenu-260320-141634

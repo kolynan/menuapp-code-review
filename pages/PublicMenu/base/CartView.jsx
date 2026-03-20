@@ -139,11 +139,14 @@ export default function CartView({
     lastSentVerifyCodeRef.current = null;
   }, [nowTs, codeLockedUntil]);
 
-  // Reset attempts on successful verification
+  // Reset attempts on successful verification + scroll to top
   React.useEffect(() => {
     if (isTableVerified === true) {
       setCodeAttempts(0);
       setCodeLockedUntil(null);
+      // Scroll drawer back to top after successful verification
+      const scrollable = document.querySelector('[data-radix-scroll-area-viewport], [role="dialog"]');
+      if (scrollable) scrollable.scrollTop = 0;
     }
   }, [isTableVerified]);
 
@@ -255,6 +258,7 @@ export default function CartView({
         'finish': tr('status.ready', 'Готово'),
         'ready': tr('status.ready', 'Готово'),
         'done': tr('status.ready', 'Готово'),
+        'accepted': tr('status.accepted', 'Принят'),
         'cancel': tr('status.cancelled', 'Отменён'),
         'cancelled': tr('status.cancelled', 'Отменён'),
       };
@@ -280,8 +284,8 @@ export default function CartView({
     }
   }, []);
 
-  // Effective guest code: prop takes priority, fallback to localStorage
-  const effectiveGuestCode = guestCode || guestCodeFromStorage;
+  // Effective guest code: prop takes priority, fallback to localStorage (only if hall guest codes enabled)
+  const effectiveGuestCode = guestCode || (hallGuestCodeEnabled ? guestCodeFromStorage : null);
 
   // Guest display: "Имя #6475" or "Гость #6475"
   const guestBaseName = currentGuest
@@ -605,7 +609,7 @@ export default function CartView({
                                   <span className="text-slate-600">
                                     {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(order.total_amount)}
                                   </span>
-                                  <span className="text-xs" style={{ color: status.color }}>{status.label}</span>
+                                  <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
                                 </div>
                               );
                             }
@@ -613,7 +617,7 @@ export default function CartView({
                             return items.map((item, idx) => (
                               <div key={`${order.id}-${idx}`} className="flex justify-between items-center text-xs">
                                 <span className="text-slate-600">{item.dish_name} × {item.quantity}</span>
-                                <span className="text-xs" style={{ color: status.color }}>{status.label}</span>
+                                <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
                               </div>
                             ));
                           })}
@@ -636,7 +640,7 @@ export default function CartView({
                     onClick={() => openReviewDialog(otherGuestsReviewableItems)}
                   >
                     ⭐ {tr('review.rate_others', 'Оценить блюда гостей')}
-                    {loyaltyAccount && ` (+${otherGuestsReviewableItems.length * (partner?.loyalty_review_points || 10)} ${tr('review.points', 'баллов')})`}
+                    {loyaltyAccount && (partner?.loyalty_review_points ?? 0) > 0 && ` (+${otherGuestsReviewableItems.length * (partner?.loyalty_review_points ?? 0)} ${tr('review.points', 'баллов')})`}
                   </Button>
                 )}
               </div>
