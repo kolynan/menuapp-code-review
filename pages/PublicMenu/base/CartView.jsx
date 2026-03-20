@@ -94,6 +94,10 @@ export default function CartView({
   const lastVerifyCodeRef = React.useRef(null);
   const countedErrorForCodeRef = React.useRef(null);
   const lastSentVerifyCodeRef = React.useRef(null);
+  const rewardTimerRef = React.useRef(null);
+
+  // Cleanup reward-email timer on unmount (PM-S140-03)
+  React.useEffect(() => () => clearTimeout(rewardTimerRef.current), []);
 
   // Partner-configurable settings (fallbacks until Base44 adds real fields)
   const tableCodeLength = React.useMemo(() => {
@@ -525,7 +529,7 @@ export default function CartView({
                     if (setCustomerEmail) setCustomerEmail(rewardEmail);
                     // Показываем toast
                     if (toast) toast.success(tr('loyalty.email_saved', 'Email сохранён! Бонусы будут начислены.'));
-                    setTimeout(() => {
+                    rewardTimerRef.current = setTimeout(() => {
                       setRewardEmailSubmitting(false);
                       setShowRewardEmailForm(false);
                     }, 1000);
@@ -909,7 +913,7 @@ export default function CartView({
                       />
                     </div>
 
-                    {!customerEmail.trim() ? (
+                    {!(customerEmail || '').trim() ? (
                       <p className="text-xs text-slate-500">{tr('loyalty.enter_email_hint', 'Введите email для начисления бонусов')}</p>
                     ) : loyaltyLoading ? (
                       <div className="flex items-center gap-2 text-xs text-slate-500">
@@ -973,7 +977,7 @@ export default function CartView({
                     )}
 
                     {partner?.discount_enabled && (
-                      partner.discount_allow_anonymous === true || customerEmail.trim() ? (
+                      partner.discount_allow_anonymous === true || (customerEmail || '').trim() ? (
                         <div className="text-xs text-green-600 bg-green-50 p-2 rounded-lg border border-green-200">
                           {trFormat('loyalty.instant_discount', { percent: partner.discount_percent || 0 }, `Скидка ${partner.discount_percent || 0}% применена`)}
                         </div>
@@ -1234,7 +1238,7 @@ export default function CartView({
             className={`w-full ${
               isSubmitting
                 ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
-                : isTableVerified === false
+                : !isTableVerified
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300'
                   : submitError
                     ? 'bg-red-600 hover:bg-red-700'
@@ -1244,7 +1248,7 @@ export default function CartView({
               if (submitError && setSubmitError) setSubmitError(null);
               handleSubmitOrder();
             }}
-            disabled={isSubmitting || isTableVerified === false}
+            disabled={isSubmitting || !isTableVerified}
           >
             {isSubmitting
               ? tr('cta.sending', 'Отправляем...')

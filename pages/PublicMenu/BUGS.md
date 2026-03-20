@@ -146,6 +146,30 @@ session: 148
 
 ## Fixed Bugs (исправлены)
 
+### BUG-PM-S140-01: customerEmail.trim() crashes if null/undefined (P2) — FIXED S148
+- **Когда:** S140, fixed S148 via consensus chain publicmenu-260320-132541
+- **Файл:** CartView.jsx:912, CartView.jsx:976
+- **Симптом:** `.trim()` called directly on `customerEmail` without null check. If user has no email set, loyalty section throws TypeError.
+- **Фикс:** Changed `customerEmail.trim()` to `(customerEmail || '').trim()` on both lines.
+
+### BUG-PM-S87-03-R: Submit button green when isTableVerified is undefined (P2) — RE-FIXED S148
+- **Когда:** S87 (original fix), re-fixed S148 via consensus chain publicmenu-260320-132541
+- **Файл:** CartView.jsx:1237, CartView.jsx:1247
+- **Симптом:** Original fix used `isTableVerified === false` (strict equality), which doesn't catch `undefined` initial state. Button appeared green and enabled before any verification attempt.
+- **Фикс:** Changed `isTableVerified === false` to `!isTableVerified` in both className ternary and disabled prop.
+
+### BUG-AC-09: No visual feedback when dish added to cart (P2) — FIXED (prior session)
+- **Когда:** AC-09, already fixed in prior session
+- **Файл:** x.jsx:2237-2238
+- **Симптом:** No toast or animation when user taps dish to add to cart.
+- **Фикс:** Toast already present: `toast.success(t('cart.item_added'), { id: 'cart-add', duration: 2000 })`. No additional changes needed.
+
+### BUG-PM-S140-03: Reward-email setTimeout not cleared on unmount (P3) — FIXED S148
+- **Когда:** S140, fixed S148 via consensus chain publicmenu-260320-132541
+- **Файл:** CartView.jsx:528
+- **Симптом:** `setTimeout` in reward-email onClick handler not cancelled on unmount. React warns about state update on unmounted component.
+- **Фикс:** Added `rewardTimerRef` ref + cleanup useEffect. setTimeout now stores ID in ref for cleanup.
+
 ### BUG-PM-027: Loyalty/discount UI hidden for normal checkout (P1) — FIXED S148
 - **Когда:** S116 (Codex review), fixed S148 via consensus chain publicmenu-260320-010828
 - **Файл:** CartView.jsx:860, x.jsx:3296
