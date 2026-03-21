@@ -1,5 +1,5 @@
 ---
-version: "27.0"
+version: "28.0"
 updated: "2026-03-21"
 session: 153
 ---
@@ -13,7 +13,7 @@ session: 153
 
 ## Active Bugs (не исправлены)
 
-*11 active bugs remaining (0x P0, 5x P1, 4x P2, 1x P3, 1x suggestion).*
+*14 active bugs remaining (0x P0, 7x P1, 5x P2, 1x P3, 1x suggestion).*
 
 ### BUG-PM-056: Drawer layout not visit-state-driven (P1 — Batch 2)
 - **Приоритет:** P1
@@ -61,11 +61,12 @@ session: 153
 - **Файл:** x.jsx
 - **Симптом:** Missing count bump animation on "+" and soft rise animation on first item.
 
-### BUG-PM-062: CategoryChips may still have indigo (P3)
+### BUG-PM-062: CategoryChips may still have indigo (P3) — PARTIAL FIX
 - **Приоритет:** P3
 - **Когда:** S153 (consensus chain publicmenu-260321-093745)
 - **Файл:** refactor/CategoryChips (imported)
 - **Симптом:** Imported component was not checked for indigo remnants.
+- **Частичный фикс:** Passed `activeColor="#B5543A"` prop (chain publicmenu-260321-110752). If component ignores prop, needs B44 prompt.
 
 ### BUG-PM-055: Status new/accepted blue→amber debate (suggestion)
 - **Приоритет:** P3 (suggestion — needs Arman decision)
@@ -80,6 +81,32 @@ session: 153
 - **Файл:** x.jsx (OrderStatusBadge, osGetStatusConfig), CartView.jsx (getSafeStatus)
 - **Симптом:** "new" and "accepted" statuses use blue, but STYLE_GUIDE says sent/waiting=amber. Task constraint said "do NOT change status colors."
 - **Фикс:** If Arman decides to align with STYLE_GUIDE, change blue→amber for these intermediate statuses.
+
+### BUG-PM-064: Partner lookup hides backend failures (P1)
+- **Приоритет:** P1
+- **Когда:** S153 (Codex review, chain publicmenu-260321-110752)
+- **Файл:** x.jsx
+- **Симптом:** Partner query catches all errors and shows "restaurant not found" even for network failures.
+- **Фикс:** Distinguish network errors from 404 and show appropriate message.
+
+### BUG-PM-065: Hall StickyCartBar ignores visit lifecycle state (P1)
+- **Приоритет:** P1
+- **Когда:** S153 (Codex review, chain publicmenu-260321-110752)
+- **Файл:** x.jsx
+- **Симптом:** StickyCartBar doesn't inspect visit/session/bill/closed/paid state.
+- **Фикс:** Full lifecycle state detection.
+
+### BUG-PM-066: Hall StickyCartBar copy — missing full state matrix (P2)
+- **Приоритет:** P2
+- **Когда:** S153 (Codex review, chain publicmenu-260321-110752)
+- **Файл:** x.jsx
+- **Симптом:** Label resolver only produces a few generic labels instead of full state matrix.
+
+### BUG-PM-067: StickyCartBar animations — no cart count tracking (P2)
+- **Приоритет:** P2
+- **Когда:** S153 (Codex review, chain publicmenu-260321-110752)
+- **Файл:** x.jsx
+- **Симптом:** Parent doesn't track previous cart count for animation triggers.
 
 ### BUG-PM-035: Verified-table block regresses mobile UX (P2)
 - **Приоритет:** P2
@@ -92,6 +119,26 @@ session: 153
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-063: Drawer stepper shows XIcon instead of Minus (P2) — FIXED S153
+- **Когда:** S153 (chain publicmenu-260321-110752)
+- **Файл:** CartView.jsx
+- **Фикс:** Replaced `XIcon` with `Minus` icon for decrement, replaced text `+` with `Plus` icon. Added `Minus`, `Plus` imports.
+
+### FIX-PM-JIT: Just-in-time table confirmation Bottom Sheet (P1) — FIXED S153
+- **Когда:** S153 (chain publicmenu-260321-110752)
+- **Файл:** x.jsx, CartView.jsx
+- **Фикс:** Submit button always enabled. If table not verified on submit → Bottom Sheet opens for code entry. Auto-submits after verification. Added 8 new i18n keys.
+
+### FIX-PM-TOAST: Mode-switch toast i18n fallback (P2) — FIXED S153
+- **Когда:** S153 (chain publicmenu-260321-110752)
+- **Файл:** x.jsx
+- **Фикс:** Added `cart.items_removed_mode_switch` to `I18N_FALLBACKS`.
+
+### FIX-PM-CONSOLE: Remove console.error in hall submit (P2) — FIXED S153
+- **Когда:** S153 (chain publicmenu-260321-110752)
+- **Файл:** x.jsx
+- **Фикс:** Removed `console.error(err)` at line ~2582.
 
 ### BUG-PM-050: Order creation race — items created after loyalty redeem (P0) — FIXED S153
 - **Когда:** S150 (found), S153 (fixed via chain publicmenu-260321-093745)
