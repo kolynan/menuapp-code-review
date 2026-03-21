@@ -1,0 +1,13 @@
+# Codex Writer Findings — TestPage
+Chain: testpage-260321-081342
+
+## Findings
+1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
+2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
+3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
+4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
+5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
+6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
+
+## Summary
+Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)

@@ -1,5 +1,13 @@
 # TestPage — Known Bugs
 
+## Review 2026-03-21 (`testpage-260321-081342`)
+- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
+- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
+- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
+- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
+- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
+- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
+
 ## Review 2026-03-20 (`testpage-260320-203824`)
 - **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
 - **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
