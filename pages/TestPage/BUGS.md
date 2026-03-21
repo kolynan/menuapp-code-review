@@ -120,6 +120,11 @@ All 5 actionable bugs fixed via consensus merge. See Fixed section below.
 - **[P3] item.id / item.name fallback** (line 65) — No fallback for missing fields. Fixed: `key={item.id ?? index}` and `{item.name ?? '—'}`.
 - **[P3] Error message not exposed as accessible alert** (line 52) — Added `role="alert"` to error element.
 
+## Fixed (consensus chain testpage-260321-155117)
+- **[P1] Race condition in error path** (line 54-58) — `.catch()` lacked abort guard; superseded requests could overwrite state from newer request. Fixed: added `controller.signal.aborted` check in catch block.
+- **[P1] Hardcoded mojibake fallback** (line 18) — Literal em-dash `"—"` in `normalizeItems()` renders as broken encoding. Fixed: replaced with `null`, render localized fallback `t("testpage.state.unnamed_item")` in JSX.
+- **[P2] Silent filtering creates false empty state** (lines 7-29) — `normalizeItems` silently dropped invalid rows; fully invalid payload showed empty state instead of error. Fixed: returns `{ items, discarded, allInvalid }`, caller treats all-invalid as error.
+- **[P2] Error state coupled to translations** (lines 47,56,61,71) — Storing `t(...)` result in state made `t` a dependency of fetch effect, triggering refetch on locale change. Fixed: store i18n keys as strings, translate only at render time via `t(error)`.
+
 ## Active (notes only — no fix needed for test page)
-- **[P3] Silent payload filtering** (line 24) — `data.filter(item => item && item.id)` silently drops bad rows; malformed API response shows empty state instead of error. Acceptable for test page.
-- **[P3] No delete confirmation** (line 50) — Clicking delete immediately removes item with no confirmation dialog. Acceptable for test page.
+- **[P3] No delete confirmation** — Acceptable for test page (no delete functionality in current version).

@@ -6,17 +6,26 @@ import { Loader2 } from "lucide-react";
 
 function normalizeItems(data) {
   if (!Array.isArray(data)) return null;
-  return data.filter(
+  const valid = data.filter(
     (row) =>
       row != null &&
       typeof row === "object" &&
       !Array.isArray(row) &&
       (typeof row.id === "string" || typeof row.id === "number") &&
       (row.name == null || typeof row.name !== "object")
-  ).map((row) => ({
-    ...row,
-    name: row.name != null ? String(row.name) : "—",
-  }));
+  );
+  const discarded = data.length - valid.length;
+  if (valid.length === 0 && data.length > 0) {
+    return { items: [], discarded, allInvalid: true };
+  }
+  return {
+    items: valid.map((row) => ({
+      ...row,
+      name: row.name != null ? String(row.name) : null,
+    })),
+    discarded,
+    allInvalid: false,
+  };
 }
 
 export default function TestPage() {
@@ -42,21 +51,27 @@ export default function TestPage() {
       })
       .then((data) => {
         if (controller.signal.aborted) return;
-        const normalized = normalizeItems(data);
-        if (normalized === null) {
-          setError(t("testpage.error.invalid_response"));
+        const result = normalizeItems(data);
+        if (result === null) {
+          setError("testpage.error.invalid_response");
           setLoading(false);
           return;
         }
-        setItems(normalized);
+        if (result.allInvalid) {
+          setError("testpage.error.all_items_invalid");
+          setLoading(false);
+          return;
+        }
+        setItems(result.items);
         setLoading(false);
       })
       .catch((err) => {
         if (err.name === "AbortError") return;
-        setError(err.message);
+        if (controller.signal.aborted) return;
+        setError("testpage.error.fetch_failed");
         setLoading(false);
       });
-  }, [t]);
+  }, []);
 
   useEffect(() => {
     loadItems();
@@ -85,7 +100,7 @@ export default function TestPage() {
       </h1>
       {error && (
         <div className="text-red-500 mb-4" role="alert">
-          <p>{t("common.error")}</p>
+          <p>{t(error)}</p>
           <button
             className="mt-2 px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200 min-h-[44px] min-w-[44px]"
             onClick={() => loadItems()}
@@ -110,7 +125,7 @@ export default function TestPage() {
       <ul>
         {items.map((item) => (
           <li key={item.id} className="py-2 border-b">
-            {item.name}
+            {item.name ?? t("testpage.state.unnamed_item")}
           </li>
         ))}
       </ul>
