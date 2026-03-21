@@ -1,5 +1,5 @@
 ---
-version: "28.0"
+version: "29.0"
 updated: "2026-03-21"
 session: 153
 ---
@@ -13,7 +13,7 @@ session: 153
 
 ## Active Bugs (не исправлены)
 
-*14 active bugs remaining (0x P0, 7x P1, 5x P2, 1x P3, 1x suggestion).*
+*15 active bugs remaining (0x P0, 7x P1, 5x P2, 2x P3, 1x suggestion).*
 
 ### BUG-PM-056: Drawer layout not visit-state-driven (P1 — Batch 2)
 - **Приоритет:** P1
@@ -61,12 +61,13 @@ session: 153
 - **Файл:** x.jsx
 - **Симптом:** Missing count bump animation on "+" and soft rise animation on first item.
 
-### BUG-PM-062: CategoryChips may still have indigo (P3) — PARTIAL FIX
+### BUG-PM-062: CategoryChips ignores activeColor prop — needs B44 prompt (P3)
 - **Приоритет:** P3
 - **Когда:** S153 (consensus chain publicmenu-260321-093745)
-- **Файл:** refactor/CategoryChips (imported)
-- **Симптом:** Imported component was not checked for indigo remnants.
-- **Частичный фикс:** Passed `activeColor="#B5543A"` prop (chain publicmenu-260321-110752). If component ignores prop, needs B44 prompt.
+- **Файл:** @/components/publicMenu/refactor/CategoryChips (imported component, NOT page code)
+- **Симптом:** Active chip still renders indigo despite `activeColor="#B5543A"` prop passed in x.jsx:3182. CC grep confirmed zero indigo in all page files — issue is inside imported component.
+- **Фикс:** B44 prompt needed to fix CategoryChips component to respect `activeColor` prop. No page-side code fix possible.
+- **Confirmed:** Chain publicmenu-260321-140331 (both CC and Codex agree).
 
 ### BUG-PM-055: Status new/accepted blue→amber debate (suggestion)
 - **Приоритет:** P3 (suggestion — needs Arman decision)
@@ -108,17 +109,40 @@ session: 153
 - **Файл:** x.jsx
 - **Симптом:** Parent doesn't track previous cart count for animation triggers.
 
-### BUG-PM-035: Verified-table block regresses mobile UX (P2)
+### BUG-PM-068: Hardcoded aria labels / missing i18n in controls (P3)
+- **Приоритет:** P3
+- **Когда:** S153 (Codex review, chain publicmenu-260321-140331)
+- **Файл:** CheckoutView.jsx, CartView.jsx, MenuView.jsx
+- **Симптом:** Hardcoded English aria labels in CheckoutView, hardcoded placeholder in CartView, missing aria-labels in MenuView.
+- **Фикс:** Replace with t()/tr() i18n calls. Future batch.
+
+### BUG-PM-069: Bottom Sheet missing cooldown/lockout countdown display (P2)
 - **Приоритет:** P2
-- **Когда:** S116 (Codex review)
-- **Файл:** CartView.jsx:1046,1007,1056
-- **Симптом:** Duplicate "Стол подтвержден" header after verification. Info buttons are tiny icon-only touch targets (< 44px).
-- **Фикс:** Restore `shouldShowOnlineOrderBlock` logic. Replace icon-only info controls with 44px labeled buttons.
-- **Регрессия:** BUG-PM-008, BUG-PM-S81-07
+- **Когда:** S153 (chain publicmenu-260321-140331)
+- **Файл:** x.jsx
+- **Симптом:** Table confirmation Bottom Sheet shows codeVerificationError but doesn't display attempt counter or lockout countdown. CartView cooldown logic still prevents brute-force via shared state, but user doesn't see countdown in Bottom Sheet.
+- **Фикс:** Lift codeAttempts/codeLockedUntil/nowTs state to x.jsx scope and display in Bottom Sheet.
 
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-PM-CHAIN-140331: 6 fixes via consensus chain publicmenu-260321-140331 — FIXED S153
+- **Когда:** S153, chain publicmenu-260321-140331
+- **Файл:** x.jsx, CartView.jsx
+- **Фикс:**
+  1. [P0] Gate hall submit on `isTableVerified` instead of `!currentTableId` — prevents orphan orders (Codex X1)
+  2. [P1] Removed inline table verification UI from CartView (201 lines) — Bottom Sheet is sole surface (A1)
+  3. [P1] Added primary CTA "Подтвердить и отправить" button to Bottom Sheet (A3)
+  4. [P1] Dynamic tableCodeLength in Bottom Sheet from partner config (A2)
+  5. [P1] Toast on Bottom Sheet close without verification (C8)
+  6. [P2] Fixed misleading "order saved" error fallback message in CartView (X4)
+- **Tag:** PublicMenu-pre-publicmenu-260321-140331 (rollback point)
+
+### BUG-PM-035: Verified-table block regresses mobile UX (P2) — FIXED S153
+- **Когда:** S116 (found), S153 (fixed via chain publicmenu-260321-140331)
+- **Файл:** CartView.jsx
+- **Фикс:** Inline table verification block removed entirely (201 lines). Bottom Sheet replaces it with proper UX. Duplicate header and tiny touch targets no longer exist.
 
 ### BUG-PM-063: Drawer stepper shows XIcon instead of Minus (P2) — FIXED S153
 - **Когда:** S153 (chain publicmenu-260321-110752)
