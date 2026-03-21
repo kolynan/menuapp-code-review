@@ -1320,14 +1320,14 @@ export default function X() {
         const res = await base44.entities.Partner.filter(byIdFirst ? { id: p } : { slug: p });
         if (res?.[0]) return res[0];
       } catch (e) {
-        console.warn("Partner primary lookup failed", e);
+        // Partner primary lookup failed — silent in prod
       }
 
       try {
         const res2 = await base44.entities.Partner.filter(byIdFirst ? { slug: p } : { id: p });
         return res2?.[0] || null;
       } catch (e) {
-        console.warn("Partner fallback lookup failed", e);
+        // Partner fallback lookup failed — silent in prod
         return null;
       }
     },
@@ -1368,7 +1368,7 @@ export default function X() {
         setMobileLayout(defaultLayout);
       }
     } catch (e) {
-      console.warn('Failed to load mobile layout preference', e);
+      // Failed to load mobile layout preference — silent in prod
     }
   }, [partner?.id, partner?._id, partner?.slug, partner?.code]);
 
@@ -1385,7 +1385,7 @@ export default function X() {
       const storageKey = `menuMobileLayout:${partnerKey}`;
       localStorage.setItem(storageKey, layout);
     } catch (e) {
-      console.warn('Failed to save mobile layout preference', e);
+      // Failed to save mobile layout preference — silent in prod
     }
   };
 
@@ -1596,10 +1596,10 @@ export default function X() {
   // P0-4: Warning if limit reached
   useEffect(() => {
     if (allDishes?.length === 100) {
-      console.warn("Dish limit reached (100), menu may be incomplete");
+      // Dish limit reached (100) — silent in prod
     }
     if (allCategories?.length === 100) {
-      console.warn("Category limit reached (100), menu may be incomplete");
+      // Category limit reached (100) — silent in prod
     }
   }, [allDishes?.length, allCategories?.length]);
 
@@ -1631,7 +1631,7 @@ export default function X() {
           lang: lang
         });
       } catch (e) {
-        console.warn("Failed to fetch category translations", e);
+        // Failed to fetch category translations — silent in prod
         return [];
       }
     },
@@ -1649,7 +1649,7 @@ export default function X() {
           lang: lang
         });
       } catch (e) {
-        console.warn("Failed to fetch dish translations", e);
+        // Failed to fetch dish translations — silent in prod
         return [];
       }
     },
@@ -2219,6 +2219,20 @@ export default function X() {
       localStorage.setItem("menu_preview_mode", normalized);
     } catch {}
 
+    // FIX P1: Revalidate cart on mode change — drop items not available in new mode
+    setCart((prev) => {
+      if (!allDishes || prev.length === 0) return prev;
+      const filtered = prev.filter((cartItem) => {
+        const dish = allDishes.find((d) => d.id === cartItem.dishId);
+        return dish && isDishEnabledForMode(dish, normalized);
+      });
+      if (filtered.length < prev.length) {
+        const removed = prev.length - filtered.length;
+        toast.info(t('cart.items_removed_mode_switch', { count: removed }), { duration: 3000 });
+      }
+      return filtered;
+    });
+
     setView("menu");
     setErrors({});
     setSubmitError(null);
@@ -2436,9 +2450,22 @@ export default function X() {
       const order = await base44.entities.Order.create(orderData);
       let orderCreated = true;
 
-      // Post-create side effects — best-effort after order exists
+      // FIX P0: Create order items FIRST — commit point before loyalty side effects
+      const newItems = cart.map((item) => ({
+        order: order.id,
+        dish: item.dishId,
+        dish_name: item.name,
+        dish_price: item.price,
+        quantity: item.quantity,
+        line_total: item.price * item.quantity,
+        split_type: splitType,
+      }));
+
+      await base44.entities.OrderItem.bulkCreate(newItems);
+
+      // Post-create side effects — best-effort after items exist
       try {
-        // Process points redemption AFTER order creation (BUG-PM-032)
+        // Process points redemption AFTER items created (BUG-PM-032, P0 fix)
         if (loyaltyAccountToUse && redeemedPoints > 0) {
           await base44.entities.LoyaltyTransaction.create({
             account: loyaltyAccountToUse.id,
@@ -2455,19 +2482,6 @@ export default function X() {
       } catch (sideEffectErr) {
         console.error('Post-create loyalty side effect failed:', sideEffectErr);
       }
-
-      // Create order items with split_type
-      const newItems = cart.map((item) => ({
-        order: order.id,
-        dish: item.dishId,
-        dish_name: item.name,
-        dish_price: item.price,
-        quantity: item.quantity,
-        line_total: item.price * item.quantity,
-        split_type: splitType,
-      }));
-
-      await base44.entities.OrderItem.bulkCreate(newItems);
 
       // Earn points after order creation — best-effort
       try {
@@ -2537,8 +2551,9 @@ export default function X() {
       setSessionItems(prev => [...prev, ...itemsWithLinks]);
 
       // GAP-01: Save cart snapshot for confirmation screen BEFORE clearing
+      // FIX P1: Use finalTotal (post-discount) instead of raw cart.reduce
       const confirmedItems = [...cart];
-      const confirmedTotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+      const confirmedTotal = finalTotal;
       const guestLabel = guestToUse
         ? getGuestDisplayName(guestToUse)
         : null;
@@ -2811,9 +2826,21 @@ export default function X() {
 
         const order = await base44.entities.Order.create(orderData);
 
-        // Post-create side effects — best-effort after order exists
+        // FIX P0: Create order items FIRST — commit point before loyalty side effects
+        const orderItemsData = cart.map((item) => ({
+          order: order.id,
+          dish: item.dishId,
+          dish_name: item.name,
+          dish_price: item.price,
+          quantity: item.quantity,
+          line_total: item.price * item.quantity,
+        }));
+
+        await base44.entities.OrderItem.bulkCreate(orderItemsData);
+
+        // Post-create side effects — best-effort after items exist
         try {
-          // Process points redemption AFTER order creation (BUG-PM-032)
+          // Process points redemption AFTER items created (BUG-PM-032, P0 fix)
           if (loyaltyAccountToUse && redeemedPoints > 0) {
             await base44.entities.LoyaltyTransaction.create({
               account: loyaltyAccountToUse.id,
@@ -2830,17 +2857,6 @@ export default function X() {
         } catch (sideEffectErr) {
           console.error('Post-create loyalty side effect failed:', sideEffectErr);
         }
-
-        const orderItemsData = cart.map((item) => ({
-          order: order.id,
-          dish: item.dishId,
-          dish_name: item.name,
-          dish_price: item.price,
-          quantity: item.quantity,
-          line_total: item.price * item.quantity,
-        }));
-
-        await base44.entities.OrderItem.bulkCreate(orderItemsData);
 
         // Earn points after order creation — best-effort
         try {

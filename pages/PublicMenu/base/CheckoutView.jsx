@@ -34,7 +34,7 @@ export default function CheckoutView({
     <div className="max-w-2xl mx-auto px-4 mt-6 space-y-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold text-slate-900">{t('cart.your_order')}</h2>
-        <button type="button" onClick={() => setView("menu")} className="text-sm text-indigo-600 hover:underline">
+        <button type="button" onClick={() => setView("menu")} className="text-sm hover:underline" style={{color:'#B5543A'}}>
           {t('cart.back_to_menu')}
         </button>
       </div>
@@ -55,11 +55,11 @@ export default function CheckoutView({
               <div className="text-right">
                 <div className="font-bold text-slate-900 mb-1">{formatPrice(item.price * item.quantity)}</div>
                 <div className="flex items-center justify-end bg-slate-100 rounded-lg p-1 w-fit ml-auto">
-                  <button type="button" onClick={() => updateQuantity(item.dishId, -1)} className="p-1 hover:bg-white rounded-md">
+                  <button type="button" onClick={() => updateQuantity(item.dishId, -1)} className="w-8 h-8 flex items-center justify-center hover:bg-white rounded-md" aria-label="Decrease">
                     <Minus className="w-3 h-3" />
                   </button>
                   <span className="mx-2 text-xs font-medium">{item.quantity}</span>
-                  <button type="button" onClick={() => updateQuantity(item.dishId, 1)} className="p-1 hover:bg-white rounded-md">
+                  <button type="button" onClick={() => updateQuantity(item.dishId, 1)} className="w-8 h-8 flex items-center justify-center hover:bg-white rounded-md" aria-label="Increase">
                     <Plus className="w-3 h-3" />
                   </button>
                 </div>
@@ -73,7 +73,7 @@ export default function CheckoutView({
         <CardContent className="p-4">
           <div className="flex justify-between items-center">
             <span className="font-semibold text-slate-900">{t('cart.total')}:</span>
-            <span className="text-xl font-bold text-indigo-600">{formatPrice(finalTotal)}</span>
+            <span className="text-xl font-bold" style={{color:'#B5543A'}}>{formatPrice(finalTotal)}</span>
           </div>
         </CardContent>
       </Card>
@@ -165,13 +165,14 @@ export default function CheckoutView({
         <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] -mx-4">
           <Button
             size="lg"
-            className={`w-full text-lg h-12 ${
+            className={`w-full text-lg h-12 text-white ${
               isSubmitting
                 ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
                 : submitError
                   ? 'bg-red-600 hover:bg-red-700'
-                  : 'bg-green-600 hover:bg-green-700'
+                  : ''
             }`}
+            style={(!isSubmitting && !submitError) ? {backgroundColor:'#B5543A'} : undefined}
             onClick={handleSubmitOrder}
             disabled={isSubmitting}
           >

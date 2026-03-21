@@ -794,14 +794,26 @@ export default function CartView({
                     <div className="font-medium text-slate-900">{item.name}</div>
                     <div className="text-xs text-slate-500">{formatPrice(item.price)} × {item.quantity}</div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <span className="font-semibold text-slate-900">{formatPrice(item.price * item.quantity)}</span>
-                    <button 
-                      onClick={() => updateQuantity(item.dishId, -item.quantity)}
-                      className="p-1.5 rounded-full hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
-                    >
-                      <XIcon className="w-4 h-4" />
-                    </button>
+                    {/* FIX P2: Stepper (-/count/+) instead of just remove-all */}
+                    <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
+                      <button
+                        onClick={() => updateQuantity(item.dishId, -1)}
+                        className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white transition-colors"
+                        aria-label={tr('menu.remove', 'Убрать')}
+                      >
+                        {item.quantity === 1 ? <XIcon className="w-3.5 h-3.5 text-red-500" /> : <span className="text-slate-600 text-sm font-medium">−</span>}
+                      </button>
+                      <span className="mx-1.5 text-sm font-semibold text-slate-900 min-w-[20px] text-center">{item.quantity}</span>
+                      <button
+                        onClick={() => updateQuantity(item.dishId, 1)}
+                        className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white transition-colors"
+                        aria-label={tr('menu.add', 'Добавить')}
+                      >
+                        <span className="text-slate-600 text-sm font-medium">+</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}

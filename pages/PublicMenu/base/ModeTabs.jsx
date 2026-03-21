@@ -28,13 +28,14 @@ export default function ModeTabs({
                 key={m.id}
                 onClick={() => onModeChange(m.id)}
                 disabled={isDisabled}
-                className={`flex-1 py-1 text-xs font-medium rounded-md transition-all relative ${
+                className={`flex-1 py-2.5 text-xs font-medium rounded-md transition-all relative ${
                   isActive
-                    ? "bg-indigo-600 text-white shadow-sm"
+                    ? "text-white shadow-sm"
                     : isDisabled
                     ? "text-slate-300 cursor-not-allowed"
                     : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                 }`}
+                style={isActive ? {backgroundColor:'#B5543A'} : undefined}
               >
                 {m.label}
                 {isDisabled && (

@@ -82,7 +82,7 @@ export default function MenuView({
                 {getDishDescription(dish)}
               </p>
             )}
-            <div className="mt-1 font-bold text-indigo-600 text-sm">
+            <div className="mt-1 font-bold text-sm" style={{color:'#B5543A'}}>
               {formatPrice(dish.price)}
             </div>
             {showReviews && dishRatings?.[dish.id] && (
@@ -101,7 +101,10 @@ export default function MenuView({
             {!inCart ? (
               <button
                 onClick={() => addToCart(dish)}
-                className="w-10 h-10 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
+                className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors"
+                style={{backgroundColor:'#B5543A'}}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor='#9A4530'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor='#B5543A'}
               >
                 <Plus className="w-5 h-5 text-white" />
               </button>
@@ -159,7 +162,10 @@ export default function MenuView({
               <button
                 onClick={() => addToCart(dish)}
                 aria-label={t('menu.add')}
-                className="w-11 h-11 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-md transition-colors"
+                className="w-11 h-11 flex items-center justify-center text-white rounded-full shadow-md transition-colors"
+                style={{backgroundColor:'#B5543A'}}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor='#9A4530'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor='#B5543A'}
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -200,7 +206,7 @@ export default function MenuView({
           )}
 
           <div className="mt-auto pt-2 space-y-1">
-            <div className="font-bold text-indigo-600">
+            <div className="font-bold" style={{color:'#B5543A'}}>
               {formatPrice(dish.price)}
             </div>
 
@@ -226,9 +232,10 @@ export default function MenuView({
             onClick={() => onSetMobileLayout('tile')}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               mobileLayout === 'tile'
-                ? 'bg-indigo-600 text-white'
+                ? 'text-white'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
+            style={mobileLayout === 'tile' ? {backgroundColor:'#B5543A'} : undefined}
           >
             <LayoutGrid className="w-4 h-4" />
             <span>{t('menu.tile')}</span>
@@ -237,9 +244,10 @@ export default function MenuView({
             onClick={() => onSetMobileLayout('list')}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               mobileLayout === 'list'
-                ? 'bg-indigo-600 text-white'
+                ? 'text-white'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
+            style={mobileLayout === 'list' ? {backgroundColor:'#B5543A'} : undefined}
           >
             <List className="w-4 h-4" />
             <span>{t('menu.list')}</span>
@@ -249,7 +257,7 @@ export default function MenuView({
 
       {loadingDishes ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+          <Loader2 className="w-8 h-8 animate-spin" style={{color:'#B5543A'}} />
         </div>
       ) : sortedCategories.length > 0 ? (
         sortedCategories.map((category) => {
