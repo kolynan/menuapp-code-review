@@ -107,6 +107,16 @@
 
 ---
 
+## Fixed (via consensus chain partnersettings-260321-235750)
+
+### FEATURE: PM-S81-04 (P2) — Appearance section with color picker (#82)
+- **Lines:** ~460-528 (AppearanceSection component), ~2225 (saveAppearance handler), ~2430 (JSX render)
+- **What:** New "Appearance" section between Profile and Working Hours with 8 preset brand color circles. Selected color saved to `Partner.primary_color`. Palette icon + tab in SectionNav. Touch targets 44px (w-11 h-11). Saving indicator (opacity-50 + pointer-events-none).
+- **Commit:** consensus chain partnersettings-260321-235750
+- **Status:** FIXED
+
+---
+
 ## Active Bugs
 
 ### BUG-PS-009 (P2) -- address_map_url accepts arbitrary URLs

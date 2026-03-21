@@ -51,6 +51,7 @@ import {
   Globe,
   Building2,
   MapPin,
+  Palette,
   RefreshCw,
   Utensils,
   Wifi,
@@ -122,6 +123,7 @@ function getWeekdays(t) {
 function getSectionTabs(t) {
   return [
     { id: "profile", label: t("settings.tabs.profile"), Icon: Building2 },
+    { id: "appearance", label: t("settings.tabs.appearance"), Icon: Palette },
     { id: "hours", label: t("settings.tabs.hours"), Icon: Clock },
     { id: "channels", label: t("settings.tabs.channels"), Icon: Store },
     { id: "hall", label: t("settings.tabs.hall"), Icon: Utensils },
@@ -454,6 +456,73 @@ function ProfileSection({ partner, setPartner, logoSaved, onLogoChange, t }) {
       </div>
 
       {/* Save button moved to sticky bar at bottom of viewport */}
+    </div>
+  );
+}
+
+/* ============================================================
+   APPEARANCE SECTION — Color Picker (#82)
+   ============================================================ */
+
+const PRESET_COLORS = [
+  { hex: "#1A1A1A", labelKey: "settings.appearance.black" },
+  { hex: "#2D6A4F", labelKey: "settings.appearance.darkGreen" },
+  { hex: "#7B2D3B", labelKey: "settings.appearance.burgundy" },
+  { hex: "#1B3A5C", labelKey: "settings.appearance.darkBlue" },
+  { hex: "#E8590C", labelKey: "settings.appearance.orange" },
+  { hex: "#C92A2A", labelKey: "settings.appearance.red" },
+  { hex: "#6741D9", labelKey: "settings.appearance.purple" },
+  { hex: "#B8860B", labelKey: "settings.appearance.gold" },
+];
+
+const DEFAULT_COLOR = "#1A1A1A";
+
+function AppearanceSection({ partner, onSave, saving, t }) {
+  const selectedColor = (partner?.primary_color || DEFAULT_COLOR).toUpperCase();
+
+  const handleSelect = (hex) => {
+    if (saving) return;
+    onSave({ primary_color: hex });
+  };
+
+  return (
+    <div id="section-appearance" className="rounded-xl border bg-white p-4 sm:p-6 space-y-4 scroll-mt-20">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+          <Palette className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="font-semibold text-lg">{t("settings.appearance.title")}</h2>
+          <p className="text-sm text-slate-500">{t("settings.appearance.subtitle")}</p>
+        </div>
+      </div>
+
+      <div className={`flex flex-wrap gap-3 pt-2${saving ? " opacity-50 pointer-events-none" : ""}`}>
+        {PRESET_COLORS.map(({ hex }) => {
+          const isSelected = hex.toUpperCase() === selectedColor;
+          return (
+            <button
+              key={hex}
+              type="button"
+              aria-label={hex === DEFAULT_COLOR ? t("settings.appearance.default") : hex}
+              className={`w-11 h-11 rounded-full cursor-pointer border-2 flex items-center justify-center transition-all ${
+                isSelected
+                  ? "ring-2 ring-offset-2 border-white"
+                  : "border-transparent hover:scale-110"
+              }`}
+              style={{ backgroundColor: hex, ...(isSelected ? { "--tw-ring-color": hex } : {}) }}
+              onClick={() => handleSelect(hex)}
+              disabled={saving}
+            >
+              {isSelected && <Check className="h-5 w-5 text-white drop-shadow" />}
+            </button>
+          );
+        })}
+      </div>
+
+      {selectedColor === DEFAULT_COLOR.toUpperCase() && (
+        <p className="text-xs text-slate-400">{t("settings.appearance.defaultHint")}</p>
+      )}
     </div>
   );
 }
@@ -2153,6 +2222,20 @@ export default function PartnerSettings() {
     }
   }
 
+  async function saveAppearance(data) {
+    if (!partner?.id) return;
+    setSavingCount(c => c + 1);
+    try {
+      await updateRec("Partner", partner.id, data);
+      setPartner(prev => ({ ...prev, ...data }));
+      showToast(t("settings.toasts.appearanceSaved"));
+    } catch (e) {
+      showError(t("settings.errors.error"), String(e?.message || e));
+    } finally {
+      setSavingCount(c => c - 1);
+    }
+  }
+
   async function saveWorkingHours(data) {
     if (!partner?.id) return;
     const seq = ++saveSeq.current.hours;
@@ -2345,6 +2428,13 @@ export default function PartnerSettings() {
               setPartner={setPartner}
               logoSaved={logoSaved}
               onLogoChange={handleLogoChange}
+              t={t}
+            />
+
+            <AppearanceSection
+              partner={partner}
+              onSave={saveAppearance}
+              saving={saving}
               t={t}
             />
 
