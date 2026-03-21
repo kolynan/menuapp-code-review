@@ -101,6 +101,15 @@
 - **[P1] Abort controller leak on retry** (line 38) — useEffect cleanup aborted captured `controller` variable, not `abortRef.current`; retry controllers were never aborted on unmount. Fixed: cleanup now aborts `abortRef.current`.
 - **[P2] No semantic list markup** (lines 83-94) — Items rendered as `<div>` elements, screen readers can't identify content as a list. Fixed: wrapped items in `<ul>`/`<li>`.
 
+## Fixed (consensus chain testpage-260321-083311)
+- **[P1] Raw error message / i18n violation in error display** (line 41) — Raw `{error}` shown to user. Fixed: replaced with `{t('common.error')}`.
+- **[P1] No data validation before .map() — crash risk** (line 20) — `setItems(data)` assumes array. Fixed: added `Array.isArray(data) ? data : []`.
+- **[P2] Missing AbortController — fetch cleanup on unmount** (lines 13-36) — No abort on unmount. Fixed: added AbortController in useEffect, abort in cleanup.
+- **[P2] No retry mechanism after fetch error** (lines 56-60) — User must refresh page. Fixed: extracted fetch to `loadItems` callback, added retry button.
+- **[P2] Translation keys don't follow Base44 naming convention** (lines 49, 62) — `test_page.title` → `testpage.header.title`, `test_page.no_items` → `testpage.state.no_items`.
+- **[P3] item.id / item.name fallback** (line 65) — No fallback for missing fields. Fixed: `key={item.id ?? index}` and `{item.name ?? '—'}`.
+- **[P3] Error message not exposed as accessible alert** (line 52) — Added `role="alert"` to error element.
+
 ## Active (notes only — no fix needed for test page)
 - **[P3] Silent payload filtering** (line 24) — `data.filter(item => item && item.id)` silently drops bad rows; malformed API response shows empty state instead of error. Acceptable for test page.
 - **[P3] No delete confirmation** (line 50) — Clicking delete immediately removes item with no confirmation dialog. Acceptable for test page.
