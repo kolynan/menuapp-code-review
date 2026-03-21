@@ -1,0 +1,14 @@
+# Codex Writer Findings — TestPage Chain: testpage-260319-234320
+
+## Findings
+1. [P0] Unvalidated API payload can crash the page — `fetch("/api/items")` stores whatever `res.json()` returns into `items` (lines 15-18), but render assumes `items` is always an array (`items.length`, `items.map` on lines 27-28). If the backend returns `null`, an error object, or any non-array payload, the page crashes. FIX: validate `data` with `Array.isArray(data)` before `setItems`; otherwise keep `items` as `[]` and surface a translated error state.
+2. [P1] HTTP failures are not checked before parsing — the fetch path never checks `res.ok` (lines 15-17), so 4xx/5xx responses are treated like success until JSON parsing or render fails. FIX: check `if (!res.ok)` before `res.json()`, then route to a handled error state.
+3. [P1] Error text bypasses i18n and exposes raw browser messages — the catch block stores `err.message` directly (line 18) and the UI prints it verbatim (line 26). That violates the Base44 i18n rule and can show inconsistent low-level network text to users. FIX: normalize errors to i18n keys or safe app-level codes, then render via `t(...)`.
+4. [P1] Delete action is UI-only and misleading — the Delete button only removes the row from local state (line 31). There is no backend delete, no rollback, and no failure handling, so a refresh restores the item and users get false success feedback. FIX: call a real delete mutation with success/error handling, or remove/disable the destructive button until persistence exists.
+5. [P2] In-flight fetch has no unmount cleanup — the effect starts an async request and always calls `setItems`/`setLoading` afterward (lines 14-18). Navigating away mid-request can trigger stale state updates after unmount. FIX: add `AbortController` cleanup in `useEffect` and guard state updates for aborted/unmounted cases.
+6. [P2] List rows are not mobile-safe for long item names — each row uses `justify-between` with a plain `<span>` for the name (lines 29-30). Long names can push the Delete button off-screen or cause cramped wrapping on narrow phones. FIX: make the text container `flex-1 min-w-0 truncate` and keep the button non-shrinking.
+7. [P2] Delete button is weak for touch interaction — the mobile action is a small text button (`px-3 py-2 text-sm`, line 31) with no minimum touch target or stronger visual affordance. On restaurant phones this is easy to miss-tap. FIX: increase hit area to at least 44x44px and add clearer button styling/disabled states.
+8. [P3] Loading state is bare text with no mobile-first feedback — while loading, the page swaps to a plain centered string only (line 21). In a QR-menu flow this feels abrupt and gives no structural cue about what is coming. FIX: replace the bare text state with a simple skeleton/spinner layout sized for mobile.
+
+## Summary
+Total: 8 findings (1 P0, 3 P1, 3 P2, 1 P3)

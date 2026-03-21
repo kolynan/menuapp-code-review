@@ -1,0 +1,9 @@
+# Codex Writer Findings — TestPage Chain: testpage-260319-225437
+## Findings
+1. [P1] Shared Retry action is wrong for delete failures — In `testpage.jsx` at lines 48-50 a failed delete stores `test_page.delete_failed`, but the only visible retry control at lines 78-86 always calls `handleRetry()`, which re-fetches `/api/items` instead of retrying the failed delete. That makes the error CTA misleading and leaves the failed action unresolved. FIX: store error metadata with a retry handler, or only show the retry button for fetch/load errors.
+2. [P1] Response validation is too shallow and malformed items can still break the page — Line 27 only checks `Array.isArray(data)`, but rendering at lines 90-97 assumes every item has a usable `id` and `name`. Arrays like `[null]` or `[{ }]` will crash on `item.id`/`item.name` or send `DELETE /api/items/undefined`. FIX: validate each element before `setItems`, and reject or sanitize entries missing a valid `id`.
+3. [P2] Retry-created fetches are not fully cleaned up on unmount — `handleRetry` at lines 58-62 replaces `abortRef.current` with a new `AbortController`, but cleanup at lines 65-70 aborts only the original `controller` captured on mount. If the user retries and then leaves the page, the latest request keeps running after unmount. FIX: abort `abortRef.current` in cleanup and keep that ref as the single source of truth for the active fetch.
+4. [P2] Delete button aria-label is not fully localizable — Line 95 builds the label by concatenating `t('common.delete')` with the item name. That is still a user-facing string, and concatenation breaks grammar and word order in many locales. FIX: replace it with one translation key that accepts the item name as an interpolation value.
+
+## Summary
+Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)

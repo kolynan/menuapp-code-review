@@ -313,19 +313,19 @@ export default function MenuManage() {
   const defaultLanguage = partner?.default_language || "RU";
 
   // Get translated dish name/description based on selected language
-  // BUG-MM-S83-06 FIX: Strip legacy :::ARCHIVED::: marker from descriptions
-  const cleanDesc = (d) => (d || "").replace(/:::ARCHIVED:::/gi, "").trim();
+  // BUG-MM-S83-06 FIX: Strip legacy :::ARCHIVED::: marker from descriptions
+  const cleanDesc = (d) => (d || "").replace(/:::ARCHIVED:::/gi, "").trim();
   const getTranslatedDish = (dish) => {
     if (!dish) return { name: "", description: "" };
     if (lang === defaultLanguage) {
-      return { name: dish.name || "", description: cleanDesc(dish.description) };
+      return { name: dish.name || "", description: cleanDesc(dish.description) };
     }
     const tr = dishTranslationsRaw.find(
       t => String(t.dish) === String(dish.id) && t.lang === lang
     );
     return {
       name: tr?.name || dish.name || "",
-      description: cleanDesc(tr?.description || dish.description),
+      description: cleanDesc(tr?.description || dish.description),
     };
   };
 

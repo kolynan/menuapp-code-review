@@ -1,0 +1,11 @@
+# Codex Writer Findings — TestPage
+Chain: testpage-260319-235930
+## Findings
+1. [P1] Delete action is UI-only — [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L68) removes the row from local state only and never sends a mutation to the backend, so the UI reports a successful delete that comes back after refresh. FIX: replace the local `setItems(...)` delete with an async DELETE request, update state only after `res.ok`, and surface an i18n error on failure; or remove the button if this page is intentionally read-only.
+2. [P1] Error state stores translated text instead of an i18n key — [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L30) saves `t('test_page.error')` directly into state, so switching language after an error leaves stale text on screen and breaks the repo’s i18n pattern. FIX: store an error key such as `'test_page.error'` (or a small enum/source object) and call `t(errorKey)` during render.
+3. [P2] Retry fetch has no unmount cleanup — the initial load is abortable in [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L35), but the retry path at [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L58) calls `fetchItems()` with no `AbortController`, so a retry can resolve after unmount and still hit `setItems`/`setLoading`. FIX: make `fetchItems` create/manage its own controller (or keep the current controller in a ref) so every request, including retries, is aborted in cleanup.
+4. [P2] Error banner is not mobile-safe — [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L54) forces the error text and retry button into one horizontal flex row; longer translations or narrow phones will compress or overflow the message/action area. FIX: use a wrapping/mobile-first layout such as `flex-col items-start sm:flex-row sm:items-center` or `flex-wrap`, and let the text block grow independently.
+5. [P3] Error message is not announced accessibly — the error container at [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L54) is plain text with no alert semantics, so assistive tech may not announce fetch failures. FIX: add `role="alert"` to the error container and keep the retry control inside the same announced region.
+
+## Summary
+Total: 5 findings (0 P0, 2 P1, 2 P2, 1 P3)

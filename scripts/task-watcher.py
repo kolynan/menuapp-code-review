@@ -28,12 +28,12 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 CONFIG_PATH = Path(__file__).parent / "task-watcher-config.json"
-MASTER_CONFIG_PATH = Path(r"C:/Users/ASUS/Dev/Claude AI Cowork/scripts/task-watcher-config.json")
+MASTER_CONFIG_PATH = Path(r"C:/Users/ASUS/Dev/Menu AI Cowork/scripts/task-watcher-config.json")
 WATCHER_CONFIG_ENV = "WATCHER_CONFIG_PATH"
 V3_LEGACY_PATH = Path(__file__).parent / "task-watcher-v3-legacy.py"
 DEFAULTS = {
     "paths": {
-        "onedrive_root": r"C:/Users/ASUS/Dev/Claude AI Cowork",
+        "onedrive_root": r"C:/Users/ASUS/Dev/Menu AI Cowork",
         "repo_dir": r"C:/Dev/menuapp-code-review",
         "powershell_exe": r"C:/WINDOWS/System32/WindowsPowerShell/v1.0/powershell.exe",
     },

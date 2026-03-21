@@ -25,6 +25,28 @@ page: PublicMenu (/x)
 
 ---
 
+## 2026-03-21 | Batch 4 (PM-062 + PM-064 Table Confirmation) | S154
+
+- **КС:** consensus-with-versioning (С6), chain publicmenu-260321-140331
+- **Коммит:** b744f9a — 6 фиксов
+- **Стоимость:** $4.69 (CC $4.69, Codex 0k tok — parser issue #65)
+- **RELEASE:** 260321-02 x.jsx, 260321-02 CartView.jsx
+- **Что пофикшено:**
+  1. [P0] Gate hall submit on `isTableVerified` — предотвращает orphan orders
+  2. [P1] Убран inline table verification из CartView (201 строк удалено)
+  3. [P1] Добавлена CTA кнопка «Подтвердить и отправить» в Bottom Sheet
+  4. [P1] Dynamic tableCodeLength из partner config в Bottom Sheet
+  5. [P1] Toast при закрытии Bottom Sheet без верификации
+  6. [P2] Исправлен misleading error fallback "заказ сохранён"
+- **SKIPPED (2):**
+  - Finding #5: import paths (архитектура B44, не баг)
+  - Finding #4: partner lookup errors → PM-070 (записан в BUGS)
+- **Новые баги найдены:** PM-068 (P3, aria), PM-069 (P2, cooldown display), PM-070 (P1, partner lookup)
+- **Деплой:** ⏳ ждёт
+- **Тест:** ⏳ ждёт деплоя (TEST_PLAN_batch4.md — 7 тест-кейсов)
+
+---
+
 ## 2026-03-21 | Batch A+5 (Chips + Stepper + Table Confirmation) | S153
 
 - **Деплой:** x.jsx, CartView.jsx (RELEASE 260321-01)

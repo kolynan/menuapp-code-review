@@ -13,7 +13,7 @@ session: 153
 
 ## Active Bugs (не исправлены)
 
-*15 active bugs remaining (0x P0, 7x P1, 5x P2, 2x P3, 1x suggestion).*
+*16 active bugs remaining (0x P0, 8x P1, 5x P2, 2x P3, 1x suggestion).*
 
 ### BUG-PM-056: Drawer layout not visit-state-driven (P1 — Batch 2)
 - **Приоритет:** P1
@@ -108,6 +108,13 @@ session: 153
 - **Когда:** S153 (Codex review, chain publicmenu-260321-110752)
 - **Файл:** x.jsx
 - **Симптом:** Parent doesn't track previous cart count for animation triggers.
+
+### BUG-PM-070: Partner lookup hides backend failures as "not found" (P1)
+- **Приоритет:** P1
+- **Когда:** S154 (Codex review, chain publicmenu-260321-140331, Finding #4 — SKIPPED by merge)
+- **Файл:** x.jsx:1321, x.jsx:3029
+- **Симптом:** Partner query swallows exceptions and returns `null`, then page always renders `error.partner_not_found`. Transient backend failure is misreported as bad QR link. User sees "restaurant not found" instead of retryable error.
+- **Фикс:** Preserve request errors separately from true not-found. Render retryable error UI for backend failures.
 
 ### BUG-PM-068: Hardcoded aria labels / missing i18n in controls (P3)
 - **Приоритет:** P3
