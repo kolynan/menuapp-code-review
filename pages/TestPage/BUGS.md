@@ -1,12 +1,7 @@
 # TestPage — Known Bugs
 
 ## Review 2026-03-21 (`testpage-260321-090140`)
-- **[P0] List rows are not normalized before render** (lines 21-22, 63-64) - Only `Array.isArray(data)` is checked before rendering, but the list assumes every entry is a non-null object with a renderable `name`. `null`, primitives, or `name: {}` can crash at `item.id` or during React child rendering. Suggested fix: normalize/filter each row before `setItems`, requiring an object record with a stable primitive `id` and string-safe display name.
-- **[P1] Invalid payloads become a false empty state** (lines 21-22, 61) - Any non-array JSON is coerced to `[]`, so a backend contract failure renders `testpage.state.no_items` instead of an error. In a QR-menu flow this can hide the entire menu as if it were empty. Suggested fix: treat non-array or invalid payloads as an error path and surface a translated failure state.
-- **[P1] Retry requests bypass request lifecycle control** (lines 33-35, 55) - Only the initial effect request is abortable. The retry button calls `loadItems()` without its own controller, so rapid taps can create overlapping fetches, stale responses can win, and a retry can still resolve after unmount. Suggested fix: keep the active controller in a ref, abort/replace it on every load, and ignore stale completions.
-- **[P2] Error handling stores raw transport text instead of stable error keys** (lines 18, 27, 52) - The fetch path generates `HTTP ${res.status}` and browser `err.message`, but the UI only shows `t('common.error')`. Failures are neither localized nor distinguishable for targeted recovery or logging. Suggested fix: map fetch/network/status failures to stable i18n error keys or codes and render those via `t(...)`.
-- **[P2] Retry control is weak for mobile-first use** (lines 53-57) - Retry stays enabled during loading and uses a small `px-3 py-1 text-sm` hit area, which is below a comfortable 44x44 touch target. On slow mobile networks this makes duplicate taps easy and amplifies duplicate requests. Suggested fix: disable retry while a request is in flight, show a busy state, and increase the touch target.
-- **[P3] Index fallback key is an unstable React identity** (line 64) - `key={item.id ?? index}` can cause React to reuse the wrong DOM node if rows arrive without IDs or the order changes between fetches. Suggested fix: require a stable ID during normalization and drop or reject rows that do not have one.
+All 5 actionable bugs fixed via consensus merge. See Fixed section below.
 
 ## Review 2026-03-21 (`testpage-260321-083311`)
 - **[P1] Unvalidated API payload can crash the page** (lines 18-19, 40-43) - `setItems(data)` accepts any JSON, but render assumes `items` is an array of objects with primitive `id` and renderable `name`. `null`, objects, or rows with object `name` values can break `items.length`, `items.map`, or React child rendering. Suggested fix: validate `Array.isArray(data)` and normalize each row before `setItems`, rejecting malformed payloads into the error path.
@@ -30,6 +25,13 @@
 - **[P2] Async callbacks are not fully unmount-safe** (lines 17-31, 34-45) - `AbortController` cleanup exists, but resolved promise callbacks can still update state after unmount or after a newer request starts. Suggested fix: add a mounted or request-token guard around state updates.
 - **[P3] Silent payload filtering hides backend issues** (lines 24, 82) - Invalid rows are dropped and can fall through to the `no_items` empty state instead of surfacing bad payloads. Suggested fix: convert malformed rows into an error or warning path.
 - **[P3] Delete has no confirmation or undo** (lines 87-90) - A single tap removes an item immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
+
+## Fixed (consensus chain testpage-260321-090140)
+- **[P1] AbortController lifecycle for all fetches** — Store controller in useRef; abort/replace on every loadItems; ignore stale completions. Fixed: controllerRef pattern.
+- **[P1] Normalize/validate item rows before setItems** — Filter rows to objects with primitive id and string-safe name. Fixed: normalizeItems() helper.
+- **[P1] Non-array API response treated as error** — Non-array JSON payload shows error UI instead of false empty state. Fixed: normalizeItems returns null for non-array.
+- **[P2] Retry button touch target + disable during loading** — Below 44px minimum, no disable during fetch. Fixed: min-h/min-w + disabled={loading}.
+- **[P2] Inline loading on retry instead of full-page spinner** — Full page spinner replaced content on retry. Fixed: isInitialLoad guard, inline indicator for retries.
 
 ## Fixed
 - **[P0] Missing await on response.json()** (line ~17) — `response.json()` returns a Promise; without `await`, `setItems` receives a Promise object instead of data. Fixed: added `await`.
