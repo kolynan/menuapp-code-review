@@ -12,6 +12,8 @@ function normalizeItems(data) {
       typeof row === "object" &&
       !Array.isArray(row) &&
       (typeof row.id === "string" || typeof row.id === "number") &&
+      row.id !== "" &&
+      !Number.isNaN(row.id) &&
       (row.name == null || typeof row.name !== "object")
   );
   const discarded = data.length - valid.length;
@@ -33,6 +35,7 @@ export default function TestPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [discardedCount, setDiscardedCount] = useState(0);
   const controllerRef = useRef(null);
 
   const loadItems = useCallback(() => {
@@ -63,6 +66,7 @@ export default function TestPage() {
           return;
         }
         setItems(result.items);
+        setDiscardedCount(result.discarded);
         setLoading(false);
       })
       .catch((err) => {
@@ -113,6 +117,11 @@ export default function TestPage() {
           </button>
         </div>
       )}
+      {discardedCount > 0 && (
+        <div className="text-yellow-600 bg-yellow-50 p-2 rounded mb-2 text-sm" role="status">
+          {t("testpage.state.items_discarded", { count: discardedCount })}
+        </div>
+      )}
       {loading && items.length > 0 && (
         <div className="flex items-center gap-2 mb-2 text-gray-500">
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -123,8 +132,8 @@ export default function TestPage() {
         <p>{t("testpage.state.no_items")}</p>
       )}
       <ul>
-        {items.map((item) => (
-          <li key={item.id} className="py-2 border-b">
+        {items.map((item, index) => (
+          <li key={`${item.id}-${index}`} className="py-2 border-b break-words overflow-hidden">
             {item.name ?? t("testpage.state.unnamed_item")}
           </li>
         ))}
