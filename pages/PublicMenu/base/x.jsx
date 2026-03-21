@@ -1527,7 +1527,7 @@ export default function X() {
         JSON.stringify({ partnerId, tableId, timestamp: Date.now() })
       );
     } catch (e) {
-      console.error("Failed to save table", e);
+      /* silent — localStorage save is best-effort */
     }
   };
 
@@ -2616,19 +2616,21 @@ export default function X() {
   const handleSubmitOrder = async () => {
     // CODE-024: protect from double-tap
     if (submitLockRef.current) return;
-    
-    if (!validate()) return;
-    
-    // Empty cart guard
-    if (cart.length === 0) {
-      toast.error(tr('cart.empty', 'Корзина пуста'), { id: 'mm1' });
-      return;
-    }
 
-    // Just-in-time table confirmation: intercept when table not verified
+    // PM-071: Just-in-time table confirmation BEFORE validate(),
+    // because validate() rejects hall submits when !currentTableId,
+    // silently blocking the BS trigger.
     if (orderMode === "hall" && !isTableVerified) {
       pendingSubmitRef.current = true;
       setShowTableConfirmSheet(true);
+      return;
+    }
+
+    if (!validate()) return;
+
+    // Empty cart guard
+    if (cart.length === 0) {
+      toast.error(tr('cart.empty', 'Корзина пуста'), { id: 'mm1' });
       return;
     }
 
@@ -3380,6 +3382,7 @@ export default function X() {
       </Drawer>
 
       {/* Just-in-time Table Confirmation Bottom Sheet (PM-064) */}
+      {/* PM-071: z-[60] on DrawerContent ensures BS renders above cart Drawer (z-50) */}
       <Drawer
         open={showTableConfirmSheet}
         onOpenChange={(open) => {
@@ -3392,19 +3395,19 @@ export default function X() {
           }
         }}
       >
-        <DrawerContent className="max-h-[85dvh] rounded-t-3xl">
+        <DrawerContent className="max-h-[85dvh] rounded-t-3xl z-[60]">
           <DrawerHeader className="text-center pb-2">
             <div className="mx-auto w-12 h-1.5 bg-slate-300 rounded-full mb-4" />
             <DrawerTitle className="text-lg font-semibold text-slate-900">
-              {t('cart.confirm_table.title')}
+              {tr('cart.confirm_table.title', 'Подтвердите стол')}
             </DrawerTitle>
             <p className="text-sm text-slate-500 mt-1">
-              {t('cart.confirm_table.subtitle')}
+              {tr('cart.confirm_table.subtitle', 'Чтобы отправить заказ официанту')}
             </p>
             <p className="text-xs text-slate-400 mt-2">
               {loyaltyEnabled
-                ? t('cart.confirm_table.benefit_loyalty')
-                : t('cart.confirm_table.benefit_default')}
+                ? tr('cart.confirm_table.benefit_loyalty', 'По онлайн-заказу вы получите бонусы / скидку')
+                : tr('cart.confirm_table.benefit_default', 'Так официант быстрее найдёт ваш заказ')}
             </p>
           </DrawerHeader>
           <div className="px-6 pb-6">

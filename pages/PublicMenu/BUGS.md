@@ -13,7 +13,7 @@ session: 153
 
 ## Active Bugs (не исправлены)
 
-*16 active bugs remaining (0x P0, 8x P1, 5x P2, 2x P3, 1x suggestion).*
+*18 active bugs remaining (0x P0, 8x P1, 7x P2, 2x P3, 1x suggestion).*
 
 ### BUG-PM-056: Drawer layout not visit-state-driven (P1 — Batch 2)
 - **Приоритет:** P1
@@ -130,9 +130,33 @@ session: 153
 - **Симптом:** Table confirmation Bottom Sheet shows codeVerificationError but doesn't display attempt counter or lockout countdown. CartView cooldown logic still prevents brute-force via shared state, but user doesn't see countdown in Bottom Sheet.
 - **Фикс:** Lift codeAttempts/codeLockedUntil/nowTs state to x.jsx scope and display in Bottom Sheet.
 
+### BUG-PM-072: Mobile grid partner setting ignored in MenuView (P2)
+- **Приоритет:** P2
+- **Когда:** S155D (Codex review, chain publicmenu-260321-195108)
+- **Файл:** MenuView.jsx
+- **Симптом:** `grid-cols-2` hardcoded on mobile despite `partner.menu_grid_mobile` setting.
+- **Фикс:** Read partner setting and apply dynamic grid class.
+
+### BUG-PM-073: useTableSession loses restored guests with only `_id` (P2)
+- **Приоритет:** P2
+- **Когда:** S155D (Codex review, chain publicmenu-260321-195108)
+- **Файл:** useTableSession.jsx
+- **Симптом:** `currentGuestIdRef.current` uses `.id` instead of `normalizeGuestId()` — restored guests with only `_id` field may be missed.
+- **Фикс:** Use `normalizeGuestId()` consistently.
+
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-PM-071-CHAIN-195108: 4 fixes via consensus chain publicmenu-260321-195108 — FIXED S155D
+- **Когда:** S155D, chain publicmenu-260321-195108
+- **Файл:** x.jsx
+- **Фикс:**
+  1. [P1] Move `!isTableVerified` check before `validate()` in `handleSubmitOrder` — root cause of BS not opening (Codex)
+  2. [P1] Add `z-[60]` to confirmation DrawerContent — ensures BS visible above cart Drawer (CC)
+  3. [P2] Add `tr()` fallbacks for 5 BS i18n keys — prevents raw key display if translations missing (CC)
+  4. [P2] Remove `console.error` in `saveTableSelection` — production log cleanup (CC)
+- **Skipped:** Fix 3 (P2 state refactor — move verification state to x.jsx) — too large, recorded as BUG-PM-069.
 
 ### FIX-PM-CHAIN-140331: 6 fixes via consensus chain publicmenu-260321-140331 — FIXED S153
 - **Когда:** S153, chain publicmenu-260321-140331
