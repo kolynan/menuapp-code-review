@@ -1555,6 +1555,12 @@ export default function X() {
   // Removed hasTableInUrl from condition - URL param alone doesn't mean verified
   const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
 
+  // Table code config (for Bottom Sheet — PM-064)
+  const tableCodeLength = useMemo(() => {
+    const n = Number(partner?.table_code_length);
+    return (Number.isFinite(n) && n > 0) ? Math.max(3, Math.min(8, Math.round(n))) : 4;
+  }, [partner?.table_code_length]);
+
   // P0-7: Removed activeTables query - no dropdown needed
 
   // P0-2: currentTableId only from resolved table or code verification
@@ -2620,7 +2626,7 @@ export default function X() {
     }
 
     // Just-in-time table confirmation: intercept when table not verified
-    if (orderMode === "hall" && !currentTableId) {
+    if (orderMode === "hall" && !isTableVerified) {
       pendingSubmitRef.current = true;
       setShowTableConfirmSheet(true);
       return;
@@ -3373,13 +3379,16 @@ export default function X() {
         </DrawerContent>
       </Drawer>
 
-      {/* Just-in-time Table Confirmation Bottom Sheet (Batch A+5) */}
+      {/* Just-in-time Table Confirmation Bottom Sheet (PM-064) */}
       <Drawer
         open={showTableConfirmSheet}
         onOpenChange={(open) => {
           if (!open) {
             pendingSubmitRef.current = false;
             setShowTableConfirmSheet(false);
+            if (!isTableVerified) {
+              toast(tr('cart.confirm_table.dismissed', 'Для отправки заказа нужно подтвердить стол'), { id: 'table-dismiss' });
+            }
           }
         }}
       >
@@ -3399,14 +3408,14 @@ export default function X() {
             </p>
           </DrawerHeader>
           <div className="px-6 pb-6">
-            {/* Table code input — reuse same slot UI as CartView */}
+            {/* Table code input */}
             <div className="flex flex-col items-center gap-4 mt-4">
               <p className="text-sm font-medium text-slate-700">
                 {tr('cart.verify.enter_table_code', 'Введите код стола')}
               </p>
               <div className="flex gap-2 justify-center">
-                {Array.from({ length: 4 }).map((_, idx) => {
-                  const safe = String(tableCodeInput || '').replace(/\D/g, '').slice(0, 4);
+                {Array.from({ length: tableCodeLength }).map((_, idx) => {
+                  const safe = String(tableCodeInput || '').replace(/\D/g, '').slice(0, tableCodeLength);
                   const ch = safe[idx] || '';
                   return (
                     <div
@@ -3421,15 +3430,15 @@ export default function X() {
               <Input
                 type="text"
                 inputMode="numeric"
-                maxLength={4}
+                maxLength={tableCodeLength}
                 autoFocus
-                value={String(tableCodeInput || '').replace(/\D/g, '').slice(0, 4)}
+                value={String(tableCodeInput || '').replace(/\D/g, '').slice(0, tableCodeLength)}
                 onChange={(e) => {
-                  const next = String(e.target.value || '').replace(/\D/g, '').slice(0, 4);
+                  const next = String(e.target.value || '').replace(/\D/g, '').slice(0, tableCodeLength);
                   if (typeof setTableCodeInput === 'function') setTableCodeInput(next);
                 }}
                 className="w-40 text-center text-lg tracking-widest"
-                placeholder="0000"
+                placeholder={'0'.repeat(tableCodeLength)}
                 aria-label={tr('cart.verify.enter_table_code', 'Введите код стола')}
               />
               {isVerifyingCode && (
@@ -3442,14 +3451,31 @@ export default function X() {
                 <p className="text-sm text-red-600 text-center">{codeVerificationError}</p>
               )}
             </div>
+            {/* Primary CTA: Confirm and submit (PM-064 A3) */}
+            <Button
+              className="w-full mt-6 text-white"
+              style={{ backgroundColor: '#B5543A' }}
+              disabled={isVerifyingCode || String(tableCodeInput || '').replace(/\D/g, '').length < tableCodeLength}
+              onClick={() => {
+                const code = String(tableCodeInput || '').replace(/\D/g, '').slice(0, tableCodeLength);
+                if (code.length === tableCodeLength && typeof verifyTableCode === 'function') {
+                  verifyTableCode(code);
+                }
+              }}
+            >
+              {isVerifyingCode
+                ? t('common.loading')
+                : tr('cart.confirm_table.submit', 'Подтвердить и отправить')}
+            </Button>
+            {/* Secondary: change table (PM-064 C4) */}
             <button
               type="button"
-              className="w-full text-center text-xs text-slate-400 mt-4 hover:text-slate-600"
+              className="w-full text-center text-xs text-slate-400 mt-4 hover:text-slate-600 min-h-[44px]"
               onClick={() => {
                 setTableCodeInput('');
               }}
             >
-              {t('cart.confirm_table.change')}
+              {tr('cart.confirm_table.change', 'Не тот стол? Изменить')}
             </button>
           </div>
         </DrawerContent>
