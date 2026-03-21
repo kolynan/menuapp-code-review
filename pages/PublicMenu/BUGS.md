@@ -1,7 +1,7 @@
 ---
-version: "26.0"
-updated: "2026-03-20"
-session: 150
+version: "27.0"
+updated: "2026-03-21"
+session: 153
 ---
 
 # PublicMenu — Bug Registry
@@ -13,21 +13,34 @@ session: 150
 
 ## Active Bugs (не исправлены)
 
-*7 active bugs remaining (1x P0, 2x P1, 3x P2, 1x suggestion).*
+*11 active bugs remaining (0x P0, 5x P1, 4x P2, 1x P3, 1x suggestion).*
 
-### BUG-PM-050: Order creation race — items created after loyalty redeem (P0)
-- **Приоритет:** P0
-- **Когда:** S150 (Codex review, chain publicmenu-260320-173330)
-- **Файл:** x.jsx
-- **Симптом:** Order items may be created after loyalty points are already redeemed, causing inconsistent state.
-- **Фикс:** Ensure order creation completes before loyalty side effects.
-
-### BUG-PM-051: Cart survives mode switches with invalid dishes (P1)
+### BUG-PM-056: Drawer layout not visit-state-driven (P1 — Batch 2)
 - **Приоритет:** P1
-- **Когда:** S150 (Codex review, chain publicmenu-260320-173330)
+- **Когда:** S153 (consensus chain publicmenu-260321-093745)
+- **Файл:** CartView.jsx
+- **Симптом:** CartView renders same layout regardless of visit state. Missing 3 distinct drawer layouts per spec (before send / after send+draft / after send no draft).
+- **Фикс:** Introduce `drawerLayout` variable, conditionally reorder sections, add collapsible bill.
+
+### BUG-PM-057: CTA 7-state matrix not implemented (P1 — Batch 2)
+- **Приоритет:** P1
+- **Когда:** S153 (consensus chain publicmenu-260321-093745)
+- **Файл:** CartView.jsx
+- **Симптом:** Submit button text doesn't vary by visit+draft state. Missing "Заказать ещё", "Открыть счёт" CTAs.
+- **Фикс:** Compute CTA text/behavior from 7-state matrix.
+
+### BUG-PM-058: StickyCartBar missing 7-state visibility (P1 — Batch 3)
+- **Приоритет:** P1
+- **Когда:** S153 (consensus chain publicmenu-260321-093745)
 - **Файл:** x.jsx
-- **Симптом:** Switching between hall/pickup/delivery modes doesn't clear cart items that may be unavailable in the new mode.
-- **Фикс:** Validate cart contents on mode switch.
+- **Симптом:** `hallStickyMode` only has 4 states. Missing: paid fade-out, closed hidden, closed+items confirm reset, two text modes.
+- **Фикс:** Full state detection from tableSession.
+
+### BUG-PM-059: StickyCartBar text modes not implemented (P1 — Batch 3)
+- **Приоритет:** P1
+- **Когда:** S153 (consensus chain publicmenu-260321-093745)
+- **Файл:** x.jsx
+- **Симптом:** No separate draft-mode vs visit-mode text formats for StickyCartBar.
 
 ### BUG-PM-052: Pickup/delivery checkout drops loyalty UI (P1)
 - **Приоритет:** P1
@@ -36,19 +49,30 @@ session: 150
 - **Симптом:** Loyalty section not shown in pickup/delivery checkout flow.
 - **Фикс:** Enable loyalty UI for all order modes.
 
-### BUG-PM-053: Hall confirmation shows wrong total (P1)
-- **Приоритет:** P1
-- **Когда:** S150 (Codex review, chain publicmenu-260320-173330)
-- **Файл:** x.jsx
-- **Симптом:** Confirmation screen may display incorrect total after loyalty discount.
-- **Фикс:** Recalculate display total from actual order data.
-
-### BUG-PM-054: Hardcoded colors in MenuView, CheckoutView, ModeTabs (P2 — Batch 2)
+### BUG-PM-060: Section rendering order wrong (P2 — Batch 2)
 - **Приоритет:** P2
-- **Когда:** S150 (Codex review, chain publicmenu-260320-173330)
-- **Файл:** MenuView.jsx, CheckoutView.jsx, ModeTabs.jsx
-- **Симптом:** Indigo/blue hardcoded colors remain in files not covered by Batch 1.
-- **Фикс:** Apply same terracotta palette as Batch 1.
+- **Когда:** S153 (consensus chain publicmenu-260321-093745)
+- **Файл:** CartView.jsx
+- **Симптом:** Sections render out of spec order (sent before draft). Part of drawer restructure (BUG-PM-056).
+
+### BUG-PM-061: StickyCartBar missing animations (P2 — Batch 3)
+- **Приоритет:** P2
+- **Когда:** S153 (consensus chain publicmenu-260321-093745)
+- **Файл:** x.jsx
+- **Симптом:** Missing count bump animation on "+" and soft rise animation on first item.
+
+### BUG-PM-062: CategoryChips may still have indigo (P3)
+- **Приоритет:** P3
+- **Когда:** S153 (consensus chain publicmenu-260321-093745)
+- **Файл:** refactor/CategoryChips (imported)
+- **Симптом:** Imported component was not checked for indigo remnants.
+
+### BUG-PM-055: Status new/accepted blue→amber debate (suggestion)
+- **Приоритет:** P3 (suggestion — needs Arman decision)
+- **Когда:** S150 (CC review, chain publicmenu-260320-173330)
+- **Файл:** x.jsx (OrderStatusBadge, osGetStatusConfig), CartView.jsx (getSafeStatus)
+- **Симптом:** "new" and "accepted" statuses use blue, but STYLE_GUIDE says sent/waiting=amber. Task constraint said "do NOT change status colors."
+- **Фикс:** If Arman decides to align with STYLE_GUIDE, change blue→amber for these intermediate statuses.
 
 ### BUG-PM-055: Status new/accepted blue→amber debate (suggestion)
 - **Приоритет:** P3 (suggestion — needs Arman decision)
@@ -68,6 +92,30 @@ session: 150
 ---
 
 ## Fixed Bugs (исправлены)
+
+### BUG-PM-050: Order creation race — items created after loyalty redeem (P0) — FIXED S153
+- **Когда:** S150 (found), S153 (fixed via chain publicmenu-260321-093745)
+- **Файл:** x.jsx
+- **Фикс:** Moved `OrderItem.bulkCreate` before loyalty side effects in both hall and pickup/delivery submit paths.
+- **Commit:** 3b65762
+
+### BUG-PM-051: Cart survives mode switches (P1) — FIXED S153
+- **Когда:** S150 (found), S153 (fixed via chain publicmenu-260321-093745)
+- **Файл:** x.jsx
+- **Фикс:** `handleModeChange()` now filters cart items via `isDishEnabledForMode()`, drops unavailable with toast.
+- **Commit:** 3b65762
+
+### BUG-PM-053: Hall confirmation shows wrong total (P1) — FIXED S153
+- **Когда:** S150 (found), S153 (fixed via chain publicmenu-260321-093745)
+- **Файл:** x.jsx
+- **Фикс:** Confirmation screen uses `finalTotal` (post-discount) instead of raw `cart.reduce`.
+- **Commit:** 3b65762
+
+### BUG-PM-054: Hardcoded colors in MenuView, CheckoutView, ModeTabs (P2) — FIXED S153
+- **Когда:** S150 (found), S153 (fixed via chain publicmenu-260321-093745)
+- **Файл:** MenuView.jsx, CheckoutView.jsx, ModeTabs.jsx
+- **Фикс:** All indigo/green replaced with terracotta #B5543A inline styles. 9+ locations.
+- **Commit:** 3b65762
 
 ### BUG-PM-PALETTE-01: Terracotta palette applied to x.jsx + CartView.jsx (17 fixes) — FIXED S150
 - **Когда:** S150, fixed via consensus chain publicmenu-260320-173330
