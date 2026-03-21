@@ -25,6 +25,25 @@ page: PublicMenu (/x)
 
 ---
 
+## 2026-03-21 | Batch A+5 (Chips + Stepper + Table Confirmation) | S153
+
+- **Деплой:** x.jsx, CartView.jsx (RELEASE 260321-01)
+- **Тест:** quick-test (Chrome MCP, S153), TEST_PLAN_batch-a5.md
+- **Результат:** ⚠️ partial — 3 pass, 3 fail, 2 skip
+- **Проверено:**
+  - ❌ TC-1: чип «Все» — ещё indigo (PM-062, partial — КС предупреждал)
+  - ❌ TC-2: активный чип «Основные блюда» — ещё indigo (PM-062)
+  - ✅ TC-3: drawer stepper «− 1 +» — PM-063 FIXED
+  - ✅ TC-4: декремент «−» при qty=1 удаляет блюдо из корзины
+  - ❌ TC-5: Table Confirmation — код стола показывается inline в drawer ДО нажатия. По спецификации должен быть Bottom Sheet ПОСЛЕ нажатия (PM-064 NEW)
+  - ⏭ TC-6: SKIP (TC-5 fail, flow другой)
+  - ⏭ TC-7: SKIP (TC-5 fail)
+  - ✅ TC-8: регрессия OK — StickyCartBar ✅, F5 ✅, no i18n keys ✅, «В зале» терракота ✅
+- **Баги найдены:** PM-062 (подтверждён, не закрыт), PM-064 (НОВЫЙ — Table Confirmation inline)
+- **Баги закрыты:** PM-063 ✅
+
+---
+
 ## 2026-03-21 | Batch 2+3 (Drawer + StickyCartBar + Terracotta) | S153
 
 - **Деплой:** x.jsx, CartView.jsx, MenuView.jsx, ModeTabs.jsx, CheckoutView.jsx (commit 3b65762 + a99d6a8)

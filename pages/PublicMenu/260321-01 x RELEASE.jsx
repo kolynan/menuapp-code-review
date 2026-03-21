@@ -505,6 +505,15 @@ const I18N_FALLBACKS = {
   // CartView — misc
   "help.call_waiter": "Позвать официанта",
   "form.table": "Стол",
+  // Mode-switch toast
+  "cart.items_removed_mode_switch": "Убрано {count} блюд, недоступных в этом режиме",
+  // Table confirmation Bottom Sheet (just-in-time)
+  "cart.confirm_table.title": "Подтвердите стол",
+  "cart.confirm_table.subtitle": "Чтобы отправить заказ официанту",
+  "cart.confirm_table.benefit_loyalty": "По онлайн-заказу вы получите бонусы / скидку",
+  "cart.confirm_table.benefit_default": "Так официант быстрее найдёт ваш заказ",
+  "cart.confirm_table.submit": "Подтвердить и отправить",
+  "cart.confirm_table.change": "Не тот стол? Изменить",
 };
 
 /**
@@ -1258,6 +1267,10 @@ export default function X() {
   
   // TASK-260203-01: Drawer state
   const [drawerMode, setDrawerMode] = useState(null); // 'cart' | null
+
+  // Just-in-time table confirmation (Batch A+5 Fix 1)
+  const [showTableConfirmSheet, setShowTableConfirmSheet] = useState(false);
+  const pendingSubmitRef = useRef(false);
   
   const [activeCategoryKey, setActiveCategoryKey] = useState("all");
   const [cart, setCart] = useState([]); // { dishId, name, price, quantity }
@@ -2068,6 +2081,16 @@ export default function X() {
   }, [isTableVerified, tableSession]);
   const isSessionLoading = isTableVerified && !tableSession && !sessionCheckTimedOut;
 
+  // Just-in-time: auto-submit after table verification via confirmation sheet
+  useEffect(() => {
+    if (pendingSubmitRef.current && isTableVerified && currentTableId) {
+      pendingSubmitRef.current = false;
+      setShowTableConfirmSheet(false);
+      // Slight delay to let state propagate
+      setTimeout(() => handleSubmitOrder(), 100);
+    }
+  }, [isTableVerified, currentTableId]);
+
   // Hall StickyBar mode: определяем что показывать
   const hallStickyMode =
     (cart?.length || 0) > 0
@@ -2579,7 +2602,6 @@ export default function X() {
 
       return true;
     } catch (err) {
-      console.error(err);
       setSubmitError(t('error.send.title'));
       return false;
     }
@@ -2597,9 +2619,10 @@ export default function X() {
       return;
     }
 
-    // P0-1: Extra safety check for hall mode
+    // Just-in-time table confirmation: intercept when table not verified
     if (orderMode === "hall" && !currentTableId) {
-      setSubmitError(t('error.table_required'));
+      pendingSubmitRef.current = true;
+      setShowTableConfirmSheet(true);
       return;
     }
 
@@ -3156,6 +3179,7 @@ export default function X() {
           getCategoryName={getCategoryName}
           chipRefs={chipRefs}
           t={t}
+          activeColor="#B5543A"
         />
       )}
 
@@ -3345,6 +3369,88 @@ export default function X() {
               hallGuestCodeEnabled={hallGuestCodeEnabled}
               guestCode={guestCode}
             />
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Just-in-time Table Confirmation Bottom Sheet (Batch A+5) */}
+      <Drawer
+        open={showTableConfirmSheet}
+        onOpenChange={(open) => {
+          if (!open) {
+            pendingSubmitRef.current = false;
+            setShowTableConfirmSheet(false);
+          }
+        }}
+      >
+        <DrawerContent className="max-h-[85dvh] rounded-t-3xl">
+          <DrawerHeader className="text-center pb-2">
+            <div className="mx-auto w-12 h-1.5 bg-slate-300 rounded-full mb-4" />
+            <DrawerTitle className="text-lg font-semibold text-slate-900">
+              {t('cart.confirm_table.title')}
+            </DrawerTitle>
+            <p className="text-sm text-slate-500 mt-1">
+              {t('cart.confirm_table.subtitle')}
+            </p>
+            <p className="text-xs text-slate-400 mt-2">
+              {loyaltyEnabled
+                ? t('cart.confirm_table.benefit_loyalty')
+                : t('cart.confirm_table.benefit_default')}
+            </p>
+          </DrawerHeader>
+          <div className="px-6 pb-6">
+            {/* Table code input — reuse same slot UI as CartView */}
+            <div className="flex flex-col items-center gap-4 mt-4">
+              <p className="text-sm font-medium text-slate-700">
+                {tr('cart.verify.enter_table_code', 'Введите код стола')}
+              </p>
+              <div className="flex gap-2 justify-center">
+                {Array.from({ length: 4 }).map((_, idx) => {
+                  const safe = String(tableCodeInput || '').replace(/\D/g, '').slice(0, 4);
+                  const ch = safe[idx] || '';
+                  return (
+                    <div
+                      key={idx}
+                      className="w-10 h-12 rounded-lg border-2 border-slate-200 bg-white flex items-center justify-center text-xl font-mono text-slate-900 focus-within:border-[#B5543A]"
+                    >
+                      {ch || <span className="text-slate-300">_</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              <Input
+                type="text"
+                inputMode="numeric"
+                maxLength={4}
+                autoFocus
+                value={String(tableCodeInput || '').replace(/\D/g, '').slice(0, 4)}
+                onChange={(e) => {
+                  const next = String(e.target.value || '').replace(/\D/g, '').slice(0, 4);
+                  if (typeof setTableCodeInput === 'function') setTableCodeInput(next);
+                }}
+                className="w-40 text-center text-lg tracking-widest"
+                placeholder="0000"
+                aria-label={tr('cart.verify.enter_table_code', 'Введите код стола')}
+              />
+              {isVerifyingCode && (
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {t('common.loading')}
+                </div>
+              )}
+              {codeVerificationError && !isVerifyingCode && (
+                <p className="text-sm text-red-600 text-center">{codeVerificationError}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              className="w-full text-center text-xs text-slate-400 mt-4 hover:text-slate-600"
+              onClick={() => {
+                setTableCodeInput('');
+              }}
+            >
+              {t('cart.confirm_table.change')}
+            </button>
           </div>
         </DrawerContent>
       </Drawer>

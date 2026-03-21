@@ -1,5 +1,5 @@
 import React from "react";
-import { XIcon, Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, X } from "lucide-react";
+import { XIcon, Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, X, Minus, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -803,7 +803,7 @@ export default function CartView({
                         className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white transition-colors"
                         aria-label={tr('menu.remove', 'Убрать')}
                       >
-                        {item.quantity === 1 ? <XIcon className="w-3.5 h-3.5 text-red-500" /> : <span className="text-slate-600 text-sm font-medium">−</span>}
+                        <Minus className="w-3.5 h-3.5 text-slate-600" />
                       </button>
                       <span className="mx-1.5 text-sm font-semibold text-slate-900 min-w-[20px] text-center">{item.quantity}</span>
                       <button
@@ -811,7 +811,7 @@ export default function CartView({
                         className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white transition-colors"
                         aria-label={tr('menu.add', 'Добавить')}
                       >
-                        <span className="text-slate-600 text-sm font-medium">+</span>
+                        <Plus className="w-3.5 h-3.5 text-slate-600" />
                       </button>
                     </div>
                   </div>
@@ -1261,18 +1261,16 @@ export default function CartView({
             className={`w-full text-white ${
               isSubmitting
                 ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
-                : !isTableVerified
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300'
-                  : submitError
-                    ? 'bg-red-600 hover:bg-red-700'
-                    : ''
+                : submitError
+                  ? 'bg-red-600 hover:bg-red-700'
+                  : ''
             }`}
-            style={(!isSubmitting && isTableVerified && !submitError) ? {backgroundColor:'#B5543A'} : undefined}
+            style={!isSubmitting && !submitError ? {backgroundColor:'#B5543A'} : undefined}
             onClick={() => {
               if (submitError && setSubmitError) setSubmitError(null);
               handleSubmitOrder();
             }}
-            disabled={isSubmitting || !isTableVerified}
+            disabled={isSubmitting}
           >
             {isSubmitting
               ? tr('cta.sending', 'Отправляем...')
@@ -1280,11 +1278,6 @@ export default function CartView({
                 ? tr('cta.retry', 'Повторить отправку')
                 : tr('cart.send_to_waiter', 'Отправить заказ официанту')}
           </Button>
-          {isTableVerified === false && (
-            <p className="text-xs text-gray-400 text-center mt-1">
-              {tr('cart.enter_table_code_hint', 'Введите код стола чтобы отправить заказ')}
-            </p>
-          )}
         </div>
       )}
     </div>

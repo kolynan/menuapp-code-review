@@ -117,13 +117,14 @@ chain_id: (заполнить после завершения КС)
 
 | TC | Результат | Баги |
 |----|-----------|------|
-| TC-1 | — | — |
-| TC-2 | — | — |
-| TC-3 | — | — |
-| TC-4 | — | — |
-| TC-5 | — | — |
-| TC-6 | — | — |
-| TC-7 | — | — |
-| TC-8 | — | — |
+| TC-1 | ❌ fail | PM-062 (чип «Все» ещё indigo, partial fix) |
+| TC-2 | ❌ fail | PM-062 (активный чип ещё indigo) |
+| TC-3 | ✅ pass | PM-063 FIXED — «− 1 +» работает |
+| TC-4 | ✅ pass | «−» при qty=1 удаляет блюдо |
+| TC-5 | ❌ fail | PM-064 NEW — код стола inline в drawer ДО нажатия, не Bottom Sheet после |
+| TC-6 | ⏭ skip | TC-5 fail, flow другой |
+| TC-7 | ⏭ skip | TC-5 fail |
+| TC-8 | ✅ pass | Регрессия OK — StickyCartBar, F5, i18n, «В зале» терракота |
 
-**Общий результат:** ✅ pass / ⚠️ partial / ❌ fail
+**Общий результат:** ⚠️ partial (3✅ 3❌ 2⏭)
+**Тестировал:** S153, 2026-03-21, Chrome MCP
