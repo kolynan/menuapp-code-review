@@ -8,15 +8,6 @@ import {
   isSessionExpired,
 } from "@/components/sessionHelpers";
 
-// Guard: protect sessions with recent activity from being expired based on opened_at alone
-// isSessionExpired checks only opened_at — this guards tables with recent orders (SESS-008)
-const hasRecentActivity = (session) => {
-  const lastActivity = session.last_activity_at || session.updated_at || session.opened_at;
-  if (!lastActivity) return false;
-  const ageMs = Date.now() - new Date(lastActivity).getTime();
-  return ageMs < 8 * 60 * 60 * 1000; // 8h
-};
-
 // Persistence helpers (FIX-260131-01: session + guest, 8h TTL)
 const TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
 
@@ -290,7 +281,7 @@ export function useTableSession({
             const savedSession = savedSessions?.[0];
             
             if (savedSession) {
-              const isExpired = isSessionExpired(savedSession) && !hasRecentActivity(savedSession);
+              const isExpired = isSessionExpired(savedSession);
               const isActive = savedSession.status === 'open' &&
                                !savedSession.closed_at &&
                                !savedSession.ended_at &&
@@ -329,7 +320,7 @@ export function useTableSession({
 
             // P0-1: Close all expired sessions, use the first non-expired one
             for (const s of sortedSessions) {
-              if (isSessionExpired(s) && !hasRecentActivity(s)) {
+              if (isSessionExpired(s)) {
                 await closeExpiredSessionInDB(s.id);
               } else if (!session) {
                 session = s;

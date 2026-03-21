@@ -281,19 +281,15 @@ const BILL_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 const getBillCooldownKey = (tableId) => `menuapp_bill_requested_${tableId}`;
 
 const isBillOnCooldown = (tableId) => {
-  try {
-    const key = getBillCooldownKey(tableId);
-    const timestamp = localStorage.getItem(key);
-    if (!timestamp) return false;
-    return Date.now() - parseInt(timestamp, 10) < BILL_COOLDOWN_MS;
-  } catch { return false; }
+  const key = getBillCooldownKey(tableId);
+  const timestamp = localStorage.getItem(key);
+  if (!timestamp) return false;
+  return Date.now() - parseInt(timestamp, 10) < BILL_COOLDOWN_MS;
 };
 
 const setBillCooldownStorage = (tableId) => {
-  try {
-    const key = getBillCooldownKey(tableId);
-    localStorage.setItem(key, String(Date.now()));
-  } catch { /* private browsing — ignore */ }
+  const key = getBillCooldownKey(tableId);
+  localStorage.setItem(key, String(Date.now()));
 };
 
 /**
@@ -404,7 +400,7 @@ const I18N_FALLBACKS = {
   "cta.sending": "Отправляем...",
   "cta.retry": "Повторить отправку",
   "error.send.title": "Не удалось отправить",
-  "error.send.subtitle": "Попробуйте отправить ещё раз",
+  "error.send.subtitle": "Ваш заказ сохранён. Попробуйте снова",
   "cart.item_added": "Добавлено",
   "cart.send_to_waiter": "Отправить официанту",
   "cart.send_order": "Отправить заказ",
@@ -974,7 +970,7 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
     const symbol = partner?.currency_symbol || currency;
     const num = Number(amount);
     if (isNaN(num)) return String(amount);
-    const formatted = num.toLocaleString();
+    const formatted = num.toLocaleString("ru-RU");
     return symbol ? `${formatted} ${symbol}` : formatted;
   };
 
@@ -1207,7 +1203,7 @@ function formatOrderTime(order) {
   if (!ts) return "";
   const d = new Date(ts);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 }
 
 export default function X() {
@@ -1871,9 +1867,8 @@ export default function X() {
           originalMode: modeLabels[originalMode] || originalMode,
           newMode: modeLabels[firstAvailable.id] || firstAvailable.id,
         });
-
-        const timerId = setTimeout(() => setRedirectBanner(null), 5000);
-        return () => clearTimeout(timerId);
+        
+        setTimeout(() => setRedirectBanner(null), 5000);
       }
     }
   }, [partner, loadingDishes, channels, orderMode, visibleModeTabs, t]);
@@ -2044,8 +2039,6 @@ export default function X() {
     } catch (err) {
       console.error('Failed to save rating:', err);
       toast.error(t('error.save_failed'), { id: 'mm1' });
-      // BUG-PM-028: Roll back draft rating so user can retry
-      updateDraftRating(itemId, 0);
     } finally {
       setRatingSavingByItemId(prev => ({ ...prev, [itemId]: false }));
     }
@@ -2265,8 +2258,51 @@ export default function X() {
     }
   }, [currentTableId]);
 
-  // Debug hook kept as no-op to maintain hook order (BUG-PM-040: removed prod logging)
-  useEffect(() => {}, []);
+  // Debug mode - moved BEFORE early returns to maintain hook order
+  const isDebugGuestItems = searchParams.get('debug') === 'guestItems';
+
+  useEffect(() => {
+    if (!isDebugGuestItems) return;
+    
+    console.log('=== GUEST ITEMS DEBUG ===');
+    console.log('currentGuest:', currentGuest?.id, currentGuest);
+    console.log('sessionGuests count:', sessionGuests.length, sessionGuests.map(g => ({ id: g.id, name: g.name, guest_number: g.guest_number })));
+    console.log('sessionOrders count:', sessionOrders.length);
+    console.log('sessionItems count:', sessionItems.length);
+    console.log('itemsByOrder size:', itemsByOrder.size);
+    
+    const guestItemsMap = new Map();
+    sessionItems.forEach(item => {
+      const orderId = getLinkId(item.order);
+      const order = sessionOrders.find(o => o.id === orderId);
+      const guestId = getLinkId(order?.guest);
+      if (!guestItemsMap.has(guestId)) guestItemsMap.set(guestId, []);
+      guestItemsMap.get(guestId).push(item);
+    });
+    
+    console.log('Items per guest:', Object.fromEntries(guestItemsMap));
+    
+    const first10 = sessionItems.slice(0, 10);
+    console.log('First 10 items:', first10.map(item => {
+      const orderId = getLinkId(item.order);
+      const order = sessionOrders.find(o => o.id === orderId);
+      const guestId = getLinkId(order?.guest);
+      const stageId = typeof order?.stage_id === 'object' 
+        ? (order.stage_id?.id ?? order.stage_id?._id) 
+        : order?.stage_id;
+      const stage = stageId ? stagesMap.get(String(stageId)) : null;
+      return {
+        itemId: item.id,
+        dish: item.dish_name,
+        orderId,
+        guestId,
+        orderStatus: order?.status,
+        stageCode: stage?.internal_code,
+        visible: guestId === currentGuest?.id ? 'YES' : 'other guest'
+      };
+    }));
+    console.log('=========================');
+  }, [isDebugGuestItems, currentGuest?.id, sessionGuests, sessionOrders, sessionItems, itemsByOrder, stagesMap]);
 
   // P0-7: Removed handleTableSelection - no dropdown
 
@@ -2403,9 +2439,24 @@ export default function X() {
         }
       }
 
+      // Process points redemption BEFORE creating order
+      if (loyaltyAccountToUse && redeemedPoints > 0) {
+        await base44.entities.LoyaltyTransaction.create({
+          account: loyaltyAccountToUse.id,
+          type: 'redeem',
+          amount: -redeemedPoints,
+          description: t('loyalty.transaction.redeem')
+        });
+        
+        await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
+          balance: loyaltyAccountToUse.balance - redeemedPoints,
+          total_spent: (loyaltyAccountToUse.total_spent || 0) + redeemedPoints
+        });
+      }
+
       // Get start stage for this order type
       const startStage = getStartStage(orderStages, orderMode);
-
+      
       // Generate order number (for staff, not shown to guest)
       const { orderNumber, updatedCounters } = getNextOrderNumber(partner, 'hall');
 
@@ -2432,27 +2483,6 @@ export default function X() {
       if (partner?.id && orderData.table) saveTableSelection(partner.id, orderData.table);
 
       const order = await base44.entities.Order.create(orderData);
-      let orderCreated = true;
-
-      // Post-create side effects — best-effort after order exists
-      try {
-        // Process points redemption AFTER order creation (BUG-PM-032)
-        if (loyaltyAccountToUse && redeemedPoints > 0) {
-          await base44.entities.LoyaltyTransaction.create({
-            account: loyaltyAccountToUse.id,
-            type: 'redeem',
-            amount: -redeemedPoints,
-            description: t('loyalty.transaction.redeem')
-          });
-
-          await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
-            balance: loyaltyAccountToUse.balance - redeemedPoints,
-            total_spent: (loyaltyAccountToUse.total_spent || 0) + redeemedPoints
-          });
-        }
-      } catch (sideEffectErr) {
-        console.error('Post-create loyalty side effect failed:', sideEffectErr);
-      }
 
       // Create order items with split_type
       const newItems = cart.map((item) => ({
@@ -2467,39 +2497,35 @@ export default function X() {
 
       await base44.entities.OrderItem.bulkCreate(newItems);
 
-      // Earn points after order creation — best-effort
-      try {
-        if (loyaltyAccountToUse && loyaltyEnabled && earnedPoints > 0) {
-          const expiresAt = new Date();
-          expiresAt.setDate(expiresAt.getDate() + (partner.loyalty_expiry_days || 100));
-
-          await base44.entities.LoyaltyTransaction.create({
-            account: loyaltyAccountToUse.id,
-            type: 'earn_order',
-            amount: earnedPoints,
-            order: order.id,
-            description: t('loyalty.transaction.earn_order', { orderNumber: order.order_number }),
-            expires_at: expiresAt.toISOString()
-          });
-
-          const newBalance = (loyaltyAccountToUse.balance - redeemedPoints) + earnedPoints;
-          await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
-            balance: newBalance,
-            total_earned: (loyaltyAccountToUse.total_earned || 0) + earnedPoints,
-            visit_count: (loyaltyAccountToUse.visit_count || 0) + 1,
-            last_visit_at: new Date().toISOString()
-          });
-
-          await base44.entities.Order.update(order.id, {
-            points_earned: earnedPoints
-          });
-        }
-      } catch (earnErr) {
-        console.error('Post-create earn points failed:', earnErr);
+      // Earn points after order creation
+      if (loyaltyAccountToUse && loyaltyEnabled && earnedPoints > 0) {
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + (partner.loyalty_expiry_days || 100));
+        
+        await base44.entities.LoyaltyTransaction.create({
+          account: loyaltyAccountToUse.id,
+          type: 'earn_order',
+          amount: earnedPoints,
+          order: order.id,
+          description: t('loyalty.transaction.earn_order', { orderNumber: order.order_number }),
+          expires_at: expiresAt.toISOString()
+        });
+        
+        const newBalance = (loyaltyAccountToUse.balance - redeemedPoints) + earnedPoints;
+        await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
+          balance: newBalance,
+          total_earned: (loyaltyAccountToUse.total_earned || 0) + earnedPoints,
+          visit_count: (loyaltyAccountToUse.visit_count || 0) + 1,
+          last_visit_at: new Date().toISOString()
+        });
+        
+        await base44.entities.Order.update(order.id, {
+          points_earned: earnedPoints
+        });
       }
 
-      // Update partner counters — best-effort
-      try { await base44.entities.Partner.update(partner.id, updatedCounters); } catch (e) { console.error('Partner counter update failed:', e); }
+      // Update partner counters
+      await base44.entities.Partner.update(partner.id, updatedCounters);
       
       // Update local partner cache
       queryClient.setQueryData(["publicPartner", partnerParamRaw], (prev) =>
@@ -2560,6 +2586,7 @@ export default function X() {
         clientName: null,
       });
 
+      console.log("Order created", order?.id);
       return true;
     } catch (err) {
       console.error(err);
@@ -2786,6 +2813,21 @@ export default function X() {
           }
         }
 
+        // Process points redemption BEFORE creating order
+        if (loyaltyAccountToUse && redeemedPoints > 0) {
+          await base44.entities.LoyaltyTransaction.create({
+            account: loyaltyAccountToUse.id,
+            type: 'redeem',
+            amount: -redeemedPoints,
+            description: t('loyalty.transaction.redeem')
+          });
+          
+          await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
+            balance: loyaltyAccountToUse.balance - redeemedPoints,
+            total_spent: (loyaltyAccountToUse.total_spent || 0) + redeemedPoints
+          });
+        }
+
         // Get start stage for this order type
         const startStage = getStartStage(orderStages, orderMode);
 
@@ -2809,26 +2851,6 @@ export default function X() {
 
         const order = await base44.entities.Order.create(orderData);
 
-        // Post-create side effects — best-effort after order exists
-        try {
-          // Process points redemption AFTER order creation (BUG-PM-032)
-          if (loyaltyAccountToUse && redeemedPoints > 0) {
-            await base44.entities.LoyaltyTransaction.create({
-              account: loyaltyAccountToUse.id,
-              type: 'redeem',
-              amount: -redeemedPoints,
-              description: t('loyalty.transaction.redeem')
-            });
-
-            await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
-              balance: loyaltyAccountToUse.balance - redeemedPoints,
-              total_spent: (loyaltyAccountToUse.total_spent || 0) + redeemedPoints
-            });
-          }
-        } catch (sideEffectErr) {
-          console.error('Post-create loyalty side effect failed:', sideEffectErr);
-        }
-
         const orderItemsData = cart.map((item) => ({
           order: order.id,
           dish: item.dishId,
@@ -2840,35 +2862,31 @@ export default function X() {
 
         await base44.entities.OrderItem.bulkCreate(orderItemsData);
 
-        // Earn points after order creation — best-effort
-        try {
-          if (loyaltyAccountToUse && loyaltyEnabled && earnedPoints > 0) {
-            const expiresAt = new Date();
-            expiresAt.setDate(expiresAt.getDate() + (partner.loyalty_expiry_days || 100));
-
-            await base44.entities.LoyaltyTransaction.create({
-              account: loyaltyAccountToUse.id,
-              type: 'earn_order',
-              amount: earnedPoints,
-              order: order.id,
-              description: t('loyalty.transaction.earn_order', { orderNumber: order.order_number || order.id }),
-              expires_at: expiresAt.toISOString()
-            });
-
-            const newBalance = (loyaltyAccountToUse.balance - redeemedPoints) + earnedPoints;
-            await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
-              balance: newBalance,
-              total_earned: (loyaltyAccountToUse.total_earned || 0) + earnedPoints,
-              visit_count: (loyaltyAccountToUse.visit_count || 0) + 1,
-              last_visit_at: new Date().toISOString()
-            });
-
-            await base44.entities.Order.update(order.id, {
-              points_earned: earnedPoints
-            });
-          }
-        } catch (earnErr) {
-          console.error('Post-create earn points failed:', earnErr);
+        // Earn points after order creation
+        if (loyaltyAccountToUse && loyaltyEnabled && earnedPoints > 0) {
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + (partner.loyalty_expiry_days || 100));
+          
+          await base44.entities.LoyaltyTransaction.create({
+            account: loyaltyAccountToUse.id,
+            type: 'earn_order',
+            amount: earnedPoints,
+            order: order.id,
+            description: t('loyalty.transaction.earn_order', { orderNumber: order.order_number || order.id }),
+            expires_at: expiresAt.toISOString()
+          });
+          
+          const newBalance = (loyaltyAccountToUse.balance - redeemedPoints) + earnedPoints;
+          await base44.entities.LoyaltyAccount.update(loyaltyAccountToUse.id, {
+            balance: newBalance,
+            total_earned: (loyaltyAccountToUse.total_earned || 0) + earnedPoints,
+            visit_count: (loyaltyAccountToUse.visit_count || 0) + 1,
+            last_visit_at: new Date().toISOString()
+          });
+          
+          await base44.entities.Order.update(order.id, {
+            points_earned: earnedPoints
+          });
         }
 
         // GAP-01: Save cart snapshot for confirmation screen BEFORE clearing
@@ -2896,6 +2914,7 @@ export default function X() {
           clientName: savedClientName,
         });
 
+        console.log("Order created", order?.id);
       }
     } catch (err) {
       console.error(err);
