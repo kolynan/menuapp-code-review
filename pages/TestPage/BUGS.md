@@ -126,5 +126,11 @@ All 5 actionable bugs fixed via consensus merge. See Fixed section below.
 - **[P2] Silent filtering creates false empty state** (lines 7-29) — `normalizeItems` silently dropped invalid rows; fully invalid payload showed empty state instead of error. Fixed: returns `{ items, discarded, allInvalid }`, caller treats all-invalid as error.
 - **[P2] Error state coupled to translations** (lines 47,56,61,71) — Storing `t(...)` result in state made `t` a dependency of fetch effect, triggering refetch on locale change. Fixed: store i18n keys as strings, translate only at render time via `t(error)`.
 
+## Fixed (consensus chain testpage-260321-184539)
+- **[P2] Silent discard of invalid rows** (normalizeItems) — Items discarded without user notification. Fixed: added `discardedCount` state and yellow warning banner with `t("testpage.state.items_discarded")`.
+- **[P3] Duplicate key risk with non-unique item.id** (line 127) — `key={item.id}` assumes unique IDs. Fixed: changed to `key={\`${item.id}-${index}\`}`.
+- **[P3] Falsy ID edge cases in normalizeItems** (line 14) — `typeof` checks pass for `""` and `NaN`. Fixed: added explicit guards `row.id !== ""` and `!Number.isNaN(row.id)`.
+- **[P3] Mobile overflow for long item names** (line 127) — Bare `<li>` with no overflow handling. Fixed: added `break-words overflow-hidden` classes.
+
 ## Active (notes only — no fix needed for test page)
 - **[P3] No delete confirmation** — Acceptable for test page (no delete functionality in current version).
