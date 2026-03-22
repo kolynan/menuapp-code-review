@@ -148,6 +148,16 @@ session: 161
 
 ## Fixed Bugs (исправлены)
 
+### FIX-PM-091-095-CHAIN-204901: MenuView L-bugs — 5 bugs fixed — FIXED S162
+- **Когда:** S162, chain publicmenu-260322-204901-9d4e
+- **Файл:** MenuView.jsx
+- **Фикс:**
+  - PM-091 (P1): Hardcoded Russian toast fallback → `t('menu.added_to_cart', 'Добавлено')`
+  - PM-092 (P2): List-mode stepper touch targets → `min-w-[44px] min-h-[44px]`
+  - PM-093 (P2): List-mode dish image onError → hide broken image
+  - PM-094 (P3): List-mode aria-labels → added `aria-label={t(...)}`
+  - PM-095 (P2): Tile-mode dish image onError → hide broken image
+
 ### FIX-PM-083-087-CHAIN-203829: CartView mobile UX — 5 bugs fixed — FIXED S162
 - **Когда:** S162, chain publicmenu-260322-203829-21fb
 - **Файл:** CartView.jsx

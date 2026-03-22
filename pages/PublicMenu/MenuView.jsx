@@ -94,6 +94,7 @@ export default function MenuView({
                 alt={getDishName(dish)}
                 className="w-full h-full object-cover"
                 loading="lazy"
+                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; }}
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50">
@@ -149,6 +150,7 @@ export default function MenuView({
             {!inCart ? (
               <button
                 onClick={() => handleAddToCart(dish)}
+                aria-label={t('menu.add')}
                 className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors"
                 style={{backgroundColor: primaryColor}}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = darkenColor(primaryColor, 0.15)}
@@ -160,14 +162,16 @@ export default function MenuView({
               <div className="flex items-center bg-slate-100 rounded-lg p-1">
                 <button
                   onClick={() => updateQuantity(dish.id, -1)}
-                  className="p-1 hover:bg-white rounded-md transition-colors"
+                  aria-label={t('menu.remove')}
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white rounded-md transition-colors"
                 >
                   <Minus className="w-4 h-4 text-slate-600" />
                 </button>
                 <span className="mx-2 font-medium text-slate-900 text-sm">{inCart.quantity}</span>
                 <button
                   onClick={() => updateQuantity(dish.id, 1)}
-                  className="p-1 hover:bg-white rounded-md transition-colors"
+                  aria-label={t('menu.add')}
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white rounded-md transition-colors"
                 >
                   <Plus className="w-4 h-4 text-slate-600" />
                 </button>
@@ -197,6 +201,7 @@ export default function MenuView({
               alt={getDishName(dish)}
               className="w-full h-full object-cover"
               loading="lazy"
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; }}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-slate-50">
@@ -366,7 +371,7 @@ export default function MenuView({
       {/* Toast feedback on add to cart (AC-09) */}
       {toastVisible && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-white text-sm rounded-lg px-4 py-2 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200">
-          {t('menu.added_to_cart') || '\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E'}
+          {t('menu.added_to_cart', '\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E')}
         </div>
       )}
     </div>
