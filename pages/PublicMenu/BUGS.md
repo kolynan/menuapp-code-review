@@ -130,12 +130,12 @@ session: 153
 - **Симптом:** Table confirmation Bottom Sheet shows codeVerificationError but doesn't display attempt counter or lockout countdown. CartView cooldown logic still prevents brute-force via shared state, but user doesn't see countdown in Bottom Sheet.
 - **Фикс:** Lift codeAttempts/codeLockedUntil/nowTs state to x.jsx scope and display in Bottom Sheet.
 
-### BUG-PM-072: Mobile grid partner setting ignored in MenuView (P2)
+### BUG-PM-072: Mobile grid partner setting ignored in MenuView (P2) — FIXED S159
 - **Приоритет:** P2
-- **Когда:** S155D (Codex review, chain publicmenu-260321-195108)
+- **Когда:** S155D (Codex review, chain publicmenu-260321-195108), fixed S159 via chain publicmenu-260322-131000
 - **Файл:** MenuView.jsx
-- **Симптом:** `grid-cols-2` hardcoded on mobile despite `partner.menu_grid_mobile` setting.
-- **Фикс:** Read partner setting and apply dynamic grid class.
+- **Симптом:** `grid-cols-2` hardcoded on mobile despite `partner.menu_grid_mobile` setting. MOBILE_GRID missing `3: "grid-cols-3"`.
+- **Фикс:** Added `3: "grid-cols-3"` to MOBILE_GRID. Replaced hardcoded `grid-cols-2` with `MOBILE_GRID[mobileCols]` on mobile path.
 
 ### BUG-PM-073: useTableSession loses restored guests with only `_id` (P2)
 - **Приоритет:** P2
@@ -147,6 +147,18 @@ session: 153
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-PM-077-KS3: "+" button moved to card bottom-right — FIXED S159
+- **Когда:** S159, chain publicmenu-260322-131000
+- **Файл:** MenuView.jsx
+- **Симптом:** "+" button was inside image container (bottom-2 right-2 of image), not at card level per LOCK-PM-001.
+- **Фикс:** Made Card `relative`, moved CTA to `absolute bottom-3 right-3` of Card. Added `pb-14` to CardContent to prevent overlap.
+
+### FIX-84-KS3: Discount badges use partner.discount_color — FIXED S159
+- **Когда:** S159, chain publicmenu-260322-131000
+- **Файл:** MenuView.jsx
+- **Симптом:** No discount badge on dish cards. No struck-through original price when discount active.
+- **Фикс:** Added discount badge (top-left of image, both tile and list cards) with `partner.discount_color || '#C92A2A'`. Added discounted price display with struck-through original price.
 
 ### FIX-PM-071-CHAIN-195108: 4 fixes via consensus chain publicmenu-260321-195108 — FIXED S155D
 - **Когда:** S155D, chain publicmenu-260321-195108
@@ -329,11 +341,11 @@ session: 153
 - **Симптом:** Original fix used `isTableVerified === false` (strict equality), which doesn't catch `undefined` initial state. Button appeared green and enabled before any verification attempt.
 - **Фикс:** Changed `isTableVerified === false` to `!isTableVerified` in both className ternary and disabled prop.
 
-### BUG-AC-09: No visual feedback when dish added to cart (P2) — FIXED (prior session)
-- **Когда:** AC-09, already fixed in prior session
-- **Файл:** x.jsx:2237-2238
-- **Симптом:** No toast or animation when user taps dish to add to cart.
-- **Фикс:** Toast already present: `toast.success(t('cart.item_added'), { id: 'cart-add', duration: 2000 })`. No additional changes needed.
+### BUG-AC-09: No visual feedback when dish added to cart (P2) — FIXED S159
+- **Когда:** AC-09, re-fixed S159 via chain publicmenu-260322-131000
+- **Файл:** MenuView.jsx
+- **Симптом:** MenuView's addToCart had no toast (x.jsx toast only covered CartView). User got no feedback when tapping "+" on menu dish cards.
+- **Фикс:** Added `handleAddToCart` wrapper with local toast state, 1.5s non-stacking auto-dismiss, cleanup on unmount. Toast positioned `fixed bottom-20` above StickyCartBar.
 
 ### BUG-PM-S140-03: Reward-email setTimeout not cleared on unmount (P3) — FIXED S148
 - **Когда:** S140, fixed S148 via consensus chain publicmenu-260320-132541
