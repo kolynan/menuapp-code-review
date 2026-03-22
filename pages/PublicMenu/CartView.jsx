@@ -422,12 +422,14 @@ export default function CartView({
 
   return (
     <div className="max-w-2xl mx-auto px-4 mt-2 pb-4">
-      {/* Drag handle + chevron close (#87 KS-2) */}
-      <div className="w-8 h-1 bg-gray-300 rounded-full mx-auto mt-2 mb-1" />
-      <ChevronDown
-        className={`w-5 h-5 mx-auto mb-2 cursor-pointer ${isSubmitting ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400'}`}
-        onClick={() => { if (isSubmitting) return; onClose ? onClose() : setView("menu"); }}
-      />
+      {/* Drag handle + chevron close — sticky top (#87 KS-2, PM-083/084/085) */}
+      <div className="sticky top-0 z-10 bg-white pt-2 pb-1">
+        <div className="w-8 h-1 bg-gray-300 rounded-full mx-auto mb-1" />
+        <ChevronDown
+          className={`w-5 h-5 ml-auto mb-0 cursor-pointer ${isSubmitting ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400'}`}
+          onClick={() => { if (isSubmitting) return; onClose ? onClose() : setView("menu"); }}
+        />
+      </div>
       {/* P0 Header: [🔔] Стол · Гость */}
       <div className="bg-white rounded-lg shadow-sm border p-3 mb-4">
         <div className="flex items-center justify-between">
@@ -883,41 +885,10 @@ export default function CartView({
             </div>
             )}
 
-            {/* P1: Loyalty — compact email + motivation line (#87 KS-1 Fix 1+3) */}
-            {showLoyaltySection && (
-              <div className="mt-4 pt-4 border-t space-y-3">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-700">
-                    {tr('loyalty.email_label', 'Email для бонусов')}
-                  </label>
-                  <Input
-                    type="email"
-                    value={customerEmail}
-                    onChange={(e) => {
-                      setCustomerEmail(e.target.value);
-                      // Clear error on typing
-                      if (emailError) setEmailError('');
-                    }}
-                    onBlur={() => {
-                      const val = (customerEmail || '').trim();
-                      if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
-                        setEmailError(tr('loyalty.invalid_email', 'Введите корректный email'));
-                      } else {
-                        setEmailError('');
-                      }
-                    }}
-                    placeholder={tr('loyalty.email_placeholder', 'email@example.com')}
-                    className={emailError ? 'border-red-400' : ''}
-                  />
-                  {emailError && (
-                    <p className="text-xs text-red-500">{emailError}</p>
-                  )}
-                </div>
-              </div>
-            )}
+            {/* PM-086: Pre-checkout loyalty email removed — motivation text near submit button is sufficient */}
 
             {/* Subtotal and submit */}
-            <div className="mt-4 pt-4 border-t space-y-3">
+            <div className="mt-3 pt-3 border-t space-y-3">
               {/* ИТОГО - bold total */}
               <div className="flex justify-between items-end pt-2 border-t">
                 <span className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
@@ -934,7 +905,7 @@ export default function CartView({
       {/* Add more link - removed, use chevron ˅ to close (#87 KS-2) */}
 
       {/* Spacer so sticky button doesn't overlap last content */}
-      {cart.length > 0 && <div className="h-20" />}
+      {cart.length > 0 && <div className="h-16" />}
 
       {/* AC-08: Error state with retry */}
       {submitError && cart.length > 0 && (
@@ -953,7 +924,7 @@ export default function CartView({
           {partner?.loyalty_enabled && (() => {
             const motivationPoints = Math.round((Number(cartTotalAmount) || 0) * (Number(partner?.loyalty_points_per_currency) || 1));
             return motivationPoints > 0 ? (
-              <p className="text-sm text-gray-500 text-center mt-2 mb-2">
+              <p className="text-sm text-gray-500 text-center mt-1 mb-1">
                 {trFormat('cart.motivation_bonus', { points: motivationPoints }, `Отправьте заказ официанту и получите +${motivationPoints} бонусов`)}
               </p>
             ) : null;

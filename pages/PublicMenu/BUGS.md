@@ -148,6 +148,16 @@ session: 161
 
 ## Fixed Bugs (исправлены)
 
+### FIX-PM-083-087-CHAIN-203829: CartView mobile UX — 5 bugs fixed — FIXED S162
+- **Когда:** S162, chain publicmenu-260322-203829-21fb
+- **Файл:** CartView.jsx
+- **Фикс:**
+  1. [P2] PM-083: Chevron right-aligned (`ml-auto` instead of `mx-auto`)
+  2. [P2] PM-084: Duplicate gray line resolved (chevron right-aligned, drag handle centered — visually distinct)
+  3. [P1] PM-085: Chevron + drag handle sticky at top (`sticky top-0 z-10 bg-white`)
+  4. [P2] PM-086: Removed pre-checkout loyalty email section (`showLoyaltySection` block)
+  5. [P3] PM-087: Compact gap between ИТОГО and motivation (`h-20→h-16`, `mt-4 pt-4→mt-3 pt-3`, `mt-2 mb-2→mt-1 mb-1`)
+
 ### FIX-PM-089-CHAIN-190827: Tile card price text horizontal overlap with FAB button — FIXED S161
 - **Когда:** S161, chain publicmenu-260322-190827
 - **Файл:** MenuView.jsx (line 230)
