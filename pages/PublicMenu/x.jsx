@@ -512,8 +512,7 @@ const I18N_FALLBACKS = {
   "cart.confirm_table.subtitle": "Чтобы отправить заказ официанту",
   "cart.confirm_table.benefit_loyalty": "По онлайн-заказу вы получите бонусы / скидку",
   "cart.confirm_table.benefit_default": "Так официант быстрее найдёт ваш заказ",
-  "cart.confirm_table.submit": "Подтвердить и отправить",
-  "cart.confirm_table.change": "Не тот стол? Изменить",
+  "cart.confirm_table.submit": "Отправить",
 };
 
 /**
@@ -1435,6 +1434,7 @@ export default function X() {
   const isManualScroll = useRef(false);
   const submitLockRef = useRef(false); // CODE-024: protect from double-tap
   const viewTransitionTimerRef = useRef(null);
+  const codeInputRef = useRef(null); // PM-088: ref for table code hidden input
 
   // Cleanup view transition timer on unmount
   useEffect(() => {
@@ -3422,8 +3422,9 @@ export default function X() {
                   return (
                     <div
                       key={idx}
-                      className="w-10 h-12 rounded-lg border-2 border-slate-200 bg-white flex items-center justify-center text-xl font-mono text-slate-900"
+                      className="w-10 h-12 rounded-lg border-2 border-slate-200 bg-white flex items-center justify-center text-xl font-mono text-slate-900 cursor-pointer"
                       style={{'--tw-ring-color': primaryColor}}
+                      onClick={() => codeInputRef.current?.focus()}
                     >
                       {ch || <span className="text-slate-300">_</span>}
                     </div>
@@ -3431,8 +3432,10 @@ export default function X() {
                 })}
               </div>
               <Input
+                ref={codeInputRef}
                 type="text"
                 inputMode="numeric"
+                pattern="[0-9]*"
                 maxLength={tableCodeLength}
                 autoFocus
                 value={String(tableCodeInput || '').replace(/\D/g, '').slice(0, tableCodeLength)}
@@ -3441,7 +3444,7 @@ export default function X() {
                   if (typeof setTableCodeInput === 'function') setTableCodeInput(next);
                 }}
                 className="w-40 text-center text-lg tracking-widest"
-                placeholder={'0'.repeat(tableCodeLength)}
+                placeholder=""
                 aria-label={tr('cart.verify.enter_table_code', 'Введите код стола')}
               />
               {isVerifyingCode && (
@@ -3454,6 +3457,17 @@ export default function X() {
                 <p className="text-sm text-red-600 text-center">{codeVerificationError}</p>
               )}
             </div>
+            {/* Bonus motivation (PM-082) */}
+            {(() => {
+              if (!loyaltyEnabled) return null;
+              const motivationPoints = Math.round((Number(cartTotalAmount) || 0) * (Number(partner?.loyalty_points_per_currency) || 1));
+              if (motivationPoints <= 0) return null;
+              return (
+                <p className="text-center text-sm text-emerald-600 mt-4">
+                  {tr('cart.motivation_bonus_short', `+${motivationPoints} бонусов за этот заказ`)}
+                </p>
+              );
+            })()}
             {/* Primary CTA: Confirm and submit (PM-064 A3) */}
             <Button
               className="w-full mt-6 text-white"
@@ -3468,18 +3482,8 @@ export default function X() {
             >
               {isVerifyingCode
                 ? t('common.loading')
-                : tr('cart.confirm_table.submit', 'Подтвердить и отправить')}
+                : tr('cart.confirm_table.submit', 'Отправить')}
             </Button>
-            {/* Secondary: change table (PM-064 C4) */}
-            <button
-              type="button"
-              className="w-full text-center text-xs text-slate-400 mt-4 hover:text-slate-600 min-h-[44px]"
-              onClick={() => {
-                setTableCodeInput('');
-              }}
-            >
-              {tr('cart.confirm_table.change', 'Не тот стол? Изменить')}
-            </button>
           </div>
         </DrawerContent>
       </Drawer>
@@ -3570,6 +3574,7 @@ export default function X() {
               buttonLabel={hallStickyButtonLabel}
               hallModeLabel={hallStickyModeLabel}
               showBillAmount={hallStickyShowBillAmount}
+              primaryColor={primaryColor}
             />
           );
         }
@@ -3587,6 +3592,7 @@ export default function X() {
               formattedBillTotal=""
               onButtonClick={handleCheckoutClick}
               buttonLabel={tr('cart.checkout', 'Оформить заказ')}
+              primaryColor={primaryColor}
             />
           );
         }
