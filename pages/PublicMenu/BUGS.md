@@ -148,6 +148,12 @@ session: 161
 
 ## Fixed Bugs (исправлены)
 
+### FIX-PM-089-CHAIN-190827: Tile card price text horizontal overlap with FAB button — FIXED S161
+- **Когда:** S161, chain publicmenu-260322-190827
+- **Файл:** MenuView.jsx (line 230)
+- **Фикс:** Added `pr-14` to tile card price container (`mt-auto pt-2 space-y-1`) to prevent horizontal overlap between price/rating text and the absolute-positioned "+" FAB button on narrow cards or when stepper is visible.
+- **PM-062:** Confirmed by both CC and Codex as NOT in MenuView.jsx — requires B44 prompt (already in Active as BUG-PM-062).
+
 ### FIX-PM-079-090-CHAIN-185123: 6 BS bugs fixed via consensus chain — FIXED S161
 - **Когда:** S161, chain publicmenu-260322-185123
 - **Файл:** x.jsx

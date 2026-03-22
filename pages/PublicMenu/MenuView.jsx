@@ -227,7 +227,7 @@ export default function MenuView({
             </p>
           )}
 
-          <div className="mt-auto pt-2 space-y-1">
+          <div className="mt-auto pt-2 space-y-1 pr-14">
             {partner?.discount_enabled && partner?.discount_percent > 0 ? (
               <div className="flex items-baseline gap-1.5">
                 <span className="font-bold" style={{ color: partner?.discount_color || '#C92A2A' }}>
