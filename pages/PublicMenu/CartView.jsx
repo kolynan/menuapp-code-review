@@ -1,5 +1,5 @@
 import React from "react";
-import { XIcon, Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, X, Minus, Plus } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, Minus, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -422,7 +422,13 @@ export default function CartView({
 
   return (
     <div className="max-w-2xl mx-auto px-4 mt-2 pb-4">
-      {/* P0 Header: [🔔] Стол · Гость [✕] */}
+      {/* Drag handle + chevron close (#87 KS-2) */}
+      <div className="w-8 h-1 bg-gray-300 rounded-full mx-auto mt-2 mb-1" />
+      <ChevronDown
+        className={`w-5 h-5 mx-auto mb-2 cursor-pointer ${isSubmitting ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400'}`}
+        onClick={() => { if (isSubmitting) return; onClose ? onClose() : setView("menu"); }}
+      />
+      {/* P0 Header: [🔔] Стол · Гость */}
       <div className="bg-white rounded-lg shadow-sm border p-3 mb-4">
         <div className="flex items-center justify-between">
           {/* Left: Call waiter */}
@@ -470,14 +476,7 @@ export default function CartView({
             </div>
           </div>
 
-          {/* Right: Close */}
-          <button
-            onClick={() => { if (isSubmitting) return; onClose ? onClose() : setView("menu"); }}
-            disabled={isSubmitting}
-            className={`p-2 rounded-full ${isSubmitting ? 'bg-slate-50 text-slate-300 cursor-not-allowed' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {/* Right: Close button removed — replaced by chevron-down above (#87 KS-2) */}
         </div>
       </div>
 
@@ -932,7 +931,7 @@ export default function CartView({
         </Card>
       )}
 
-      {/* Add more link - removed, use ✕ to close */}
+      {/* Add more link - removed, use chevron ˅ to close (#87 KS-2) */}
 
       {/* Spacer so sticky button doesn't overlap last content */}
       {cart.length > 0 && <div className="h-20" />}
