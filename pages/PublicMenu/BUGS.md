@@ -653,6 +653,30 @@ session: 153
 - **RELEASE:** `260223-00 x RELEASE.txt`
 - **Связано с:** BUG-PM-005 (корзина тоже пропадает при F5, но другая проблема — cart vs session)
 
+### BUG-PM-150-01: Email input in CartView has no format validation (P2) — FIXED S160
+- **Приоритет:** P2
+- **Когда:** Task #87 KS-1
+- **Root cause:** Email input in loyalty section accepted any string without validation.
+- **Фикс:** Added `onBlur` validation with regex `/^[^\s@]+@[^\s@]+\.[^\s@]+$/`, error text under input, submit button disabled while email invalid.
+- **Файл:** `CartView.jsx`
+- **Коммит:** #87 KS-1
+
+### BUG-PM-150-02: Checkout drawer shows full loyalty UI (balance, progress, catalog) (P2) — FIXED S160
+- **Приоритет:** P2
+- **Когда:** Task #87 KS-1
+- **Root cause:** Checkout drawer contained collapsible loyalty section with balance, redeem controls, discount info — too heavy for checkout flow.
+- **Фикс:** Replaced with compact email field + motivation text line above submit button. Motivation: "Отправьте заказ и получите +N бонусов" (only when loyalty_enabled).
+- **Файл:** `CartView.jsx`
+- **Коммит:** #87 KS-1
+
+### BUG-PM-150-03: Table code BS lacks helper text explaining where to find code (P3) — FIXED S160
+- **Приоритет:** P3
+- **Когда:** Task #87 KS-1
+- **Root cause:** BS had generic title "Подтвердите стол" without explaining what the code is or where to find it.
+- **Фикс:** Changed title to "Введите код стола", added always-visible helper: "Код указан на табличке вашего стола. Он нужен, чтобы официант знал куда нести заказ."
+- **Файл:** `x.jsx`
+- **Коммит:** #87 KS-1
+
 ---
 
 ## Notes

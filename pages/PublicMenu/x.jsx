@@ -3406,23 +3406,15 @@ export default function X() {
           <DrawerHeader className="text-center pb-2">
             <div className="mx-auto w-12 h-1.5 bg-slate-300 rounded-full mb-4" />
             <DrawerTitle className="text-lg font-semibold text-slate-900">
-              {tr('cart.confirm_table.title', 'Подтвердите стол')}
+              {tr('cart.verify.enter_table_code', 'Введите код стола')}
             </DrawerTitle>
-            <p className="text-sm text-slate-500 mt-1">
-              {tr('cart.confirm_table.subtitle', 'Чтобы отправить заказ официанту')}
-            </p>
-            <p className="text-xs text-slate-400 mt-2">
-              {loyaltyEnabled
-                ? tr('cart.confirm_table.benefit_loyalty', 'По онлайн-заказу вы получите бонусы / скидку')
-                : tr('cart.confirm_table.benefit_default', 'Так официант быстрее найдёт ваш заказ')}
+            <p className="text-xs text-gray-400 mt-2 px-4">
+              {tr('cart.verify.helper_text', 'Код указан на табличке вашего стола. Он нужен, чтобы официант знал куда нести заказ.')}
             </p>
           </DrawerHeader>
           <div className="px-6 pb-6">
             {/* Table code input */}
             <div className="flex flex-col items-center gap-4 mt-4">
-              <p className="text-sm font-medium text-slate-700">
-                {tr('cart.verify.enter_table_code', 'Введите код стола')}
-              </p>
               <div className="flex gap-2 justify-center">
                 {Array.from({ length: tableCodeLength }).map((_, idx) => {
                   const safe = String(tableCodeInput || '').replace(/\D/g, '').slice(0, tableCodeLength);

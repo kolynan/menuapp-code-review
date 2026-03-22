@@ -88,11 +88,12 @@ export default function CartView({
 
   // ===== P1 Expandable States =====
   const [splitExpanded, setSplitExpanded] = React.useState(false);
-  const [loyaltyExpanded, setLoyaltyExpanded] = React.useState(false);
+  // loyaltyExpanded removed — loyalty section simplified to motivation text (#87 KS-1)
   const [myOrdersExpanded, setMyOrdersExpanded] = React.useState(true); // default open
   const [showRewardEmailForm, setShowRewardEmailForm] = React.useState(false);
   const [rewardEmail, setRewardEmail] = React.useState('');
   const [rewardEmailSubmitting, setRewardEmailSubmitting] = React.useState(false);
+  const [emailError, setEmailError] = React.useState('');
 
   // ===== P0: Table-code verification UX (mask + auto-verify + cooldown) =====
   const [infoModal, setInfoModal] = React.useState(null); // 'online' | 'tableCode' | null
@@ -417,23 +418,7 @@ export default function CartView({
     ? `${tr('cart.for_all', 'На всех')} (÷${guestCount})`
     : tr('cart.only_me', 'Только я');
 
-  // Loyalty summary
-  const loyaltySummary = React.useMemo(() => {
-    if (Number(loyaltyAccount?.balance || 0) > 0) {
-      return `${Number(loyaltyAccount.balance || 0).toLocaleString()} ${tr('loyalty.points_short', 'баллов')}`;
-    }
-    if (earnedPoints > 0) {
-      return `+${earnedPoints}`;
-    }
-    return null;
-  }, [loyaltyAccount, earnedPoints]);
-
-  // Reward for review (shown in Loyalty header if partner configured)
-  const reviewRewardLabel = React.useMemo(() => {
-    const pts = Number(partner?.loyalty_review_points);
-    if (Number.isFinite(pts) && pts > 0) return `+${pts}`;
-    return null;
-  }, [partner?.loyalty_review_points]);
+  // loyaltySummary + reviewRewardLabel removed — loyalty section simplified (#87 KS-1)
 
   return (
     <div className="max-w-2xl mx-auto px-4 mt-2 pb-4">
@@ -899,141 +884,41 @@ export default function CartView({
             </div>
             )}
 
-            {/* P1: Loyalty section - COLLAPSIBLE (BUG-PM-027: use showLoyaltySection, not showLoginPromptAfterRating) */}
+            {/* P1: Loyalty — compact email + motivation line (#87 KS-1 Fix 1+3) */}
             {showLoyaltySection && (
-              <div className="mt-4 pt-4 border-t">
-                <button
-                  type="button"
-                  className="w-full flex items-center justify-between text-left"
-                  onClick={() => setLoyaltyExpanded(!loyaltyExpanded)}
-                >
-                  <div className="flex items-center gap-2">
-                    <Gift className="w-4 h-4 text-amber-500" />
-                    <span className="text-sm font-medium text-slate-700">
-                      {tr('loyalty.title', 'Бонусы')}
-                      {reviewRewardLabel && (
-                        <span className="ml-2 text-xs text-slate-500 font-normal">
-                          • {tr('loyalty.review_reward_prefix', 'за отзыв')} {reviewRewardLabel}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {loyaltySummary && (
-                      <span className="text-sm font-semibold text-green-600">
-                        {loyaltySummary}
-                      </span>
-                    )}
-                    {loyaltyExpanded ? (
-                      <ChevronUp className="w-4 h-4 text-slate-400" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-slate-400" />
-                    )}
-                  </div>
-                </button>
-
-                {loyaltyExpanded && (
-                  <div className="mt-3 space-y-3">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700">
-                        {tr('loyalty.email_label', 'Email для бонусов')}
-                      </label>
-                      <Input
-                        type="email"
-                        value={customerEmail}
-                        onChange={(e) => setCustomerEmail(e.target.value)}
-                        placeholder={tr('loyalty.email_placeholder', 'email@example.com')}
-                      />
-                    </div>
-
-                    {!(customerEmail || '').trim() ? (
-                      <p className="text-xs text-slate-500">{tr('loyalty.enter_email_hint', 'Введите email для начисления бонусов')}</p>
-                    ) : loyaltyLoading ? (
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        {tr('common.loading', 'Загрузка')}
-                      </div>
-                    ) : !loyaltyAccount ? (
-                      partner?.loyalty_enabled && (
-                        <div className="text-xs text-green-600 bg-green-50 p-2 rounded-lg">
-                          {trFormat('loyalty.new_customer', { points: earnedPoints }, `Вы получите ${earnedPoints} бонусов за первый заказ`)}
-                        </div>
-                      )
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="p-2 rounded-lg text-xs" style={{backgroundColor: lightenColor(primaryColor, 0.85)}}>
-                          <div className="text-slate-600">
-                            {trFormat('loyalty.your_balance', { points: Number(loyaltyAccount.balance || 0).toLocaleString() }, `Ваш баланс: ${Number(loyaltyAccount.balance || 0).toLocaleString()} баллов`)}
-                          </div>
-                          <div className="text-slate-500">
-                            = {formatPrice(Number(loyaltyAccount.balance || 0) * (partner?.loyalty_redeem_rate ?? 1))}
-                          </div>
-                        </div>
-
-                        {loyaltyAccount.balance > 0 && maxRedeemPoints > 0 && (
-                          <div className="space-y-1">
-                            <label className="text-xs font-medium text-slate-700">
-                              {tr('loyalty.redeem_points', 'Списать баллы')}
-                            </label>
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="number"
-                                min={0}
-                                max={maxRedeemPoints}
-                                value={redeemedPoints}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value) || 0;
-                                  setRedeemedPoints(Math.min(Math.max(0, val), maxRedeemPoints));
-                                }}
-                                className="w-24 h-8 text-sm"
-                              />
-                              <Button
-                                size="sm"
-                                className="h-8 text-xs"
-                                onClick={() => {
-                                  setRedeemedPoints(maxRedeemPoints);
-                                  toast.success(tr('loyalty.points_applied', 'Баллы применены'), { id: 'mm1' });
-                                }}
-                              >
-                                {tr('loyalty.apply', 'Применить')}
-                              </Button>
-                            </div>
-                            <p className="text-xs text-slate-500">
-                              {trFormat('loyalty.max_redeem', {
-                                max: maxRedeemPoints.toLocaleString(),
-                                percent: partner?.loyalty_max_redeem_percent || 0
-                              }, `Максимум ${maxRedeemPoints} баллов (${partner?.loyalty_max_redeem_percent || 0}% от заказа)`) }
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {partner?.discount_enabled && (
-                      partner.discount_allow_anonymous === true || (customerEmail || '').trim() ? (
-                        <div className="text-xs text-green-600 bg-green-50 p-2 rounded-lg border border-green-200">
-                          {trFormat('loyalty.instant_discount', { percent: partner.discount_percent || 0 }, `Скидка ${partner.discount_percent || 0}% применена`)}
-                        </div>
-                      ) : (
-                        <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                          {trFormat('loyalty.enter_email_for_discount', { percent: partner.discount_percent || 0 }, `Введите email для скидки ${partner.discount_percent || 0}%`)}
-                        </div>
-                      )
-                    )}
-                  </div>
-                )}
+              <div className="mt-4 pt-4 border-t space-y-3">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-700">
+                    {tr('loyalty.email_label', 'Email для бонусов')}
+                  </label>
+                  <Input
+                    type="email"
+                    value={customerEmail}
+                    onChange={(e) => {
+                      setCustomerEmail(e.target.value);
+                      // Clear error on typing
+                      if (emailError) setEmailError('');
+                    }}
+                    onBlur={() => {
+                      const val = (customerEmail || '').trim();
+                      if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+                        setEmailError(tr('loyalty.invalid_email', 'Введите корректный email'));
+                      } else {
+                        setEmailError('');
+                      }
+                    }}
+                    placeholder={tr('loyalty.email_placeholder', 'email@example.com')}
+                    className={emailError ? 'border-red-400' : ''}
+                  />
+                  {emailError && (
+                    <p className="text-xs text-red-500">{emailError}</p>
+                  )}
+                </div>
               </div>
             )}
 
             {/* Subtotal and submit */}
             <div className="mt-4 pt-4 border-t space-y-3">
-              {partner?.loyalty_enabled && earnedPoints > 0 && !loyaltyExpanded && (
-                <div className="flex justify-between text-sm text-green-600">
-                  <span>{tr('loyalty.online_bonus_label', 'Бонусы за онлайн-заказ')}</span>
-                  <span>+{Number(earnedPoints || 0).toLocaleString()}{tr('loyalty.points_suffix', 'Б')}</span>
-                </div>
-              )}
-
               {/* ИТОГО - bold total */}
               <div className="flex justify-between items-end pt-2 border-t">
                 <span className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
@@ -1065,21 +950,30 @@ export default function CartView({
       {/* Submit button - sticky at bottom of drawer scroll area */}
       {cart.length > 0 && (
         <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 -mx-4">
+          {/* Motivation text — only if loyalty enabled (#87 KS-1 Fix 1) */}
+          {partner?.loyalty_enabled && (() => {
+            const motivationPoints = Math.round((Number(cartTotalAmount) || 0) * (Number(partner?.loyalty_points_per_currency) || 1));
+            return motivationPoints > 0 ? (
+              <p className="text-sm text-gray-500 text-center mt-2 mb-2">
+                {trFormat('cart.motivation_bonus', { points: motivationPoints }, `Отправьте заказ официанту и получите +${motivationPoints} бонусов`)}
+              </p>
+            ) : null;
+          })()}
           <Button
             size="lg"
             className={`w-full text-white ${
-              isSubmitting
+              isSubmitting || emailError
                 ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
                 : submitError
                   ? 'bg-red-600 hover:bg-red-700'
                   : ''
             }`}
-            style={!isSubmitting && !submitError ? {backgroundColor: primaryColor} : undefined}
+            style={!isSubmitting && !submitError && !emailError ? {backgroundColor: primaryColor} : undefined}
             onClick={() => {
               if (submitError && setSubmitError) setSubmitError(null);
               handleSubmitOrder();
             }}
-            disabled={isSubmitting}
+            disabled={isSubmitting || !!emailError}
           >
             {isSubmitting
               ? tr('cta.sending', 'Отправляем...')
