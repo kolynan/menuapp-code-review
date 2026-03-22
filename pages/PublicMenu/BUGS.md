@@ -1,7 +1,7 @@
 ---
-version: "29.0"
-updated: "2026-03-21"
-session: 153
+version: "30.0"
+updated: "2026-03-22"
+session: 161
 ---
 
 # PublicMenu — Bug Registry
@@ -13,7 +13,7 @@ session: 153
 
 ## Active Bugs (не исправлены)
 
-*18 active bugs remaining (0x P0, 8x P1, 7x P2, 2x P3, 1x suggestion).*
+*13 active bugs remaining (0x P0, 7x P1, 4x P2, 1x P3, 1x suggestion).*
 
 ### BUG-PM-056: Drawer layout not visit-state-driven (P1 — Batch 2)
 - **Приоритет:** P1
@@ -147,6 +147,18 @@ session: 153
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-PM-079-090-CHAIN-185123: 6 BS bugs fixed via consensus chain — FIXED S161
+- **Когда:** S161, chain publicmenu-260322-185123
+- **Файл:** x.jsx
+- **Фикс:**
+  1. [P1] PM-088: Code input cells tappable on mobile — added ref + onClick on visual cells, pattern="[0-9]*"
+  2. [P2] PM-079: Removed "0000" placeholder from code input cells — set placeholder=""
+  3. [P2] PM-080: Shortened submit button text to "Отправить" — updated i18n fallback map + render
+  4. [P2] PM-081: Removed "Wrong table? Change" link — deleted button block + cleaned i18n fallback
+  5. [P2] PM-090: Passed primaryColor to both StickyCartBar instances
+  6. [P3] PM-082: Added bonus motivation text on BS — IIFE with loyalty calculation
+- **Commit:** 2a58c8c
 
 ### FIX-PM-077-KS3: "+" button moved to card bottom-right — FIXED S159
 - **Когда:** S159, chain publicmenu-260322-131000
