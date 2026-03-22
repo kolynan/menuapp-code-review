@@ -5,6 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Rating from "@/components/Rating";
 
+function lightenColor(hex, amount) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = Math.min(255, (num >> 16) + Math.round((255 - (num >> 16)) * amount));
+  const g = Math.min(255, ((num >> 8) & 0x00FF) + Math.round((255 - ((num >> 8) & 0x00FF)) * amount));
+  const b = Math.min(255, (num & 0x0000FF) + Math.round((255 - (num & 0x0000FF)) * amount));
+  return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
+}
+
 export default function CartView({
   partner,
   currentTable,
@@ -72,6 +80,8 @@ export default function CartView({
   guestCode,
   showLoyaltySection,
 }) {
+  const primaryColor = partner?.primary_color || '#1A1A1A';
+
   // ===== P0: Safe prop defaults (BUG-PM-023, BUG-PM-025) =====
   const safeReviewedItems = reviewedItems || new Set();
   const safeDraftRatings = draftRatings || {};
@@ -467,7 +477,7 @@ export default function CartView({
                 <button 
                   onClick={() => { setGuestNameInput(currentGuest?.name || ''); setIsEditingName(true); }}
                   className="hover:underline"
-                  style={{color:'#B5543A'}}
+                  style={{color: primaryColor}}
                 >
                   {guestDisplay} {(!currentGuest?.name) && <span className="text-xs">✏️</span>}
                 </button>
@@ -505,7 +515,7 @@ export default function CartView({
               <button
                 type="button"
                 className="hover:underline font-medium text-sm"
-                style={{color:'#B5543A'}}
+                style={{color: primaryColor}}
                 onClick={() => setShowRewardEmailForm(true)}
               >
                 {tr('loyalty.get_bonus', 'Получить бонусы')} →
@@ -859,7 +869,7 @@ export default function CartView({
                       name="splitType"
                       checked={splitType === 'single'}
                       onChange={() => setSplitType('single')}
-                      className="w-4 h-4" style={{accentColor:'#B5543A'}}
+                      className="w-4 h-4" style={{accentColor: primaryColor}}
                     />
                     <span className="text-sm text-slate-700">{tr('cart.only_me', 'Только я')}</span>
                   </label>
@@ -869,7 +879,7 @@ export default function CartView({
                       name="splitType"
                       checked={splitType === 'all'}
                       onChange={() => setSplitType('all')}
-                      className="w-4 h-4" style={{accentColor:'#B5543A'}}
+                      className="w-4 h-4" style={{accentColor: primaryColor}}
                     />
                     <span className="text-sm text-slate-700">{tr('cart.for_all', 'На всех')} (÷{guestCount})</span>
                   </label>
@@ -951,7 +961,7 @@ export default function CartView({
                       )
                     ) : (
                       <div className="space-y-2">
-                        <div className="p-2 rounded-lg text-xs" style={{backgroundColor:'#F5E6E0'}}>
+                        <div className="p-2 rounded-lg text-xs" style={{backgroundColor: lightenColor(primaryColor, 0.85)}}>
                           <div className="text-slate-600">
                             {trFormat('loyalty.your_balance', { points: Number(loyaltyAccount.balance || 0).toLocaleString() }, `Ваш баланс: ${Number(loyaltyAccount.balance || 0).toLocaleString()} баллов`)}
                           </div>
@@ -1064,7 +1074,7 @@ export default function CartView({
                   ? 'bg-red-600 hover:bg-red-700'
                   : ''
             }`}
-            style={!isSubmitting && !submitError ? {backgroundColor:'#B5543A'} : undefined}
+            style={!isSubmitting && !submitError ? {backgroundColor: primaryColor} : undefined}
             onClick={() => {
               if (submitError && setSubmitError) setSubmitError(null);
               handleSubmitOrder();

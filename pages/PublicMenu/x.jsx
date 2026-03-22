@@ -613,7 +613,9 @@ function OrderConfirmationScreen({
   onOpenOrders,
   onTrackOrder,
   t,
+  partner,
 }) {
+  const primaryColor = partner?.primary_color || '#1A1A1A';
   // Safe translation with fallback
   const tr = (key, fallback) => {
     const val = typeof t === "function" ? t(key) : "";
@@ -748,7 +750,7 @@ function OrderConfirmationScreen({
       <div className="space-y-3">
         <Button
           className="w-full h-12 text-white"
-          style={{backgroundColor:'#B5543A'}}
+          style={{backgroundColor: primaryColor}}
           onClick={onBackToMenu}
         >
           {tr("confirmation.back_to_menu", "Вернуться в меню")}
@@ -767,7 +769,7 @@ function OrderConfirmationScreen({
           <Button
             variant="ghost"
             className="w-full h-12"
-            style={{color:'#B5543A'}}
+            style={{color: primaryColor}}
             onClick={() => {
               onTrackOrder(publicToken);
             }}
@@ -925,6 +927,7 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
       return partners?.[0] || null;
     },
   });
+  const statusPrimaryColor = partner?.primary_color || '#1A1A1A';
 
   const { data: orderItems = [] } = useQuery({
     queryKey: ["statusOrderItems", orderId],
@@ -1021,7 +1024,7 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
     return (
       <div className="fixed inset-0 z-[60]" style={{backgroundColor:'#faf9f7'}}>
         <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin" style={{color:'#B5543A'}} />
+          <Loader2 className="w-8 h-8 animate-spin" style={{color: statusPrimaryColor}} />
         </div>
       </div>
     );
@@ -1153,8 +1156,8 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
                 href={phoneLink.url}
                 className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors min-h-[44px]"
               >
-                <Phone className="w-5 h-5" style={{color:'#B5543A'}} />
-                <span className="text-sm font-medium" style={{color:'#B5543A'}}>{phoneLink.url.replace("tel:", "")}</span>
+                <Phone className="w-5 h-5" style={{color: statusPrimaryColor}} />
+                <span className="text-sm font-medium" style={{color: statusPrimaryColor}}>{phoneLink.url.replace("tel:", "")}</span>
               </a>
             </CardContent>
           </Card>
@@ -1345,6 +1348,8 @@ export default function X() {
       }
     },
   });
+
+  const primaryColor = partner?.primary_color || '#1A1A1A';
 
   // Breakpoint listener
   useEffect(() => {
@@ -3029,7 +3034,7 @@ export default function X() {
   if (loadingPartner) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 animate-spin" style={{color:'#B5543A'}} />
+        <Loader2 className="w-8 h-8 animate-spin" style={{color: '#1A1A1A'}} />
       </div>
     );
   }
@@ -3175,6 +3180,7 @@ export default function X() {
           resolvedTable={resolvedTable}
           verifiedByCode={verifiedByCode}
           t={t}
+          primaryColor={primaryColor}
         />
       )}
 
@@ -3187,7 +3193,7 @@ export default function X() {
           getCategoryName={getCategoryName}
           chipRefs={chipRefs}
           t={t}
-          activeColor="#B5543A"
+          activeColor={primaryColor}
         />
       )}
 
@@ -3275,6 +3281,7 @@ export default function X() {
           publicToken={confirmationData.publicToken}
           clientName={confirmationData.clientName}
           formatPrice={formatPrice}
+          partner={partner}
           onBackToMenu={dismissConfirmation}
           onOpenOrders={() => {
             dismissConfirmation();
@@ -3423,7 +3430,8 @@ export default function X() {
                   return (
                     <div
                       key={idx}
-                      className="w-10 h-12 rounded-lg border-2 border-slate-200 bg-white flex items-center justify-center text-xl font-mono text-slate-900 focus-within:border-[#B5543A]"
+                      className="w-10 h-12 rounded-lg border-2 border-slate-200 bg-white flex items-center justify-center text-xl font-mono text-slate-900"
+                      style={{'--tw-ring-color': primaryColor}}
                     >
                       {ch || <span className="text-slate-300">_</span>}
                     </div>
@@ -3457,7 +3465,7 @@ export default function X() {
             {/* Primary CTA: Confirm and submit (PM-064 A3) */}
             <Button
               className="w-full mt-6 text-white"
-              style={{ backgroundColor: '#B5543A' }}
+              style={{ backgroundColor: primaryColor }}
               disabled={isVerifyingCode || String(tableCodeInput || '').replace(/\D/g, '').length < tableCodeLength}
               onClick={() => {
                 const code = String(tableCodeInput || '').replace(/\D/g, '').slice(0, tableCodeLength);

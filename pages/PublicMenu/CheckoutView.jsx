@@ -29,12 +29,14 @@ export default function CheckoutView({
   isSubmitting,
   handleSubmitOrder,
   isTableVerified,
+  partner,
 }) {
+  const primaryColor = partner?.primary_color || '#1A1A1A';
   return (
     <div className="max-w-2xl mx-auto px-4 mt-6 space-y-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold text-slate-900">{t('cart.your_order')}</h2>
-        <button type="button" onClick={() => setView("menu")} className="text-sm hover:underline" style={{color:'#B5543A'}}>
+        <button type="button" onClick={() => setView("menu")} className="text-sm hover:underline" style={{color: primaryColor}}>
           {t('cart.back_to_menu')}
         </button>
       </div>
@@ -73,7 +75,7 @@ export default function CheckoutView({
         <CardContent className="p-4">
           <div className="flex justify-between items-center">
             <span className="font-semibold text-slate-900">{t('cart.total')}:</span>
-            <span className="text-xl font-bold" style={{color:'#B5543A'}}>{formatPrice(finalTotal)}</span>
+            <span className="text-xl font-bold" style={{color: primaryColor}}>{formatPrice(finalTotal)}</span>
           </div>
         </CardContent>
       </Card>
@@ -172,7 +174,7 @@ export default function CheckoutView({
                   ? 'bg-red-600 hover:bg-red-700'
                   : ''
             }`}
-            style={(!isSubmitting && !submitError) ? {backgroundColor:'#B5543A'} : undefined}
+            style={(!isSubmitting && !submitError) ? {backgroundColor: primaryColor} : undefined}
             onClick={handleSubmitOrder}
             disabled={isSubmitting}
           >

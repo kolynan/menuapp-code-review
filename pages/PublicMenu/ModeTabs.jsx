@@ -14,6 +14,7 @@ export default function ModeTabs({
   resolvedTable,
   verifiedByCode,
   t,
+  primaryColor = '#1A1A1A',
 }) {
   return (
     <div className="max-w-2xl mx-auto px-4 mt-4">
@@ -35,7 +36,7 @@ export default function ModeTabs({
                     ? "text-slate-300 cursor-not-allowed"
                     : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                 }`}
-                style={isActive ? {backgroundColor:'#B5543A'} : undefined}
+                style={isActive ? {backgroundColor: primaryColor} : undefined}
               >
                 {m.label}
                 {isDisabled && (
