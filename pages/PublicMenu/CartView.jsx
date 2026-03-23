@@ -423,15 +423,16 @@ export default function CartView({
   return (
     <div className="max-w-2xl mx-auto px-4 mt-2 pb-4">
       {/* Drag handle + chevron close — sticky top (#87 KS-2, PM-083/084/085) */}
-      <div className="sticky top-0 z-10 bg-white pt-2 pb-1 flex items-center justify-center gap-3">
-        <div className="w-10 h-1 rounded-full bg-gray-300" />
+      <div className="sticky top-0 z-10 bg-white px-4 pt-3 pb-1 flex items-center justify-between">
+        <div className="w-9" /> {/* Spacer to balance the close button */}
+        <div className="w-12 h-1.5 bg-gray-300 rounded-full" /> {/* Drag handle */}
         <button
-          className="min-w-[44px] min-h-[44px] flex items-center justify-center"
+          className="w-11 h-11 flex items-center justify-center -mr-2"
           onClick={() => { if (isSubmitting) return; onClose ? onClose() : setView("menu"); }}
           aria-label="Close cart"
         >
           <ChevronDown
-            className={`w-9 h-9 ${isSubmitting ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400 cursor-pointer'}`}
+            className={`w-9 h-9 ${isSubmitting ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500'}`}
           />
         </button>
       </div>
