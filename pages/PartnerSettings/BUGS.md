@@ -117,6 +117,16 @@
 
 ---
 
+## Fixed (via consensus chain partnersettings-260323-142203-51fa)
+
+### FEATURE: #104 (P2) — Discount management section (toggle, %, color, badge size)
+- **Lines:** ~545-720 (DiscountSection component), ~2431 (saveDiscount handler), ~2650 (JSX render)
+- **What:** New "Скидки" section between Appearance and Working Hours. Toggle for `discount_enabled`, number input for `discount_percent` (1-99 validation), color picker for `discount_color` (8 preset colors), select for `discount_badge_size` (sm/base/lg). Local Save button (WifiSection pattern). All i18n with `t()` fallbacks. Touch targets >= 44px. Discounts tab in section nav.
+- **Commit:** consensus chain partnersettings-260323-142203-51fa
+- **Status:** FIXED
+
+---
+
 ## Active Bugs
 
 ### BUG-PS-009 (P2) -- address_map_url accepts arbitrary URLs

@@ -55,6 +55,7 @@ import {
   RefreshCw,
   Utensils,
   Wifi,
+  Percent,
 } from "lucide-react";
 import PartnerShell from "@/components/PartnerShell";
 import ImageUploader from "@/components/ImageUploader";
@@ -124,6 +125,7 @@ function getSectionTabs(t) {
   return [
     { id: "profile", label: t("settings.tabs.profile"), Icon: Building2 },
     { id: "appearance", label: t("settings.tabs.appearance"), Icon: Palette },
+    { id: "discounts", label: t("settings.tabs.discounts", "Скидки"), Icon: Percent },
     { id: "hours", label: t("settings.tabs.hours"), Icon: Clock },
     { id: "channels", label: t("settings.tabs.channels"), Icon: Store },
     { id: "hall", label: t("settings.tabs.hall"), Icon: Utensils },
@@ -523,6 +525,196 @@ function AppearanceSection({ partner, onSave, saving, t }) {
       {selectedColor === DEFAULT_COLOR.toUpperCase() && (
         <p className="text-xs text-slate-400">{t("settings.appearance.defaultHint")}</p>
       )}
+    </div>
+  );
+}
+
+const DISCOUNT_PRESET_COLORS = [
+  { hex: "#C92A2A" },
+  { hex: "#E67700" },
+  { hex: "#2B8A3E" },
+  { hex: "#1864AB" },
+  { hex: "#5F3DC4" },
+  { hex: "#D6336C" },
+  { hex: "#212529" },
+  { hex: "#F06595" },
+];
+
+const DISCOUNT_DEFAULT_COLOR = "#C92A2A";
+
+function DiscountSection({ partner, onSave, saving, t }) {
+  const [discountEnabled, setDiscountEnabled] = useState(partner?.discount_enabled ?? false);
+  const [discountPercent, setDiscountPercent] = useState(partner?.discount_percent ?? 10);
+  const [discountColor, setDiscountColor] = useState(partner?.discount_color || DISCOUNT_DEFAULT_COLOR);
+  const [discountBadgeSize, setDiscountBadgeSize] = useState(partner?.discount_badge_size || "base");
+  const [localSaving, setLocalSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  useEffect(() => {
+    setDiscountEnabled(partner?.discount_enabled ?? false);
+    setDiscountPercent(partner?.discount_percent ?? 10);
+    setDiscountColor(partner?.discount_color || DISCOUNT_DEFAULT_COLOR);
+    setDiscountBadgeSize(partner?.discount_badge_size || "base");
+    setHasChanges(false);
+  }, [partner?.id, partner?.discount_enabled, partner?.discount_percent, partner?.discount_color, partner?.discount_badge_size]);
+
+  const isSaving = saving || localSaving;
+
+  const handleToggle = (checked) => {
+    setDiscountEnabled(checked === true);
+    setHasChanges(true);
+  };
+
+  const handlePercentChange = (e) => {
+    const val = parseInt(e.target.value, 10);
+    if (!isNaN(val)) {
+      setDiscountPercent(Math.max(1, Math.min(99, val)));
+    } else if (e.target.value === "") {
+      setDiscountPercent("");
+    }
+    setHasChanges(true);
+  };
+
+  const handleColorSelect = (hex) => {
+    if (isSaving || !discountEnabled) return;
+    setDiscountColor(hex);
+    setHasChanges(true);
+  };
+
+  const handleSave = async () => {
+    setLocalSaving(true);
+    try {
+      await onSave({
+        discount_enabled: discountEnabled,
+        discount_percent: typeof discountPercent === "number" ? discountPercent : 10,
+        discount_color: discountColor,
+        discount_badge_size: discountBadgeSize,
+      });
+      setHasChanges(false);
+    } catch (e) {
+      // Error handled in parent
+    } finally {
+      setLocalSaving(false);
+    }
+  };
+
+  const fieldsDisabled = !discountEnabled || isSaving;
+
+  return (
+    <div id="section-discounts" className="rounded-xl border bg-white p-4 sm:p-6 space-y-4 scroll-mt-20">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-600">
+          <Percent className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="font-semibold text-lg flex items-center gap-2">
+            {t("settings.discount.title", "Скидки")}
+            {isSaving && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
+          </h2>
+          <p className="text-sm text-slate-500">{t("settings.discount.subtitle", "Настройки скидок для меню")}</p>
+        </div>
+      </div>
+
+      {/* Enable discount toggle */}
+      <label
+        className={`flex items-start space-x-3 p-3 rounded-lg border bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors min-h-[44px] ${isSaving ? "opacity-50 pointer-events-none" : ""}`}
+        onClick={(e) => {
+          if (e.target.closest('[role="checkbox"]')) return;
+          handleToggle(!discountEnabled);
+        }}
+      >
+        <Checkbox
+          id="discount_enabled"
+          checked={discountEnabled}
+          onCheckedChange={handleToggle}
+          disabled={isSaving}
+          className="h-6 w-6"
+        />
+        <div className="grid gap-1.5 leading-none">
+          <span className="font-medium">{t("settings.discount_enabled", "Включить скидку")}</span>
+        </div>
+      </label>
+
+      {/* Discount fields — disabled when toggle is off */}
+      <div className={`space-y-4${fieldsDisabled ? " opacity-50 pointer-events-none" : ""}`}>
+        {/* Discount percentage */}
+        <div className="space-y-2">
+          <Label htmlFor="discount_percent">{t("settings.discount_percent", "Размер скидки, %")}</Label>
+          <Input
+            id="discount_percent"
+            type="number"
+            min={1}
+            max={99}
+            value={discountPercent}
+            onChange={handlePercentChange}
+            disabled={fieldsDisabled}
+            className="min-h-[44px]"
+          />
+        </div>
+
+        {/* Discount badge color */}
+        <div className="space-y-2">
+          <Label>{t("settings.discount_color", "Цвет бейджа скидки")}</Label>
+          <div className="flex flex-wrap gap-3 pt-1">
+            {DISCOUNT_PRESET_COLORS.map(({ hex }) => {
+              const isSelected = hex.toUpperCase() === (discountColor || DISCOUNT_DEFAULT_COLOR).toUpperCase();
+              return (
+                <button
+                  key={hex}
+                  type="button"
+                  aria-label={hex}
+                  className={`w-11 h-11 rounded-full cursor-pointer border-2 flex items-center justify-center transition-all ${
+                    isSelected
+                      ? "ring-2 ring-offset-2 border-white"
+                      : "border-transparent hover:scale-110"
+                  }`}
+                  style={{ backgroundColor: hex, ...(isSelected ? { "--tw-ring-color": hex } : {}) }}
+                  onClick={() => handleColorSelect(hex)}
+                  disabled={fieldsDisabled}
+                >
+                  {isSelected && <Check className="h-5 w-5 text-white drop-shadow" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Badge font size */}
+        <div className="space-y-2">
+          <Label>{t("settings.discount_badge_size", "Размер шрифта бейджа")}</Label>
+          <Select value={discountBadgeSize} onValueChange={(val) => { setDiscountBadgeSize(val); setHasChanges(true); }} disabled={fieldsDisabled}>
+            <SelectTrigger className="min-h-[44px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sm">{t("settings.discount_badge_sm", "Маленький")}</SelectItem>
+              <SelectItem value="base">{t("settings.discount_badge_base", "Средний")}</SelectItem>
+              <SelectItem value="lg">{t("settings.discount_badge_lg", "Большой")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Save Button */}
+        <div className="pt-2">
+          <Button
+            onClick={handleSave}
+            disabled={isSaving || !hasChanges}
+            className="w-full sm:w-auto min-h-[44px]"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {t("common.saving", "Сохранение...")}
+              </>
+            ) : (
+              <>
+                <Check className="h-4 w-4 mr-2" />
+                {t("common.save", "Сохранить")}
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2236,6 +2428,20 @@ export default function PartnerSettings() {
     }
   }
 
+  async function saveDiscount(data) {
+    if (!partner?.id) return;
+    setSavingCount(c => c + 1);
+    try {
+      await updateRec("Partner", partner.id, data);
+      setPartner(prev => ({ ...prev, ...data }));
+      showToast(t("settings.toasts.discountSaved", "Скидки сохранены"));
+    } catch (e) {
+      showError(t("settings.errors.error"), String(e?.message || e));
+    } finally {
+      setSavingCount(c => c - 1);
+    }
+  }
+
   async function saveWorkingHours(data) {
     if (!partner?.id) return;
     const seq = ++saveSeq.current.hours;
@@ -2434,6 +2640,13 @@ export default function PartnerSettings() {
             <AppearanceSection
               partner={partner}
               onSave={saveAppearance}
+              saving={saving}
+              t={t}
+            />
+
+            <DiscountSection
+              partner={partner}
+              onSave={saveDiscount}
               saving={saving}
               t={t}
             />
