@@ -1293,6 +1293,22 @@ export default function X() {
   // Just-in-time table confirmation (Batch A+5 Fix 1)
   const [showTableConfirmSheet, setShowTableConfirmSheet] = useState(false);
   const pendingSubmitRef = useRef(false);
+
+  // PM-105: Ref-based overlay stack for Android back button priority
+  const overlayStackRef = useRef([]);
+  const isPopStateClosingRef = useRef(false);
+
+  const pushOverlay = useCallback((name) => {
+    overlayStackRef.current = [...overlayStackRef.current.filter(n => n !== name), name];
+    window.history.pushState({ sheet: name }, '');
+  }, []);
+
+  const popOverlay = useCallback((name) => {
+    overlayStackRef.current = overlayStackRef.current.filter(n => n !== name);
+    if (!isPopStateClosingRef.current) {
+      window.history.back();
+    }
+  }, []);
   
   const [activeCategoryKey, setActiveCategoryKey] = useState("all");
   const [cart, setCart] = useState([]); // { dishId, name, price, quantity }
@@ -1471,6 +1487,7 @@ export default function X() {
   const showConfirmation = useCallback((data) => {
     setConfirmationData(data);
     setView("confirmation");
+    popOverlay('cart');
     setDrawerMode(null);
   }, []);
 
@@ -2123,6 +2140,7 @@ export default function X() {
   useEffect(() => {
     if (pendingSubmitRef.current && isTableVerified && currentTableId) {
       pendingSubmitRef.current = false;
+      popOverlay('tableConfirm');
       setShowTableConfirmSheet(false);
       // Slight delay to let state propagate
       if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
@@ -2349,26 +2367,36 @@ export default function X() {
   // Debug hook kept as no-op to maintain hook order (BUG-PM-040: removed prod logging)
   useEffect(() => {}, []);
 
-  // PM-S81-15: Android back button closes topmost overlay instead of browser
+  // PM-S81-15 + PM-105: Android back button closes topmost overlay (stack-based)
   useEffect(() => {
     const handlePopState = () => {
-      if (drawerMode === 'cart') {
-        if (isSubmitting) {
-          window.history.pushState({ overlay: 'cart' }, '');
-          return;
-        }
-        setDrawerMode(null);
-        return;
+      const stack = overlayStackRef.current;
+      if (stack.length === 0) return; // No overlay open — let browser handle normally
+
+      isPopStateClosingRef.current = true;
+      const topOverlay = stack[stack.length - 1];
+      overlayStackRef.current = stack.slice(0, -1);
+
+      switch (topOverlay) {
+        case 'tableConfirm':
+          pendingSubmitRef.current = false;
+          setShowTableConfirmSheet(false);
+          break;
+        case 'cart':
+          if (isSubmitting) {
+            // Re-push to prevent closing during submit
+            overlayStackRef.current = [...overlayStackRef.current, 'cart'];
+            window.history.pushState({ sheet: 'cart' }, '');
+          } else {
+            setDrawerMode(null);
+          }
+          break;
       }
-      if (showTableConfirmSheet) {
-        setShowTableConfirmSheet(false);
-        return;
-      }
-      // No overlay open — let browser handle normally
+      isPopStateClosingRef.current = false;
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [drawerMode, showTableConfirmSheet, isSubmitting]);
+  }, [isSubmitting]);
 
   // P0-7: Removed handleTableSelection - no dropdown
 
@@ -2679,7 +2707,7 @@ export default function X() {
     // silently blocking the BS trigger.
     if (orderMode === "hall" && !isTableVerified) {
       pendingSubmitRef.current = true;
-      window.history.pushState({ overlay: 'tableConfirm' }, '');
+      pushOverlay('tableConfirm');
       setShowTableConfirmSheet(true);
       return;
     }
@@ -3352,7 +3380,7 @@ export default function X() {
           onBackToMenu={dismissConfirmation}
           onOpenOrders={() => {
             dismissConfirmation();
-            window.history.pushState({ overlay: 'cart' }, '');
+            pushOverlay('cart');
             setDrawerMode("cart");
           }}
           onTrackOrder={handleTrackOrder}
@@ -3374,7 +3402,7 @@ export default function X() {
       <Drawer
         open={drawerMode === 'cart'}
         dismissible={!isSubmitting}
-        onOpenChange={(open) => { if (!open && !isSubmitting) setDrawerMode(null); }}
+        onOpenChange={(open) => { if (!open && !isSubmitting) { popOverlay('cart'); setDrawerMode(null); } }}
       >
         <DrawerContent className="max-h-[85vh] overflow-hidden">
           <DrawerHeader className="sr-only">
@@ -3441,7 +3469,7 @@ export default function X() {
               formatOrderTime={formatOrderTime}
               handleRateDish={handleRateDish}
               ratingSavingByItemId={ratingSavingByItemId}
-              onClose={() => setDrawerMode(null)}
+              onClose={() => { popOverlay('cart'); setDrawerMode(null); }}
               onCallWaiter={handleOpenHelpModal}
               isTableVerified={isTableVerified}
               tableCodeInput={tableCodeInput}
@@ -3463,6 +3491,7 @@ export default function X() {
         onOpenChange={(open) => {
           if (!open) {
             pendingSubmitRef.current = false;
+            popOverlay('tableConfirm');
             setShowTableConfirmSheet(false);
             if (!isTableVerified) {
               toast(tr('cart.confirm_table.dismissed', 'Для отправки заказа нужно подтвердить стол'), { id: 'table-dismiss' });
@@ -3637,8 +3666,13 @@ export default function X() {
                   return;
                 }
                 if (isSubmitting && drawerMode === 'cart') return;
-                if (drawerMode !== 'cart') window.history.pushState({ overlay: 'cart' }, '');
-                setDrawerMode(drawerMode === 'cart' ? null : 'cart');
+                if (drawerMode !== 'cart') {
+                  pushOverlay('cart');
+                  setDrawerMode('cart');
+                } else {
+                  popOverlay('cart');
+                  setDrawerMode(null);
+                }
               }}
               buttonLabel={hallStickyButtonLabel}
               hallModeLabel={hallStickyModeLabel}

@@ -1,7 +1,7 @@
 ---
-version: "31.0"
+version: "32.0"
 updated: "2026-03-23"
-session: 164
+session: 165
 ---
 
 # PublicMenu — Bug Registry
@@ -129,6 +129,12 @@ session: 164
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-PM-105-CHAIN-bcbe: Android back button nested sheet priority stack — FIXED S165
+- **Когда:** S165, chain publicmenu-260323-124313-bcbe
+- **Файл:** x.jsx
+- **Баги:** PM-105 (P1, Android back button closes nested sheets in wrong order — added ref-based overlay stack with pushOverlay/popOverlay, stack-based popstate handler, guarded history.back() on all programmatic close paths)
+- **Коммит:** (pending)
 
 ### FIX-PM-070-074-075-073-069A-CHAIN-466b: 5 x.jsx logic fixes — FIXED S164
 - **Когда:** S164, chain publicmenu-260323-112857-466b
