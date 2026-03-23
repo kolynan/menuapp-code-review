@@ -88,33 +88,7 @@ export default function MenuView({
         onClick={() => onDishClick?.(dish)}
       >
         <CardContent className="p-3 flex gap-3">
-          {/* Image LEFT - fixed size */}
-          <div className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100">
-            {dish.image ? (
-              <img
-                src={dish.image}
-                alt={getDishName(dish)}
-                className="w-full h-full object-cover"
-                loading="lazy"
-                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; }}
-              />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50">
-                <ImageIcon className="w-6 h-6 opacity-50" />
-              </div>
-            )}
-            {/* Discount badge (top-left of list image) */}
-            {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 && (
-              <span
-                className="absolute top-1 left-1 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm"
-                style={{ backgroundColor: partner?.discount_color || '#C92A2A' }}
-              >
-                -{partner.discount_percent}%
-              </span>
-            )}
-          </div>
-
-          {/* Text TOP-RIGHT, button BOTTOM-RIGHT */}
+          {/* Text LEFT — name, description, price, stepper */}
           <div className="flex-1 min-w-0 flex flex-col justify-between min-h-[96px]">
             <div>
               <h3 className="font-semibold text-base text-slate-900 line-clamp-2">{getDishName(dish)}</h3>
@@ -147,20 +121,9 @@ export default function MenuView({
                 </div>
               )}
             </div>
-            {/* Plus / stepper — BOTTOM-RIGHT */}
-            <div className="flex justify-end pr-1" onClick={(e) => e.stopPropagation()}>
-              {!inCart ? (
-                <button
-                  onClick={() => handleAddToCart(dish)}
-                  aria-label={t('menu.add')}
-                  className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors"
-                  style={{backgroundColor: primaryColor}}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = darkenColor(primaryColor, 0.15)}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = primaryColor}
-                >
-                  <Plus className="w-5 h-5 text-white" />
-                </button>
-              ) : (
+            {/* Stepper — stays in text column when inCart (too wide for image overlay) */}
+            {inCart && (
+              <div className="flex justify-end pr-1" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center bg-slate-100 rounded-lg p-1">
                   <button
                     onClick={() => updateQuantity(dish.id, -1)}
@@ -178,8 +141,49 @@ export default function MenuView({
                     <Plus className="w-4 h-4 text-slate-600" />
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+          </div>
+
+          {/* Image RIGHT — fixed size, "+" button overlay (PM-108+PM-110) */}
+          <div className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100">
+            {dish.image ? (
+              <img
+                src={dish.image}
+                alt={getDishName(dish)}
+                className="w-full h-full object-cover"
+                loading="lazy"
+                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; }}
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50">
+                <ImageIcon className="w-6 h-6 opacity-50" />
+              </div>
+            )}
+            {/* Discount badge (top-left of list image) */}
+            {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 && (
+              <span
+                className="absolute top-1 left-1 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm"
+                style={{ backgroundColor: partner?.discount_color || '#C92A2A' }}
+              >
+                -{partner.discount_percent}%
+              </span>
+            )}
+            {/* "+" button overlay on image — only when not in cart */}
+            {!inCart && (
+              <div className="absolute bottom-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => handleAddToCart(dish)}
+                  aria-label={t('menu.add')}
+                  className="w-9 h-9 flex items-center justify-center text-white rounded-full shadow-md transition-colors"
+                  style={{backgroundColor: primaryColor}}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = darkenColor(primaryColor, 0.15)}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = primaryColor}
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -197,7 +201,7 @@ export default function MenuView({
         className="relative overflow-hidden hover:shadow-md transition-shadow border-slate-200 flex flex-col cursor-pointer"
         onClick={() => onDishClick?.(dish)}
       >
-        {/* Image area */}
+        {/* Image area — "+" overlay on image (PM-111) */}
         <div className="relative w-full h-36 sm:h-48 bg-slate-100">
           {dish.image ? (
             <img
@@ -222,10 +226,46 @@ export default function MenuView({
               -{partner.discount_percent}%
             </span>
           )}
+
+          {/* Add/Stepper button — overlay on image bottom-right (PM-111) */}
+          <div className="absolute bottom-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
+            {!inCart ? (
+              <button
+                onClick={() => handleAddToCart(dish)}
+                aria-label={t('menu.add')}
+                className="w-11 h-11 flex items-center justify-center text-white rounded-full shadow-md transition-colors"
+                style={{backgroundColor: primaryColor}}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = darkenColor(primaryColor, 0.15)}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = primaryColor}
+              >
+                <Plus className="w-5 h-5" />
+              </button>
+            ) : (
+              <div className="h-11 px-1.5 flex items-center gap-1 bg-white rounded-full shadow-md whitespace-nowrap">
+                <button
+                  onClick={() => updateQuantity(dish.id, -1)}
+                  aria-label={t('menu.remove')}
+                  className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
+                >
+                  <Minus className="w-4 h-4 text-slate-700" />
+                </button>
+                <span className="min-w-[18px] text-center text-sm font-semibold text-slate-900">
+                  {inCart.quantity}
+                </span>
+                <button
+                  onClick={() => updateQuantity(dish.id, 1)}
+                  aria-label={t('menu.add')}
+                  className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
+                >
+                  <Plus className="w-4 h-4 text-slate-700" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Content: vertical layout, price pinned to bottom */}
-        <CardContent className="p-3 sm:p-4 flex flex-col flex-1 pb-14">
+        <CardContent className="p-3 sm:p-4 flex flex-col flex-1">
           <h3 className="font-semibold text-base sm:text-lg text-slate-900 line-clamp-2">
             {getDishName(dish)}
           </h3>
@@ -236,7 +276,7 @@ export default function MenuView({
             </p>
           )}
 
-          <div className="mt-auto pt-2 space-y-1 pr-14">
+          <div className="mt-auto pt-2 space-y-1">
             {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
               <div className="flex items-baseline gap-1.5 flex-nowrap">
                 <span className="font-bold text-sm whitespace-nowrap" style={{ color: primaryColor }}>
@@ -261,42 +301,6 @@ export default function MenuView({
             )}
           </div>
         </CardContent>
-
-        {/* Add/Stepper button — card bottom-right (LOCK-PM-001) */}
-        <div className="absolute bottom-3 right-3 z-10" onClick={(e) => e.stopPropagation()}>
-          {!inCart ? (
-            <button
-              onClick={() => handleAddToCart(dish)}
-              aria-label={t('menu.add')}
-              className="w-11 h-11 flex items-center justify-center text-white rounded-full shadow-md transition-colors"
-              style={{backgroundColor: primaryColor}}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = darkenColor(primaryColor, 0.15)}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = primaryColor}
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-          ) : (
-            <div className="h-11 px-1.5 flex items-center gap-1 bg-white rounded-full shadow-md whitespace-nowrap">
-              <button
-                onClick={() => updateQuantity(dish.id, -1)}
-                aria-label={t('menu.remove')}
-                className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
-              >
-                <Minus className="w-4 h-4 text-slate-700" />
-              </button>
-              <span className="min-w-[18px] text-center text-sm font-semibold text-slate-900">
-                {inCart.quantity}
-              </span>
-              <button
-                onClick={() => updateQuantity(dish.id, 1)}
-                aria-label={t('menu.add')}
-                className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
-              >
-                <Plus className="w-4 h-4 text-slate-700" />
-              </button>
-            </div>
-          )}
-        </div>
       </Card>
     );
   };

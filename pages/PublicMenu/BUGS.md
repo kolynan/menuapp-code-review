@@ -1,5 +1,5 @@
 ---
-version: "34.0"
+version: "35.0"
 updated: "2026-03-23"
 session: 168
 ---
@@ -131,6 +131,13 @@ session: 168
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-CHAIN-f92b: PM-108+PM-110+PM-111 — Card layout redesign — FIXED S168
+- **Когда:** S168, chain publicmenu-260323-205015-f92b
+- **Файл:** MenuView.jsx
+- **Баги:**
+  - PM-108+PM-110 (P2): List-mode card redesign — image moved to RIGHT side (Glovo/Wolt pattern), "+" button as overlay on image bottom-right (`absolute bottom-2 right-2 z-10 rounded-full`), stepper stays in text column when inCart.
+  - PM-111 (P2): Tile-mode "+" button moved from card-level absolute to image container overlay (`absolute bottom-2 right-2 z-10`). Removed `pb-14` from CardContent and `pr-14` from price area.
 
 ### FIX-CHAIN-bfb4: PM-109, PM-104 — FIXED S168
 - **Когда:** S168, chain publicmenu-260323-162542-bfb4
