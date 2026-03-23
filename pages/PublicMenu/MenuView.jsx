@@ -148,7 +148,7 @@ export default function MenuView({
               )}
             </div>
             {/* Plus / stepper — BOTTOM-RIGHT */}
-            <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-end pr-1" onClick={(e) => e.stopPropagation()}>
               {!inCart ? (
                 <button
                   onClick={() => handleAddToCart(dish)}

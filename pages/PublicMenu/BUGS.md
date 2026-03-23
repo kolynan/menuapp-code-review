@@ -130,6 +130,16 @@ session: 165
 
 ## Fixed Bugs (исправлены)
 
+### FIX-BATCH6-CHAIN-c460: PM-107, PM-102, PM-108, PM-104 refinements — FIXED S166
+- **Когда:** S166, chain publicmenu-260323-142203-c460
+- **Файл:** x.jsx, MenuView.jsx
+- **Баги:**
+  - PM-107 (P1): Separated `isProgrammaticCloseRef` from `isPopStateClosingRef` — prevents race condition where single flag is reused by both popOverlay and handlePopState directions.
+  - PM-102 (P2): Dish detail button — inline `color: '#FFFFFF'` bypasses CSS specificity (shadcn Button class override). Removed `text-white hover:text-white` classes.
+  - PM-108 (P2): "+" button in list-mode — added `pr-1` to button container for breathing room inside `overflow-hidden` Card.
+  - PM-104 (P3): Added `[&_[data-vaul-handle]]:hidden` to cart DrawerContent for handle artifact. Removed unused `ChevronDown` import.
+- **No-ops:** PM-103 (already fully fixed by d0a4), PM-096/PM-discount-check/#84b (already fixed in prior КС).
+
 ### FIX-BATCH6-CHAIN-d0a4: PM-103, PM-102 sub-fixes — FIXED S166
 - **Когда:** S166, chain publicmenu-260323-142202-d0a4
 - **Файл:** MenuView.jsx, x.jsx

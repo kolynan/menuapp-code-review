@@ -25,7 +25,6 @@ import {
   Bell,
   Check,
   CheckCircle2,
-  ChevronDown,
   Clock,
   ChevronUp,
   Image as ImageIcon,
@@ -1300,6 +1299,7 @@ export default function X() {
   // PM-105: Ref-based overlay stack for Android back button priority
   const overlayStackRef = useRef([]);
   const isPopStateClosingRef = useRef(false);
+  const isProgrammaticCloseRef = useRef(false);
 
   const pushOverlay = useCallback((name) => {
     overlayStackRef.current = [...overlayStackRef.current.filter(n => n !== name), name];
@@ -1309,7 +1309,7 @@ export default function X() {
   const popOverlay = useCallback((name) => {
     overlayStackRef.current = overlayStackRef.current.filter(n => n !== name);
     if (!isPopStateClosingRef.current) {
-      isPopStateClosingRef.current = true;
+      isProgrammaticCloseRef.current = true;
       window.history.back();
     }
   }, []);
@@ -2377,8 +2377,8 @@ export default function X() {
   useEffect(() => {
     const handlePopState = () => {
       // PM-107: If popOverlay triggered this back, skip — sheet already closed
-      if (isPopStateClosingRef.current) {
-        isPopStateClosingRef.current = false;
+      if (isProgrammaticCloseRef.current) {
+        isProgrammaticCloseRef.current = false;
         return;
       }
       const stack = overlayStackRef.current;
@@ -3416,7 +3416,7 @@ export default function X() {
         dismissible={!isSubmitting}
         onOpenChange={(open) => { if (!open && !isSubmitting) { popOverlay('cart'); setDrawerMode(null); } }}
       >
-        <DrawerContent className="max-h-[85vh] overflow-hidden [&>[data-vaul-handle-hitarea]]:hidden">
+        <DrawerContent className="max-h-[85vh] overflow-hidden [&>[data-vaul-handle-hitarea]]:hidden [&_[data-vaul-handle]]:hidden">
           <DrawerHeader className="sr-only">
             <DrawerTitle>{t('cart.title')}</DrawerTitle>
           </DrawerHeader>
@@ -3707,8 +3707,8 @@ export default function X() {
                 )}
                 <Button
                   variant="ghost"
-                  className="w-full min-h-[44px] text-white hover:text-white"
-                  style={{ backgroundColor: partner?.primary_color || '#1A1A1A' }}
+                  className="w-full min-h-[44px]"
+                  style={{ backgroundColor: partner?.primary_color || '#1A1A1A', color: '#FFFFFF' }}
                   onClick={() => { addToCart(detailDish); setDetailDish(null); }}
                 >
                   {t('menu.add_to_cart', 'Добавить в корзину')}
