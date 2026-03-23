@@ -1029,8 +1029,28 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
     );
   }
 
-  // Error / not found
-  if (orderError || !order) {
+  // Network/backend error — retryable (PM-074)
+  if (orderError) {
+    return (
+      <div className="fixed inset-0 z-[60] overflow-y-auto" style={{backgroundColor:'#faf9f7'}}>
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-8 text-center">
+              <XCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+              <h2 className="text-lg font-semibold text-slate-800 mb-2">{t("error.network_error")}</h2>
+              <p className="text-sm text-slate-500 mb-4">{t("error.check_connection")}</p>
+              <Button variant="outline" className="min-h-[44px]" onClick={() => refetchOrder()}>
+                {t("common.retry")}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Order genuinely not found (query succeeded, returned null)
+  if (!order) {
     return (
       <div className="fixed inset-0 z-[60] overflow-y-auto" style={{backgroundColor:'#faf9f7'}}>
         <div className="min-h-screen flex items-center justify-center p-4">
@@ -1321,7 +1341,7 @@ export default function X() {
   const [ratingSavingByItemId, setRatingSavingByItemId] = useState({});
 
   // Partner fetch (id or slug) - MUST BE FIRST before any partner dependencies
-  const { data: partner, isLoading: loadingPartner } = useQuery({
+  const { data: partner, isLoading: loadingPartner, error: partnerError, refetch: refetchPartner } = useQuery({
     queryKey: ["publicPartner", partnerParamRaw],
     enabled: !!partnerParamRaw,
     retry: shouldRetry,
@@ -1335,16 +1355,12 @@ export default function X() {
         const res = await base44.entities.Partner.filter(byIdFirst ? { id: p } : { slug: p });
         if (res?.[0]) return res[0];
       } catch (e) {
-        // Partner primary lookup failed — silent in prod
+        // Partner primary lookup failed — try fallback
       }
 
-      try {
-        const res2 = await base44.entities.Partner.filter(byIdFirst ? { slug: p } : { id: p });
-        return res2?.[0] || null;
-      } catch (e) {
-        // Partner fallback lookup failed — silent in prod
-        return null;
-      }
+      // Fallback lookup — let errors propagate to React Query (PM-070)
+      const res2 = await base44.entities.Partner.filter(byIdFirst ? { slug: p } : { id: p });
+      return res2?.[0] || null;
     },
   });
 
@@ -1435,6 +1451,7 @@ export default function X() {
   const submitLockRef = useRef(false); // CODE-024: protect from double-tap
   const viewTransitionTimerRef = useRef(null);
   const codeInputRef = useRef(null); // PM-088: ref for table code hidden input
+  const autoSubmitTimerRef = useRef(null); // PM-075: cleanup for auto-submit timeout
 
   // Cleanup view transition timer on unmount
   useEffect(() => {
@@ -1521,6 +1538,16 @@ export default function X() {
     codeVerificationError,
     verifyTableCode,
   } = useHallTable({ partner, location, orderMode, t });
+
+  // Auto-clear code input after wrong entry (PM-069)
+  useEffect(() => {
+    if (codeVerificationError && !isVerifyingCode) {
+      const timer = setTimeout(() => {
+        if (typeof setTableCodeInput === 'function') setTableCodeInput('');
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [codeVerificationError, isVerifyingCode]);
 
   // Helper for saving table selection (used by help requests and other features)
   const saveTableSelection = (partnerId, tableId) => {
@@ -2098,8 +2125,12 @@ export default function X() {
       pendingSubmitRef.current = false;
       setShowTableConfirmSheet(false);
       // Slight delay to let state propagate
-      setTimeout(() => handleSubmitOrder(), 100);
+      if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+      autoSubmitTimerRef.current = setTimeout(() => handleSubmitOrder(), 100);
     }
+    return () => {
+      if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+    };
   }, [isTableVerified, currentTableId]);
 
   // Hall StickyBar mode: определяем что показывать
@@ -2702,10 +2733,10 @@ export default function X() {
         // because currentGuest hasn't been set yet
         // ============================================================
         let guest = currentGuest;
+        const normalizeId = (g) => String(g?.id ?? g?._id ?? "");
 
         if (!guest) {
           try {
-            const normalizeId = (g) => String(g?.id ?? g?._id ?? "");
             
             // 1) Try device-based lookup (all known device keys)
             const deviceIds = Array.from(new Set(
@@ -2795,7 +2826,7 @@ export default function X() {
         if (!guest) {
           const deviceId = getDeviceId();
           guest = await addGuestToSession(session.id, null, deviceId);
-          const gid = String(guest?.id ?? guest?._id ?? "");
+          const gid = normalizeId(guest);
           setCurrentGuest(guest);
           currentGuestIdRef.current = gid || null;
           setSessionGuests(prev => [...(Array.isArray(prev) ? prev : []), guest]);
@@ -3057,6 +3088,20 @@ export default function X() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <Loader2 className="w-8 h-8 animate-spin" style={{color: '#1A1A1A'}} />
+      </div>
+    );
+  }
+
+  if (partnerError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <Card className="w-full max-w-md text-center p-6">
+          <p className="text-slate-500">{t('error.network_error')}</p>
+          <p className="text-sm text-slate-400 mt-2">{t('error.check_connection')}</p>
+          <Button variant="outline" className="mt-4 min-h-[44px]" onClick={() => refetchPartner()}>
+            {t('common.retry')}
+          </Button>
+        </Card>
       </div>
     );
   }
