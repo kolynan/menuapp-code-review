@@ -2068,7 +2068,7 @@ export default function X() {
       queryClient.invalidateQueries({ queryKey: ["dishFeedbacksRecent", partnerId] });
       
     } catch (err) {
-      console.error('Failed to save rating:', err);
+      // silent
       toast.error(t('error.save_failed'), { id: 'mm1' });
       // BUG-PM-028: Roll back draft rating so user can retry
       updateDraftRating(itemId, 0);
@@ -2161,7 +2161,7 @@ export default function X() {
       }
       setGuestCode(code);
     } catch (e) {
-      console.error("Failed to init guest code", e);
+      // silent
     }
   }, [isHallMode, hallGuestCodeEnabled]);
 
@@ -2318,6 +2318,27 @@ export default function X() {
   // Debug hook kept as no-op to maintain hook order (BUG-PM-040: removed prod logging)
   useEffect(() => {}, []);
 
+  // PM-S81-15: Android back button closes topmost overlay instead of browser
+  useEffect(() => {
+    const handlePopState = () => {
+      if (drawerMode === 'cart') {
+        if (isSubmitting) {
+          window.history.pushState({ overlay: 'cart' }, '');
+          return;
+        }
+        setDrawerMode(null);
+        return;
+      }
+      if (showTableConfirmSheet) {
+        setShowTableConfirmSheet(false);
+        return;
+      }
+      // No overlay open — let browser handle normally
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [drawerMode, showTableConfirmSheet, isSubmitting]);
+
   // P0-7: Removed handleTableSelection - no dropdown
 
   // Phone input
@@ -2410,7 +2431,7 @@ export default function X() {
 
       return recentUserOrders.length < limitCount;
     } catch (e) {
-      console.error("Rate limit check failed", e);
+      // silent
       return true;
     }
   };
@@ -2514,7 +2535,7 @@ export default function X() {
           });
         }
       } catch (sideEffectErr) {
-        console.error('Post-create loyalty side effect failed:', sideEffectErr);
+        // silent
       }
 
       // Earn points after order creation — best-effort
@@ -2545,11 +2566,11 @@ export default function X() {
           });
         }
       } catch (earnErr) {
-        console.error('Post-create earn points failed:', earnErr);
+        // silent
       }
 
       // Update partner counters — best-effort
-      try { await base44.entities.Partner.update(partner.id, updatedCounters); } catch (e) { console.error('Partner counter update failed:', e); }
+      try { await base44.entities.Partner.update(partner.id, updatedCounters); } catch (e) { /* silent */ }
       
       // Update local partner cache
       queryClient.setQueryData(["publicPartner", partnerParamRaw], (prev) =>
@@ -2627,6 +2648,7 @@ export default function X() {
     // silently blocking the BS trigger.
     if (orderMode === "hall" && !isTableVerified) {
       pendingSubmitRef.current = true;
+      window.history.pushState({ overlay: 'tableConfirm' }, '');
       setShowTableConfirmSheet(true);
       return;
     }
@@ -2891,7 +2913,7 @@ export default function X() {
             });
           }
         } catch (sideEffectErr) {
-          console.error('Post-create loyalty side effect failed:', sideEffectErr);
+          // silent
         }
 
         // Earn points after order creation — best-effort
@@ -2922,7 +2944,7 @@ export default function X() {
             });
           }
         } catch (earnErr) {
-          console.error('Post-create earn points failed:', earnErr);
+          // silent
         }
 
         // GAP-01: Save cart snapshot for confirmation screen BEFORE clearing
@@ -2952,7 +2974,7 @@ export default function X() {
 
       }
     } catch (err) {
-      console.error(err);
+      // silent
       setSubmitError(t('error.send.title'));
     } finally {
       submitLockRef.current = false;
@@ -2978,7 +3000,7 @@ export default function X() {
       
       toast.success(t('guest.name_saved'), { id: 'mm1' });
     } catch (err) {
-      console.error('Failed to update guest name:', err);
+      // silent
       toast.error(t('error.save_failed'), { id: 'mm1' });
     }
   };
@@ -3009,7 +3031,7 @@ export default function X() {
       setBillCooldown(true);
       toast.success(tr('cart.bill_requested', 'Официант скоро принесёт счёт'), { id: 'mm1' });
     } catch (err) {
-      console.error('Failed to request bill:', err);
+      // silent
       toast.error(t('toast.error'), { id: 'mm1' });
       setBillRequested(false);
     }
@@ -3285,6 +3307,7 @@ export default function X() {
           onBackToMenu={dismissConfirmation}
           onOpenOrders={() => {
             dismissConfirmation();
+            window.history.pushState({ overlay: 'cart' }, '');
             setDrawerMode("cart");
           }}
           onTrackOrder={handleTrackOrder}
@@ -3569,6 +3592,7 @@ export default function X() {
                   return;
                 }
                 if (isSubmitting && drawerMode === 'cart') return;
+                if (drawerMode !== 'cart') window.history.pushState({ overlay: 'cart' }, '');
                 setDrawerMode(drawerMode === 'cart' ? null : 'cart');
               }}
               buttonLabel={hallStickyButtonLabel}
