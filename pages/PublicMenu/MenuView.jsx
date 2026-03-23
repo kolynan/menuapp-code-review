@@ -100,7 +100,7 @@ export default function MenuView({
               {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
                 <div className="mt-0.5 flex items-baseline gap-1.5">
                   <span className="font-bold text-sm" style={{ color: primaryColor }}>
-                    {formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100)))}
+                    {formatPrice(parseFloat((dish.price * (1 - partner.discount_percent / 100)).toFixed(2)))}
                   </span>
                   <span className="text-xs text-slate-400 line-through">
                     {formatPrice(dish.price)}
@@ -121,28 +121,6 @@ export default function MenuView({
                 </div>
               )}
             </div>
-            {/* Stepper — stays in text column when inCart (too wide for image overlay) */}
-            {inCart && (
-              <div className="flex justify-end pr-1" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center bg-slate-100 rounded-lg p-1">
-                  <button
-                    onClick={() => updateQuantity(dish.id, -1)}
-                    aria-label={t('menu.remove')}
-                    className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white rounded-md transition-colors"
-                  >
-                    <Minus className="w-4 h-4 text-slate-600" />
-                  </button>
-                  <span className="mx-2 font-medium text-slate-900 text-sm">{inCart.quantity}</span>
-                  <button
-                    onClick={() => updateQuantity(dish.id, 1)}
-                    aria-label={t('menu.add')}
-                    className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white rounded-md transition-colors"
-                  >
-                    <Plus className="w-4 h-4 text-slate-600" />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Image RIGHT — fixed size, "+" button overlay (PM-108+PM-110) */}
@@ -169,9 +147,9 @@ export default function MenuView({
                 -{partner.discount_percent}%
               </span>
             )}
-            {/* "+" button overlay on image — only when not in cart */}
-            {!inCart && (
-              <div className="absolute bottom-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
+            {/* Add/Stepper button — overlay on image bottom-right (PM-108+PM-110+PM-115) */}
+            <div className="absolute bottom-1 right-1 z-10" onClick={(e) => e.stopPropagation()}>
+              {!inCart ? (
                 <button
                   onClick={() => handleAddToCart(dish)}
                   aria-label={t('menu.add')}
@@ -182,8 +160,28 @@ export default function MenuView({
                 >
                   <Plus className="w-5 h-5" />
                 </button>
-              </div>
-            )}
+              ) : (
+                <div className="h-9 px-1 flex items-center gap-0.5 bg-white rounded-full shadow-md whitespace-nowrap">
+                  <button
+                    onClick={() => updateQuantity(dish.id, -1)}
+                    aria-label={t('menu.remove')}
+                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
+                  >
+                    <Minus className="w-4 h-4 text-slate-700" />
+                  </button>
+                  <span className="min-w-[16px] text-center text-xs font-semibold text-slate-900">
+                    {inCart.quantity}
+                  </span>
+                  <button
+                    onClick={() => updateQuantity(dish.id, 1)}
+                    aria-label={t('menu.add')}
+                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
+                  >
+                    <Plus className="w-4 h-4 text-slate-700" />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -989,7 +989,7 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
     const symbol = partner?.currency_symbol || currency;
     const num = Number(amount);
     if (isNaN(num)) return String(amount);
-    const formatted = Number.isInteger(num) ? num.toLocaleString() : num.toFixed(1);
+    const formatted = Number.isInteger(num) ? num.toLocaleString() : parseFloat(num.toFixed(2)).toString();
     return symbol ? `${formatted} ${symbol}` : formatted;
   };
 
@@ -3687,7 +3687,7 @@ export default function X() {
                   {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
                     <>
                       <span className="text-lg font-bold" style={{ color: partner?.primary_color || '#1A1A1A' }}>
-                        {formatPrice(Math.round(detailDish.price * (1 - partner.discount_percent / 100)))}
+                        {formatPrice(parseFloat((detailDish.price * (1 - partner.discount_percent / 100)).toFixed(2)))}
                       </span>
                       <span className="text-sm text-slate-400 line-through">
                         {formatPrice(detailDish.price)}
