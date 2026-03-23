@@ -694,26 +694,27 @@ function DiscountSection({ partner, onSave, saving, t }) {
           </Select>
         </div>
 
-        {/* Save Button */}
-        <div className="pt-2">
-          <Button
-            onClick={handleSave}
-            disabled={isSaving || !hasChanges}
-            className="w-full sm:w-auto min-h-[44px]"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {t("common.saving", "Сохранение...")}
-              </>
-            ) : (
-              <>
-                <Check className="h-4 w-4 mr-2" />
-                {t("common.save", "Сохранить")}
-              </>
-            )}
-          </Button>
-        </div>
+      </div>
+
+      {/* Save Button — outside disabled wrapper so it stays clickable when toggle is OFF */}
+      <div className="pt-2">
+        <Button
+          onClick={handleSave}
+          disabled={isSaving || !hasChanges}
+          className="w-full sm:w-auto min-h-[44px]"
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              {t("common.saving", "Сохранение...")}
+            </>
+          ) : (
+            <>
+              <Check className="h-4 w-4 mr-2" />
+              {t("common.save", "Сохранить")}
+            </>
+          )}
+        </Button>
       </div>
     </div>
   );
