@@ -1,7 +1,7 @@
 ---
-version: "30.0"
-updated: "2026-03-22"
-session: 161
+version: "31.0"
+updated: "2026-03-23"
+session: 164
 ---
 
 # PublicMenu — Bug Registry
@@ -140,6 +140,12 @@ session: 161
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-PM-S81-15-076-CHAIN-0c33: Android back button + console.error cleanup — FIXED S164
+- **Когда:** S164, chain publicmenu-260323-103002-0c33
+- **Файл:** x.jsx
+- **Баги:** PM-S81-15 (P1, Android back button closes browser instead of drawer/cart — added pushState + popstate listener), PM-076 (P3, 11 console.error calls removed from production code)
+- **Коммит:** 13c2299
 
 ### FIX-PM-096-068-84-CHAIN-5842: L-fixes — touch targets, aria i18n, price color — FIXED S164
 - **Когда:** S164, chain publicmenu-260323-103001-5842
