@@ -130,6 +130,15 @@ session: 165
 
 ## Fixed Bugs (исправлены)
 
+### FIX-BATCH6-CHAIN-d0a4: PM-103, PM-102 sub-fixes — FIXED S166
+- **Когда:** S166, chain publicmenu-260323-142202-d0a4
+- **Файл:** MenuView.jsx, x.jsx
+- **Баги:**
+  - PM-103 (P2): Toast sub-fixes — fallback text 'Добавлено' → 'Добавлено в корзину', timeout 1500ms → 2000ms, removed unreliable animation classes, added pointer-events-none.
+  - PM-102 (P2): Dish detail button — added `variant="ghost"` + `min-h-[44px]` + `hover:text-white` for touch target and text visibility on Android.
+- **No-ops:** PM-107 (already fixed by fd04), PM-096/PM-discount-check/#84b (already fixed), PM-108 (already fixed by fd04).
+- **Skipped:** PM-104 (P3, CartView.jsx is read-only).
+
 ### FIX-BATCH6-CHAIN-fd04: PM-107, PM-103, PM-102, PM-108 — FIXED S166
 - **Когда:** S166, chain publicmenu-260323-140917-fd04
 - **Файл:** x.jsx, MenuView.jsx

@@ -3706,7 +3706,8 @@ export default function X() {
                   </div>
                 )}
                 <Button
-                  className="w-full text-white"
+                  variant="ghost"
+                  className="w-full min-h-[44px] text-white hover:text-white"
                   style={{ backgroundColor: partner?.primary_color || '#1A1A1A' }}
                   onClick={() => { addToCart(detailDish); setDetailDish(null); }}
                 >

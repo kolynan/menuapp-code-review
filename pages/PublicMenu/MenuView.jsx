@@ -60,7 +60,7 @@ export default function MenuView({
     // Non-stacking: clear previous timer before setting new one
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastVisible(true);
-    toastTimerRef.current = setTimeout(() => setToastVisible(false), 1500);
+    toastTimerRef.current = setTimeout(() => setToastVisible(false), 2000);
   }, [addToCart]);
 
   // Cleanup timer on unmount
@@ -374,8 +374,8 @@ export default function MenuView({
 
       {/* Toast feedback on add to cart (AC-09) */}
       {toastVisible && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-slate-800 text-white text-sm rounded-lg px-4 py-2 min-h-[36px] flex items-center shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
-          {t('menu.added_to_cart', '\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E')}
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-slate-800 text-white text-sm rounded-lg px-4 py-2 min-h-[36px] flex items-center shadow-lg pointer-events-none">
+          {t('menu.added_to_cart', '\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E \u0432 \u043A\u043E\u0440\u0437\u0438\u043D\u0443')}
         </div>
       )}
     </div>
