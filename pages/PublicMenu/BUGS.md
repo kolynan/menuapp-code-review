@@ -1,7 +1,7 @@
 ---
-version: "33.0"
+version: "34.0"
 updated: "2026-03-23"
-session: 165
+session: 168
 ---
 
 # PublicMenu — Bug Registry
@@ -13,7 +13,7 @@ session: 165
 
 ## Active Bugs (не исправлены)
 
-*9 active bugs remaining (0x P0, 5x P1, 3x P2, 0x P3, 1x suggestion).*
+*8 active bugs remaining (0x P0, 4x P1, 3x P2, 0x P3, 1x suggestion).*
 
 ### BUG-PM-056: Drawer layout not visit-state-driven (P1 — Batch 2)
 - **Приоритет:** P1
@@ -128,7 +128,16 @@ session: 165
 
 ---
 
+---
+
 ## Fixed Bugs (исправлены)
+
+### FIX-CHAIN-bfb4: PM-109, PM-104 — FIXED S168
+- **Когда:** S168, chain publicmenu-260323-162542-bfb4
+- **Файл:** MenuView.jsx, x.jsx
+- **Баги:**
+  - PM-109 (P1): Discount badge/strikethrough showed when `discount_enabled=false`. Fix: changed all 5 discount guards from truthy check to `=== true && (discount_percent ?? 0) > 0` (4 in MenuView.jsx, 1 in x.jsx dish detail).
+  - PM-104 (P3): Cart drawer drag handle hidden by prior fix (chain c460). Fix: removed `[&>[data-vaul-handle-hitarea]]:hidden [&_[data-vaul-handle]]:hidden` from DrawerContent to restore vaul default handle.
 
 ### FIX-BATCH6-CHAIN-c460: PM-107, PM-102, PM-108, PM-104 refinements — FIXED S166
 - **Когда:** S166, chain publicmenu-260323-142203-c460

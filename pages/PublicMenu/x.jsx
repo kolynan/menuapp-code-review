@@ -3416,7 +3416,7 @@ export default function X() {
         dismissible={!isSubmitting}
         onOpenChange={(open) => { if (!open && !isSubmitting) { popOverlay('cart'); setDrawerMode(null); } }}
       >
-        <DrawerContent className="max-h-[85vh] overflow-hidden [&>[data-vaul-handle-hitarea]]:hidden [&_[data-vaul-handle]]:hidden">
+        <DrawerContent className="max-h-[85vh] overflow-hidden">
           <DrawerHeader className="sr-only">
             <DrawerTitle>{t('cart.title')}</DrawerTitle>
           </DrawerHeader>
@@ -3684,7 +3684,7 @@ export default function X() {
                   )}
                 </DialogHeader>
                 <div className="flex items-baseline gap-2">
-                  {partner?.discount_enabled && partner?.discount_percent > 0 ? (
+                  {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
                     <>
                       <span className="text-lg font-bold" style={{ color: partner?.primary_color || '#1A1A1A' }}>
                         {formatPrice(Math.round(detailDish.price * (1 - partner.discount_percent / 100)))}

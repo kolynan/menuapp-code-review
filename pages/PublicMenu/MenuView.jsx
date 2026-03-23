@@ -104,7 +104,7 @@ export default function MenuView({
               </div>
             )}
             {/* Discount badge (top-left of list image) */}
-            {partner?.discount_enabled && partner?.discount_percent > 0 && (
+            {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 && (
               <span
                 className="absolute top-1 left-1 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm"
                 style={{ backgroundColor: partner?.discount_color || '#C92A2A' }}
@@ -123,7 +123,7 @@ export default function MenuView({
                   {getDishDescription(dish)}
                 </p>
               )}
-              {partner?.discount_enabled && partner?.discount_percent > 0 ? (
+              {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
                 <div className="mt-0.5 flex items-baseline gap-1.5">
                   <span className="font-bold text-sm" style={{ color: primaryColor }}>
                     {formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100)))}
@@ -214,7 +214,7 @@ export default function MenuView({
           )}
 
           {/* Discount badge (top-left) */}
-          {partner?.discount_enabled && partner?.discount_percent > 0 && (
+          {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 && (
             <span
               className="absolute top-2 left-2 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm z-10"
               style={{ backgroundColor: partner?.discount_color || '#C92A2A' }}
@@ -237,7 +237,7 @@ export default function MenuView({
           )}
 
           <div className="mt-auto pt-2 space-y-1 pr-14">
-            {partner?.discount_enabled && partner?.discount_percent > 0 ? (
+            {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
               <div className="flex items-baseline gap-1.5 flex-nowrap">
                 <span className="font-bold text-sm whitespace-nowrap" style={{ color: primaryColor }}>
                   {formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100)))}
