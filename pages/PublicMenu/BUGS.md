@@ -13,7 +13,7 @@ session: 161
 
 ## Active Bugs (не исправлены)
 
-*13 active bugs remaining (0x P0, 7x P1, 4x P2, 1x P3, 1x suggestion).*
+*11 active bugs remaining (0x P0, 7x P1, 3x P2, 0x P3, 1x suggestion).*
 
 ### BUG-PM-056: Drawer layout not visit-state-driven (P1 — Batch 2)
 - **Приоритет:** P1
@@ -116,13 +116,6 @@ session: 161
 - **Симптом:** Partner query swallows exceptions and returns `null`, then page always renders `error.partner_not_found`. Transient backend failure is misreported as bad QR link. User sees "restaurant not found" instead of retryable error.
 - **Фикс:** Preserve request errors separately from true not-found. Render retryable error UI for backend failures.
 
-### BUG-PM-068: Hardcoded aria labels / missing i18n in controls (P3)
-- **Приоритет:** P3
-- **Когда:** S153 (Codex review, chain publicmenu-260321-140331)
-- **Файл:** CheckoutView.jsx, CartView.jsx, MenuView.jsx
-- **Симптом:** Hardcoded English aria labels in CheckoutView, hardcoded placeholder in CartView, missing aria-labels in MenuView.
-- **Фикс:** Replace with t()/tr() i18n calls. Future batch.
-
 ### BUG-PM-069: Bottom Sheet missing cooldown/lockout countdown display (P2)
 - **Приоритет:** P2
 - **Когда:** S153 (chain publicmenu-260321-140331)
@@ -147,6 +140,12 @@ session: 161
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-PM-096-068-84-CHAIN-5842: L-fixes — touch targets, aria i18n, price color — FIXED S164
+- **Когда:** S164, chain publicmenu-260323-103001-5842
+- **Файл:** MenuView.jsx, CheckoutView.jsx
+- **Баги:** PM-096 (P2, tile stepper w-8→w-11), PM-068 (P3, hardcoded aria-labels → t()), #84 (P2, discount price color → primaryColor)
+- **Коммит:** consensus chain publicmenu-260323-103001-5842
 
 ### FIX-PM-091-095-CHAIN-204901: MenuView L-bugs — 5 bugs fixed — FIXED S162
 - **Когда:** S162, chain publicmenu-260322-204901-9d4e

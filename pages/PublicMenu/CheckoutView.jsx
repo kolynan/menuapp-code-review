@@ -57,11 +57,11 @@ export default function CheckoutView({
               <div className="text-right">
                 <div className="font-bold text-slate-900 mb-1">{formatPrice(item.price * item.quantity)}</div>
                 <div className="flex items-center justify-end bg-slate-100 rounded-lg p-1 w-fit ml-auto">
-                  <button type="button" onClick={() => updateQuantity(item.dishId, -1)} className="w-8 h-8 flex items-center justify-center hover:bg-white rounded-md" aria-label="Decrease">
+                  <button type="button" onClick={() => updateQuantity(item.dishId, -1)} className="w-8 h-8 flex items-center justify-center hover:bg-white rounded-md" aria-label={t('cart.decrease', 'Уменьшить')}>
                     <Minus className="w-3 h-3" />
                   </button>
                   <span className="mx-2 text-xs font-medium">{item.quantity}</span>
-                  <button type="button" onClick={() => updateQuantity(item.dishId, 1)} className="w-8 h-8 flex items-center justify-center hover:bg-white rounded-md" aria-label="Increase">
+                  <button type="button" onClick={() => updateQuantity(item.dishId, 1)} className="w-8 h-8 flex items-center justify-center hover:bg-white rounded-md" aria-label={t('cart.increase', 'Увеличить')}>
                     <Plus className="w-3 h-3" />
                   </button>
                 </div>

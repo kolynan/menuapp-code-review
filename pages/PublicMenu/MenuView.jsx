@@ -123,7 +123,7 @@ export default function MenuView({
               )}
               {partner?.discount_enabled && partner?.discount_percent > 0 ? (
                 <div className="mt-0.5 flex items-baseline gap-1.5">
-                  <span className="font-bold text-sm" style={{ color: partner?.discount_color || '#C92A2A' }}>
+                  <span className="font-bold text-sm" style={{ color: primaryColor }}>
                     {formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100)))}
                   </span>
                   <span className="text-xs text-slate-400 line-through">
@@ -236,7 +236,7 @@ export default function MenuView({
           <div className="mt-auto pt-2 space-y-1 pr-14">
             {partner?.discount_enabled && partner?.discount_percent > 0 ? (
               <div className="flex items-baseline gap-1.5">
-                <span className="font-bold" style={{ color: partner?.discount_color || '#C92A2A' }}>
+                <span className="font-bold" style={{ color: primaryColor }}>
                   {formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100)))}
                 </span>
                 <span className="text-sm text-slate-400 line-through">
@@ -277,7 +277,7 @@ export default function MenuView({
               <button
                 onClick={() => updateQuantity(dish.id, -1)}
                 aria-label={t('menu.remove')}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
+                className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
               >
                 <Minus className="w-4 h-4 text-slate-700" />
               </button>
@@ -287,7 +287,7 @@ export default function MenuView({
               <button
                 onClick={() => updateQuantity(dish.id, 1)}
                 aria-label={t('menu.add')}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
+                className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
               >
                 <Plus className="w-4 h-4 text-slate-700" />
               </button>
