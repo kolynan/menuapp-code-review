@@ -3664,7 +3664,7 @@ export default function X() {
           {detailDish && (
             <>
               {detailDish.image && (
-                <div className="w-full h-48 bg-slate-100">
+                <div className="w-full aspect-square bg-slate-100">
                   <img
                     src={detailDish.image}
                     alt={getDishName(detailDish)}
@@ -3677,20 +3677,21 @@ export default function X() {
                   <DialogTitle className="text-lg font-bold text-slate-900">
                     {getDishName(detailDish)}
                   </DialogTitle>
-                  {getDishDescription(detailDish) && (
-                    <DialogDescription className="text-sm text-slate-500 mt-1">
-                      {getDishDescription(detailDish)}
-                    </DialogDescription>
-                  )}
                 </DialogHeader>
                 <div className="flex items-baseline gap-2">
-                  {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
+                  {detailDish.discount_enabled === true && detailDish.original_price ? (
                     <>
                       <span className="text-lg font-bold" style={{ color: partner?.primary_color || '#1A1A1A' }}>
-                        {formatPrice(parseFloat((detailDish.price * (1 - partner.discount_percent / 100)).toFixed(2)))}
+                        {formatPrice(detailDish.price)}
                       </span>
                       <span className="text-sm text-slate-400 line-through">
-                        {formatPrice(detailDish.price)}
+                        {formatPrice(detailDish.original_price)}
+                      </span>
+                      <span
+                        className="text-xs font-bold text-white px-2 py-0.5 rounded-full"
+                        style={{ backgroundColor: partner?.discount_color || '#C92A2A' }}
+                      >
+                        -{Math.round((1 - detailDish.price / detailDish.original_price) * 100)}%
                       </span>
                     </>
                   ) : (
@@ -3704,6 +3705,11 @@ export default function X() {
                     <span>{dishRatings[detailDish.id]?.avg?.toFixed(1)}</span>
                     <span>({dishRatings[detailDish.id]?.count})</span>
                   </div>
+                )}
+                {getDishDescription(detailDish) && (
+                  <p className="text-sm text-slate-500">
+                    {getDishDescription(detailDish)}
+                  </p>
                 )}
                 <Button
                   variant="ghost"
