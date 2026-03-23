@@ -46,6 +46,7 @@ export default function MenuView({
   formatPrice,
   addToCart,
   updateQuantity,
+  onDishClick,
   t,
 }) {
   const primaryColor = partner?.primary_color || '#1A1A1A';
@@ -83,7 +84,8 @@ export default function MenuView({
     return (
       <Card
         key={dish.id}
-        className="overflow-hidden hover:shadow-md transition-shadow border-slate-200"
+        className="overflow-hidden hover:shadow-md transition-shadow border-slate-200 cursor-pointer"
+        onClick={() => onDishClick?.(dish)}
       >
         <CardContent className="p-3 flex gap-3">
           {/* Image LEFT - fixed size */}
@@ -146,7 +148,7 @@ export default function MenuView({
               )}
             </div>
             {/* Plus / stepper — BOTTOM-RIGHT */}
-            <div className="flex justify-end">
+            <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
               {!inCart ? (
                 <button
                   onClick={() => handleAddToCart(dish)}
@@ -192,7 +194,8 @@ export default function MenuView({
     return (
       <Card
         key={dish.id}
-        className="relative overflow-hidden hover:shadow-md transition-shadow border-slate-200 flex flex-col"
+        className="relative overflow-hidden hover:shadow-md transition-shadow border-slate-200 flex flex-col cursor-pointer"
+        onClick={() => onDishClick?.(dish)}
       >
         {/* Image area */}
         <div className="relative w-full h-36 sm:h-48 bg-slate-100">
@@ -235,11 +238,11 @@ export default function MenuView({
 
           <div className="mt-auto pt-2 space-y-1 pr-14">
             {partner?.discount_enabled && partner?.discount_percent > 0 ? (
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-bold" style={{ color: primaryColor }}>
+              <div className="flex items-baseline gap-1.5 flex-nowrap">
+                <span className="font-bold text-sm whitespace-nowrap" style={{ color: primaryColor }}>
                   {formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100)))}
                 </span>
-                <span className="text-sm text-slate-400 line-through">
+                <span className="text-xs text-slate-400 line-through whitespace-nowrap">
                   {formatPrice(dish.price)}
                 </span>
               </div>

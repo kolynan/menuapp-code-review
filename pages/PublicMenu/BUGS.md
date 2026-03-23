@@ -1,5 +1,5 @@
 ---
-version: "32.0"
+version: "33.0"
 updated: "2026-03-23"
 session: 165
 ---
@@ -130,11 +130,20 @@ session: 165
 
 ## Fixed Bugs (исправлены)
 
+### FIX-PM-102-103-106-104-CHAIN-3bf4: Dish card detail, toast, tile price, chevron — FIXED S165
+- **Когда:** S165, chain publicmenu-260323-125539-3bf4
+- **Файл:** MenuView.jsx, x.jsx
+- **Баги:**
+  - PM-102 (P2): Dish card tap opens detail dialog — added `onDishClick` prop to MenuView, `onClick` on both list/tile cards, new `<Dialog>` for dish detail in x.jsx
+  - PM-103 (P2): Toast thin line fix — removed duplicate sonner `toast.success()` from `addToCart`, kept MenuView custom toast
+  - PM-106 (P2): Tile-mode discount price wrapping — added `flex-nowrap`, `whitespace-nowrap`, `text-sm`/`text-xs` to tile price spans
+  - PM-104 (P3): Cart drawer drag handle hidden via `[&>[data-vaul-handle-hitarea]]:hidden` on DrawerContent to fix chevron misalignment
+
 ### FIX-PM-105-CHAIN-bcbe: Android back button nested sheet priority stack — FIXED S165
 - **Когда:** S165, chain publicmenu-260323-124313-bcbe
 - **Файл:** x.jsx
 - **Баги:** PM-105 (P1, Android back button closes nested sheets in wrong order — added ref-based overlay stack with pushOverlay/popOverlay, stack-based popstate handler, guarded history.back() on all programmatic close paths)
-- **Коммит:** (pending)
+- **Коммит:** 4da1dc4
 
 ### FIX-PM-070-074-075-073-069A-CHAIN-466b: 5 x.jsx logic fixes — FIXED S164
 - **Когда:** S164, chain publicmenu-260323-112857-466b

@@ -1329,6 +1329,9 @@ export default function X() {
   // Dish reviews modal state
   const [selectedDishId, setSelectedDishId] = useState(null);
 
+  // PM-102: Dish detail dialog state
+  const [detailDish, setDetailDish] = useState(null);
+
   // Form
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
@@ -2338,8 +2341,7 @@ export default function X() {
         quantity: 1
       }];
     });
-    // AC-09: Toast "Добавлено" — non-blocking, auto-dismiss 2s
-    toast.success(t('cart.item_added'), { id: 'cart-add', duration: 2000 });
+    // AC-09: Toast handled by MenuView custom toast (PM-103: removed duplicate sonner call)
   };
 
   const updateQuantity = (dishId, delta) => {
@@ -3314,6 +3316,7 @@ export default function X() {
           formatPrice={formatPrice}
           addToCart={addToCart}
           updateQuantity={updateQuantity}
+          onDishClick={(dish) => setDetailDish(dish)}
           t={t}
         />
       )}
@@ -3404,7 +3407,7 @@ export default function X() {
         dismissible={!isSubmitting}
         onOpenChange={(open) => { if (!open && !isSubmitting) { popOverlay('cart'); setDrawerMode(null); } }}
       >
-        <DrawerContent className="max-h-[85vh] overflow-hidden">
+        <DrawerContent className="max-h-[85vh] overflow-hidden [&>[data-vaul-handle-hitarea]]:hidden">
           <DrawerHeader className="sr-only">
             <DrawerTitle>{t('cart.title')}</DrawerTitle>
           </DrawerHeader>
@@ -3645,6 +3648,66 @@ export default function X() {
         reviews={selectedDishReviews}
         loading={loadingDishReviews}
       />
+
+      {/* PM-102: Dish Detail Dialog */}
+      <Dialog open={!!detailDish} onOpenChange={(open) => !open && setDetailDish(null)}>
+        <DialogContent className="max-w-md p-0 overflow-hidden">
+          {detailDish && (
+            <>
+              {detailDish.image && (
+                <div className="w-full h-48 bg-slate-100">
+                  <img
+                    src={detailDish.image}
+                    alt={getDishName(detailDish)}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+              <div className="p-4 space-y-3">
+                <DialogHeader>
+                  <DialogTitle className="text-lg font-bold text-slate-900">
+                    {getDishName(detailDish)}
+                  </DialogTitle>
+                  {getDishDescription(detailDish) && (
+                    <DialogDescription className="text-sm text-slate-500 mt-1">
+                      {getDishDescription(detailDish)}
+                    </DialogDescription>
+                  )}
+                </DialogHeader>
+                <div className="flex items-baseline gap-2">
+                  {partner?.discount_enabled && partner?.discount_percent > 0 ? (
+                    <>
+                      <span className="text-lg font-bold" style={{ color: partner?.primary_color || '#1A1A1A' }}>
+                        {formatPrice(Math.round(detailDish.price * (1 - partner.discount_percent / 100)))}
+                      </span>
+                      <span className="text-sm text-slate-400 line-through">
+                        {formatPrice(detailDish.price)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-lg font-bold" style={{ color: partner?.primary_color || '#1A1A1A' }}>
+                      {formatPrice(detailDish.price)}
+                    </span>
+                  )}
+                </div>
+                {showReviews && dishRatings?.[detailDish.id] && (
+                  <div className="flex items-center gap-1 text-sm text-slate-500">
+                    <span>{dishRatings[detailDish.id]?.avg?.toFixed(1)}</span>
+                    <span>({dishRatings[detailDish.id]?.count})</span>
+                  </div>
+                )}
+                <Button
+                  className="w-full text-white"
+                  style={{ backgroundColor: partner?.primary_color || '#1A1A1A' }}
+                  onClick={() => { addToCart(detailDish); setDetailDish(null); }}
+                >
+                  {t('menu.add_to_cart', 'Добавить в корзину')}
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Sticky cart bar - updated for TableSession */}
       {view === "menu" && (() => {
