@@ -1373,17 +1373,20 @@ export default function X() {
       if (!p) return null;
 
       const byIdFirst = looksLikePartnerId(p);
+      let primaryError = null;
 
       try {
         const res = await base44.entities.Partner.filter(byIdFirst ? { id: p } : { slug: p });
         if (res?.[0]) return res[0];
       } catch (e) {
-        // Partner primary lookup failed — try fallback
+        primaryError = e;
       }
 
       // Fallback lookup — let errors propagate to React Query (PM-070)
       const res2 = await base44.entities.Partner.filter(byIdFirst ? { slug: p } : { id: p });
-      return res2?.[0] || null;
+      if (res2?.[0]) return res2[0];
+      if (primaryError) throw primaryError;
+      return null;
     },
   });
 
