@@ -130,6 +130,16 @@ session: 165
 
 ## Fixed Bugs (исправлены)
 
+### FIX-BATCH6-CHAIN-fd04: PM-107, PM-103, PM-102, PM-108 — FIXED S166
+- **Когда:** S166, chain publicmenu-260323-140917-fd04
+- **Файл:** x.jsx, MenuView.jsx
+- **Баги:**
+  - PM-107 (P1): Programmatic BS close collapsed entire sheet stack (regression from КС-4). Fix: set `isPopStateClosingRef=true` before `history.back()` in `popOverlay`; guard `popstate` handler to skip when flag set.
+  - PM-103 (P2): Toast thin line on Android — empty text from missing i18n key. Fix: added `menu.added_to_cart` to `I18N_FALLBACKS`, moved toast to top-center with `z-[200]` and `min-h-[36px]`.
+  - PM-102 (P2): Dish detail "Add to cart" button empty — missing i18n key. Fix: added `menu.add_to_cart` to `I18N_FALLBACKS`.
+  - PM-108 (P2): "+" button clipped in list-mode — fixed `h-24` → `min-h-[96px]` on content column.
+- **Skipped:** PM-104 (P3, requires CartView.jsx which is read-only). PM-096, PM-discount-check, #84b already fixed in prior КС.
+
 ### FIX-PM-102-103-106-104-CHAIN-3bf4: Dish card detail, toast, tile price, chevron — FIXED S165
 - **Когда:** S165, chain publicmenu-260323-125539-3bf4
 - **Файл:** MenuView.jsx, x.jsx

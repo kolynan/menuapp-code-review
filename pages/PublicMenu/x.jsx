@@ -513,6 +513,9 @@ const I18N_FALLBACKS = {
   "cart.confirm_table.benefit_loyalty": "По онлайн-заказу вы получите бонусы / скидку",
   "cart.confirm_table.benefit_default": "Так официант быстрее найдёт ваш заказ",
   "cart.confirm_table.submit": "Отправить",
+  // Menu — dish actions (PM-102, PM-103)
+  "menu.added_to_cart": "Добавлено в корзину",
+  "menu.add_to_cart": "Добавить в корзину",
 };
 
 /**
@@ -1306,6 +1309,7 @@ export default function X() {
   const popOverlay = useCallback((name) => {
     overlayStackRef.current = overlayStackRef.current.filter(n => n !== name);
     if (!isPopStateClosingRef.current) {
+      isPopStateClosingRef.current = true;
       window.history.back();
     }
   }, []);
@@ -2372,6 +2376,11 @@ export default function X() {
   // PM-S81-15 + PM-105: Android back button closes topmost overlay (stack-based)
   useEffect(() => {
     const handlePopState = () => {
+      // PM-107: If popOverlay triggered this back, skip — sheet already closed
+      if (isPopStateClosingRef.current) {
+        isPopStateClosingRef.current = false;
+        return;
+      }
       const stack = overlayStackRef.current;
       if (stack.length === 0) return; // No overlay open — let browser handle normally
 

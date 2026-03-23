@@ -115,7 +115,7 @@ export default function MenuView({
           </div>
 
           {/* Text TOP-RIGHT, button BOTTOM-RIGHT */}
-          <div className="flex-1 min-w-0 flex flex-col justify-between h-24">
+          <div className="flex-1 min-w-0 flex flex-col justify-between min-h-[96px]">
             <div>
               <h3 className="font-semibold text-base text-slate-900 line-clamp-2">{getDishName(dish)}</h3>
               {getDishDescription(dish) && (
@@ -374,7 +374,7 @@ export default function MenuView({
 
       {/* Toast feedback on add to cart (AC-09) */}
       {toastVisible && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-white text-sm rounded-lg px-4 py-2 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-slate-800 text-white text-sm rounded-lg px-4 py-2 min-h-[36px] flex items-center shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
           {t('menu.added_to_cart', '\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E')}
         </div>
       )}
