@@ -13,7 +13,7 @@ session: 164
 
 ## Active Bugs (не исправлены)
 
-*11 active bugs remaining (0x P0, 7x P1, 3x P2, 0x P3, 1x suggestion).*
+*9 active bugs remaining (0x P0, 5x P1, 3x P2, 0x P3, 1x suggestion).*
 
 ### BUG-PM-056: Drawer layout not visit-state-driven (P1 — Batch 2)
 - **Приоритет:** P1
@@ -83,12 +83,8 @@ session: 164
 - **Симптом:** "new" and "accepted" statuses use blue, but STYLE_GUIDE says sent/waiting=amber. Task constraint said "do NOT change status colors."
 - **Фикс:** If Arman decides to align with STYLE_GUIDE, change blue→amber for these intermediate statuses.
 
-### BUG-PM-064: Partner lookup hides backend failures (P1)
-- **Приоритет:** P1
-- **Когда:** S153 (Codex review, chain publicmenu-260321-110752)
-- **Файл:** x.jsx
-- **Симптом:** Partner query catches all errors and shows "restaurant not found" even for network failures.
-- **Фикс:** Distinguish network errors from 404 and show appropriate message.
+### BUG-PM-064: Partner lookup hides backend failures (P1) — FIXED S164 (as PM-070)
+- **Приоритет:** P1 — duplicate of PM-070, fixed in chain publicmenu-260323-112857-466b
 
 ### BUG-PM-065: Hall StickyCartBar ignores visit lifecycle state (P1)
 - **Приоритет:** P1
@@ -109,19 +105,12 @@ session: 164
 - **Файл:** x.jsx
 - **Симптом:** Parent doesn't track previous cart count for animation triggers.
 
-### BUG-PM-070: Partner lookup hides backend failures as "not found" (P1)
-- **Приоритет:** P1
-- **Когда:** S154 (Codex review, chain publicmenu-260321-140331, Finding #4 — SKIPPED by merge)
-- **Файл:** x.jsx:1321, x.jsx:3029
-- **Симптом:** Partner query swallows exceptions and returns `null`, then page always renders `error.partner_not_found`. Transient backend failure is misreported as bad QR link. User sees "restaurant not found" instead of retryable error.
-- **Фикс:** Preserve request errors separately from true not-found. Render retryable error UI for backend failures.
-
-### BUG-PM-069: Bottom Sheet missing cooldown/lockout countdown display (P2)
+### BUG-PM-069-B: Bottom Sheet missing cooldown/lockout countdown display (P2)
 - **Приоритет:** P2
-- **Когда:** S153 (chain publicmenu-260321-140331)
+- **Когда:** S153 (chain publicmenu-260321-140331), Part A fixed S164
 - **Файл:** x.jsx
-- **Симптом:** Table confirmation Bottom Sheet shows codeVerificationError but doesn't display attempt counter or lockout countdown. CartView cooldown logic still prevents brute-force via shared state, but user doesn't see countdown in Bottom Sheet.
-- **Фикс:** Lift codeAttempts/codeLockedUntil/nowTs state to x.jsx scope and display in Bottom Sheet.
+- **Симптом:** Table confirmation Bottom Sheet doesn't display attempt counter or lockout countdown. CartView cooldown logic still prevents brute-force via shared state, but user doesn't see countdown in Bottom Sheet.
+- **Фикс:** Lift codeAttempts/codeLockedUntil/nowTs state to x.jsx scope (requires useHallTable hook modification — separate task).
 
 ### BUG-PM-072: Mobile grid partner setting ignored in MenuView (P2) — FIXED S159
 - **Приоритет:** P2
@@ -130,16 +119,28 @@ session: 164
 - **Симптом:** `grid-cols-2` hardcoded on mobile despite `partner.menu_grid_mobile` setting. MOBILE_GRID missing `3: "grid-cols-3"`.
 - **Фикс:** Added `3: "grid-cols-3"` to MOBILE_GRID. Replaced hardcoded `grid-cols-2` with `MOBILE_GRID[mobileCols]` on mobile path.
 
-### BUG-PM-073: useTableSession loses restored guests with only `_id` (P2)
+### BUG-PM-073: Guest ID normalization scope inconsistency in x.jsx (P2) — FIXED S164
 - **Приоритет:** P2
-- **Когда:** S155D (Codex review, chain publicmenu-260321-195108)
-- **Файл:** useTableSession.jsx
-- **Симптом:** `currentGuestIdRef.current` uses `.id` instead of `normalizeGuestId()` — restored guests with only `_id` field may be missed.
-- **Фикс:** Use `normalizeGuestId()` consistently.
+- **Когда:** S155D, fixed S164 chain publicmenu-260323-112857-466b
+- **Файл:** x.jsx
+- **Симптом:** `normalizeId` was block-scoped inside try block; create-guest path used inline `String(guest?.id ?? guest?._id ?? "")`.
+- **Фикс:** Moved `normalizeId` to shared scope, both paths now use it.
 
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-PM-070-074-075-073-069A-CHAIN-466b: 5 x.jsx logic fixes — FIXED S164
+- **Когда:** S164, chain publicmenu-260323-112857-466b
+- **Файл:** x.jsx
+- **Баги:**
+  - PM-070 (P1): Partner lookup separates network errors from not-found — removed second try/catch, added retry UI with `refetchPartner()`
+  - PM-074 (P1): OrderStatusScreen separates fetch errors from not-found — split `orderError || !order` into two blocks, added retry UI with `refetchOrder()`
+  - PM-075 (P2): Auto-submit setTimeout tracked in `autoSubmitTimerRef` with cleanup
+  - PM-073 (P2): `normalizeId` moved to shared scope so both guest paths use same function
+  - PM-069 Part A (P2): BS table code auto-clears input 500ms after wrong entry
+- **Skipped:** PM-069 Part B (lockout countdown UI) — requires useHallTable hook modification (out of scope)
+- **Коммит:** 7c42b32
 
 ### FIX-PM-S81-15-076-CHAIN-0c33: Android back button + console.error cleanup — FIXED S164
 - **Когда:** S164, chain publicmenu-260323-103002-0c33
