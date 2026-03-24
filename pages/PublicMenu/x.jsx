@@ -713,7 +713,7 @@ function OrderConfirmationScreen({
                   <span className="text-slate-400">x{item.quantity}</span>
                 </span>
                 <span className="text-slate-700 font-medium tabular-nums">
-                  {formatPrice(item.price * item.quantity)}
+                  {formatPrice(Math.round(item.price * item.quantity * 100) / 100)}
                 </span>
               </div>
             ))}
@@ -1998,7 +1998,7 @@ export default function X() {
   }, [sortedCategoriesAll, visibleDishes, orderMode]);
 
   const cartTotalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
-  const cartTotalAmount = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  const cartTotalAmount = cart.reduce((acc, item) => acc + Math.round(item.price * item.quantity * 100) / 100, 0);
 
   // Loyalty hook
   const {
@@ -2585,7 +2585,7 @@ export default function X() {
         dish_name: item.name,
         dish_price: item.price,
         quantity: item.quantity,
-        line_total: item.price * item.quantity,
+        line_total: Math.round(item.price * item.quantity * 100) / 100,
         split_type: splitType,
       }));
 
@@ -2964,7 +2964,7 @@ export default function X() {
           dish_name: item.name,
           dish_price: item.price,
           quantity: item.quantity,
-          line_total: item.price * item.quantity,
+          line_total: Math.round(item.price * item.quantity * 100) / 100,
         }));
 
         await base44.entities.OrderItem.bulkCreate(orderItemsData);

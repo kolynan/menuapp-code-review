@@ -422,10 +422,8 @@ export default function CartView({
 
   return (
     <div className="max-w-2xl mx-auto px-4 mt-2 pb-4">
-      {/* Drag handle + chevron close — sticky top (#87 KS-2, PM-083/084/085) */}
-      <div className="sticky top-0 z-10 bg-white px-4 pt-3 pb-1 flex items-center justify-between">
-        <div className="w-9" /> {/* Spacer to balance the close button */}
-        <div className="w-12 h-1.5 bg-gray-300 rounded-full" /> {/* Drag handle */}
+      {/* Chevron close — sticky top (#87 KS-2, PM-083/084/085, PM-121 removed custom handle) */}
+      <div className="sticky top-0 z-10 bg-white px-4 pt-3 pb-1 flex items-center justify-end">
         <button
           className="w-11 h-11 flex items-center justify-center -mr-2"
           onClick={() => { if (isSubmitting) return; onClose ? onClose() : setView("menu"); }}
@@ -797,7 +795,7 @@ export default function CartView({
                     <div className="text-xs text-slate-500">{formatPrice(item.price)} × {item.quantity}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-900">{formatPrice(item.price * item.quantity)}</span>
+                    <span className="font-semibold text-slate-900">{formatPrice(Math.round(item.price * item.quantity * 100) / 100)}</span>
                     {/* FIX P2: Stepper (-/count/+) instead of just remove-all */}
                     <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
                       <button
