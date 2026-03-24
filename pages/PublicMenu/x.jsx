@@ -1645,6 +1645,26 @@ export default function X() {
     submitHelpRequest,
   } = useHelpRequests({ partner, currentTableId, t, toast, isRateLimitError, saveTableSelection });
 
+  // PM-126/PM-125: Help drawer open/close with overlay stack integration
+  const openHelpDrawer = useCallback(() => {
+    setIsHelpModalOpen(true);
+    pushOverlay('help');
+  }, [pushOverlay]);
+
+  const closeHelpDrawer = useCallback(() => {
+    popOverlay('help');
+    setIsHelpModalOpen(false);
+  }, [popOverlay]);
+
+  // PM-125: Cart-to-help sequencing — close cart first, 300ms delay, then open help
+  const handleHelpFromCart = useCallback(() => {
+    popOverlay('cart');
+    setDrawerMode(null);
+    setTimeout(() => {
+      openHelpDrawer();
+    }, 300);
+  }, [popOverlay, openHelpDrawer]);
+
   // OrderStages for the partner (for stage_id assignment)
   const { data: orderStages = [] } = useQuery({
     queryKey: ["orderStages", partner?.id],
@@ -2405,6 +2425,12 @@ export default function X() {
           } else {
             setDrawerMode(null);
           }
+          break;
+        case 'detailDish':
+          setDetailDish(null);
+          break;
+        case 'help':
+          setIsHelpModalOpen(false);
           break;
       }
       isPopStateClosingRef.current = false;
@@ -3329,7 +3355,7 @@ export default function X() {
           formatPrice={formatPrice}
           addToCart={addToCart}
           updateQuantity={updateQuantity}
-          onDishClick={(dish) => setDetailDish(dish)}
+          onDishClick={(dish) => { setDetailDish(dish); pushOverlay('detailDish'); }}
           t={t}
         />
       )}
@@ -3486,7 +3512,7 @@ export default function X() {
               handleRateDish={handleRateDish}
               ratingSavingByItemId={ratingSavingByItemId}
               onClose={() => { popOverlay('cart'); setDrawerMode(null); }}
-              onCallWaiter={handleOpenHelpModal}
+              onCallWaiter={handleHelpFromCart}
               isTableVerified={isTableVerified}
               tableCodeInput={tableCodeInput}
               setTableCodeInput={setTableCodeInput}
@@ -3515,7 +3541,15 @@ export default function X() {
           }
         }}
       >
-        <DrawerContent className="max-h-[85dvh] rounded-t-3xl z-[60]">
+        <DrawerContent className="max-h-[85dvh] rounded-t-3xl z-[60] relative">
+          {/* #143: Chevron close button — top-right */}
+          <button
+            onClick={() => { popOverlay('tableConfirm'); pendingSubmitRef.current = false; setShowTableConfirmSheet(false); }}
+            className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 z-10"
+            aria-label={t('common.close', 'Закрыть')}
+          >
+            <ChevronDown className="w-6 h-6" />
+          </button>
           <DrawerHeader className="text-center pb-2">
 
             <DrawerTitle className="text-lg font-semibold text-slate-900">
@@ -3607,28 +3641,85 @@ export default function X() {
           fabSuccess={fabSuccess}
           isSendingHelp={isSendingHelp}
           isHelpModalOpen={isHelpModalOpen}
-          onOpen={handleOpenHelpModal}
+          onOpen={openHelpDrawer}
           t={t}
         />
       )}
 
-      {/* Help Modal */}
-      {isHelpModalOpen && (
-        <HelpModal
-          onClose={() => setIsHelpModalOpen(false)}
-          t={t}
-          currentTableLabel={currentTable?.name || currentTable?.code || ""}
-          hasActiveRequest={hasActiveRequest}
-          selectedHelpType={selectedHelpType}
-          onSelectHelpType={handlePresetSelect}
-          helpComment={helpComment}
-          onChangeHelpComment={setHelpComment}
-          helpSubmitError={helpSubmitError}
-          isSendingHelp={isSendingHelp}
-          onSubmit={submitHelpRequest}
-          disabled={!currentTableId}
-        />
-      )}
+      {/* PM-125: Help as Bottom Drawer (replaces HelpModal Dialog) */}
+      <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
+        <DrawerContent className="max-h-[85vh] rounded-t-2xl">
+          <DrawerHeader className="text-center pb-2">
+            <DrawerTitle className="text-lg font-semibold text-slate-900">{t('help.modal_title', 'Нужна помощь?')}</DrawerTitle>
+            <p className="text-sm text-slate-500 mt-1">{t('help.modal_desc', 'Выберите, чем мы можем помочь')}</p>
+          </DrawerHeader>
+          <div className="px-4 pb-6 space-y-4">
+            {currentTable && (
+              <div className="flex items-center justify-center gap-2 text-sm text-slate-600">
+                <MapPin className="w-4 h-4" />
+                <span>{currentTable?.name || currentTable?.code}</span>
+              </div>
+            )}
+            {hasActiveRequest && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2 text-sm text-blue-700">
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse flex-shrink-0" />
+                {t('help.active_request', 'У вас уже есть активный запрос')}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: 'call_waiter', label: t('help.call_waiter', 'Позвать официанта') },
+                { id: 'bill', label: t('help.bill', 'Счёт') },
+                { id: 'napkins', label: t('help.napkins', 'Салфетки') },
+                { id: 'menu', label: t('help.menu', 'Меню') },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => handlePresetSelect(opt.id)}
+                  className={`min-h-[44px] rounded-lg border text-sm font-medium px-3 py-2 ${selectedHelpType === opt.id ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+              <button
+                onClick={() => handlePresetSelect('other')}
+                className={`min-h-[44px] rounded-lg border text-sm font-medium px-3 py-2 col-span-2 sm:col-span-1 ${selectedHelpType === 'other' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+              >
+                {t('help.other', 'Другое')}
+              </button>
+            </div>
+            <div>
+              <label className="text-sm text-slate-600 mb-1 block">
+                {selectedHelpType === 'other' ? t('help.comment_required', 'Опишите проблему *') : t('help.comment_optional', 'Комментарий (необязательно)')}
+              </label>
+              <textarea
+                value={helpComment}
+                onChange={(e) => setHelpComment(e.target.value)}
+                placeholder={selectedHelpType === 'other' ? t('help.comment_placeholder_other', 'Расскажите, что случилось...') : t('help.comment_placeholder', 'Добавьте комментарий...')}
+                className="w-full rounded-lg border border-slate-200 p-3 text-sm min-h-[80px] resize-none focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
+            {helpSubmitError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{helpSubmitError}</div>
+            )}
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1 min-h-[44px]" onClick={closeHelpDrawer} disabled={isSendingHelp}>
+                {t('common.cancel', 'Отмена')}
+              </Button>
+              <Button
+                className="flex-1 min-h-[44px] text-white"
+                style={{ backgroundColor: primaryColor }}
+                onClick={submitHelpRequest}
+                disabled={isSendingHelp || !currentTableId}
+              >
+                {isSendingHelp ? (
+                  <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />{t('common.loading', 'Отправка...')}</span>
+                ) : t('help.submit', 'Отправить')}
+              </Button>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
       {/* P0-6: Removed custom toast - using sonner */}
 
@@ -3663,7 +3754,7 @@ export default function X() {
       />
 
       {/* PM-102/PM-122: Dish Detail as Bottom Drawer */}
-      <Drawer open={!!detailDish} onOpenChange={(open) => !open && setDetailDish(null)}>
+      <Drawer open={!!detailDish} onOpenChange={(open) => { if (!open) { popOverlay('detailDish'); setDetailDish(null); } }}>
         <DrawerContent className="max-h-[88vh] rounded-t-2xl overflow-hidden p-0">
           <DrawerTitle className="sr-only">{detailDish ? getDishName(detailDish) : ''}</DrawerTitle>
           {detailDish && (
@@ -3680,7 +3771,7 @@ export default function X() {
                   </div>
                 )}
                 <button
-                  onClick={() => setDetailDish(null)}
+                  onClick={() => { popOverlay('detailDish'); setDetailDish(null); }}
                   className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-black/40 text-white"
                   aria-label={t('common.close', 'Закрыть')}
                 >
@@ -3733,7 +3824,7 @@ export default function X() {
                   variant="ghost"
                   className="w-full min-h-[44px]"
                   style={{ backgroundColor: partner?.primary_color || '#1A1A1A', color: '#FFFFFF' }}
-                  onClick={() => { addToCart(detailDish); setDetailDish(null); }}
+                  onClick={() => { addToCart(detailDish); popOverlay('detailDish'); setDetailDish(null); }}
                 >
                   {t('menu.add_to_cart', 'Добавить в корзину')}
                 </Button>
@@ -3742,6 +3833,17 @@ export default function X() {
           )}
         </DrawerContent>
       </Drawer>
+
+      {/* PM-127: Bell icon on main menu — opens help drawer directly */}
+      {view === "menu" && orderMode === "hall" && isTableVerified && currentTableId && drawerMode !== 'cart' && (
+        <button
+          onClick={openHelpDrawer}
+          className="fixed bottom-20 left-4 z-40 min-w-[44px] min-h-[44px] p-3 rounded-full bg-amber-50 text-amber-600 shadow-lg border border-amber-200 flex items-center justify-center"
+          aria-label={t('help.call_waiter', 'Позвать официанта')}
+        >
+          <Bell className="w-5 h-5" />
+        </button>
+      )}
 
       {/* Sticky cart bar - updated for TableSession */}
       {view === "menu" && (() => {

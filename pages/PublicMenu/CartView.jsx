@@ -422,20 +422,8 @@ export default function CartView({
 
   return (
     <div className="max-w-2xl mx-auto px-4 mt-2 pb-4">
-      {/* Chevron close — sticky top (#87 KS-2, PM-083/084/085, PM-121 removed custom handle) */}
-      <div className="sticky top-0 z-10 bg-white px-4 pt-3 pb-1 flex items-center justify-end">
-        <button
-          className="w-11 h-11 flex items-center justify-center -mr-2"
-          onClick={() => { if (isSubmitting) return; onClose ? onClose() : setView("menu"); }}
-          aria-label="Close cart"
-        >
-          <ChevronDown
-            className={`w-9 h-9 ${isSubmitting ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500'}`}
-          />
-        </button>
-      </div>
-      {/* P0 Header: [🔔] Стол · Гость */}
-      <div className="bg-white rounded-lg shadow-sm border p-3 mb-4">
+      {/* P0 Header: [🔔] Стол · Гость · [˅] — #140: chevron moved into table card, not sticky */}
+      <div className="bg-white rounded-lg shadow-sm border p-3 mb-4 mt-2">
         <div className="flex items-center justify-between">
           {/* Left: Call waiter */}
           {onCallWaiter && (
@@ -471,7 +459,7 @@ export default function CartView({
                   <button onClick={() => { setIsEditingName(false); setGuestNameInput(''); }} className="text-slate-400 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label={tr('common.cancel', 'Отмена')}>✕</button>
                 </span>
               ) : (
-                <button 
+                <button
                   onClick={() => { setGuestNameInput(currentGuest?.name || ''); setIsEditingName(true); }}
                   className="hover:underline"
                   style={{color: primaryColor}}
@@ -482,7 +470,16 @@ export default function CartView({
             </div>
           </div>
 
-          {/* Right: Close button removed — replaced by chevron-down above (#87 KS-2) */}
+          {/* Right: Chevron close — #140 moved from sticky row into table card */}
+          <button
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center"
+            onClick={() => { if (isSubmitting) return; onClose ? onClose() : setView("menu"); }}
+            aria-label="Close cart"
+          >
+            <ChevronDown
+              className={`w-7 h-7 ${isSubmitting ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500'}`}
+            />
+          </button>
         </div>
       </div>
 

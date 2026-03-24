@@ -132,6 +132,25 @@ session: 168
 
 ## Fixed Bugs (исправлены)
 
+### FIX-CHAIN-30fb: PM-126+PM-125+PM-127+#143+#140 — Drawers & Android Back — FIXED S176
+- **Когда:** S176, chain publicmenu-260324-190433-30fb
+- **Файлы:** x.jsx, CartView.jsx
+- **Баги:**
+  - PM-126 (P1): Android Back now closes all 4 drawers (detail card, cart, table code, help) via extended overlay stack — added 'detailDish' and 'help' cases to handlePopState
+  - PM-125 (P1): "Нужна помощь?" converted from Dialog (HelpModal) to inline Drawer (bottom sheet). Cart bell now closes cart first (300ms delay) then opens help drawer. Two open paths: from-cart (delayed) and from-FAB/bell (immediate)
+  - PM-127 (P2): Bell icon restored on main menu (fixed bottom-left, amber style, visible in hall mode when table verified)
+  - #143 (P3): Chevron close button added to table code drawer (top-right, bg-gray-200, 44×44 touch target)
+  - #140 (P2): Cart chevron moved from separate sticky row into table info card right side (non-sticky, isSubmitting guard preserved)
+
+### FIX-CHAIN-d45d: PM-122+PM-123+PM-118 — Detail card drawer + layout + discount — FIXED S173
+- **Когда:** S173, chain publicmenu-260324-153540-d45d
+- **Файл:** x.jsx
+- **Баги:**
+  - PM-122 (P2): Detail card Dialog → Drawer (bottom sheet, max-h-[88vh], close chevron, sr-only DrawerTitle, scrollable content, sticky bottom bar)
+  - PM-123 (P2): Content reorder: Photo → Title → Description → Price+Discount → Rating → Sticky bar (was: Title → Price → Rating → Description)
+  - PM-118 (P2): Discount display aligned to partner-level fields (partner.discount_enabled, partner.discount_percent), matching MenuView.jsx pattern
+- **Commit:** 98f67d0
+
 ### FIX-CHAIN-f92b: PM-108+PM-110+PM-111 — Card layout redesign — FIXED S168
 - **Когда:** S168, chain publicmenu-260323-205015-f92b
 - **Файл:** MenuView.jsx
