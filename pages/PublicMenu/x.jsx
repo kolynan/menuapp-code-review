@@ -26,6 +26,7 @@ import {
   Check,
   CheckCircle2,
   Clock,
+  ChevronDown,
   ChevronUp,
   Image as ImageIcon,
   Loader2,
@@ -3661,40 +3662,56 @@ export default function X() {
         loading={loadingDishReviews}
       />
 
-      {/* PM-102: Dish Detail Dialog */}
-      <Dialog open={!!detailDish} onOpenChange={(open) => !open && setDetailDish(null)}>
-        <DialogContent className="max-w-md p-0 overflow-hidden">
+      {/* PM-102/PM-122: Dish Detail as Bottom Drawer */}
+      <Drawer open={!!detailDish} onOpenChange={(open) => !open && setDetailDish(null)}>
+        <DrawerContent className="max-h-[88vh] rounded-t-2xl overflow-hidden p-0">
+          <DrawerTitle className="sr-only">{detailDish ? getDishName(detailDish) : ''}</DrawerTitle>
           {detailDish && (
-            <>
-              {detailDish.image && (
-                <div className="w-full aspect-square bg-slate-100">
-                  <img
-                    src={detailDish.image}
-                    alt={getDishName(detailDish)}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-              <div className="p-4 space-y-3">
-                <DialogHeader>
-                  <DialogTitle className="text-lg font-bold text-slate-900">
-                    {getDishName(detailDish)}
-                  </DialogTitle>
-                </DialogHeader>
+            <div className="flex flex-col h-full">
+              {/* Photo with close chevron */}
+              <div className="relative w-full flex-shrink-0">
+                {detailDish.image && (
+                  <div className="w-full aspect-square bg-slate-100">
+                    <img
+                      src={detailDish.image}
+                      alt={getDishName(detailDish)}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                <button
+                  onClick={() => setDetailDish(null)}
+                  className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-black/40 text-white"
+                  aria-label={t('common.close', 'Закрыть')}
+                >
+                  <ChevronDown className="w-6 h-6" />
+                </button>
+              </div>
+              {/* Scrollable content: PM-123 order: Title → Description → Price+Discount → Rating */}
+              <div className="overflow-y-auto flex-1 p-4 space-y-3">
+                <h2 className="text-lg font-bold text-slate-900">
+                  {getDishName(detailDish)}
+                </h2>
+                {getDishDescription(detailDish) && (
+                  <p className="text-sm text-slate-500">
+                    {getDishDescription(detailDish)}
+                  </p>
+                )}
+                {/* PM-118: Discount display — partner-level pattern (matches MenuView.jsx) */}
                 <div className="flex items-baseline gap-2">
-                  {detailDish.discount_enabled === true && detailDish.original_price ? (
+                  {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
                     <>
                       <span className="text-lg font-bold" style={{ color: partner?.primary_color || '#1A1A1A' }}>
-                        {formatPrice(detailDish.price)}
+                        {formatPrice(Math.round(detailDish.price * (1 - partner.discount_percent / 100)))}
                       </span>
                       <span className="text-sm text-slate-400 line-through">
-                        {formatPrice(detailDish.original_price)}
+                        {formatPrice(detailDish.price)}
                       </span>
                       <span
                         className="text-xs font-bold text-white px-2 py-0.5 rounded-full"
                         style={{ backgroundColor: partner?.discount_color || '#C92A2A' }}
                       >
-                        -{Math.round((1 - detailDish.price / detailDish.original_price) * 100)}%
+                        -{partner.discount_percent}%
                       </span>
                     </>
                   ) : (
@@ -3709,11 +3726,9 @@ export default function X() {
                     <span>({dishRatings[detailDish.id]?.count})</span>
                   </div>
                 )}
-                {getDishDescription(detailDish) && (
-                  <p className="text-sm text-slate-500">
-                    {getDishDescription(detailDish)}
-                  </p>
-                )}
+              </div>
+              {/* Sticky bottom bar */}
+              <div className="sticky bottom-0 bg-white p-4 border-t border-slate-100">
                 <Button
                   variant="ghost"
                   className="w-full min-h-[44px]"
@@ -3723,10 +3738,10 @@ export default function X() {
                   {t('menu.add_to_cart', 'Добавить в корзину')}
                 </Button>
               </div>
-            </>
+            </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </DrawerContent>
+      </Drawer>
 
       {/* Sticky cart bar - updated for TableSession */}
       {view === "menu" && (() => {
