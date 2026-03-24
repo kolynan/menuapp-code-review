@@ -148,7 +148,7 @@ export default function MenuView({
               </span>
             )}
             {/* Add/Stepper button — overlay on image bottom-right (PM-108+PM-110+PM-115) */}
-            <div className="absolute inset-0 flex items-center justify-center z-10" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute bottom-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
               {!inCart ? (
                 <button
                   onClick={() => handleAddToCart(dish)}
