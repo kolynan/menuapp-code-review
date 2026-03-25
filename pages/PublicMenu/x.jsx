@@ -2748,8 +2748,8 @@ export default function X() {
     // silently blocking the BS trigger.
     if (orderMode === "hall" && !isTableVerified) {
       pendingSubmitRef.current = true;
-      pushOverlay('tableConfirm');
       setShowTableConfirmSheet(true);
+      requestAnimationFrame(() => pushOverlay('tableConfirm'));
       return;
     }
 
@@ -3648,7 +3648,14 @@ export default function X() {
 
       {/* PM-125: Help as Bottom Drawer (replaces HelpModal Dialog) */}
       <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
-        <DrawerContent className="max-h-[85vh] rounded-t-2xl">
+        <DrawerContent className="max-h-[85vh] rounded-t-2xl relative">
+          <button
+            onClick={closeHelpDrawer}
+            className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 z-10"
+            aria-label={t('common.close', 'Закрыть')}
+          >
+            <ChevronDown className="w-6 h-6" />
+          </button>
           <DrawerHeader className="text-center pb-2">
             <DrawerTitle className="text-lg font-semibold text-slate-900">{t('help.modal_title', 'Нужна помощь?')}</DrawerTitle>
             <p className="text-sm text-slate-500 mt-1">{t('help.modal_desc', 'Выберите, чем мы можем помочь')}</p>
@@ -3835,7 +3842,7 @@ export default function X() {
       </Drawer>
 
       {/* PM-127: Bell icon on main menu — opens help drawer directly */}
-      {view === "menu" && orderMode === "hall" && isTableVerified && currentTableId && drawerMode !== 'cart' && (
+      {view === "menu" && isHallMode && drawerMode !== 'cart' && (
         <button
           onClick={openHelpDrawer}
           className="fixed bottom-20 left-4 z-40 min-w-[44px] min-h-[44px] p-3 rounded-full bg-amber-50 text-amber-600 shadow-lg border border-amber-200 flex items-center justify-center"
