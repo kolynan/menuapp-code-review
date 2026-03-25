@@ -1353,7 +1353,9 @@ export default function X() {
   // Hall UI state (not in session hook)
   const [splitType, setSplitType] = useState('single'); // 'single' | 'all'
   const [otherGuestsExpanded, setOtherGuestsExpanded] = useState(false);
-  const [guestNameInput, setGuestNameInput] = useState('');
+  const [guestNameInput, setGuestNameInput] = useState(() => {
+    try { return localStorage.getItem('menuapp_guest_name') || ''; } catch (e) { return ''; }
+  });
   const [isEditingName, setIsEditingName] = useState(false);
 
   // Bill request state
@@ -3140,20 +3142,26 @@ export default function X() {
 
   // Update guest name (inline on cart page)
   const handleUpdateGuestName = async () => {
-    if (!currentGuest?.id || !guestNameInput.trim()) return;
-    
+    const trimmedName = guestNameInput.trim();
+    if (!trimmedName) return;
+
     try {
-      await base44.entities.SessionGuest.update(currentGuest.id, {
-        name: guestNameInput.trim()
-      });
-      
-      setCurrentGuest(prev => ({ ...prev, name: guestNameInput.trim() }));
-      setSessionGuests(prev => prev.map(g => 
-        g.id === currentGuest.id ? { ...g, name: guestNameInput.trim() } : g
-      ));
+      // DB update only if guest record exists
+      if (currentGuest?.id) {
+        await base44.entities.SessionGuest.update(currentGuest.id, {
+          name: trimmedName
+        });
+        setSessionGuests(prev => prev.map(g =>
+          g.id === currentGuest.id ? { ...g, name: trimmedName } : g
+        ));
+      }
+
+      // Always: persist locally + update state
+      try { localStorage.setItem('menuapp_guest_name', trimmedName); } catch (e) { /* quota */ }
+      setCurrentGuest(prev => prev ? { ...prev, name: trimmedName } : prev);
       setIsEditingName(false);
       setGuestNameInput('');
-      
+
       toast.success(t('guest.name_saved'), { id: 'mm1' });
     } catch (err) {
       // silent

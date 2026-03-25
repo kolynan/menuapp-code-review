@@ -719,7 +719,7 @@ export default function CartView({
 
                                 {/* Draft rating stars - show always if reviews enabled */}
                                 {reviewsEnabled && (
-                                  <div className="flex items-center gap-2 pl-2">
+                                  <div className="flex items-center gap-2 pl-2 py-2">
                                     <Rating
                                       value={draftRating}
                                       onChange={(val) => {
@@ -735,7 +735,7 @@ export default function CartView({
                                           });
                                         }
                                       }}
-                                      size="sm"
+                                      size="md"
                                       readonly={draftRating > 0 || hasReview || ratingSavingByItemId?.[itemId]}
                                     />
                                     {ratingSavingByItemId?.[itemId] && (
@@ -774,6 +774,20 @@ export default function CartView({
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* CTA: Add more items when cart is empty but orders exist */}
+      {cart.length === 0 && myOrders.length > 0 && (
+        <div className="mt-4 px-4">
+          <Button
+            variant="outline"
+            className="w-full min-h-[44px]"
+            style={{borderColor: primaryColor, color: primaryColor}}
+            onClick={() => { onClose ? onClose() : setView("menu"); }}
+          >
+            + {tr('cart.add_more', 'Добавить к заказу')}
+          </Button>
+        </div>
       )}
 
       {/* SECTION 2: NEW ORDER */}
