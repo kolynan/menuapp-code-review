@@ -1652,10 +1652,20 @@ export default function X() {
   const pendingQuickSendRef = useRef(null);
 
   // PM-126/PM-125: Help drawer open/close with overlay stack integration
+  // PM-133: Guard for null currentTableId — redirect to table code entry
+  // PM-135: Reset all help drawer state before opening
   const openHelpDrawer = useCallback(() => {
+    if (!currentTableId) {
+      setShowTableConfirmSheet(true);
+      return;
+    }
+    setHelpQuickSent(false);
+    setSendingCardId(null);
+    setShowOtherForm(false);
+    setHelpComment('');
     setIsHelpModalOpen(true);
     pushOverlay('help');
-  }, [pushOverlay]);
+  }, [pushOverlay, currentTableId, setShowTableConfirmSheet, setHelpComment]);
 
   // Fix 5: closeHelpDrawer resets all new state
   const closeHelpDrawer = useCallback(() => {
@@ -3696,7 +3706,7 @@ export default function X() {
 
       {/* PM-125: Help as Bottom Drawer (replaces HelpModal Dialog) */}
       <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
-        <DrawerContent className="max-h-[85vh] rounded-t-2xl">
+        <DrawerContent className="max-h-[85vh] rounded-t-2xl flex flex-col">
           <div className="relative">
             <button
               onClick={closeHelpDrawer}
@@ -3710,7 +3720,7 @@ export default function X() {
               <p className="text-sm text-slate-500 mt-1">{t('help.modal_desc', 'Выберите, чем мы можем помочь')}</p>
             </DrawerHeader>
           </div>
-          <div className="px-4 pb-6 space-y-4">
+          <div className="px-4 pb-6 space-y-4 overflow-y-auto flex-1">
             {currentTable && (
               <div className="flex items-center justify-center gap-2 text-sm text-slate-600">
                 <MapPin className="w-4 h-4" />
@@ -3763,34 +3773,39 @@ export default function X() {
                     <span className="text-sm font-medium text-slate-700">{t('help.other', 'Другое...')}</span>
                   </button>
                 </div>
-                {/* Expandable "Другое" form */}
-                <div className={`overflow-hidden transition-all duration-300 ${showOtherForm ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                {/* PM-134a+b: Conditional rendering + autoFocus for "Другое" textarea */}
+                {showOtherForm && (
                   <div className="space-y-3 pt-1">
                     <textarea
+                      autoFocus
                       value={helpComment}
                       onChange={(e) => setHelpComment(e.target.value)}
                       placeholder={t('help.comment_placeholder_other', 'Расскажите, что случилось...')}
                       className="w-full rounded-lg border border-slate-200 p-3 text-sm min-h-[80px] resize-none focus:outline-none focus:ring-2 focus:ring-blue-200"
                     />
-                    {/* Fix 6 (PM-131): disabled only by empty comment + sending */}
-                    <Button
-                      className="w-full min-h-[44px] text-white"
-                      style={{ backgroundColor: primaryColor }}
-                      onClick={submitHelpRequest}
-                      disabled={isSendingHelp || !helpComment.trim()}
-                    >
-                      {isSendingHelp ? (
-                        <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />{t('common.loading', 'Отправка...')}</span>
-                      ) : t('help.submit', 'Отправить')}
-                    </Button>
                   </div>
-                </div>
+                )}
                 {helpSubmitError && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{helpSubmitError}</div>
                 )}
               </>
             )}
           </div>
+          {/* PM-134c: Sticky submit button outside scrollable area */}
+          {showOtherForm && !helpQuickSent && (
+            <div className="px-4 pb-4 pt-2 border-t border-slate-100">
+              <Button
+                className="w-full min-h-[44px] text-white"
+                style={{ backgroundColor: primaryColor }}
+                onClick={submitHelpRequest}
+                disabled={isSendingHelp || !helpComment.trim()}
+              >
+                {isSendingHelp ? (
+                  <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />{t('common.loading', 'Отправка...')}</span>
+                ) : t('help.submit', 'Отправить')}
+              </Button>
+            </div>
+          )}
         </DrawerContent>
       </Drawer>
 
