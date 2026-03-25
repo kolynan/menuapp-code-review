@@ -3548,24 +3548,26 @@ export default function X() {
           }
         }}
       >
-        <DrawerContent className="max-h-[85dvh] rounded-t-3xl z-[60] relative">
-          {/* #143: Chevron close button — top-right */}
-          <button
-            onClick={() => { popOverlay('tableConfirm'); pendingSubmitRef.current = false; setShowTableConfirmSheet(false); }}
-            className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 z-10"
-            aria-label={t('common.close', 'Закрыть')}
-          >
-            <ChevronDown className="w-6 h-6" />
-          </button>
-          <DrawerHeader className="text-center pb-2">
+        <DrawerContent className="max-h-[85dvh] rounded-t-3xl z-[60]">
+          <div className="relative">
+            {/* #143: Chevron close button — top-right */}
+            <button
+              onClick={() => { popOverlay('tableConfirm'); pendingSubmitRef.current = false; setShowTableConfirmSheet(false); }}
+              className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 z-10"
+              aria-label={t('common.close', 'Закрыть')}
+            >
+              <ChevronDown className="w-6 h-6" />
+            </button>
+            <DrawerHeader className="text-center pb-2">
 
-            <DrawerTitle className="text-lg font-semibold text-slate-900">
-              {tr('cart.verify.enter_table_code', 'Введите код стола')}
-            </DrawerTitle>
-            <p className="text-xs text-gray-400 mt-2 px-4">
-              {tr('cart.verify.helper_text', 'Код указан на табличке вашего стола. Он нужен, чтобы официант знал куда нести заказ.')}
-            </p>
-          </DrawerHeader>
+              <DrawerTitle className="text-lg font-semibold text-slate-900">
+                {tr('cart.verify.enter_table_code', 'Введите код стола')}
+              </DrawerTitle>
+              <p className="text-xs text-gray-400 mt-2 px-4">
+                {tr('cart.verify.helper_text', 'Код указан на табличке вашего стола. Он нужен, чтобы официант знал куда нести заказ.')}
+              </p>
+            </DrawerHeader>
+          </div>
           <div className="px-6 pb-6">
             {/* Table code input */}
             <div className="flex flex-col items-center gap-4 mt-4">
