@@ -2182,6 +2182,14 @@ export default function X() {
     };
   }, [isTableVerified, currentTableId]);
 
+  // PM-128: Deferred pushOverlay for table confirm drawer — avoids disrupting vaul animation
+  useEffect(() => {
+    if (showTableConfirmSheet) {
+      const id = setTimeout(() => pushOverlay('tableConfirm'), 50);
+      return () => clearTimeout(id);
+    }
+  }, [showTableConfirmSheet, pushOverlay]);
+
   // Hall StickyBar mode: определяем что показывать
   const hallStickyMode =
     (cart?.length || 0) > 0
@@ -2749,7 +2757,6 @@ export default function X() {
     if (orderMode === "hall" && !isTableVerified) {
       pendingSubmitRef.current = true;
       setShowTableConfirmSheet(true);
-      requestAnimationFrame(() => pushOverlay('tableConfirm'));
       return;
     }
 
@@ -3648,18 +3655,20 @@ export default function X() {
 
       {/* PM-125: Help as Bottom Drawer (replaces HelpModal Dialog) */}
       <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
-        <DrawerContent className="max-h-[85vh] rounded-t-2xl relative">
-          <button
-            onClick={closeHelpDrawer}
-            className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 z-10"
-            aria-label={t('common.close', 'Закрыть')}
-          >
-            <ChevronDown className="w-6 h-6" />
-          </button>
-          <DrawerHeader className="text-center pb-2">
-            <DrawerTitle className="text-lg font-semibold text-slate-900">{t('help.modal_title', 'Нужна помощь?')}</DrawerTitle>
-            <p className="text-sm text-slate-500 mt-1">{t('help.modal_desc', 'Выберите, чем мы можем помочь')}</p>
-          </DrawerHeader>
+        <DrawerContent className="max-h-[85vh] rounded-t-2xl">
+          <div className="relative">
+            <button
+              onClick={closeHelpDrawer}
+              className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 z-10"
+              aria-label={t('common.close', 'Закрыть')}
+            >
+              <ChevronDown className="w-6 h-6" />
+            </button>
+            <DrawerHeader className="text-center pb-2">
+              <DrawerTitle className="text-lg font-semibold text-slate-900">{t('help.modal_title', 'Нужна помощь?')}</DrawerTitle>
+              <p className="text-sm text-slate-500 mt-1">{t('help.modal_desc', 'Выберите, чем мы можем помочь')}</p>
+            </DrawerHeader>
+          </div>
           <div className="px-4 pb-6 space-y-4">
             {currentTable && (
               <div className="flex items-center justify-center gap-2 text-sm text-slate-600">
