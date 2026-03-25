@@ -132,6 +132,14 @@ session: 168
 
 ## Fixed Bugs (исправлены)
 
+### FIX-CHAIN-c028: #150+PM-131 — Help drawer redesign + submit fix — FIXED S177
+- **Когда:** S177, chain publicmenu-260325-131945-c028
+- **Файлы:** x.jsx
+- **Баги:**
+  - #150 (P2): Help drawer redesigned — replaced multi-step type-selector+textarea flow with 4 one-tap quick-action cards (2x2 grid) + "Другое" expandable form. Cards send immediately via `handleQuickSend` + `pendingQuickSendRef` pattern. Success state with auto-close after 2s.
+  - PM-131 (P2): Submit button in "Другое" form — removed `!currentTableId` from disabled condition, now `disabled={isSendingHelp || !helpComment.trim()}` only.
+  - Added states: `helpQuickSent`, `sendingCardId`, `showOtherForm`. All reset on `closeHelpDrawer`.
+
 ### FIX-CHAIN-30fb: PM-126+PM-125+PM-127+#143+#140 — Drawers & Android Back — FIXED S176
 - **Когда:** S176, chain publicmenu-260324-190433-30fb
 - **Файлы:** x.jsx, CartView.jsx

@@ -1645,16 +1645,55 @@ export default function X() {
     submitHelpRequest,
   } = useHelpRequests({ partner, currentTableId, t, toast, isRateLimitError, saveTableSelection });
 
+  // #150: Help drawer one-tap cards — new state
+  const [helpQuickSent, setHelpQuickSent] = useState(false);
+  const [sendingCardId, setSendingCardId] = useState(null);
+  const [showOtherForm, setShowOtherForm] = useState(false);
+  const pendingQuickSendRef = useRef(null);
+
   // PM-126/PM-125: Help drawer open/close with overlay stack integration
   const openHelpDrawer = useCallback(() => {
     setIsHelpModalOpen(true);
     pushOverlay('help');
   }, [pushOverlay]);
 
+  // Fix 5: closeHelpDrawer resets all new state
   const closeHelpDrawer = useCallback(() => {
     popOverlay('help');
     setIsHelpModalOpen(false);
-  }, [popOverlay]);
+    setHelpQuickSent(false);
+    setSendingCardId(null);
+    setShowOtherForm(false);
+    setHelpComment('');
+  }, [popOverlay, setHelpComment]);
+
+  // Fix 1 + Fix 4: Quick-send handler for one-tap cards
+  const handleQuickSend = useCallback((type) => {
+    setSendingCardId(type);
+    pendingQuickSendRef.current = type;
+    handlePresetSelect(type);
+  }, [handlePresetSelect]);
+
+  // Fix 1: Auto-submit when selectedHelpType matches pending quick send
+  useEffect(() => {
+    if (pendingQuickSendRef.current && selectedHelpType === pendingQuickSendRef.current) {
+      pendingQuickSendRef.current = null;
+      const result = submitHelpRequest();
+      // Handle both sync and async submitHelpRequest
+      const onSuccess = () => {
+        setHelpQuickSent(true);
+        setSendingCardId(null);
+        // Fix 3: Auto-close after 2s
+        setTimeout(() => { closeHelpDrawer(); }, 2000);
+      };
+      const onError = () => { setSendingCardId(null); };
+      if (result && typeof result.then === 'function') {
+        result.then(onSuccess).catch(onError);
+      } else {
+        onSuccess();
+      }
+    }
+  }, [selectedHelpType, submitHelpRequest, closeHelpDrawer]);
 
   // PM-125: Cart-to-help sequencing — close cart first, 300ms delay, then open help
   const handleHelpFromCart = useCallback(() => {
@@ -3684,57 +3723,73 @@ export default function X() {
                 {t('help.active_request', 'У вас уже есть активный запрос')}
               </div>
             )}
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: 'call_waiter', label: t('help.call_waiter', 'Позвать официанта') },
-                { id: 'bill', label: t('help.bill', 'Счёт') },
-                { id: 'napkins', label: t('help.napkins', 'Салфетки') },
-                { id: 'menu', label: t('help.menu', 'Меню') },
-              ].map(opt => (
-                <button
-                  key={opt.id}
-                  onClick={() => handlePresetSelect(opt.id)}
-                  className={`min-h-[44px] rounded-lg border text-sm font-medium px-3 py-2 ${selectedHelpType === opt.id ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-              <button
-                onClick={() => handlePresetSelect('other')}
-                className={`min-h-[44px] rounded-lg border text-sm font-medium px-3 py-2 col-span-2 sm:col-span-1 ${selectedHelpType === 'other' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
-              >
-                {t('help.other', 'Другое')}
-              </button>
-            </div>
-            <div>
-              <label className="text-sm text-slate-600 mb-1 block">
-                {selectedHelpType === 'other' ? t('help.comment_required', 'Опишите проблему *') : t('help.comment_optional', 'Комментарий (необязательно)')}
-              </label>
-              <textarea
-                value={helpComment}
-                onChange={(e) => setHelpComment(e.target.value)}
-                placeholder={selectedHelpType === 'other' ? t('help.comment_placeholder_other', 'Расскажите, что случилось...') : t('help.comment_placeholder', 'Добавьте комментарий...')}
-                className="w-full rounded-lg border border-slate-200 p-3 text-sm min-h-[80px] resize-none focus:outline-none focus:ring-2 focus:ring-blue-200"
-              />
-            </div>
-            {helpSubmitError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{helpSubmitError}</div>
+            {/* #150: One-tap quick-action cards */}
+            {helpQuickSent ? (
+              <div className="flex flex-col items-center justify-center gap-2 py-8">
+                <CheckCircle2 className="w-12 h-12 text-green-500" />
+                <p className="text-lg font-semibold text-slate-900">{t('help.quick_sent_title', 'Запрос отправлен!')}</p>
+                <p className="text-sm text-slate-500">{t('help.quick_sent_desc', 'Официант скоро подойдёт')}</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: 'call_waiter', emoji: '\uD83D\uDE4B', label: t('help.call_waiter', 'Позвать официанта') },
+                    { id: 'bill', emoji: '\uD83E\uDDFE', label: t('help.bill', 'Принести счёт') },
+                    { id: 'napkins', emoji: '\uD83D\uDDD2\uFE0F', label: t('help.napkins', 'Салфетки') },
+                    { id: 'menu', emoji: '\uD83D\uDCC4', label: t('help.menu', 'Бумажное меню') },
+                  ].map(card => (
+                    <button
+                      key={card.id}
+                      onClick={() => handleQuickSend(card.id)}
+                      disabled={!!sendingCardId || hasActiveRequest}
+                      className="rounded-xl border border-slate-200 bg-white min-h-[80px] flex flex-col items-center justify-center gap-1 active:border-blue-400 active:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {sendingCardId === card.id ? (
+                        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                      ) : (
+                        <span className="text-2xl">{card.emoji}</span>
+                      )}
+                      <span className="text-sm font-medium text-slate-700 text-center px-1">{card.label}</span>
+                    </button>
+                  ))}
+                  {/* "Другое" card — col-span-2 */}
+                  <button
+                    onClick={() => { setShowOtherForm(prev => !prev); handlePresetSelect('other'); }}
+                    disabled={!!sendingCardId}
+                    className="col-span-2 rounded-xl border border-slate-200 bg-white min-h-[48px] flex flex-row items-center justify-center gap-2 active:border-blue-400 active:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="text-xl">{'\u270F\uFE0F'}</span>
+                    <span className="text-sm font-medium text-slate-700">{t('help.other', 'Другое...')}</span>
+                  </button>
+                </div>
+                {/* Expandable "Другое" form */}
+                <div className={`overflow-hidden transition-all duration-300 ${showOtherForm ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="space-y-3 pt-1">
+                    <textarea
+                      value={helpComment}
+                      onChange={(e) => setHelpComment(e.target.value)}
+                      placeholder={t('help.comment_placeholder_other', 'Расскажите, что случилось...')}
+                      className="w-full rounded-lg border border-slate-200 p-3 text-sm min-h-[80px] resize-none focus:outline-none focus:ring-2 focus:ring-blue-200"
+                    />
+                    {/* Fix 6 (PM-131): disabled only by empty comment + sending */}
+                    <Button
+                      className="w-full min-h-[44px] text-white"
+                      style={{ backgroundColor: primaryColor }}
+                      onClick={submitHelpRequest}
+                      disabled={isSendingHelp || !helpComment.trim()}
+                    >
+                      {isSendingHelp ? (
+                        <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />{t('common.loading', 'Отправка...')}</span>
+                      ) : t('help.submit', 'Отправить')}
+                    </Button>
+                  </div>
+                </div>
+                {helpSubmitError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{helpSubmitError}</div>
+                )}
+              </>
             )}
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex-1 min-h-[44px]" onClick={closeHelpDrawer} disabled={isSendingHelp}>
-                {t('common.cancel', 'Отмена')}
-              </Button>
-              <Button
-                className="flex-1 min-h-[44px] text-white"
-                style={{ backgroundColor: primaryColor }}
-                onClick={submitHelpRequest}
-                disabled={isSendingHelp || !currentTableId}
-              >
-                {isSendingHelp ? (
-                  <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />{t('common.loading', 'Отправка...')}</span>
-                ) : t('help.submit', 'Отправить')}
-              </Button>
-            </div>
           </div>
         </DrawerContent>
       </Drawer>
