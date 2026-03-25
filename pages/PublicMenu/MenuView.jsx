@@ -100,7 +100,7 @@ export default function MenuView({
               {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
                 <div className="mt-0.5 flex items-baseline gap-1.5">
                   <span className="font-bold text-sm" style={{ color: primaryColor }}>
-                    {formatPrice(parseFloat((dish.price * (1 - partner.discount_percent / 100)).toFixed(2)))}
+                    {formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100)}
                   </span>
                   <span className="text-xs text-slate-400 line-through">
                     {formatPrice(dish.price)}
@@ -124,17 +124,17 @@ export default function MenuView({
           </div>
 
           {/* Image RIGHT — fixed size, "+" button overlay (PM-108+PM-110) */}
-          <div className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100">
+          <div className="relative w-24 h-24 shrink-0 rounded-xl overflow-visible bg-slate-100">
             {dish.image ? (
               <img
                 src={dish.image}
                 alt={getDishName(dish)}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover rounded-xl"
                 loading="lazy"
                 onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; }}
               />
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50">
+              <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50 rounded-xl">
                 <ImageIcon className="w-6 h-6 opacity-50" />
               </div>
             )}
@@ -147,13 +147,13 @@ export default function MenuView({
                 -{partner.discount_percent}%
               </span>
             )}
-            {/* Add/Stepper button — overlay on image bottom-right (PM-108+PM-110+PM-115) */}
-            <div className="absolute bottom-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
+            {/* Add/Stepper button — overlay on image edge (PM-108+PM-110+PM-115+#141) */}
+            <div className="absolute bottom-[-10px] right-[-10px] z-10" onClick={(e) => e.stopPropagation()}>
               {!inCart ? (
                 <button
                   onClick={() => handleAddToCart(dish)}
                   aria-label={t('menu.add')}
-                  className="w-9 h-9 flex items-center justify-center text-white rounded-full shadow-md transition-colors"
+                  className="w-9 h-9 flex items-center justify-center text-white rounded-full shadow-md transition-colors border-2 border-white"
                   style={{backgroundColor: primaryColor}}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = darkenColor(primaryColor, 0.15)}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = primaryColor}
@@ -161,7 +161,7 @@ export default function MenuView({
                   <Plus className="w-5 h-5" />
                 </button>
               ) : (
-                <div className="h-9 px-1 flex items-center gap-0.5 bg-white rounded-full shadow-md whitespace-nowrap">
+                <div className="h-9 px-1 flex items-center gap-0.5 bg-white rounded-full shadow-md whitespace-nowrap border-2 border-white">
                   <button
                     onClick={() => updateQuantity(dish.id, -1)}
                     aria-label={t('menu.remove')}
@@ -196,7 +196,7 @@ export default function MenuView({
     return (
       <Card
         key={dish.id}
-        className="relative overflow-hidden hover:shadow-md transition-shadow border-slate-200 flex flex-col cursor-pointer"
+        className="relative overflow-visible hover:shadow-md transition-shadow border-slate-200 flex flex-col cursor-pointer"
         onClick={() => onDishClick?.(dish)}
       >
         {/* Image area — "+" overlay on image (PM-111) */}
@@ -205,12 +205,12 @@ export default function MenuView({
             <img
               src={dish.image}
               alt={getDishName(dish)}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover rounded-t-xl"
               loading="lazy"
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; }}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-slate-50">
+            <div className="w-full h-full flex items-center justify-center bg-slate-50 rounded-t-xl">
               <ImageIcon className="w-10 h-10 text-slate-300 opacity-30" aria-hidden="true" />
             </div>
           )}
@@ -225,13 +225,13 @@ export default function MenuView({
             </span>
           )}
 
-          {/* Add/Stepper button — overlay on image bottom-right (PM-111) */}
-          <div className="absolute bottom-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
+          {/* Add/Stepper button — overlay on image edge (PM-111+#141) */}
+          <div className="absolute bottom-[-10px] right-[-10px] z-10" onClick={(e) => e.stopPropagation()}>
             {!inCart ? (
               <button
                 onClick={() => handleAddToCart(dish)}
                 aria-label={t('menu.add')}
-                className="w-11 h-11 flex items-center justify-center text-white rounded-full shadow-md transition-colors"
+                className="w-11 h-11 flex items-center justify-center text-white rounded-full shadow-md transition-colors border-2 border-white"
                 style={{backgroundColor: primaryColor}}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = darkenColor(primaryColor, 0.15)}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = primaryColor}
@@ -239,7 +239,7 @@ export default function MenuView({
                 <Plus className="w-5 h-5" />
               </button>
             ) : (
-              <div className="h-11 px-1.5 flex items-center gap-1 bg-white rounded-full shadow-md whitespace-nowrap">
+              <div className="h-11 px-1.5 flex items-center gap-1 bg-white rounded-full shadow-md whitespace-nowrap border-2 border-white">
                 <button
                   onClick={() => updateQuantity(dish.id, -1)}
                   aria-label={t('menu.remove')}
@@ -278,7 +278,7 @@ export default function MenuView({
             {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
               <div className="flex items-baseline gap-1.5 flex-nowrap">
                 <span className="font-bold text-sm whitespace-nowrap" style={{ color: primaryColor }}>
-                  {formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100)))}
+                  {formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100)}
                 </span>
                 <span className="text-xs text-slate-400 line-through whitespace-nowrap">
                   {formatPrice(dish.price)}

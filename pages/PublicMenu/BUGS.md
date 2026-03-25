@@ -13,7 +13,14 @@ session: 168
 
 ## Active Bugs (не исправлены)
 
-*8 active bugs remaining (0x P0, 4x P1, 3x P2, 0x P3, 1x suggestion).*
+*9 active bugs remaining (0x P0, 4x P1, 4x P2, 0x P3, 1x suggestion).*
+
+### BUG-PM-132: List mode stepper buttons use w-9 h-9 (36px) instead of w-11 h-11 (44px) (P2)
+- **Приоритет:** P2
+- **Когда:** S177 (found by Codex in chain 74b9, confirmed by CC)
+- **Файл:** MenuView.jsx, lines 156, 168, 178
+- **Симптом:** List mode +/- buttons are 36px (w-9 h-9) while tile mode uses 44px (w-11 h-11). Violates 44px minimum touch target spec.
+- **Фикс:** Change w-9 h-9 to w-11 h-11 in list mode renderListCard stepper buttons. Deferred — FROZEN UX in batch 10 forbade stepper size changes.
 
 ### BUG-PM-056: Drawer layout not visit-state-driven (P1 — Batch 2)
 - **Приоритет:** P1
@@ -131,6 +138,14 @@ session: 168
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-CHAIN-74b9: PM-119+#141 — Batch 10: discount price calc + photo-edge plus button — FIXED S177
+- **Когда:** S177, chain publicmenu-260325-133629-74b9
+- **Файлы:** MenuView.jsx
+- **Фиксы:**
+  - PM-119 (P2): Standardized discount formula in both renderTileCard and renderListCard to `Math.round(price * (1 - pct/100) * 100) / 100` — consistent format
+  - #141 (P3): "+" button moved to photo EDGE (`bottom-[-10px] right-[-10px]`) in list+tile, `overflow-visible`, `rounded-xl`/`rounded-t-xl` on img, `border-2 border-white` ring on button+stepper
+- **Новый баг:** PM-132 — list mode stepper w-9 h-9 (should be w-11 h-11), deferred
 
 ### FIX-CHAIN-c028: #150+PM-131 — Help drawer redesign + submit fix — FIXED S177
 - **Когда:** S177, chain publicmenu-260325-131945-c028
