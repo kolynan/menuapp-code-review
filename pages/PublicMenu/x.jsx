@@ -990,7 +990,8 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
     const symbol = partner?.currency_symbol || currency;
     const num = Number(amount);
     if (isNaN(num)) return String(amount);
-    const formatted = Number.isInteger(num) ? num.toLocaleString() : parseFloat(num.toFixed(2)).toString();
+    const rounded = Math.round(num * 100) / 100;
+    const formatted = Number.isInteger(rounded) ? rounded.toLocaleString('ru-KZ') : rounded.toFixed(2);
     return symbol ? `${formatted} ${symbol}` : formatted;
   };
 
@@ -2070,7 +2071,7 @@ export default function X() {
   }, [sortedCategoriesAll, visibleDishes, orderMode]);
 
   const cartTotalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
-  const cartTotalAmount = cart.reduce((acc, item) => acc + Math.round(item.price * item.quantity * 100) / 100, 0);
+  const cartTotalAmount = parseFloat(cart.reduce((acc, item) => acc + Math.round(item.price * item.quantity * 100) / 100, 0).toFixed(2));
 
   // Loyalty hook
   const {
@@ -3158,9 +3159,9 @@ export default function X() {
 
       // Always: persist locally + update state
       try { localStorage.setItem('menuapp_guest_name', trimmedName); } catch (e) { /* quota */ }
-      setCurrentGuest(prev => prev ? { ...prev, name: trimmedName } : prev);
+      setCurrentGuest(prev => ({ ...(prev || {}), name: trimmedName }));
       setIsEditingName(false);
-      setGuestNameInput('');
+      setGuestNameInput(trimmedName);
 
       toast.success(t('guest.name_saved'), { id: 'mm1' });
     } catch (err) {
@@ -3889,7 +3890,7 @@ export default function X() {
                   {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
                     <>
                       <span className="text-lg font-bold" style={{ color: partner?.primary_color || '#1A1A1A' }}>
-                        {formatPrice(Math.round(detailDish.price * (1 - partner.discount_percent / 100)))}
+                        {formatPrice(Math.round(detailDish.price * (1 - partner.discount_percent / 100) * 100) / 100)}
                       </span>
                       <span className="text-sm text-slate-400 line-through">
                         {formatPrice(detailDish.price)}
