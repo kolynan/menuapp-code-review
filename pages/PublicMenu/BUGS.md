@@ -1,7 +1,7 @@
 ---
-version: "35.0"
-updated: "2026-03-23"
-session: 168
+version: "36.0"
+updated: "2026-03-26"
+session: 182
 ---
 
 # PublicMenu — Bug Registry
@@ -138,6 +138,18 @@ session: 168
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-CHAIN-f62f: PM-142+143+144+145 — CartView drawer redesign, current visit only — FIXED S182
+- **Когда:** S182, chain publicmenu-260326-223118-f62f
+- **Файлы:** CartView.jsx
+- **Фиксы:**
+  - PM-142 (P2): Filter myOrders to today's date only — no more past-day orders in drawer
+  - PM-143 (P2): Sort orders by full datetime descending (not just HH:MM)
+  - PM-144 (P2): Restructured drawer: Выдано (collapsed) → Заказано (expanded) → Новый заказ → ИТОГО за визит
+  - PM-145 (P2): Float fix — parseFloat(toFixed(2)) on visit total, line item totals, order subtotals
+  - i18n: All new section labels use tr() (cart.served, cart.ordered, cart.visit_total)
+  - Chevron touch targets: min-w-[44px] min-h-[44px] on section collapse buttons
+  - D7: No `relative` class added inside DrawerContent (KB-096)
 
 ### FIX-CHAIN-74b9: PM-119+#141 — Batch 10: discount price calc + photo-edge plus button — FIXED S177
 - **Когда:** S177, chain publicmenu-260325-133629-74b9
