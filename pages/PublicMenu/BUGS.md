@@ -1,7 +1,7 @@
 ---
-version: "36.0"
-updated: "2026-03-26"
-session: 182
+version: "37.0"
+updated: "2026-03-27"
+session: 184
 ---
 
 # PublicMenu — Bug Registry
@@ -138,6 +138,13 @@ session: 182
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-CHAIN-c24f: PM-148+PM-149 — Small UX fixes (banner + guest ID suffix) — FIXED S184
+- **Когда:** S184, chain publicmenu-260327-065807-c24f (previous chain 77f1 targeted x.jsx incorrectly and was reverted)
+- **Файлы:** ModeTabs.jsx, CartView.jsx
+- **Фиксы:**
+  - PM-148 (P3): Removed green table confirmation banner from ModeTabs.jsx (lines 55–65). Also cleaned up unused CheckCircle2 import.
+  - PM-149 (P3): Stripped #N guest ID suffix from cart header display in CartView.jsx (lines 307–309). Changed guestDisplay to use guestBaseName directly, kept effectiveGuestCode for backend use.
 
 ### FIX-CHAIN-f62f: PM-142+143+144+145 — CartView drawer redesign, current visit only — FIXED S182
 - **Когда:** S182, chain publicmenu-260326-223118-f62f
