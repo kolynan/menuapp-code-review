@@ -304,9 +304,7 @@ export default function CartView({
     ? (currentGuest.name || getGuestDisplayName(currentGuest))
     : tr("cart.guest", "Гость");
 
-  const guestDisplay = effectiveGuestCode 
-    ? `${guestBaseName} #${effectiveGuestCode}` 
-    : guestBaseName;
+  const guestDisplay = guestBaseName;
 
   // Table label: avoid "Стол Стол 3"
   const tablePrefix = tr("form.table", "Стол");

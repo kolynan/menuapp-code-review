@@ -1,5 +1,5 @@
 import React from "react";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
 export default function ModeTabs({
   visibleModeTabs,
@@ -52,18 +52,6 @@ export default function ModeTabs({
 
       <p className="text-xs text-slate-500 text-center px-2 mb-2">{getModeDescription()}</p>
       
-      {/* Verified badge in menu view */}
-      {isHallMode && isTableVerified && currentTableId && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-          <div className="flex items-center justify-center gap-2 text-green-800">
-            <CheckCircle2 className="w-5 h-5" />
-            <span className="font-medium">
-              {t('form.table')} {currentTable?.name || currentTable?.code || ""} {t('x.hall.verified')}
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Hall: Invalid table code in URL */}
       {isHallMode && tableCodeParam && !resolvedTable && !verifiedByCode && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
