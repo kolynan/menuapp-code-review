@@ -478,7 +478,7 @@ const I18N_FALLBACKS = {
   "cart.verify.locked": "Слишком много попыток. Повторите через",
   "cart.verify.online_order_title": "Онлайн-заказ официанту",
   "cart.verify.points_discount_label": "Списание баллов",
-  // PM-148: removed unused "cart.verify.table_verified" key (banner removed)
+  "cart.verify.table_verified": "Стол подтверждён",
   // CartView — loyalty
   "loyalty.apply": "Применить",
   "loyalty.email_label": "Email для бонусов",
@@ -1569,12 +1569,6 @@ export default function X() {
     codeVerificationError,
     verifyTableCode,
   } = useHallTable({ partner, location, orderMode, t });
-
-  // PM-149: Strip system guest ID suffix (#N) from guest-facing display
-  const getGuestDisplayNameClean = (guest) => {
-    const raw = getGuestDisplayName(guest);
-    return raw ? raw.replace(/\s*#\d+$/, '') : raw;
-  };
 
   // Auto-clear code input after wrong entry (PM-069)
   useEffect(() => {
@@ -2776,7 +2770,7 @@ export default function X() {
       const confirmedItems = [...cart];
       const confirmedTotal = finalTotal;
       const guestLabel = guestToUse
-        ? getGuestDisplayNameClean(guestToUse)
+        ? getGuestDisplayName(guestToUse)
         : null;
 
       // Clear form
@@ -3385,6 +3379,7 @@ export default function X() {
           currentTable={currentTable}
           tableCodeParam={tableCodeParam}
           resolvedTable={resolvedTable}
+          verifiedByCode={verifiedByCode}
           t={t}
           primaryColor={primaryColor}
         />
@@ -3532,7 +3527,7 @@ export default function X() {
               setGuestNameInput={setGuestNameInput}
               handleUpdateGuestName={handleUpdateGuestName}
               setIsEditingName={setIsEditingName}
-              getGuestDisplayName={getGuestDisplayNameClean}
+              getGuestDisplayName={getGuestDisplayName}
               cart={cart}
               formatPrice={formatPrice}
               updateQuantity={updateQuantity}
