@@ -92,6 +92,7 @@ import {
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 
 import Rating from "@/components/Rating";
+import DishRating from "@/components/publicMenu/DishRating";
 import PublicMenuHeader from "@/components/publicMenu/PublicMenuHeader";
 import HelpFab from "@/components/publicMenu/HelpFab";
 import HelpModal from "@/components/publicMenu/HelpModal";
@@ -3890,7 +3891,7 @@ export default function X() {
                   {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
                     <>
                       <span className="text-lg font-bold" style={{ color: partner?.primary_color || '#1A1A1A' }}>
-                        {formatPrice(Math.round(detailDish.price * (1 - partner.discount_percent / 100) * 100) / 100)}
+                        {formatPrice(detailDish.price * (1 - partner.discount_percent / 100))}
                       </span>
                       <span className="text-sm text-slate-400 line-through">
                         {formatPrice(detailDish.price)}
@@ -3909,10 +3910,10 @@ export default function X() {
                   )}
                 </div>
                 {showReviews && dishRatings?.[detailDish.id] && (
-                  <div className="flex items-center gap-1 text-sm text-slate-500">
-                    <span>{dishRatings[detailDish.id]?.avg?.toFixed(1)}</span>
-                    <span>({dishRatings[detailDish.id]?.count})</span>
-                  </div>
+                  <DishRating
+                    avgRating={dishRatings[detailDish.id]?.avg}
+                    reviewCount={dishRatings[detailDish.id]?.count}
+                  />
                 )}
               </div>
               {/* Sticky bottom bar */}

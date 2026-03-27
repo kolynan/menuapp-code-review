@@ -93,14 +93,14 @@ export default function MenuView({
             <div>
               <h3 className="font-semibold text-base text-slate-900 line-clamp-2">{getDishName(dish)}</h3>
               {getDishDescription(dish) && (
-                <p className="text-sm text-slate-500 mt-0.5 line-clamp-1">
+                <p className="text-sm text-slate-500 mt-0.5 line-clamp-2">
                   {getDishDescription(dish)}
                 </p>
               )}
               {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
                 <div className="mt-0.5 flex items-baseline gap-1.5">
                   <span className="font-bold text-sm" style={{ color: primaryColor }}>
-                    {formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100)}
+                    {formatPrice(dish.price * (1 - partner.discount_percent / 100))}
                   </span>
                   <span className="text-xs text-slate-400 line-through">
                     {formatPrice(dish.price)}
@@ -153,7 +153,7 @@ export default function MenuView({
                 <button
                   onClick={() => handleAddToCart(dish)}
                   aria-label={t('menu.add')}
-                  className="w-9 h-9 flex items-center justify-center text-white rounded-full shadow-md transition-colors border-2 border-white"
+                  className="w-11 h-11 flex items-center justify-center text-white rounded-full shadow-md transition-colors border-2 border-white"
                   style={{backgroundColor: primaryColor}}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = darkenColor(primaryColor, 0.15)}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = primaryColor}
@@ -161,11 +161,11 @@ export default function MenuView({
                   <Plus className="w-5 h-5" />
                 </button>
               ) : (
-                <div className="h-9 px-1 flex items-center gap-0.5 bg-white rounded-full shadow-md whitespace-nowrap border-2 border-white">
+                <div className="h-11 px-1.5 flex items-center gap-0.5 bg-white rounded-full shadow-md whitespace-nowrap border-2 border-white">
                   <button
                     onClick={() => updateQuantity(dish.id, -1)}
                     aria-label={t('menu.remove')}
-                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
+                    className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
                   >
                     <Minus className="w-4 h-4 text-slate-700" />
                   </button>
@@ -175,7 +175,7 @@ export default function MenuView({
                   <button
                     onClick={() => updateQuantity(dish.id, 1)}
                     aria-label={t('menu.add')}
-                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
+                    className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
                   >
                     <Plus className="w-4 h-4 text-slate-700" />
                   </button>
@@ -278,7 +278,7 @@ export default function MenuView({
             {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
               <div className="flex items-baseline gap-1.5 flex-nowrap">
                 <span className="font-bold text-sm whitespace-nowrap" style={{ color: primaryColor }}>
-                  {formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100)}
+                  {formatPrice(dish.price * (1 - partner.discount_percent / 100))}
                 </span>
                 <span className="text-xs text-slate-400 line-through whitespace-nowrap">
                   {formatPrice(dish.price)}
