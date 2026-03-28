@@ -100,7 +100,7 @@ export default function MenuView({
               {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
                 <div className="mt-0.5 flex items-baseline gap-1.5">
                   <span className="font-bold text-sm" style={{ color: primaryColor }}>
-                    {formatPrice(dish.price * (1 - partner.discount_percent / 100))}
+                    {formatPrice(parseFloat((dish.price * (1 - partner.discount_percent / 100)).toFixed(2)))}
                   </span>
                   <span className="text-xs text-slate-400 line-through">
                     {formatPrice(dish.price)}
@@ -278,7 +278,7 @@ export default function MenuView({
             {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
               <div className="flex items-baseline gap-1.5 flex-nowrap">
                 <span className="font-bold text-sm whitespace-nowrap" style={{ color: primaryColor }}>
-                  {formatPrice(dish.price * (1 - partner.discount_percent / 100))}
+                  {formatPrice(parseFloat((dish.price * (1 - partner.discount_percent / 100)).toFixed(2)))}
                 </span>
                 <span className="text-xs text-slate-400 line-through whitespace-nowrap">
                   {formatPrice(dish.price)}
