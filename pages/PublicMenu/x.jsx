@@ -728,7 +728,7 @@ function OrderConfirmationScreen({
                 {tr("confirmation.total", "Итого")}
               </span>
               <span className="font-semibold text-slate-800 tabular-nums">
-                {formatPrice(totalAmount)}
+                {formatPrice(parseFloat(Number(totalAmount).toFixed(2)))}
               </span>
             </div>
           </div>
@@ -2454,6 +2454,17 @@ export default function X() {
       setBillCooldown(isBillOnCooldown(currentTableId));
     }
   }, [currentTableId]);
+
+  // PM-152/153: Clear guest name when table changes (prevents stale name from other table)
+  const prevTableRef = useRef(tableCodeParam);
+  useEffect(() => {
+    if (!tableCodeParam) return;
+    if (prevTableRef.current && prevTableRef.current !== tableCodeParam) {
+      try { localStorage.removeItem('menuapp_guest_name'); } catch(e) {}
+      setGuestNameInput('');
+    }
+    prevTableRef.current = tableCodeParam;
+  }, [tableCodeParam]);
 
   // Debug hook kept as no-op to maintain hook order (BUG-PM-040: removed prod logging)
   useEffect(() => {}, []);

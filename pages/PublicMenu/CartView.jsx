@@ -89,8 +89,15 @@ export default function CartView({
   // ===== P1 Expandable States =====
   const [splitExpanded, setSplitExpanded] = React.useState(false);
   // loyaltyExpanded removed — loyalty section simplified to motivation text (#87 KS-1)
-  const [servedExpanded, setServedExpanded] = React.useState(false); // PM-144: Выдано collapsed by default
-  const [activeExpanded, setActiveExpanded] = React.useState(true); // PM-144: Заказано expanded by default
+  // CV-01/CV-09: Status-based bucket expand states (replaces old binary split)
+  const [expandedStatuses, setExpandedStatuses] = React.useState({
+    served: false, // Подано — collapsed by default (CV-10)
+    ready: true,
+    in_progress: true,
+    accepted: true,
+    new_order: true, // Отправлено
+  });
+  const [expandedOrders, setExpandedOrders] = React.useState({}); // per-order collapse (Fix 4)
   const [showRewardEmailForm, setShowRewardEmailForm] = React.useState(false);
   const [rewardEmail, setRewardEmail] = React.useState('');
   const [rewardEmailSubmitting, setRewardEmailSubmitting] = React.useState(false);
@@ -247,41 +254,41 @@ export default function CartView({
     return norm;
   };
 
-  // Safe status label - prevents showing raw translation keys like "orderprocess.default.new"
+  // Safe status label - guest-facing (CV-08: 5 statuses)
   const getSafeStatus = (status) => {
     if (!status) {
-      return { icon: '🔵', label: tr('status.new', 'Заказано'), color: '#3B82F6' };
+      return { icon: '🔵', label: tr('status.sent', 'Отправлено'), color: '#6B7280' };
     }
 
     let label = status.label || '';
 
     // Check if label is a raw translation key (contains dots and looks like a key)
     if (label.includes('.') && (label.startsWith('orderprocess') || label.startsWith('status'))) {
-      // Extract code from key like "orderprocess.default.new" → "new"
       const parts = label.split('.');
       const code = parts[parts.length - 1];
 
-      // Use human-readable fallbacks based on code
       const fallbacks = {
-        'new': tr('status.new', 'Заказано'),
+        'new': tr('status.sent', 'Отправлено'),
         'start': tr('status.cooking', 'Готовится'),
         'cook': tr('status.cooking', 'Готовится'),
         'cooking': tr('status.cooking', 'Готовится'),
-        'finish': tr('status.ready', 'Готово'),
-        'ready': tr('status.ready', 'Готово'),
-        'done': tr('status.ready', 'Готово'),
+        'finish': tr('status.ready', 'Готов'),
+        'ready': tr('status.ready', 'Готов'),
+        'done': tr('status.served', 'Подано'),
         'accepted': tr('status.accepted', 'Принят'),
+        'served': tr('status.served', 'Подано'),
+        'completed': tr('status.served', 'Подано'),
         'cancel': tr('status.cancelled', 'Отменён'),
         'cancelled': tr('status.cancelled', 'Отменён'),
       };
 
-      label = fallbacks[code] || tr('status.new', 'Заказано');
+      label = fallbacks[code] || tr('status.sent', 'Отправлено');
     }
 
     return {
       icon: status.icon || '🔵',
       label: label,
-      color: status.color || '#3B82F6'
+      color: status.color || '#6B7280'
     };
   };
 
@@ -347,15 +354,18 @@ export default function CartView({
   );
   const canSplit = guestCount > 1;
 
-  // ===== PM-142/143: Filter myOrders to today + sort by full datetime =====
+  // ===== PM-142/143/154: Filter myOrders to 06:00 business-day + sort by datetime =====
   const todayMyOrders = React.useMemo(() => {
-    const today = new Date().toDateString();
+    const today6am = new Date();
+    today6am.setHours(6, 0, 0, 0);
+    if (new Date() < today6am) today6am.setDate(today6am.getDate() - 1);
     return (myOrders || [])
       .filter(o => {
         const d = o.created_at || o.created_date || o.createdAt;
-        if (!d) return true; // keep orders without date (safety)
-        return new Date(d).toDateString() === today;
+        if (!d) return true;
+        return new Date(d) >= today6am;
       })
+      .filter(o => o.status !== 'cancelled')
       .sort((a, b) => {
         const da = new Date(a.created_at || a.created_date || a.createdAt || 0);
         const db = new Date(b.created_at || b.created_date || b.createdAt || 0);
@@ -363,23 +373,26 @@ export default function CartView({
       });
   }, [myOrders]);
 
-  // ===== PM-144: Split orders into Выдано (served) vs Заказано (active) =====
-  const servedOrders = React.useMemo(() =>
-    todayMyOrders.filter(o => o.status === 'served' || o.status === 'completed'),
-    [todayMyOrders]
-  );
+  // ===== CV-01/CV-09: Status-based buckets (replaces binary Выдано/Заказано split) =====
+  const statusBuckets = React.useMemo(() => {
+    const buckets = { served: [], ready: [], in_progress: [], accepted: [], new_order: [] };
+    todayMyOrders.forEach(o => {
+      const s = o.status;
+      if (s === 'served' || s === 'completed') buckets.served.push(o);
+      else if (s === 'ready') buckets.ready.push(o);
+      else if (s === 'in_progress') buckets.in_progress.push(o);
+      else if (s === 'accepted') buckets.accepted.push(o);
+      else if (s === 'new') buckets.new_order.push(o);
+      // cancelled: already filtered out
+    });
+    return buckets;
+  }, [todayMyOrders]);
 
-  const activeOrders = React.useMemo(() =>
-    todayMyOrders.filter(o => o.status !== 'served' && o.status !== 'completed' && o.status !== 'cancelled'),
-    [todayMyOrders]
-  );
-
-  // ===== PM-145: Visit total (all today's orders + current cart), float-safe =====
-  const visitTotal = React.useMemo(() => {
-    const ordersSum = todayMyOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
-    const cartSum = Number(cartTotalAmount) || 0;
-    return parseFloat((ordersSum + cartSum).toFixed(2));
-  }, [todayMyOrders, cartTotalAmount]);
+  // ===== CV-02: Orders sum for drawer header (replaces ИТОГО ЗА ВИЗИТ) =====
+  const ordersSum = React.useMemo(() => {
+    const sum = todayMyOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+    return parseFloat(sum.toFixed(2));
+  }, [todayMyOrders]);
 
   // ===== Table Orders from sessionOrders =====
   const ordersByGuestId = React.useMemo(() => {
@@ -453,26 +466,84 @@ export default function CartView({
 
   // loyaltySummary + reviewRewardLabel removed — loyalty section simplified (#87 KS-1)
 
-  // ===== PM-144: Reusable order list renderer for Выдано / Заказано sections =====
-  const renderOrderItems = (orders) => (
-    <div className="space-y-3">
+  // ===== CV-01: Bucket display names =====
+  const bucketDisplayNames = {
+    served: 'Подано',
+    ready: 'Готов',
+    in_progress: 'Готовится',
+    accepted: 'Принят',
+    new_order: 'Отправлено',
+  };
+
+  const bucketIcons = {
+    served: '✅', ready: '🟠', in_progress: '🔵', accepted: '🟡', new_order: '⚪',
+  };
+
+  // CV-04: Check if all items in served bucket are rated
+  const allServedRated = React.useMemo(() => {
+    if (statusBuckets.served.length === 0) return false;
+    return statusBuckets.served.every(order => {
+      const orderItems = itemsByOrder.get(order.id) || [];
+      if (orderItems.length === 0) return true;
+      return orderItems.every((item, idx) => {
+        const itemId = item.id || `${order.id}_${idx}`;
+        return safeReviewedItems.has(itemId) || (safeDraftRatings[itemId] || 0) > 0;
+      });
+    });
+  }, [statusBuckets.served, itemsByOrder, safeReviewedItems, safeDraftRatings]);
+
+  // CV-06: Build order summary text (collapsed row)
+  const getOrderSummary = (order) => {
+    const orderItems = itemsByOrder.get(order.id) || [];
+    if (orderItems.length === 0) return tr('cart.order_total', 'Сумма заказа');
+    const names = orderItems.slice(0, 2).map(i =>
+      i.dish_name + (i.quantity > 1 ? ` ×${i.quantity}` : '')
+    ).join(', ');
+    const extra = orderItems.length > 2 ? ` +${orderItems.length - 2}` : '';
+    return names + extra;
+  };
+
+  const getOrderTime = (order) => {
+    const d = order.created_at || order.created_date || order.createdAt;
+    if (!d) return '';
+    return new Date(d).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // ===== CV-01: Render orders for a status bucket =====
+  const renderBucketOrders = (orders, showRating) => (
+    <div className="space-y-2 mt-3 pt-3 border-t">
       {orders.map((order) => {
         const orderItems = itemsByOrder.get(order.id) || [];
-        const rawStatus = getOrderStatus(order);
-        const status = getSafeStatus(rawStatus);
+        const isOrderExpanded = !!expandedOrders[order.id];
+        const orderTotal = parseFloat((Number(order.total_amount) || 0).toFixed(2));
 
         return (
-          <div key={order.id} className="border-b pb-3 last:border-0 last:pb-0">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-slate-400">
-                {formatOrderTime(order)}
-              </span>
-              <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${status.color}15`, color: status.color }}>
-                {status.label}
-              </span>
-            </div>
-            {orderItems.length > 0 ? (
-              <div className="space-y-2">
+          <div key={order.id} className="border-b pb-2 last:border-0 last:pb-0">
+            {/* CV-06: Collapsed summary row */}
+            <button
+              type="button"
+              className="w-full flex items-center justify-between text-left min-h-[44px] gap-2"
+              onClick={() => setExpandedOrders(prev => ({ ...prev, [order.id]: !prev[order.id] }))}
+            >
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <span className="text-xs text-slate-400 shrink-0">{getOrderTime(order)}</span>
+                <span className="text-sm text-slate-700 truncate">{getOrderSummary(order)}</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-sm font-medium text-slate-700">{formatPrice(orderTotal)}</span>
+                <div className="min-w-[44px] min-h-[44px] flex items-center justify-center">
+                  {isOrderExpanded ? (
+                    <ChevronUp className="w-4 h-4 text-slate-400" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                  )}
+                </div>
+              </div>
+            </button>
+
+            {/* Expanded: full item list */}
+            {isOrderExpanded && orderItems.length > 0 && (
+              <div className="space-y-2 mt-2 pl-2">
                 {orderItems.map((item, idx) => {
                   const itemId = item.id || `${order.id}_${idx}`;
                   const hasReview = safeReviewedItems.has(itemId);
@@ -482,11 +553,14 @@ export default function CartView({
                   return (
                     <div key={itemId} className="space-y-1">
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-slate-700">{item.dish_name} × {item.quantity}</span>
+                        <span className="text-slate-700">
+                          {item.dish_name}{item.quantity > 1 ? ` ×${item.quantity}` : ''}
+                        </span>
                         <span className="text-slate-600">{formatPrice(lineTotal)}</span>
                       </div>
 
-                      {reviewsEnabled && (
+                      {/* CV-04/CV-05: Rating only on served bucket */}
+                      {showRating && reviewsEnabled && (
                         <div className="flex items-center gap-2 pl-2 py-2">
                           <Rating
                             value={draftRating}
@@ -518,9 +592,12 @@ export default function CartView({
                   );
                 })}
               </div>
-            ) : (
-              <div className="text-sm text-slate-500">
-                {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(parseFloat((Number(order.total_amount) || 0).toFixed(2)))}
+            )}
+
+            {/* Expanded but no items */}
+            {isOrderExpanded && orderItems.length === 0 && (
+              <div className="text-sm text-slate-500 mt-2 pl-2">
+                {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(orderTotal)}
               </div>
             )}
           </div>
@@ -545,7 +622,7 @@ export default function CartView({
             </button>
           )}
 
-          {/* Center: Table & Guest */}
+          {/* Center: Table & Guest + orders sum */}
           <div className="text-center flex-1 mx-2">
             <div className="text-sm font-medium text-slate-700">{tableLabel}</div>
             <div className="flex items-center justify-center gap-1 text-xs">
@@ -570,13 +647,19 @@ export default function CartView({
               ) : (
                 <button
                   onClick={() => { setGuestNameInput(currentGuest?.name || ''); setIsEditingName(true); }}
-                  className="hover:underline"
+                  className="min-h-[44px] flex items-center hover:underline"
                   style={{color: primaryColor}}
                 >
-                  {guestDisplay} {(!currentGuest?.name) && <span className="text-xs">✏️</span>}
+                  {guestDisplay} <span className="text-xs ml-0.5">›</span>
                 </button>
               )}
             </div>
+            {/* CV-02: Orders sum in drawer header */}
+            {ordersSum > 0 && (
+              <div className="text-xs text-slate-500 mt-0.5">
+                {tr('cart.orders_sum', 'Заказов')}: {formatPrice(ordersSum)}
+              </div>
+            )}
           </div>
 
           {/* Right: Chevron close — #140 moved from sticky row into table card */}
@@ -769,105 +852,119 @@ export default function CartView({
         </Card>
       )}
 
-      {/* SECTION: Выдано (served orders) — PM-144, collapsed by default */}
-      {servedOrders.length > 0 && (
-        <Card className="mb-4">
-          <CardContent className="p-4">
-            <button
-              type="button"
-              className="w-full flex items-center justify-between text-left min-h-[44px]"
-              onClick={() => setServedExpanded(!servedExpanded)}
-            >
-              <div className="flex items-center gap-2">
-                <span>✅</span>
-                <span className="text-base font-semibold text-slate-800">
-                  {tr('cart.served', 'Выдано')} ({servedOrders.length})
-                </span>
-              </div>
-              <div className="min-w-[44px] min-h-[44px] flex items-center justify-end">
-                {servedExpanded ? (
-                  <ChevronUp className="w-5 h-5 text-slate-400" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-slate-400" />
-                )}
-              </div>
-            </button>
+      {/* Fix 9 — D3: All served + cart empty → «Ничего не ждёте» screen */}
+      {(() => {
+        const isV8 = statusBuckets.accepted.length === 0
+          && statusBuckets.in_progress.length === 0
+          && statusBuckets.ready.length === 0
+          && statusBuckets.new_order.length === 0
+          && statusBuckets.served.length > 0
+          && cart.length === 0;
 
-            {servedExpanded && (
-              <div className="mt-4 pt-4 border-t">
-                {renderOrderItems(servedOrders)}
+        if (isV8) {
+          const servedSubtotal = parseFloat(statusBuckets.served.reduce((s, o) => s + (Number(o.total_amount) || 0), 0).toFixed(2));
+          return (
+            <>
+              <div className="text-center py-6 mb-4">
+                <p className="text-base font-medium text-slate-700">✅ {tr('cart.nothing_waiting', 'Ничего не ждёте.')}</p>
+                <p className="text-sm text-slate-500 mt-1">{tr('cart.can_order_or_rate', 'Можно заказать ещё или оценить.')}</p>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
-      {/* SECTION: Заказано (active orders) — PM-144, expanded by default */}
-      {activeOrders.length > 0 && (
-        <Card className="mb-4">
-          <CardContent className="p-4">
-            <button
-              type="button"
-              className="w-full flex items-center justify-between text-left min-h-[44px]"
-              onClick={() => setActiveExpanded(!activeExpanded)}
-            >
-              <div className="flex items-center gap-2">
-                <span>🕐</span>
-                <span className="text-base font-semibold text-slate-800">
-                  {tr('cart.ordered', 'Заказано')} ({activeOrders.length})
-                </span>
-              </div>
-              <div className="min-w-[44px] min-h-[44px] flex items-center justify-end">
-                {activeExpanded ? (
-                  <ChevronUp className="w-5 h-5 text-slate-400" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-slate-400" />
-                )}
-              </div>
-            </button>
-
-            {activeExpanded && (
-              <div className="mt-4 pt-4 border-t">
-                {renderOrderItems(activeOrders)}
-
-                {/* Review button */}
-                {reviewableItems.length > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full mt-3"
-                    onClick={() => openReviewDialog(reviewableItems)}
+              {/* Подано bucket — collapsed with accent chip */}
+              <Card className="mb-4">
+                <CardContent className="p-4">
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-between text-left min-h-[44px]"
+                    onClick={() => setExpandedStatuses(prev => ({ ...prev, served: !prev.served }))}
                   >
-                    💬 {tr('review.add_comments', 'Добавить комментарии')}
-                  </Button>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                    <div className="flex items-center gap-2">
+                      <span>✅</span>
+                      <span className="text-base font-semibold text-slate-800">
+                        {bucketDisplayNames.served} ({statusBuckets.served.length})
+                      </span>
+                      {reviewsEnabled && (
+                        allServedRated
+                          ? <span className="ml-1 text-xs text-green-600">✅</span>
+                          : <button
+                              type="button"
+                              className="ml-1 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full"
+                              onClick={(e) => { e.stopPropagation(); setExpandedStatuses(prev => ({ ...prev, served: true })); }}
+                            >{tr('review.rate', 'Оценить')}</button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-slate-600">{formatPrice(servedSubtotal)}</span>
+                      <div className="min-w-[44px] min-h-[44px] flex items-center justify-end">
+                        {expandedStatuses.served ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                      </div>
+                    </div>
+                  </button>
+                  {expandedStatuses.served && renderBucketOrders(statusBuckets.served, true)}
+                </CardContent>
+              </Card>
+            </>
+          );
+        }
 
-      {/* CTA: Add more items when cart is empty but orders exist */}
-      {cart.length === 0 && todayMyOrders.length > 0 && (
-        <div className="mt-4 px-4">
-          <Button
-            variant="outline"
-            className="w-full min-h-[44px]"
-            style={{borderColor: primaryColor, color: primaryColor}}
-            onClick={() => { onClose ? onClose() : setView("menu"); }}
-          >
-            + {tr('cart.add_more', 'Добавить к заказу')}
-          </Button>
-        </div>
-      )}
+        // Normal rendering: status buckets in order
+        const bucketOrder = ['served', 'ready', 'in_progress', 'accepted', 'new_order'];
+        return bucketOrder.map(key => {
+          const orders = statusBuckets[key];
+          if (orders.length === 0) return null;
+          const isExpanded = !!expandedStatuses[key];
+          const subtotal = parseFloat(orders.reduce((s, o) => s + (Number(o.total_amount) || 0), 0).toFixed(2));
+          const isServed = key === 'served';
+          const showRating = isServed;
+
+          return (
+            <Card key={key} className="mb-4">
+              <CardContent className="p-4">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between text-left min-h-[44px]"
+                  onClick={() => setExpandedStatuses(prev => ({ ...prev, [key]: !prev[key] }))}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>{bucketIcons[key]}</span>
+                    <span className="text-base font-semibold text-slate-800">
+                      {bucketDisplayNames[key]} ({orders.length})
+                    </span>
+                    {/* CV-05: Accent chip on Подано only */}
+                    {isServed && reviewsEnabled && (
+                      allServedRated
+                        ? <span className="ml-1 text-xs text-green-600">✅</span>
+                        : <button
+                            type="button"
+                            className="ml-1 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full"
+                            onClick={(e) => { e.stopPropagation(); setExpandedStatuses(prev => ({ ...prev, served: true })); }}
+                          >{tr('review.rate', 'Оценить')}</button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-slate-600">{formatPrice(subtotal)}</span>
+                    <div className="min-w-[44px] min-h-[44px] flex items-center justify-end">
+                      {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                    </div>
+                  </div>
+                </button>
+                {isExpanded && renderBucketOrders(orders, showRating)}
+              </CardContent>
+            </Card>
+          );
+        });
+      })()}
 
       {/* SECTION 2: NEW ORDER */}
       {cart.length > 0 && (
         <Card className="mb-4">
           <CardContent className="p-4">
-            <h2 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
-              🛒 {tr('cart.new_order', 'Новый заказ')}
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                🛒 {tr('cart.new_order', 'Новый заказ')}
+              </h2>
+              <span className="text-sm font-medium text-slate-600">{formatPrice(parseFloat((Number(cartTotalAmount) || 0).toFixed(2)))}</span>
+            </div>
 
             <div className="space-y-2">
               {cart.map((item) => (
@@ -977,22 +1074,8 @@ export default function CartView({
         </Card>
       )}
 
-      {/* ИТОГО за визит — PM-145: sum of all today's orders + current cart */}
-      {(todayMyOrders.length > 0 || cart.length > 0) && (
-        <Card className="mb-4 bg-slate-50">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
-                {tr('cart.visit_total', 'ИТОГО за визит')}:
-              </span>
-              <span className="text-xl font-bold text-slate-900">{formatPrice(visitTotal)}</span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Spacer so sticky button doesn't overlap last content */}
-      {cart.length > 0 && <div className="h-16" />}
+      {/* Spacer so sticky footer doesn't overlap last content */}
+      {(cart.length > 0 || todayMyOrders.length > 0) && <div className="h-20" />}
 
       {/* AC-08: Error state with retry */}
       {submitError && cart.length > 0 && (
@@ -1004,40 +1087,54 @@ export default function CartView({
         </div>
       )}
 
-      {/* Submit button - sticky at bottom of drawer scroll area */}
-      {cart.length > 0 && (
+      {/* CV-02: Sticky footer — always visible when cart or orders exist */}
+      {(cart.length > 0 || todayMyOrders.length > 0) && (
         <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 -mx-4">
-          {/* Motivation text — only if loyalty enabled (#87 KS-1 Fix 1) */}
-          {partner?.loyalty_enabled && (() => {
-            const motivationPoints = Math.round((Number(cartTotalAmount) || 0) * (Number(partner?.loyalty_points_per_currency) || 1));
-            return motivationPoints > 0 ? (
-              <p className="text-sm text-gray-500 text-center mt-1 mb-1">
-                {trFormat('cart.motivation_bonus', { points: motivationPoints }, `Отправьте заказ официанту и получите +${motivationPoints} бонусов`)}
-              </p>
-            ) : null;
-          })()}
-          <Button
-            size="lg"
-            className={`w-full text-white ${
-              isSubmitting || emailError
-                ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
-                : submitError
-                  ? 'bg-red-600 hover:bg-red-700'
-                  : ''
-            }`}
-            style={!isSubmitting && !submitError && !emailError ? {backgroundColor: primaryColor} : undefined}
-            onClick={() => {
-              if (submitError && setSubmitError) setSubmitError(null);
-              handleSubmitOrder();
-            }}
-            disabled={isSubmitting || !!emailError}
-          >
-            {isSubmitting
-              ? tr('cta.sending', 'Отправляем...')
-              : submitError
-                ? tr('cta.retry', 'Повторить отправку')
-                : tr('cart.send_to_waiter', 'Отправить заказ официанту')}
-          </Button>
+          {cart.length > 0 ? (
+            <>
+              {/* Motivation text — only if loyalty enabled (#87 KS-1 Fix 1) */}
+              {partner?.loyalty_enabled && (() => {
+                const motivationPoints = Math.round((Number(cartTotalAmount) || 0) * (Number(partner?.loyalty_points_per_currency) || 1));
+                return motivationPoints > 0 ? (
+                  <p className="text-sm text-gray-500 text-center mt-1 mb-1">
+                    {trFormat('cart.motivation_bonus', { points: motivationPoints }, `Отправьте заказ официанту и получите +${motivationPoints} бонусов`)}
+                  </p>
+                ) : null;
+              })()}
+              <Button
+                size="lg"
+                className={`w-full text-white ${
+                  isSubmitting || emailError
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
+                    : submitError
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : ''
+                }`}
+                style={!isSubmitting && !submitError && !emailError ? {backgroundColor: primaryColor} : undefined}
+                onClick={() => {
+                  if (submitError && setSubmitError) setSubmitError(null);
+                  handleSubmitOrder();
+                }}
+                disabled={isSubmitting || !!emailError}
+              >
+                {isSubmitting
+                  ? tr('cta.sending', 'Отправляем...')
+                  : submitError
+                    ? tr('cta.retry', 'Повторить отправку')
+                    : tr('cart.send_to_waiter', 'Отправить заказ официанту')}
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full min-h-[44px]"
+              style={{borderColor: primaryColor, color: primaryColor}}
+              onClick={() => { onClose ? onClose() : setView("menu"); }}
+            >
+              {tr('cart.order_more', 'Заказать ещё')}
+            </Button>
+          )}
         </div>
       )}
     </div>
