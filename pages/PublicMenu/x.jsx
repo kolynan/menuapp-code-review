@@ -1461,6 +1461,12 @@ export default function X() {
     saveCartToStorage(partner.id, cart);
   }, [cart, partner?.id]);
 
+  // PM-153: Auto-save guest name to localStorage on every change (survives Chrome kill)
+  useEffect(() => {
+    if (!guestNameInput) return;
+    try { localStorage.setItem('menuapp_guest_name', guestNameInput); } catch(e) {}
+  }, [guestNameInput]);
+
   // Restore cart from localStorage on page load (once)
   // BUG-PM-005: mark restored before setCart to prevent save effect from firing on stale empty cart
   useEffect(() => {

@@ -356,20 +356,27 @@ export default function CartView({
 
   // ===== PM-142/143/154: Filter myOrders to 06:00 business-day + sort by datetime =====
   const todayMyOrders = React.useMemo(() => {
-    const today6am = new Date();
-    today6am.setHours(6, 0, 0, 0);
-    if (new Date() < today6am) today6am.setDate(today6am.getDate() - 1);
+    const now = new Date();
+    const isBeforeSixAM = now.getHours() < 6;
+    // Business-day cutoff: before 06:00 → yesterday's shift still active
+    const cutoffDate = new Date(now);
+    if (isBeforeSixAM) cutoffDate.setDate(cutoffDate.getDate() - 1);
+    const cutoffDay = new Date(cutoffDate.getFullYear(), cutoffDate.getMonth(), cutoffDate.getDate());
+
     return (myOrders || [])
       .filter(o => {
         const d = o.created_at || o.created_date || o.createdAt;
         if (!d) return true;
-        return new Date(d) >= today6am;
+        const orderDate = new Date(d);
+        // Compare calendar dates in LOCAL timezone (avoids UTC-offset bugs with date-only strings)
+        const orderDay = new Date(orderDate.getFullYear(), orderDate.getMonth(), orderDate.getDate());
+        return orderDay >= cutoffDay;
       })
       .filter(o => o.status !== 'cancelled')
       .sort((a, b) => {
         const da = new Date(a.created_at || a.created_date || a.createdAt || 0);
         const db = new Date(b.created_at || b.created_date || b.createdAt || 0);
-        return db - da; // newest first
+        return db - da;
       });
   }, [myOrders]);
 
