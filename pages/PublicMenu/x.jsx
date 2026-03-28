@@ -728,7 +728,7 @@ function OrderConfirmationScreen({
                 {tr("confirmation.total", "Итого")}
               </span>
               <span className="font-semibold text-slate-800 tabular-nums">
-                {formatPrice(totalAmount)}
+                {formatPrice(parseFloat((totalAmount || 0).toFixed(2)))}
               </span>
             </div>
           </div>
@@ -1356,7 +1356,18 @@ export default function X() {
   const [splitType, setSplitType] = useState('single'); // 'single' | 'all'
   const [otherGuestsExpanded, setOtherGuestsExpanded] = useState(false);
   const [guestNameInput, setGuestNameInput] = useState(() => {
-    try { return localStorage.getItem('menuapp_guest_name') || ''; } catch (e) { return ''; }
+    try {
+      // PM-152/153: Clear guest name if table changed
+      const savedTable = localStorage.getItem('menuapp_last_table');
+      const currentTableParam = new URLSearchParams(window.location.search).get('table') || '';
+      if (savedTable && currentTableParam && savedTable !== currentTableParam) {
+        localStorage.removeItem('menuapp_guest_name');
+        localStorage.setItem('menuapp_last_table', currentTableParam);
+        return '';
+      }
+      if (currentTableParam) localStorage.setItem('menuapp_last_table', currentTableParam);
+      return localStorage.getItem('menuapp_guest_name') || '';
+    } catch (e) { return ''; }
   });
   const [isEditingName, setIsEditingName] = useState(false);
 

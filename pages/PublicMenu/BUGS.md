@@ -1,7 +1,7 @@
 ---
-version: "37.0"
-updated: "2026-03-27"
-session: 184
+version: "38.0"
+updated: "2026-03-28"
+session: 186
 ---
 
 # PublicMenu — Bug Registry
@@ -138,6 +138,21 @@ session: 184
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-CHAIN-385c: CartView v3 UX redesign — CV-01..CV-09, PM-151..154, D3 screen — FIXED S186
+- **Когда:** S186, chain publicmenu-260328-083047-385c
+- **Файлы:** CartView.jsx, x.jsx
+- **Фиксы:**
+  - CV-01+CV-09 (P1): Section restructure — Сейчас (active, urgency sub-groups) → История (delivered, collapsed) → Новый заказ. Old «Выдано»/«Заказано» labels replaced.
+  - CV-02+CV-03 (P1): Sticky footer — three-state (cart+history / first-order / empty-cart). Float-safe sums. «ИТОГО ЗА ВИЗИТ» removed.
+  - CV-04+CV-05 (P1): Stars hidden for non-delivered orders. «Оценить блюда» CTA for delivered orders, expand on tap.
+  - CV-06 (P1): Collapsed summary rows in «Сейчас» — first 2 items + «+N», chevron ≥ 44px.
+  - CV-07 (P1): Guest selector — hidden for 1 guest, local picker for 2+. Old radio buttons replaced.
+  - CV-08 (P1): Status labels remapped — Заказано→Принят, Выдан гостю→Подано, Готово→Готов.
+  - PM-154 (P1): 06:00 AM business-day filter replaces midnight cutoff.
+  - PM-151 (P1): Float fix on success screen total in x.jsx.
+  - PM-152+PM-153 (P1): Guest name localStorage — clears on table change, persists across Chrome kill.
+  - D3/VL-04 (P1): «Все блюда поданы» screen with collapsed История + Дозаказать/Попросить счёт.
 
 ### FIX-CHAIN-c24f: PM-148+PM-149 — Small UX fixes (banner + guest ID suffix) — FIXED S184
 - **Когда:** S184, chain publicmenu-260327-065807-c24f (previous chain 77f1 targeted x.jsx incorrectly and was reverted)
