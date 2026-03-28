@@ -88,10 +88,10 @@ export default function CartView({
 
   // ===== P1 Expandable States =====
   const [splitExpanded, setSplitExpanded] = React.useState(false);
-  const [historyExpanded, setHistoryExpanded] = React.useState(false); // CV-01: История collapsed by default
+  // loyaltyExpanded removed — loyalty section simplified to motivation text (#87 KS-1)
+  const [servedExpanded, setServedExpanded] = React.useState(false); // PM-144: Выдано collapsed by default
+  const [activeExpanded, setActiveExpanded] = React.useState(true); // PM-144: Заказано expanded by default
   const [showRewardEmailForm, setShowRewardEmailForm] = React.useState(false);
-  const [expandedOrders, setExpandedOrders] = React.useState(new Set()); // CV-06: per-order collapse in Сейчас
-  const [ratingExpandedByOrder, setRatingExpandedByOrder] = React.useState({}); // CV-04: per-order rating expand
   const [rewardEmail, setRewardEmail] = React.useState('');
   const [rewardEmailSubmitting, setRewardEmailSubmitting] = React.useState(false);
   const [emailError, setEmailError] = React.useState('');
@@ -250,7 +250,7 @@ export default function CartView({
   // Safe status label - prevents showing raw translation keys like "orderprocess.default.new"
   const getSafeStatus = (status) => {
     if (!status) {
-      return { icon: '🔵', label: tr('status.accepted', 'Принят'), color: '#3B82F6' };
+      return { icon: '🔵', label: tr('status.new', 'Заказано'), color: '#3B82F6' };
     }
 
     let label = status.label || '';
@@ -263,31 +263,20 @@ export default function CartView({
 
       // Use human-readable fallbacks based on code
       const fallbacks = {
-        'new': tr('status.accepted', 'Принят'),
+        'new': tr('status.new', 'Заказано'),
         'start': tr('status.cooking', 'Готовится'),
         'cook': tr('status.cooking', 'Готовится'),
         'cooking': tr('status.cooking', 'Готовится'),
-        'finish': tr('status.ready', 'Готов'),
-        'ready': tr('status.ready', 'Готов'),
-        'done': tr('status.ready', 'Готов'),
+        'finish': tr('status.ready', 'Готово'),
+        'ready': tr('status.ready', 'Готово'),
+        'done': tr('status.ready', 'Готово'),
         'accepted': tr('status.accepted', 'Принят'),
-        'served': tr('status.served', 'Подано'),
-        'completed': tr('status.served', 'Подано'),
         'cancel': tr('status.cancelled', 'Отменён'),
         'cancelled': tr('status.cancelled', 'Отменён'),
       };
 
-      label = fallbacks[code] || tr('status.accepted', 'Принят');
+      label = fallbacks[code] || tr('status.new', 'Заказано');
     }
-
-    // CV-08: Guest-facing label normalization
-    const displayMap = {
-      'Заказано': tr('status.accepted', 'Принят'),
-      'Принято': tr('status.accepted', 'Принят'),
-      'Готово': tr('status.ready', 'Готов'),
-      'Выдан гостю': tr('status.served', 'Подано'),
-    };
-    label = displayMap[label] || label;
 
     return {
       icon: status.icon || '🔵',
@@ -358,16 +347,14 @@ export default function CartView({
   );
   const canSplit = guestCount > 1;
 
-  // ===== PM-154: Filter myOrders to current shift (06:00 cutoff) + sort by full datetime =====
+  // ===== PM-142/143: Filter myOrders to today + sort by full datetime =====
   const todayMyOrders = React.useMemo(() => {
-    const today6am = new Date();
-    today6am.setHours(6, 0, 0, 0);
-    if (new Date() < today6am) today6am.setDate(today6am.getDate() - 1);
+    const today = new Date().toDateString();
     return (myOrders || [])
       .filter(o => {
         const d = o.created_at || o.created_date || o.createdAt;
         if (!d) return true; // keep orders without date (safety)
-        return new Date(d) >= today6am;
+        return new Date(d).toDateString() === today;
       })
       .sort((a, b) => {
         const da = new Date(a.created_at || a.created_date || a.createdAt || 0);
@@ -376,43 +363,16 @@ export default function CartView({
       });
   }, [myOrders]);
 
-  // ===== CV-01: Split orders into Сейчас (active) vs История (delivered) =====
-  const historyOrders = React.useMemo(() =>
+  // ===== PM-144: Split orders into Выдано (served) vs Заказано (active) =====
+  const servedOrders = React.useMemo(() =>
     todayMyOrders.filter(o => o.status === 'served' || o.status === 'completed'),
     [todayMyOrders]
   );
 
-  const nowOrders = React.useMemo(() =>
+  const activeOrders = React.useMemo(() =>
     todayMyOrders.filter(o => o.status !== 'served' && o.status !== 'completed' && o.status !== 'cancelled'),
     [todayMyOrders]
   );
-
-  // CV-01: Sub-group nowOrders by status with urgency ordering (Готов → Готовится → Принят)
-  const STATUS_URGENCY = { 'ready': 0, 'done': 0, 'finish': 0, 'preparing': 1, 'cooking': 1, 'cook': 1, 'start': 1 };
-  const nowOrdersByStatus = React.useMemo(() => {
-    const groups = {};
-    nowOrders.forEach(o => {
-      const s = o.status || 'new';
-      if (!groups[s]) groups[s] = [];
-      groups[s].push(o);
-    });
-    const urgencyLabels = {
-      'ready': tr('status.ready', 'Готов'),
-      'done': tr('status.ready', 'Готов'),
-      'finish': tr('status.ready', 'Готов'),
-      'preparing': tr('status.cooking', 'Готовится'),
-      'cooking': tr('status.cooking', 'Готовится'),
-      'cook': tr('status.cooking', 'Готовится'),
-      'start': tr('status.cooking', 'Готовится'),
-    };
-    return Object.entries(groups)
-      .sort(([a], [b]) => (STATUS_URGENCY[a] ?? 2) - (STATUS_URGENCY[b] ?? 2))
-      .map(([status, orders]) => ({
-        status,
-        label: urgencyLabels[status] || tr('status.accepted', 'Принят'),
-        orders,
-      }));
-  }, [nowOrders]);
 
   // ===== PM-145: Visit total (all today's orders + current cart), float-safe =====
   const visitTotal = React.useMemo(() => {
@@ -493,50 +453,13 @@ export default function CartView({
 
   // loyaltySummary + reviewRewardLabel removed — loyalty section simplified (#87 KS-1)
 
-  // ===== CV-01/CV-04/CV-05: Render order items (supports collapse + rating gating) =====
-  const toggleOrderExpanded = (orderId) => {
-    setExpandedOrders(prev => {
-      const next = new Set(prev);
-      if (next.has(orderId)) next.delete(orderId); else next.add(orderId);
-      return next;
-    });
-  };
-
-  const renderOrderItems = (orders, { collapsible = false, showRating = false } = {}) => (
+  // ===== PM-144: Reusable order list renderer for Выдано / Заказано sections =====
+  const renderOrderItems = (orders) => (
     <div className="space-y-3">
       {orders.map((order) => {
         const orderItems = itemsByOrder.get(order.id) || [];
         const rawStatus = getOrderStatus(order);
         const status = getSafeStatus(rawStatus);
-        const isExpanded = !collapsible || expandedOrders.has(order.id);
-        const orderTotal = parseFloat((Number(order.total_amount) || 0).toFixed(2));
-        const isRatingExpanded = ratingExpandedByOrder[order.id];
-
-        // CV-06: Collapsed summary row
-        if (collapsible && !isExpanded) {
-          const names = orderItems.slice(0, 2).map(i => i.dish_name);
-          const extra = orderItems.length > 2 ? ` +${orderItems.length - 2}` : '';
-          const summary = names.join(', ') + extra;
-          return (
-            <button
-              key={order.id}
-              type="button"
-              className="w-full flex items-center justify-between text-left border-b pb-2 last:border-0 last:pb-0"
-              onClick={() => toggleOrderExpanded(order.id)}
-            >
-              <div className="flex-1 min-w-0">
-                <span className="text-xs text-slate-400 mr-2">{formatOrderTime(order)}</span>
-                <span className="text-sm text-slate-700 truncate">{summary}</span>
-              </div>
-              <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                <span className="text-sm font-medium text-slate-700">{formatPrice(orderTotal)}</span>
-                <div className="min-w-[44px] min-h-[44px] flex items-center justify-center">
-                  <ChevronDown className="w-4 h-4 text-slate-400" />
-                </div>
-              </div>
-            </button>
-          );
-        }
 
         return (
           <div key={order.id} className="border-b pb-3 last:border-0 last:pb-0">
@@ -544,22 +467,9 @@ export default function CartView({
               <span className="text-xs text-slate-400">
                 {formatOrderTime(order)}
               </span>
-              <div className="flex items-center gap-2">
-                {!collapsible && (
-                  <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${status.color}15`, color: status.color }}>
-                    {status.label}
-                  </span>
-                )}
-                {collapsible && (
-                  <button
-                    type="button"
-                    className="min-w-[44px] min-h-[44px] flex items-center justify-center"
-                    onClick={() => toggleOrderExpanded(order.id)}
-                  >
-                    <ChevronUp className="w-4 h-4 text-slate-400" />
-                  </button>
-                )}
-              </div>
+              <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${status.color}15`, color: status.color }}>
+                {status.label}
+              </span>
             </div>
             {orderItems.length > 0 ? (
               <div className="space-y-2">
@@ -576,8 +486,7 @@ export default function CartView({
                         <span className="text-slate-600">{formatPrice(lineTotal)}</span>
                       </div>
 
-                      {/* CV-04/CV-05: Rating only for delivered orders, expanded on CTA tap */}
-                      {showRating && reviewsEnabled && isRatingExpanded && (
+                      {reviewsEnabled && (
                         <div className="flex items-center gap-2 pl-2 py-2">
                           <Rating
                             value={draftRating}
@@ -608,21 +517,10 @@ export default function CartView({
                     </div>
                   );
                 })}
-                {/* CV-05: «Оценить блюда» CTA for delivered orders */}
-                {showRating && reviewsEnabled && !isRatingExpanded && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full mt-2"
-                    onClick={() => setRatingExpandedByOrder(prev => ({ ...prev, [order.id]: true }))}
-                  >
-                    ⭐ {tr('review.rate_dishes', 'Оценить блюда')}
-                  </Button>
-                )}
               </div>
             ) : (
               <div className="text-sm text-slate-500">
-                {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(orderTotal)}
+                {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(parseFloat((Number(order.total_amount) || 0).toFixed(2)))}
               </div>
             )}
           </div>
@@ -632,8 +530,7 @@ export default function CartView({
   );
 
   return (
-    <div className="flex flex-col h-full max-w-2xl mx-auto">
-    <div className="flex-1 overflow-y-auto px-4 mt-2 pb-4">
+    <div className="max-w-2xl mx-auto px-4 mt-2 pb-4">
       {/* P0 Header: [🔔] Стол · Гость · [˅] — #140: chevron moved into table card, not sticky */}
       <div className="bg-white rounded-lg shadow-sm border p-3 mb-4 mt-2">
         <div className="flex items-center justify-between">
@@ -872,53 +769,23 @@ export default function CartView({
         </Card>
       )}
 
-      {/* Fix 10 — D3: «Все блюда поданы» screen */}
-      {nowOrders.length === 0 && historyOrders.length > 0 && cart.length === 0 && (
-        <div className="mb-4 text-center py-4">
-          <div className="text-2xl mb-2">✅</div>
-          <div className="text-lg font-semibold text-slate-800">{tr('cart.all_served', 'Все блюда поданы')}</div>
-        </div>
-      )}
-
-      {/* SECTION: Сейчас (active orders) — CV-01, with urgency sub-groups */}
-      {nowOrders.length > 0 && (
-        <Card className="mb-4">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <span>⏱</span>
-              <span className="text-base font-semibold text-slate-800">
-                {tr('cart.now_section', 'Сейчас')} ({nowOrders.length})
-              </span>
-            </div>
-            {nowOrdersByStatus.map((group) => (
-              <div key={group.status} className="mb-3 last:mb-0">
-                <div className="text-xs text-slate-500 font-medium uppercase tracking-wide border-b border-slate-100 pb-1 mb-2">
-                  {group.label}
-                </div>
-                {renderOrderItems(group.orders, { collapsible: true, showRating: false })}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* SECTION: История (delivered orders) — CV-01, collapsed by default */}
-      {historyOrders.length > 0 && (
+      {/* SECTION: Выдано (served orders) — PM-144, collapsed by default */}
+      {servedOrders.length > 0 && (
         <Card className="mb-4">
           <CardContent className="p-4">
             <button
               type="button"
               className="w-full flex items-center justify-between text-left min-h-[44px]"
-              onClick={() => setHistoryExpanded(!historyExpanded)}
+              onClick={() => setServedExpanded(!servedExpanded)}
             >
               <div className="flex items-center gap-2">
-                <span>📋</span>
+                <span>✅</span>
                 <span className="text-base font-semibold text-slate-800">
-                  {tr('cart.history_section', 'История')} · {historyOrders.length} {tr('cart.orders_count', 'заказ')} · {tr('review.rate_action', 'оценить')}
+                  {tr('cart.served', 'Выдано')} ({servedOrders.length})
                 </span>
               </div>
               <div className="min-w-[44px] min-h-[44px] flex items-center justify-end">
-                {historyExpanded ? (
+                {servedExpanded ? (
                   <ChevronUp className="w-5 h-5 text-slate-400" />
                 ) : (
                   <ChevronDown className="w-5 h-5 text-slate-400" />
@@ -926,13 +793,72 @@ export default function CartView({
               </div>
             </button>
 
-            {historyExpanded && (
+            {servedExpanded && (
               <div className="mt-4 pt-4 border-t">
-                {renderOrderItems(historyOrders, { collapsible: false, showRating: true })}
+                {renderOrderItems(servedOrders)}
               </div>
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* SECTION: Заказано (active orders) — PM-144, expanded by default */}
+      {activeOrders.length > 0 && (
+        <Card className="mb-4">
+          <CardContent className="p-4">
+            <button
+              type="button"
+              className="w-full flex items-center justify-between text-left min-h-[44px]"
+              onClick={() => setActiveExpanded(!activeExpanded)}
+            >
+              <div className="flex items-center gap-2">
+                <span>🕐</span>
+                <span className="text-base font-semibold text-slate-800">
+                  {tr('cart.ordered', 'Заказано')} ({activeOrders.length})
+                </span>
+              </div>
+              <div className="min-w-[44px] min-h-[44px] flex items-center justify-end">
+                {activeExpanded ? (
+                  <ChevronUp className="w-5 h-5 text-slate-400" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-slate-400" />
+                )}
+              </div>
+            </button>
+
+            {activeExpanded && (
+              <div className="mt-4 pt-4 border-t">
+                {renderOrderItems(activeOrders)}
+
+                {/* Review button */}
+                {reviewableItems.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-3"
+                    onClick={() => openReviewDialog(reviewableItems)}
+                  >
+                    💬 {tr('review.add_comments', 'Добавить комментарии')}
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* CTA: Add more items when cart is empty but orders exist */}
+      {cart.length === 0 && todayMyOrders.length > 0 && (
+        <div className="mt-4 px-4">
+          <Button
+            variant="outline"
+            className="w-full min-h-[44px]"
+            style={{borderColor: primaryColor, color: primaryColor}}
+            onClick={() => { onClose ? onClose() : setView("menu"); }}
+          >
+            + {tr('cart.add_more', 'Добавить к заказу')}
+          </Button>
+        </div>
       )}
 
       {/* SECTION 2: NEW ORDER */}
@@ -975,41 +901,71 @@ export default function CartView({
               ))}
             </div>
 
-            {/* CV-07: Guest selector — only when 2+ guests at table */}
-            {isTableVerified === true && canSplit && (
+            {/* P1: Split toggle - STABLE (always visible, disabled if < 2 guests) */}
+            {isTableVerified === true && (
             <div className="mt-4 pt-4 border-t">
               <button
                 type="button"
-                className="w-full flex items-center justify-between text-left"
-                onClick={() => setSplitExpanded(!splitExpanded)}
+                className={`w-full flex items-center justify-between text-left ${
+                  canSplit ? "cursor-pointer" : "cursor-not-allowed"
+                }`}
+                onClick={() => canSplit && setSplitExpanded(!splitExpanded)}
+                disabled={!canSplit}
               >
                 <span className="text-sm font-medium text-slate-700">
-                  {tr('cart.order_for', 'Кому заказ')}
+                  {tr('cart.split_title', 'Для кого заказ')}
                 </span>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-600">
-                    {splitType === 'all' ? tr('cart.for_all', 'На всех') : tr('cart.for_me', 'Мне')}
+                  <span className={`text-sm ${canSplit ? 'text-slate-600' : 'text-slate-400'}`}>
+                    {splitSummary}
                   </span>
-                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                  {canSplit ? (
+                    splitExpanded ? (
+                      <ChevronUp className="w-4 h-4 text-slate-400" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    )
+                  ) : (
+                    <span className="text-xs text-slate-400">
+                      {tr('cart.split_disabled_hint', '(2+ гостей)')}
+                    </span>
+                  )}
                 </div>
               </button>
 
-              {splitExpanded && (
-                <div className="mt-3 space-y-1 bg-slate-50 rounded-lg p-2">
-                  <button
-                    type="button"
-                    className={`w-full text-left px-3 py-2 rounded-md text-sm ${splitType === 'single' ? 'bg-white shadow-sm font-medium' : 'text-slate-600'}`}
-                    onClick={() => { setSplitType('single'); setSplitExpanded(false); }}
-                  >
-                    {tr('cart.for_me', 'Мне')}
-                  </button>
-                  <button
-                    type="button"
-                    className={`w-full text-left px-3 py-2 rounded-md text-sm ${splitType === 'all' ? 'bg-white shadow-sm font-medium' : 'text-slate-600'}`}
-                    onClick={() => { setSplitType('all'); setSplitExpanded(false); }}
-                  >
-                    {tr('cart.for_all', 'На всех')} (÷{guestCount})
-                  </button>
+              {splitExpanded && canSplit && (
+                <div className="mt-3 flex items-center justify-center gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="splitType"
+                      checked={splitType === 'single'}
+                      onChange={() => setSplitType('single')}
+                      className="w-4 h-4" style={{accentColor: primaryColor}}
+                    />
+                    <span className="text-sm text-slate-700">{tr('cart.only_me', 'Только я')}</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="splitType"
+                      checked={splitType === 'all'}
+                      onChange={() => setSplitType('all')}
+                      className="w-4 h-4" style={{accentColor: primaryColor}}
+                    />
+                    <span className="text-sm text-slate-700">{tr('cart.for_all', 'На всех')} (÷{guestCount})</span>
+                  </label>
+                  {/* P2 placeholder - disabled until data model supports custom split */}
+                  <label className="flex items-center gap-2 opacity-50 cursor-not-allowed">
+                    <input
+                      type="radio"
+                      disabled
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm text-slate-400">
+                      {tr('cart.split_pick_guests_soon', 'Выбрать гостей (скоро)')}
+                    </span>
+                  </label>
                 </div>
               )}
             </div>
@@ -1021,137 +977,69 @@ export default function CartView({
         </Card>
       )}
 
-      </div>{/* end scrollable area */}
-
-      {/* CV-02/CV-03: Sticky footer — always visible */}
+      {/* ИТОГО за визит — PM-145: sum of all today's orders + current cart */}
       {(todayMyOrders.length > 0 || cart.length > 0) && (
-        <div className="border-t border-slate-200 bg-white p-4">
-          {/* AC-08: Error state with retry */}
-          {submitError && cart.length > 0 && (
-            <div className="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg text-center">
-              <p className="text-sm font-medium text-red-700">{submitError}</p>
-              <p className="text-xs text-red-500 mt-1">
-                {tr('error.send.subtitle', 'Не удалось отправить. Попробуйте снова')}
-              </p>
+        <Card className="mb-4 bg-slate-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+                {tr('cart.visit_total', 'ИТОГО за визит')}:
+              </span>
+              <span className="text-xl font-bold text-slate-900">{formatPrice(visitTotal)}</span>
             </div>
-          )}
+          </CardContent>
+        </Card>
+      )}
 
-          {cart.length > 0 && todayMyOrders.length > 0 ? (
-            <>
-              {/* Cart + history → К отправке + Всего */}
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-bold text-slate-800">{tr('cart.to_submit', 'К отправке')}:</span>
-                <span className="text-base font-bold text-slate-900">{formatPrice(parseFloat(cartGrandTotal.toFixed(2)))}</span>
-              </div>
-              <div className="flex justify-between items-center mb-3">
-                <span className="text-xs text-gray-500">{tr('cart.total_label', 'Всего')}:</span>
-                <span className="text-xs text-gray-500">{formatPrice(visitTotal)}</span>
-              </div>
-              {/* Motivation text */}
-              {partner?.loyalty_enabled && (() => {
-                const motivationPoints = Math.round((Number(cartTotalAmount) || 0) * (Number(partner?.loyalty_points_per_currency) || 1));
-                return motivationPoints > 0 ? (
-                  <p className="text-sm text-gray-500 text-center mb-1">
-                    {trFormat('cart.motivation_bonus', { points: motivationPoints }, `Отправьте заказ официанту и получите +${motivationPoints} бонусов`)}
-                  </p>
-                ) : null;
-              })()}
-              <Button
-                size="lg"
-                className={`w-full text-white ${
-                  isSubmitting || emailError
-                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
-                    : submitError
-                      ? 'bg-red-600 hover:bg-red-700'
-                      : ''
-                }`}
-                style={!isSubmitting && !submitError && !emailError ? {backgroundColor: primaryColor} : undefined}
-                onClick={() => {
-                  if (submitError && setSubmitError) setSubmitError(null);
-                  handleSubmitOrder();
-                }}
-                disabled={isSubmitting || !!emailError}
-              >
-                {isSubmitting
-                  ? tr('cta.sending', 'Отправляем...')
-                  : submitError
-                    ? tr('cta.retry', 'Повторить отправку')
-                    : tr('cart.send_to_waiter', 'Отправить заказ официанту')}
-              </Button>
-            </>
-          ) : cart.length > 0 ? (
-            <>
-              {/* First order only → ИТОГО (just cart) */}
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-bold text-slate-800">{tr('cart.total_short', 'ИТОГО')}:</span>
-                <span className="text-base font-bold text-slate-900">{formatPrice(parseFloat(cartGrandTotal.toFixed(2)))}</span>
-              </div>
-              {earnedPoints > 0 && (
-                <p className="text-xs text-green-600 mb-2">+{earnedPoints} {tr('loyalty.points_short', 'бонусов')}</p>
-              )}
-              {partner?.loyalty_enabled && (() => {
-                const motivationPoints = Math.round((Number(cartTotalAmount) || 0) * (Number(partner?.loyalty_points_per_currency) || 1));
-                return motivationPoints > 0 ? (
-                  <p className="text-sm text-gray-500 text-center mb-1">
-                    {trFormat('cart.motivation_bonus', { points: motivationPoints }, `Отправьте заказ официанту и получите +${motivationPoints} бонусов`)}
-                  </p>
-                ) : null;
-              })()}
-              <Button
-                size="lg"
-                className={`w-full text-white ${
-                  isSubmitting || emailError
-                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
-                    : submitError
-                      ? 'bg-red-600 hover:bg-red-700'
-                      : ''
-                }`}
-                style={!isSubmitting && !submitError && !emailError ? {backgroundColor: primaryColor} : undefined}
-                onClick={() => {
-                  if (submitError && setSubmitError) setSubmitError(null);
-                  handleSubmitOrder();
-                }}
-                disabled={isSubmitting || !!emailError}
-              >
-                {isSubmitting
-                  ? tr('cta.sending', 'Отправляем...')
-                  : submitError
-                    ? tr('cta.retry', 'Повторить отправку')
-                    : tr('cart.send_to_waiter', 'Отправить заказ официанту')}
-              </Button>
-            </>
-          ) : (
-            <>
-              {/* Empty cart → ИТОГО (all orders) + Заказать ещё / D3 buttons */}
-              <div className="flex justify-between items-center mb-3">
-                <span className="text-sm font-bold text-slate-800">{tr('cart.total_short', 'ИТОГО')}:</span>
-                <span className="text-base font-bold text-slate-900">{formatPrice(visitTotal)}</span>
-              </div>
-              <Button
-                variant={nowOrders.length === 0 ? "default" : "outline"}
-                size="lg"
-                className="w-full"
-                style={nowOrders.length === 0 ? {backgroundColor: primaryColor, color: 'white'} : {borderColor: primaryColor, color: primaryColor}}
-                onClick={() => { onClose ? onClose() : setView("menu"); }}
-              >
-                {nowOrders.length === 0 ? tr('cart.order_more', 'Дозаказать') : tr('cart.add_more', 'Заказать ещё')}
-              </Button>
-              {/* D3: «Попросить счёт» only when all delivered */}
-              {nowOrders.length === 0 && historyOrders.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="w-full mt-2 text-slate-500 border-slate-300"
-                  disabled
-                  title={tr('cart.ask_waiter_directly', 'Попросите официанта напрямую')}
-                >
-                  {tr('cart.request_bill', 'Попросить счёт')}
-                </Button>
-              )}
-            </>
-          )}
+      {/* Spacer so sticky button doesn't overlap last content */}
+      {cart.length > 0 && <div className="h-16" />}
+
+      {/* AC-08: Error state with retry */}
+      {submitError && cart.length > 0 && (
+        <div className="mx-0 mb-2 p-3 bg-red-50 border border-red-200 rounded-lg text-center">
+          <p className="text-sm font-medium text-red-700">{submitError}</p>
+          <p className="text-xs text-red-500 mt-1">
+            {tr('error.send.subtitle', 'Не удалось отправить. Попробуйте снова')}
+          </p>
+        </div>
+      )}
+
+      {/* Submit button - sticky at bottom of drawer scroll area */}
+      {cart.length > 0 && (
+        <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 -mx-4">
+          {/* Motivation text — only if loyalty enabled (#87 KS-1 Fix 1) */}
+          {partner?.loyalty_enabled && (() => {
+            const motivationPoints = Math.round((Number(cartTotalAmount) || 0) * (Number(partner?.loyalty_points_per_currency) || 1));
+            return motivationPoints > 0 ? (
+              <p className="text-sm text-gray-500 text-center mt-1 mb-1">
+                {trFormat('cart.motivation_bonus', { points: motivationPoints }, `Отправьте заказ официанту и получите +${motivationPoints} бонусов`)}
+              </p>
+            ) : null;
+          })()}
+          <Button
+            size="lg"
+            className={`w-full text-white ${
+              isSubmitting || emailError
+                ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
+                : submitError
+                  ? 'bg-red-600 hover:bg-red-700'
+                  : ''
+            }`}
+            style={!isSubmitting && !submitError && !emailError ? {backgroundColor: primaryColor} : undefined}
+            onClick={() => {
+              if (submitError && setSubmitError) setSubmitError(null);
+              handleSubmitOrder();
+            }}
+            disabled={isSubmitting || !!emailError}
+          >
+            {isSubmitting
+              ? tr('cta.sending', 'Отправляем...')
+              : submitError
+                ? tr('cta.retry', 'Повторить отправку')
+                : tr('cart.send_to_waiter', 'Отправить заказ официанту')}
+          </Button>
         </div>
       )}
     </div>
   );
-}
+}                                                                           
