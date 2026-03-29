@@ -699,10 +699,6 @@ function OrderConfirmationScreen({
       {/* Order summary card */}
       <Card className="mb-6">
         <CardContent className="p-4">
-          <p className="text-sm font-medium text-slate-600 mb-3">
-            {tr("confirmation.your_order", "Ваш заказ")}
-          </p>
-
           {/* Items list */}
           <div className="space-y-2 mb-3">
             {items.map((item, idx) => (
@@ -732,13 +728,6 @@ function OrderConfirmationScreen({
               </span>
             </div>
           </div>
-
-          {/* Guest label */}
-          {guestLabel && (
-            <p className="text-sm text-slate-500 mt-3">
-              {tr("confirmation.guest_label", "Гость")}: {guestLabel}
-            </p>
-          )}
 
           {/* Client name (pickup/delivery) */}
           {clientName && orderMode !== "hall" && (
@@ -2280,11 +2269,11 @@ export default function X() {
         : tr("cart.your_orders", "Ваши заказы");
 
   // Hall StickyBar: сумма для показа
-  const hallStickyBillTotal = 
-    hallStickyMode === "myBill" 
-      ? formatPrice(myBill.total) 
-      : hallStickyMode === "tableOrders" 
-        ? formatPrice(tableTotal) 
+  const hallStickyBillTotal =
+    hallStickyMode === "myBill"
+      ? formatPrice(parseFloat((myBill.total || 0).toFixed(2)))
+      : hallStickyMode === "tableOrders"
+        ? formatPrice(parseFloat((tableTotal || 0).toFixed(2)))
         : "";
 
   // Hall StickyBar: показывать ли сумму

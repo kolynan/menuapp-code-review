@@ -91,9 +91,9 @@ export default function MenuView({
           {/* Text LEFT — name, description, price, stepper */}
           <div className="flex-1 min-w-0 flex flex-col justify-between min-h-[96px]">
             <div>
-              <h3 className="font-semibold text-base text-slate-900 line-clamp-2">{getDishName(dish)}</h3>
+              <h3 className="font-semibold text-base text-slate-900 line-clamp-1">{getDishName(dish)}</h3>
               {getDishDescription(dish) && (
-                <p className="text-sm text-slate-500 mt-0.5 line-clamp-2">
+                <p className="text-sm text-slate-500 mt-0.5 line-clamp-1">
                   {getDishDescription(dish)}
                 </p>
               )}
