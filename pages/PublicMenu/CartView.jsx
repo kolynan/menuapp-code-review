@@ -102,7 +102,13 @@ export default function CartView({
   // CV-32: Auto-collapse "Подано" when cart is non-empty (D1 state)
   React.useEffect(() => {
     if (cart.length > 0) {
-      setExpandedStatuses(prev => ({ ...prev, served: false }));
+      setExpandedStatuses(prev => ({
+        ...prev,
+        served: false,
+        ready: false,
+        in_progress: false,
+        accepted: false,
+      }));
     }
   }, [cart.length > 0]);
   const [showRewardEmailForm, setShowRewardEmailForm] = React.useState(false);
@@ -487,9 +493,6 @@ export default function CartView({
     new_order: 'Отправлено',
   };
 
-  const bucketIcons = {
-    served: '✅', ready: '🟠', in_progress: '🔵', accepted: '🟡', new_order: '⚪',
-  };
 
   // CV-04: Check if all items in served bucket are rated
   const allServedRated = React.useMemo(() => {
@@ -862,14 +865,13 @@ export default function CartView({
 
               {/* Подано bucket — collapsed with accent chip */}
               <Card className="mb-4">
-                <CardContent className="p-4">
+                <CardContent className="p-3">
                   <button
                     type="button"
                     className="w-full flex items-center justify-between text-left min-h-[44px]"
                     onClick={() => setExpandedStatuses(prev => ({ ...prev, served: !prev.served }))}
                   >
                     <div className="flex items-center gap-2">
-                      <span>✅</span>
                       <span className="text-base font-semibold text-slate-800">
                         {bucketDisplayNames.served} ({statusBuckets.served.length})
                       </span>
@@ -909,14 +911,13 @@ export default function CartView({
 
           return (
             <Card key={key} className="mb-4">
-              <CardContent className="p-4">
+              <CardContent className="p-3">
                 <button
                   type="button"
                   className="w-full flex items-center justify-between text-left min-h-[44px]"
                   onClick={() => setExpandedStatuses(prev => ({ ...prev, [key]: !prev[key] }))}
                 >
                   <div className="flex items-center gap-2">
-                    <span>{bucketIcons[key]}</span>
                     <span className="text-base font-semibold text-slate-800">
                       {bucketDisplayNames[key]} ({orders.length})
                     </span>
@@ -951,7 +952,7 @@ export default function CartView({
           <CardContent className="px-3 py-2">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                🛒 {tr('cart.new_order', 'Новый заказ')}
+                {tr('cart.new_order', 'Новый заказ')}
               </h2>
               <span className="text-sm font-medium text-slate-600">{formatPrice(parseFloat((Number(cartTotalAmount) || 0).toFixed(2)))}</span>
             </div>

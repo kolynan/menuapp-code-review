@@ -3806,9 +3806,6 @@ export default function StaffOrdersMobile() {
 
         {!isKitchen && finalRequests.length > 0 && (
           <div>
-            <h2 className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider mb-2 flex items-center gap-1">
-              <Hand className="w-3 h-3" /> ЗАПРОСЫ ГОСТЕЙ ({finalRequests.length})
-            </h2>
             {finalRequests.map((req) => {
               // P0-1: Normalize table for RequestCard
               const reqTableId = getLinkId(req.table);
