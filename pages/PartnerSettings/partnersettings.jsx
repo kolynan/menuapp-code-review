@@ -124,7 +124,7 @@ function getWeekdays(t) {
 function getSectionTabs(t) {
   return [
     { id: "profile", label: t("settings.tabs.profile"), Icon: Building2 },
-    { id: "appearance", label: t("settings.tabs.appearance"), Icon: Palette },
+    { id: "appearance", label: t("settings.tabs.appearance", "Внешний вид"), Icon: Palette },
     { id: "discounts", label: t("settings.tabs.discounts", "Скидки"), Icon: Percent },
     { id: "hours", label: t("settings.tabs.hours"), Icon: Clock },
     { id: "channels", label: t("settings.tabs.channels"), Icon: Store },
@@ -494,8 +494,8 @@ function AppearanceSection({ partner, onSave, saving, t }) {
           <Palette className="h-5 w-5" />
         </div>
         <div>
-          <h2 className="font-semibold text-lg">{t("settings.appearance.title")}</h2>
-          <p className="text-sm text-slate-500">{t("settings.appearance.subtitle")}</p>
+          <h2 className="font-semibold text-lg">{t("settings.appearance.title", "Цвет оформления")}</h2>
+          <p className="text-sm text-slate-500">{t("settings.appearance.subtitle", "Основной цвет интерфейса ресторана")}</p>
         </div>
       </div>
 
@@ -506,7 +506,7 @@ function AppearanceSection({ partner, onSave, saving, t }) {
             <button
               key={hex}
               type="button"
-              aria-label={hex === DEFAULT_COLOR ? t("settings.appearance.default") : hex}
+              aria-label={hex === DEFAULT_COLOR ? t("settings.appearance.default", "По умолчанию") : hex}
               className={`w-11 h-11 rounded-full cursor-pointer border-2 flex items-center justify-center transition-all ${
                 isSelected
                   ? "ring-2 ring-offset-2 border-white"
@@ -523,7 +523,7 @@ function AppearanceSection({ partner, onSave, saving, t }) {
       </div>
 
       {selectedColor === DEFAULT_COLOR.toUpperCase() && (
-        <p className="text-xs text-slate-400">{t("settings.appearance.defaultHint")}</p>
+        <p className="text-xs text-slate-400">{t("settings.appearance.defaultHint", "Используется цвет по умолчанию")}</p>
       )}
     </div>
   );
@@ -547,58 +547,43 @@ function DiscountSection({ partner, onSave, saving, t }) {
   const [discountPercent, setDiscountPercent] = useState(partner?.discount_percent ?? 10);
   const [discountColor, setDiscountColor] = useState(partner?.discount_color || DISCOUNT_DEFAULT_COLOR);
   const [discountBadgeSize, setDiscountBadgeSize] = useState(partner?.discount_badge_size || "base");
-  const [localSaving, setLocalSaving] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     setDiscountEnabled(partner?.discount_enabled ?? false);
     setDiscountPercent(partner?.discount_percent ?? 10);
     setDiscountColor(partner?.discount_color || DISCOUNT_DEFAULT_COLOR);
     setDiscountBadgeSize(partner?.discount_badge_size || "base");
-    setHasChanges(false);
   }, [partner?.id, partner?.discount_enabled, partner?.discount_percent, partner?.discount_color, partner?.discount_badge_size]);
 
-  const isSaving = saving || localSaving;
+  const debouncedSavePercent = useDebouncedCallback(
+    (val) => onSave({ discount_percent: val }),
+    500
+  );
 
   const handleToggle = (checked) => {
-    setDiscountEnabled(checked === true);
-    setHasChanges(true);
+    const newVal = checked === true;
+    setDiscountEnabled(newVal);
+    onSave({ discount_enabled: newVal });
   };
 
   const handlePercentChange = (e) => {
     const val = parseInt(e.target.value, 10);
     if (!isNaN(val)) {
-      setDiscountPercent(Math.max(1, Math.min(99, val)));
+      const clamped = Math.max(1, Math.min(99, val));
+      setDiscountPercent(clamped);
+      debouncedSavePercent(clamped);
     } else if (e.target.value === "") {
       setDiscountPercent("");
     }
-    setHasChanges(true);
   };
 
   const handleColorSelect = (hex) => {
-    if (isSaving || !discountEnabled) return;
+    if (saving || !discountEnabled) return;
     setDiscountColor(hex);
-    setHasChanges(true);
+    onSave({ discount_color: hex });
   };
 
-  const handleSave = async () => {
-    setLocalSaving(true);
-    try {
-      await onSave({
-        discount_enabled: discountEnabled,
-        discount_percent: typeof discountPercent === "number" ? discountPercent : 10,
-        discount_color: discountColor,
-        discount_badge_size: discountBadgeSize,
-      });
-      setHasChanges(false);
-    } catch (e) {
-      // Error handled in parent
-    } finally {
-      setLocalSaving(false);
-    }
-  };
-
-  const fieldsDisabled = !discountEnabled || isSaving;
+  const fieldsDisabled = !discountEnabled || saving;
 
   return (
     <div id="section-discounts" className="rounded-xl border bg-white p-4 sm:p-6 space-y-4 scroll-mt-20">
@@ -609,7 +594,7 @@ function DiscountSection({ partner, onSave, saving, t }) {
         <div>
           <h2 className="font-semibold text-lg flex items-center gap-2">
             {t("settings.discount.title", "Скидки")}
-            {isSaving && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
+            {saving && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
           </h2>
           <p className="text-sm text-slate-500">{t("settings.discount.subtitle", "Настройки скидок для меню")}</p>
         </div>
@@ -617,7 +602,7 @@ function DiscountSection({ partner, onSave, saving, t }) {
 
       {/* Enable discount toggle */}
       <label
-        className={`flex items-start space-x-3 p-3 rounded-lg border bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors min-h-[44px] ${isSaving ? "opacity-50 pointer-events-none" : ""}`}
+        className={`flex items-start space-x-3 p-3 rounded-lg border bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors min-h-[44px] ${saving ? "opacity-50 pointer-events-none" : ""}`}
         onClick={(e) => {
           if (e.target.closest('[role="checkbox"]')) return;
           handleToggle(!discountEnabled);
@@ -627,7 +612,7 @@ function DiscountSection({ partner, onSave, saving, t }) {
           id="discount_enabled"
           checked={discountEnabled}
           onCheckedChange={handleToggle}
-          disabled={isSaving}
+          disabled={saving}
           className="h-6 w-6"
         />
         <div className="grid gap-1.5 leading-none">
@@ -682,7 +667,7 @@ function DiscountSection({ partner, onSave, saving, t }) {
         {/* Badge font size */}
         <div className="space-y-2">
           <Label>{t("settings.discount_badge_size", "Размер шрифта бейджа")}</Label>
-          <Select value={discountBadgeSize} onValueChange={(val) => { setDiscountBadgeSize(val); setHasChanges(true); }} disabled={fieldsDisabled}>
+          <Select value={discountBadgeSize} onValueChange={(val) => { setDiscountBadgeSize(val); onSave({ discount_badge_size: val }); }} disabled={fieldsDisabled}>
             <SelectTrigger className="min-h-[44px]">
               <SelectValue />
             </SelectTrigger>
@@ -696,26 +681,6 @@ function DiscountSection({ partner, onSave, saving, t }) {
 
       </div>
 
-      {/* Save Button — outside disabled wrapper so it stays clickable when toggle is OFF */}
-      <div className="pt-2">
-        <Button
-          onClick={handleSave}
-          disabled={isSaving || !hasChanges}
-          className="w-full sm:w-auto min-h-[44px]"
-        >
-          {isSaving ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              {t("common.saving", "Сохранение...")}
-            </>
-          ) : (
-            <>
-              <Check className="h-4 w-4 mr-2" />
-              {t("common.save", "Сохранить")}
-            </>
-          )}
-        </Button>
-      </div>
     </div>
   );
 }
@@ -1044,6 +1009,7 @@ function HallOrderingSection({ partner, onSave, saving, t }) {
             <p className="text-xs text-slate-500">{t("settings.hall.code_length_hint")}</p>
           </div>
 
+          {false && (
           <div className="space-y-1.5">
             <Label className="text-xs text-slate-600">{t("settings.hall.max_attempts")}</Label>
             <Input
@@ -1061,6 +1027,7 @@ function HallOrderingSection({ partner, onSave, saving, t }) {
             />
             <p className="text-xs text-slate-500">{t("settings.hall.max_attempts_hint")}</p>
           </div>
+          )}
 
           <div className="space-y-1.5">
             <Label className="text-xs text-slate-600">{t("settings.hall.cooldown_seconds")}</Label>
