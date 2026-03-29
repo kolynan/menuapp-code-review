@@ -87,7 +87,7 @@ export default function CartView({
   const safeDraftRatings = draftRatings || {};
 
   // ===== P1 Expandable States =====
-  const [splitExpanded, setSplitExpanded] = React.useState(false);
+  // CV-33: splitExpanded removed — split-order section removed
   // loyaltyExpanded removed — loyalty section simplified to motivation text (#87 KS-1)
   // CV-01/CV-09: Status-based bucket expand states (replaces old binary split)
   const [expandedStatuses, setExpandedStatuses] = React.useState({
@@ -97,7 +97,14 @@ export default function CartView({
     accepted: true,
     new_order: true, // Отправлено
   });
-  const [expandedOrders, setExpandedOrders] = React.useState({}); // per-order collapse (Fix 4)
+  // CV-28: expandedOrders removed — flat dish list replaces per-order collapse
+
+  // CV-32: Auto-collapse "Подано" when cart is non-empty (D1 state)
+  React.useEffect(() => {
+    if (cart.length > 0) {
+      setExpandedStatuses(prev => ({ ...prev, served: false }));
+    }
+  }, [cart.length > 0]);
   const [showRewardEmailForm, setShowRewardEmailForm] = React.useState(false);
   const [rewardEmail, setRewardEmail] = React.useState('');
   const [rewardEmailSubmitting, setRewardEmailSubmitting] = React.useState(false);
@@ -307,9 +314,10 @@ export default function CartView({
   const effectiveGuestCode = guestCode || (hallGuestCodeEnabled ? guestCodeFromStorage : null);
 
   // Guest display: "Имя #6475" or "Гость #6475"
+  // PM-153: Use guestNameInput (from localStorage) as fallback when DB name is empty
   const guestBaseName = currentGuest
-    ? (currentGuest.name || getGuestDisplayName(currentGuest))
-    : tr("cart.guest", "Гость");
+    ? (currentGuest.name || guestNameInput || getGuestDisplayName(currentGuest))
+    : (guestNameInput || tr("cart.guest", "Гость"));
 
   const guestDisplay = guestBaseName;
 
@@ -466,10 +474,7 @@ export default function CartView({
   // Показывать nudge "Введите email" после первой оценки
   const shouldShowReviewRewardNudge = isReviewRewardActive && hasAnyRating && !isCustomerIdentified;
 
-  // Split summary text
-  const splitSummary = splitType === "all" 
-    ? `${tr('cart.for_all', 'На всех')} (÷${guestCount})`
-    : tr('cart.only_me', 'Только я');
+  // CV-33: splitSummary removed — split-order section removed
 
   // loyaltySummary + reviewRewardLabel removed — loyalty section simplified (#87 KS-1)
 
@@ -499,119 +504,91 @@ export default function CartView({
     });
   }, [statusBuckets.served, itemsByOrder, safeReviewedItems, safeDraftRatings]);
 
-  // CV-06: Build order summary text (collapsed row)
-  const getOrderSummary = (order) => {
-    const orderItems = itemsByOrder.get(order.id) || [];
-    if (orderItems.length === 0) return tr('cart.order_total', 'Сумма заказа');
-    const names = orderItems.slice(0, 2).map(i =>
-      i.dish_name + (i.quantity > 1 ? ` ×${i.quantity}` : '')
-    ).join(', ');
-    const extra = orderItems.length > 2 ? ` +${orderItems.length - 2}` : '';
-    return names + extra;
-  };
+  // CV-28: getOrderSummary/getOrderTime removed — flat dish list replaces per-order collapse
 
-  const getOrderTime = (order) => {
-    const d = order.created_at || order.created_date || order.createdAt;
-    if (!d) return '';
-    return new Date(d).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
-  };
+  // ===== CV-28: Render flat dish list for a status bucket (grouped by dish name) =====
+  const renderBucketOrders = (orders, showRating) => {
+    // Collect ALL items from ALL orders in this bucket
+    const allItems = [];
+    orders.forEach(order => {
+      const orderItems = itemsByOrder.get(order.id) || [];
+      orderItems.forEach((item, idx) => {
+        allItems.push({
+          ...item,
+          itemId: item.id || `${order.id}_${idx}`,
+          orderId: order.id,
+        });
+      });
+    });
 
-  // ===== CV-01: Render orders for a status bucket =====
-  const renderBucketOrders = (orders, showRating) => (
-    <div className="space-y-2 mt-3 pt-3 border-t">
-      {orders.map((order) => {
-        const orderItems = itemsByOrder.get(order.id) || [];
-        const isOrderExpanded = !!expandedOrders[order.id];
-        const orderTotal = parseFloat((Number(order.total_amount) || 0).toFixed(2));
+    // Group by dish_name for display
+    const grouped = new Map();
+    allItems.forEach(item => {
+      const name = item.dish_name || 'Unknown';
+      if (!grouped.has(name)) {
+        grouped.set(name, { name, totalQty: 0, totalPrice: 0, items: [] });
+      }
+      const g = grouped.get(name);
+      g.totalQty += (item.quantity || 1);
+      g.totalPrice += (item.line_total ?? (item.dish_price * (item.quantity || 1)));
+      g.items.push(item);
+    });
 
-        return (
-          <div key={order.id} className="border-b pb-2 last:border-0 last:pb-0">
-            {/* CV-06: Collapsed summary row */}
-            <button
-              type="button"
-              className="w-full flex items-center justify-between text-left min-h-[44px] gap-2"
-              onClick={() => setExpandedOrders(prev => ({ ...prev, [order.id]: !prev[order.id] }))}
-            >
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <span className="text-xs text-slate-400 shrink-0">{getOrderTime(order)}</span>
-                <span className="text-sm text-slate-700 truncate">{getOrderSummary(order)}</span>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-sm font-medium text-slate-700">{formatPrice(orderTotal)}</span>
-                <div className="min-w-[44px] min-h-[44px] flex items-center justify-center">
-                  {isOrderExpanded ? (
-                    <ChevronUp className="w-4 h-4 text-slate-400" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-slate-400" />
+    const groups = Array.from(grouped.values());
+
+    return (
+      <div className="space-y-1 mt-3 pt-3">
+        {groups.map(g => (
+          <div key={g.name}>
+            <div className="flex justify-between items-center text-sm py-1">
+              <span className="text-slate-700">
+                {g.name}{g.totalQty > 1 ? ` ×${g.totalQty}` : ''}
+              </span>
+              <span className="text-slate-600">{formatPrice(parseFloat(g.totalPrice.toFixed(2)))}</span>
+            </div>
+            {/* CV-04/CV-05: Per-item ratings in served bucket */}
+            {showRating && reviewsEnabled && g.items.map(item => {
+              const hasReview = safeReviewedItems.has(item.itemId);
+              const draftRating = safeDraftRatings[item.itemId] || 0;
+              return (
+                <div key={item.itemId} className="flex items-center gap-2 pl-2 py-1">
+                  <Rating
+                    value={draftRating}
+                    onChange={(val) => {
+                      if (draftRating > 0 || hasReview) return;
+                      updateDraftRating(item.itemId, val);
+                      if (val > 0 && handleRateDish) {
+                        const dishId = typeof item.dish === 'object' ? item.dish?.id : item.dish;
+                        handleRateDish({
+                          itemId: item.itemId,
+                          dishId,
+                          orderId: item.orderId,
+                          rating: val,
+                        });
+                      }
+                    }}
+                    size="md"
+                    readonly={draftRating > 0 || hasReview || ratingSavingByItemId?.[item.itemId]}
+                  />
+                  {ratingSavingByItemId?.[item.itemId] && (
+                    <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
+                  )}
+                  {(draftRating > 0 || hasReview) && !ratingSavingByItemId?.[item.itemId] && (
+                    <span className="text-xs text-green-600">✓</span>
                   )}
                 </div>
-              </div>
-            </button>
-
-            {/* Expanded: full item list */}
-            {isOrderExpanded && orderItems.length > 0 && (
-              <div className="space-y-2 mt-2 pl-2">
-                {orderItems.map((item, idx) => {
-                  const itemId = item.id || `${order.id}_${idx}`;
-                  const hasReview = safeReviewedItems.has(itemId);
-                  const draftRating = safeDraftRatings[itemId] || 0;
-                  const lineTotal = parseFloat((item.line_total ?? (item.dish_price * item.quantity)).toFixed(2));
-
-                  return (
-                    <div key={itemId} className="space-y-1">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-slate-700">
-                          {item.dish_name}{item.quantity > 1 ? ` ×${item.quantity}` : ''}
-                        </span>
-                        <span className="text-slate-600">{formatPrice(lineTotal)}</span>
-                      </div>
-
-                      {/* CV-04/CV-05: Rating only on served bucket */}
-                      {showRating && reviewsEnabled && (
-                        <div className="flex items-center gap-2 pl-2 py-2">
-                          <Rating
-                            value={draftRating}
-                            onChange={(val) => {
-                              if (draftRating > 0 || hasReview) return;
-                              updateDraftRating(itemId, val);
-                              if (val > 0 && handleRateDish) {
-                                const dishId = typeof item.dish === 'object' ? item.dish?.id : item.dish;
-                                handleRateDish({
-                                  itemId,
-                                  dishId,
-                                  orderId: order.id,
-                                  rating: val,
-                                });
-                              }
-                            }}
-                            size="md"
-                            readonly={draftRating > 0 || hasReview || ratingSavingByItemId?.[itemId]}
-                          />
-                          {ratingSavingByItemId?.[itemId] && (
-                            <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
-                          )}
-                          {(draftRating > 0 || hasReview) && !ratingSavingByItemId?.[itemId] && (
-                            <span className="text-xs text-green-600">✓</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Expanded but no items */}
-            {isOrderExpanded && orderItems.length === 0 && (
-              <div className="text-sm text-slate-500 mt-2 pl-2">
-                {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(orderTotal)}
-              </div>
-            )}
+              );
+            })}
           </div>
-        );
-      })}
-    </div>
-  );
+        ))}
+        {groups.length === 0 && orders.length > 0 && (
+          <div className="text-sm text-slate-500 py-1">
+            {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(parseFloat(orders.reduce((s, o) => s + (Number(o.total_amount) || 0), 0).toFixed(2)))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="max-w-2xl mx-auto px-4 mt-2 pb-4">
@@ -629,11 +606,11 @@ export default function CartView({
             </button>
           )}
 
-          {/* Center: Table & Guest + orders sum */}
+          {/* Center: Table & Guest on one line (CV-31) + orders sum */}
           <div className="text-center flex-1 mx-2">
-            <div className="text-sm font-medium text-slate-700">{tableLabel}</div>
-            <div className="flex items-center justify-center gap-1 text-xs">
-              <span className="text-slate-500">{tr('cart.you', 'Вы')}:</span>
+            <div className="flex items-center justify-center gap-1 text-sm">
+              <span className="font-medium text-slate-700">{tableLabel}</span>
+              <span className="text-slate-400">·</span>
               {isEditingName ? (
                 <span className="inline-flex items-center gap-1">
                   <input
@@ -661,12 +638,18 @@ export default function CartView({
                 </button>
               )}
             </div>
-            {/* CV-02: Orders sum in drawer header */}
-            {ordersSum > 0 && (
-              <div className="text-xs text-slate-500 mt-0.5">
-                {tr('cart.orders_sum', 'Заказов')}: {formatPrice(ordersSum)}
-              </div>
-            )}
+            {/* CV-30: Order count + sum in drawer header */}
+            {ordersSum > 0 && (() => {
+              const cnt = todayMyOrders.length;
+              const plural = cnt === 1 ? tr('cart.order_one', 'заказ')
+                : (cnt >= 2 && cnt <= 4) ? tr('cart.order_few', 'заказа')
+                : tr('cart.order_many', 'заказов');
+              return (
+                <div className="text-xs text-slate-500 mt-0.5">
+                  {cnt} {plural} · {formatPrice(ordersSum)}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Right: Chevron close — #140 moved from sticky row into table card */}
@@ -964,8 +947,8 @@ export default function CartView({
 
       {/* SECTION 2: NEW ORDER */}
       {cart.length > 0 && (
-        <Card className="mb-4">
-          <CardContent className="p-4">
+        <Card className="mb-2">
+          <CardContent className="px-3 py-2">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
                 🛒 {tr('cart.new_order', 'Новый заказ')}
@@ -978,7 +961,7 @@ export default function CartView({
                 <div key={item.dishId} className="flex items-center justify-between py-2 border-b last:border-0">
                   <div className="flex-1">
                     <div className="font-medium text-slate-900">{item.name}</div>
-                    <div className="text-xs text-slate-500">{formatPrice(item.price)} × {item.quantity}</div>
+                    {item.quantity > 1 && <div className="text-xs text-slate-500">{formatPrice(item.price)} × {item.quantity}</div>}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-slate-900">{formatPrice(parseFloat((item.price * item.quantity).toFixed(2)))}</span>
@@ -1005,75 +988,7 @@ export default function CartView({
               ))}
             </div>
 
-            {/* P1: Split toggle - STABLE (always visible, disabled if < 2 guests) */}
-            {isTableVerified === true && (
-            <div className="mt-4 pt-4 border-t">
-              <button
-                type="button"
-                className={`w-full flex items-center justify-between text-left ${
-                  canSplit ? "cursor-pointer" : "cursor-not-allowed"
-                }`}
-                onClick={() => canSplit && setSplitExpanded(!splitExpanded)}
-                disabled={!canSplit}
-              >
-                <span className="text-sm font-medium text-slate-700">
-                  {tr('cart.split_title', 'Для кого заказ')}
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm ${canSplit ? 'text-slate-600' : 'text-slate-400'}`}>
-                    {splitSummary}
-                  </span>
-                  {canSplit ? (
-                    splitExpanded ? (
-                      <ChevronUp className="w-4 h-4 text-slate-400" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-slate-400" />
-                    )
-                  ) : (
-                    <span className="text-xs text-slate-400">
-                      {tr('cart.split_disabled_hint', '(2+ гостей)')}
-                    </span>
-                  )}
-                </div>
-              </button>
-
-              {splitExpanded && canSplit && (
-                <div className="mt-3 flex items-center justify-center gap-6">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="splitType"
-                      checked={splitType === 'single'}
-                      onChange={() => setSplitType('single')}
-                      className="w-4 h-4" style={{accentColor: primaryColor}}
-                    />
-                    <span className="text-sm text-slate-700">{tr('cart.only_me', 'Только я')}</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="splitType"
-                      checked={splitType === 'all'}
-                      onChange={() => setSplitType('all')}
-                      className="w-4 h-4" style={{accentColor: primaryColor}}
-                    />
-                    <span className="text-sm text-slate-700">{tr('cart.for_all', 'На всех')} (÷{guestCount})</span>
-                  </label>
-                  {/* P2 placeholder - disabled until data model supports custom split */}
-                  <label className="flex items-center gap-2 opacity-50 cursor-not-allowed">
-                    <input
-                      type="radio"
-                      disabled
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm text-slate-400">
-                      {tr('cart.split_pick_guests_soon', 'Выбрать гостей (скоро)')}
-                    </span>
-                  </label>
-                </div>
-              )}
-            </div>
-            )}
+            {/* CV-33: Split-order section removed — each guest orders for themselves */}
 
             {/* PM-086: Pre-checkout loyalty email removed — motivation text near submit button is sufficient */}
 

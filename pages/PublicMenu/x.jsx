@@ -2461,15 +2461,17 @@ export default function X() {
     }
   }, [currentTableId]);
 
-  // PM-152/153: Clear guest name when table changes (prevents stale name from other table)
-  const prevTableRef = useRef(tableCodeParam);
+  // PM-152: Clear guest name when table changes — localStorage-based (survives Chrome kill)
   useEffect(() => {
     if (!tableCodeParam) return;
-    if (prevTableRef.current && prevTableRef.current !== tableCodeParam) {
-      try { localStorage.removeItem('menuapp_guest_name'); } catch(e) {}
-      setGuestNameInput('');
-    }
-    prevTableRef.current = tableCodeParam;
+    try {
+      const lastTable = localStorage.getItem('menuapp_last_table');
+      if (lastTable && lastTable !== tableCodeParam) {
+        localStorage.removeItem('menuapp_guest_name');
+        setGuestNameInput('');
+      }
+      localStorage.setItem('menuapp_last_table', tableCodeParam);
+    } catch(e) {}
   }, [tableCodeParam]);
 
   // Debug hook kept as no-op to maintain hook order (BUG-PM-040: removed prod logging)
@@ -3949,16 +3951,7 @@ export default function X() {
         </DrawerContent>
       </Drawer>
 
-      {/* PM-127: Bell icon on main menu — opens help drawer directly */}
-      {view === "menu" && isHallMode && drawerMode !== 'cart' && (
-        <button
-          onClick={openHelpDrawer}
-          className="fixed bottom-20 left-4 z-40 min-w-[44px] min-h-[44px] p-3 rounded-full bg-amber-50 text-amber-600 shadow-lg border border-amber-200 flex items-center justify-center"
-          aria-label={t('help.call_waiter', 'Позвать официанта')}
-        >
-          <Bell className="w-5 h-5" />
-        </button>
-      )}
+      {/* PM-156: Floating bell removed — bell accessible via CartView header + help drawer */}
 
       {/* Sticky cart bar - updated for TableSession */}
       {view === "menu" && (() => {
