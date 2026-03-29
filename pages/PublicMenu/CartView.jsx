@@ -540,7 +540,7 @@ export default function CartView({
     const groups = Array.from(grouped.values());
 
     return (
-      <div className="space-y-1 mt-3 pt-3">
+      <div className="space-y-1 mt-2 pt-2">
         {groups.map(g => (
           <div key={g.name}>
             <div className="flex justify-between items-center text-sm py-1">
@@ -667,74 +667,6 @@ export default function CartView({
           </button>
         </div>
       </div>
-
-      {/* Review reward hint */}
-      {shouldShowReviewRewardHint && (
-        <div className="mb-4 text-xs text-amber-700 bg-amber-50 rounded-md px-3 py-2 flex items-center gap-2">
-          <span>⭐</span>
-          <span>{tr('loyalty.review_reward_hint', 'За отзыв')} +{reviewRewardPoints} {tr('loyalty.points_short', 'бонусов')}</span>
-        </div>
-      )}
-
-      {/* Review reward nudge - показываем после первой оценки с формой email */}
-      {shouldShowReviewRewardNudge && (
-        <div className="mb-4 text-sm bg-green-50 border border-green-200 rounded-md p-3">
-          {!showRewardEmailForm ? (
-            <div className="flex items-center justify-between">
-              <span className="text-slate-700">
-                ✅ {tr('loyalty.thanks_for_rating', 'Спасибо за оценку!')}
-              </span>
-              <button
-                type="button"
-                className="hover:underline font-medium text-sm"
-                style={{color: primaryColor}}
-                onClick={() => setShowRewardEmailForm(true)}
-              >
-                {tr('loyalty.get_bonus', 'Получить бонусы')} →
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-slate-700 text-xs">
-                {tr('loyalty.enter_email_for_bonus', 'Введите email для начисления бонусов:')}
-              </p>
-              <div className="flex gap-2">
-                <Input
-                  type="email"
-                  value={rewardEmail}
-                  onChange={(e) => setRewardEmail(e.target.value)}
-                  placeholder="email@example.com"
-                  className="flex-1 h-9 text-sm"
-                />
-                <Button
-                  size="sm"
-                  className="h-9"
-                  disabled={!rewardEmail.trim() || rewardEmailSubmitting}
-                  onClick={() => {
-                    if (!rewardEmail.trim()) return;
-                    // BUG-PM-034: Validate email format before saving
-                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rewardEmail.trim())) {
-                      if (toast) toast.error(tr('loyalty.invalid_email', 'Введите корректный email'));
-                      return;
-                    }
-                    setRewardEmailSubmitting(true);
-                    // Используем существующий setCustomerEmail для синхронизации
-                    if (setCustomerEmail) setCustomerEmail(rewardEmail);
-                    // Показываем toast
-                    if (toast) toast.success(tr('loyalty.email_saved', 'Email сохранён! Бонусы будут начислены.'));
-                    rewardTimerRef.current = setTimeout(() => {
-                      setRewardEmailSubmitting(false);
-                      setShowRewardEmailForm(false);
-                    }, 1000);
-                  }}
-                >
-                  {rewardEmailSubmitting ? '...' : tr('common.save', 'Сохранить')}
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* SECTION 5: TABLE ORDERS (other guests) - STABLE based on sessionOrders */}
       {showTableOrdersSection && (
@@ -865,7 +797,7 @@ export default function CartView({
 
               {/* Подано bucket — collapsed with accent chip */}
               <Card className="mb-4">
-                <CardContent className="p-3">
+                <CardContent className="px-3 py-2">
                   <button
                     type="button"
                     className="w-full flex items-center justify-between text-left min-h-[44px]"
@@ -877,7 +809,7 @@ export default function CartView({
                       </span>
                       {reviewsEnabled && (
                         allServedRated
-                          ? <span className="ml-1 text-xs text-green-600">✅</span>
+                          ? <span className="ml-1 text-xs text-green-600 font-medium">{tr('review.all_rated', 'Оценено')}</span>
                           : <button
                               type="button"
                               className="ml-1 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full"
@@ -892,7 +824,72 @@ export default function CartView({
                       </div>
                     </div>
                   </button>
-                  {expandedStatuses.served && renderBucketOrders(statusBuckets.served, true)}
+                  {expandedStatuses.served && (
+                    <>
+                      {shouldShowReviewRewardHint && (
+                        <div className="mt-2 text-xs text-amber-700 bg-amber-50 rounded-md px-3 py-2 flex items-center gap-2">
+                          <span>⭐</span>
+                          <span>{tr('loyalty.review_reward_hint', 'За отзыв')} +{reviewRewardPoints} {tr('loyalty.points_short', 'бонусов')}</span>
+                        </div>
+                      )}
+                      {shouldShowReviewRewardNudge && (
+                        <div className="mt-2 text-sm bg-green-50 border border-green-200 rounded-md p-3">
+                          {!showRewardEmailForm ? (
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-700">
+                                ✅ {tr('loyalty.thanks_for_rating', 'Спасибо за оценку!')}
+                              </span>
+                              <button
+                                type="button"
+                                className="hover:underline font-medium text-sm"
+                                style={{color: primaryColor}}
+                                onClick={() => setShowRewardEmailForm(true)}
+                              >
+                                {tr('loyalty.get_bonus', 'Получить бонусы')} →
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <p className="text-slate-700 text-xs">
+                                {tr('loyalty.enter_email_for_bonus', 'Введите email для начисления бонусов:')}
+                              </p>
+                              <div className="flex gap-2">
+                                <Input
+                                  type="email"
+                                  value={rewardEmail}
+                                  onChange={(e) => setRewardEmail(e.target.value)}
+                                  placeholder="email@example.com"
+                                  className="flex-1 h-9 text-sm"
+                                />
+                                <Button
+                                  size="sm"
+                                  className="h-9"
+                                  disabled={!rewardEmail.trim() || rewardEmailSubmitting}
+                                  onClick={() => {
+                                    if (!rewardEmail.trim()) return;
+                                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rewardEmail.trim())) {
+                                      if (toast) toast.error(tr('loyalty.invalid_email', 'Введите корректный email'));
+                                      return;
+                                    }
+                                    setRewardEmailSubmitting(true);
+                                    if (setCustomerEmail) setCustomerEmail(rewardEmail);
+                                    if (toast) toast.success(tr('loyalty.email_saved', 'Email сохранён! Бонусы будут начислены.'));
+                                    rewardTimerRef.current = setTimeout(() => {
+                                      setRewardEmailSubmitting(false);
+                                      setShowRewardEmailForm(false);
+                                    }, 1000);
+                                  }}
+                                >
+                                  {rewardEmailSubmitting ? '...' : tr('common.save', 'Сохранить')}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {renderBucketOrders(statusBuckets.served, true)}
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </>
@@ -911,7 +908,7 @@ export default function CartView({
 
           return (
             <Card key={key} className="mb-4">
-              <CardContent className="p-3">
+              <CardContent className="px-3 py-2">
                 <button
                   type="button"
                   className="w-full flex items-center justify-between text-left min-h-[44px]"
@@ -924,7 +921,7 @@ export default function CartView({
                     {/* CV-05: Accent chip on Подано only */}
                     {isServed && reviewsEnabled && (
                       allServedRated
-                        ? <span className="ml-1 text-xs text-green-600">✅</span>
+                        ? <span className="ml-1 text-xs text-green-600 font-medium">{tr('review.all_rated', 'Оценено')}</span>
                         : <button
                             type="button"
                             className="ml-1 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full"
@@ -939,6 +936,71 @@ export default function CartView({
                     </div>
                   </div>
                 </button>
+                {isExpanded && isServed && (
+                  <>
+                    {shouldShowReviewRewardHint && (
+                      <div className="mt-2 text-xs text-amber-700 bg-amber-50 rounded-md px-3 py-2 flex items-center gap-2">
+                        <span>⭐</span>
+                        <span>{tr('loyalty.review_reward_hint', 'За отзыв')} +{reviewRewardPoints} {tr('loyalty.points_short', 'бонусов')}</span>
+                      </div>
+                    )}
+                    {shouldShowReviewRewardNudge && (
+                      <div className="mt-2 text-sm bg-green-50 border border-green-200 rounded-md p-3">
+                        {!showRewardEmailForm ? (
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-700">
+                              ✅ {tr('loyalty.thanks_for_rating', 'Спасибо за оценку!')}
+                            </span>
+                            <button
+                              type="button"
+                              className="hover:underline font-medium text-sm"
+                              style={{color: primaryColor}}
+                              onClick={() => setShowRewardEmailForm(true)}
+                            >
+                              {tr('loyalty.get_bonus', 'Получить бонусы')} →
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <p className="text-slate-700 text-xs">
+                              {tr('loyalty.enter_email_for_bonus', 'Введите email для начисления бонусов:')}
+                            </p>
+                            <div className="flex gap-2">
+                              <Input
+                                type="email"
+                                value={rewardEmail}
+                                onChange={(e) => setRewardEmail(e.target.value)}
+                                placeholder="email@example.com"
+                                className="flex-1 h-9 text-sm"
+                              />
+                              <Button
+                                size="sm"
+                                className="h-9"
+                                disabled={!rewardEmail.trim() || rewardEmailSubmitting}
+                                onClick={() => {
+                                  if (!rewardEmail.trim()) return;
+                                  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rewardEmail.trim())) {
+                                    if (toast) toast.error(tr('loyalty.invalid_email', 'Введите корректный email'));
+                                    return;
+                                  }
+                                  setRewardEmailSubmitting(true);
+                                  if (setCustomerEmail) setCustomerEmail(rewardEmail);
+                                  if (toast) toast.success(tr('loyalty.email_saved', 'Email сохранён! Бонусы будут начислены.'));
+                                  rewardTimerRef.current = setTimeout(() => {
+                                    setRewardEmailSubmitting(false);
+                                    setShowRewardEmailForm(false);
+                                  }, 1000);
+                                }}
+                              >
+                                {rewardEmailSubmitting ? '...' : tr('common.save', 'Сохранить')}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
                 {isExpanded && renderBucketOrders(orders, showRating)}
               </CardContent>
             </Card>
@@ -948,7 +1010,7 @@ export default function CartView({
 
       {/* SECTION 2: NEW ORDER */}
       {cart.length > 0 && (
-        <Card className="mb-2">
+        <Card className="mb-4">
           <CardContent className="px-3 py-2">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
