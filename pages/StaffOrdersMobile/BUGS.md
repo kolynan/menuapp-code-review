@@ -127,6 +127,16 @@
 - **RELEASE:** `260306-05 StaffOrdersMobile RELEASE.jsx`
 - **Status:** FIXED (v2)
 
+### PM-158 (P1) -- Order statuses don't update in CartView after StaffOrdersMobile status change
+- **Function:** handleAction, handleAdvance, getStatusConfig
+- **Root cause:** When OrderStages are configured, `handleAction` and `handleAdvance` update only `stage_id` in DB payload, never `status`. CartView polls `order.status` for bucket sorting → orders stay in "Новый заказ" bucket forever.
+- **Fix:** (1) Added `nextStageInternalCode` to `getStatusConfig` stage-mode return object. (2) In `handleAction` and `handleAdvance`, added CODE_TO_STATUS mapping to derive and set `payload.status` alongside `stage_id` when internal_code is recognized.
+- **Commit:** `b91919d`
+- **Chain:** staffordersmobile-260329-155109-3e10
+- **Status:** FIXED
+
+---
+
 ## Active Bugs
 
 ### BUG-SM-001 (P1 -- deferred) -- Complete absence of i18n
