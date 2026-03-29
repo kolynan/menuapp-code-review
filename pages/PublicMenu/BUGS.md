@@ -1,7 +1,7 @@
 ---
-version: "38.0"
-updated: "2026-03-28"
-session: 186
+version: "39.0"
+updated: "2026-03-29"
+session: 198
 ---
 
 # PublicMenu — Bug Registry
@@ -138,6 +138,17 @@ session: 186
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-CHAIN-0279: Batch 7 CartView polish + PM-162 verification — FIXED S198
+- **Когда:** S198, chain publicmenu-260329-232408-0279
+- **Файлы:** CartView.jsx
+- **Фиксы:**
+  - Fix 1 (CV-UX P2): Review banners moved inside served bucket — only visible when expanded
+  - Fix 2 (P3): Collapsed bucket header padding p-3→px-3 py-2
+  - Fix 3 (PM-159 P3): New order card margin mb-2→mb-4
+  - Fix 4 (P3): Bucket header-to-items gap mt-3 pt-3→mt-2 pt-2
+  - Fix 5 (CV-05 P3): Replaced checkmark emoji with text "Оценено"
+  - Fix 6-7 (PM-162 P2): Verified already fixed in MenuView.jsx and x.jsx — no action needed
 
 ### FIX-CHAIN-385c: CartView v3 UX redesign — CV-01..CV-09, PM-151..154, D3 screen — FIXED S186
 - **Когда:** S186, chain publicmenu-260328-083047-385c
