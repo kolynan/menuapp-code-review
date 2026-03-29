@@ -1038,16 +1038,7 @@ function OrderCard({
     // Режим OrderStage (приоритет)
     if (statusConfig.nextStageId) {
       payload.stage_id = statusConfig.nextStageId;
-      const CODE_TO_STATUS = {
-        start: 'accepted',
-        cook: 'in_progress',
-        cooking: 'in_progress',
-        finish: 'served',
-        done: 'served',
-        cancel: 'cancelled',
-      };
-      const derivedStatus = CODE_TO_STATUS[statusConfig.nextStageInternalCode];
-      if (derivedStatus !== undefined) payload.status = derivedStatus;
+      if (statusConfig.derivedNextStatus) payload.status = statusConfig.derivedNextStatus;
     }
     // Fallback режим (старый status)
     else if (statusConfig.nextStatus) {
@@ -1495,16 +1486,7 @@ function OrderGroupCard({
     const payload = {};
     if (config.nextStageId) {
       payload.stage_id = config.nextStageId;
-      const CODE_TO_STATUS = {
-        start: 'accepted',
-        cook: 'in_progress',
-        cooking: 'in_progress',
-        finish: 'served',
-        done: 'served',
-        cancel: 'cancelled',
-      };
-      const derivedStatus = CODE_TO_STATUS[config.nextStageInternalCode];
-      if (derivedStatus !== undefined) payload.status = derivedStatus;
+      if (config.derivedNextStatus) payload.status = config.derivedNextStatus;
     }
     else if (config.nextStatus) payload.status = config.nextStatus;
     if (config.isFirstStage && effectiveUserId && !getAssigneeId(order)) {
@@ -2958,7 +2940,13 @@ export default function StaffOrdersMobile() {
         color: stage.color,
         actionLabel: nextStage ? `→ ${getStageName(nextStage, t)}` : null,
         nextStageId: nextStage?.id || null,
-        nextStageInternalCode: nextStage?.internal_code || null,
+        derivedNextStatus: (() => {
+          if (!nextStage) return null;
+          const nextIsLast = currentIndex + 1 === relevantStages.length - 1;
+          if (isFirstStage) return 'accepted';
+          if (nextIsLast) return 'served';
+          return 'in_progress';
+        })(),
         nextStatus: null, // don't use old status
         badgeClass: '', // will use inline style with color
         isStageMode: true,
