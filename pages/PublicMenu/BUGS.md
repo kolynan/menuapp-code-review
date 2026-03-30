@@ -139,6 +139,19 @@ session: 205
 
 ## Fixed Bugs (исправлены)
 
+### FIX-CHAIN-a1d6: Help Drawer Mini-Ticket Board UX (HD-01..HD-08) — FIXED S207
+- **Когда:** S207, chain publicmenu-260330-213949-a1d6
+- **Файлы:** x.jsx
+- **Фиксы:**
+  - HD-01 (P1): Per-card request states (idle→sending→pending→repeat) replacing global helpQuickSent/sendingCardId
+  - HD-02 (P1): Per-type cooldown (waiter 90s, bill 150s, napkins/menu 240s, other 120s) with pending→repeat transition
+  - HD-03 (P1): Timer "X мин назад" on pending cards, 30s interval + visibilitychange recalc
+  - HD-04 (P1): "Другое" expanded form with quick-action chips + 100-char textarea + counter + dual buttons
+  - HD-05 (P2): localStorage persistence keyed by helpdrawer_${tableId}, filter expired on load
+  - HD-06 (P2): 5s undo toast after card tap — cancel returns to idle, countdown display
+  - HD-07 (P2): Badge on HelpFab showing active request count (wrapper overlay approach)
+  - HD-08 (P2): Active requests summary block above card grid with per-type timers
+
 ### FIX-CHAIN-9b4e: CV-05 v2 Rating Flow — view/rating modes, autosave, email sheet + PM-164/PM-165 — FIXED S205
 - **Когда:** S205, chain publicmenu-260330-161543-9b4e
 - **Файлы:** CartView.jsx

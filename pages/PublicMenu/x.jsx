@@ -1644,11 +1644,42 @@ export default function X() {
     submitHelpRequest,
   } = useHelpRequests({ partner, currentTableId, t, toast, isRateLimitError, saveTableSelection });
 
-  // #150: Help drawer one-tap cards — new state
-  const [helpQuickSent, setHelpQuickSent] = useState(false);
-  const [sendingCardId, setSendingCardId] = useState(null);
+  // HD-01..HD-08: Help drawer mini-ticket board state
+  const HELP_COOLDOWN_SECONDS = useMemo(() => ({ call_waiter: 90, bill: 150, napkins: 240, menu: 240, other: 120 }), []);
+  const HELP_CARD_LABELS = useMemo(() => ({
+    call_waiter: t('help.call_waiter', 'Позвать официанта'),
+    bill: t('help.bill', 'Принести счёт'),
+    napkins: t('help.napkins', 'Салфетки'),
+    menu: t('help.menu', 'Бумажное меню'),
+    other: t('help.other_label', 'Другое'),
+  }), [t]);
+  const HELP_CHIPS = useMemo(() => ['Детский стул', 'Приборы', 'Соус', 'Убрать со стола', 'Вода'], []);
+
+  const [requestStates, setRequestStates] = useState({});
+  // Structure: { call_waiter: { status: 'idle'|'sending'|'pending'|'repeat'|'resolved', sentAt: timestamp, message?: string }, ... }
+  const [undoToast, setUndoToast] = useState(null); // { type, expiresAt, timeoutId }
   const [showOtherForm, setShowOtherForm] = useState(false);
+  const [timerTick, setTimerTick] = useState(0);
   const pendingQuickSendRef = useRef(null);
+
+  // HD-03: Relative time helper
+  const getRelativeTime = useCallback((sentAtMs) => {
+    const seconds = Math.floor((Date.now() - sentAtMs) / 1000);
+    if (seconds < 60) return t('help.just_now', 'Только что');
+    return `${Math.floor(seconds / 60)} ${t('help.min_ago', 'мин назад')}`;
+  }, [t, timerTick]);
+
+  // HD-07: Active request count for badge
+  const activeRequestCount = useMemo(() =>
+    Object.values(requestStates).filter(s => s.status === 'pending' || s.status === 'sending').length,
+  [requestStates]);
+
+  // HD-08: Pending requests list for summary
+  const pendingRequests = useMemo(() =>
+    Object.entries(requestStates)
+      .filter(([_, s]) => s.status === 'pending')
+      .map(([type, s]) => ({ type, sentAt: s.sentAt, message: s.message })),
+  [requestStates]);
 
   // PM-126/PM-125: Help drawer open/close with overlay stack integration
   // PM-133: Guard for null currentTableId — redirect to table code entry
@@ -1658,51 +1689,146 @@ export default function X() {
       setShowTableConfirmSheet(true);
       return;
     }
-    setHelpQuickSent(false);
-    setSendingCardId(null);
+    // HD-05: Load requestStates from localStorage on open
+    try {
+      const stored = JSON.parse(localStorage.getItem(`helpdrawer_${currentTableId}`) || '{}');
+      const maxCooldownMs = 240 * 1000;
+      const now = Date.now();
+      const filtered = {};
+      for (const [type, state] of Object.entries(stored)) {
+        if (state.sentAt && (now - state.sentAt) < maxCooldownMs) {
+          const cooldownMs = (HELP_COOLDOWN_SECONDS[type] || 120) * 1000;
+          filtered[type] = {
+            ...state,
+            status: (now - state.sentAt) >= cooldownMs ? 'repeat' : state.status
+          };
+        }
+      }
+      if (Object.keys(filtered).length > 0) setRequestStates(filtered);
+      else setRequestStates({});
+    } catch (e) { setRequestStates({}); }
     setShowOtherForm(false);
     setHelpComment('');
+    setUndoToast(null);
     setIsHelpModalOpen(true);
     pushOverlay('help');
-  }, [pushOverlay, currentTableId, setShowTableConfirmSheet, setHelpComment]);
+  }, [pushOverlay, currentTableId, setShowTableConfirmSheet, setHelpComment, HELP_COOLDOWN_SECONDS]);
 
-  // Fix 5: closeHelpDrawer resets all new state
+  // HD-01: closeHelpDrawer resets UI state, keeps requestStates (persisted in localStorage)
   const closeHelpDrawer = useCallback(() => {
     popOverlay('help');
     setIsHelpModalOpen(false);
-    setHelpQuickSent(false);
-    setSendingCardId(null);
     setShowOtherForm(false);
     setHelpComment('');
-  }, [popOverlay, setHelpComment]);
+    // Clean up any pending undo timeout
+    if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId);
+    setUndoToast(null);
+  }, [popOverlay, setHelpComment, undoToast]);
 
-  // Fix 1 + Fix 4: Quick-send handler for one-tap cards
-  const handleQuickSend = useCallback((type) => {
-    setSendingCardId(type);
-    pendingQuickSendRef.current = type;
-    handlePresetSelect(type);
-  }, [handlePresetSelect]);
+  // HD-01 + HD-06: Card tap with 5s undo delay before actual server send
+  const handleCardTap = useCallback((type) => {
+    // Cancel previous undo if any
+    if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId);
 
-  // Fix 1: Auto-submit when selectedHelpType matches pending quick send
+    // Set card to sending visually immediately
+    setRequestStates(prev => ({ ...prev, [type]: { status: 'sending', sentAt: Date.now() } }));
+
+    // Schedule actual send after 5s (undo window)
+    const timeoutId = setTimeout(() => {
+      // Actually send to server via existing hook chain
+      pendingQuickSendRef.current = type;
+      handlePresetSelect(type);
+      setUndoToast(null);
+    }, 5000);
+
+    setUndoToast({ type, expiresAt: Date.now() + 5000, timeoutId });
+  }, [handlePresetSelect, undoToast]);
+
+  // HD-06: Undo handler — cancel pending send, return card to idle
+  const handleUndo = useCallback(() => {
+    if (!undoToast) return;
+    clearTimeout(undoToast.timeoutId);
+    setRequestStates(prev => {
+      const next = { ...prev };
+      delete next[undoToast.type];
+      return next;
+    });
+    setUndoToast(null);
+  }, [undoToast]);
+
+  // HD-01: Auto-submit when selectedHelpType matches pending quick send
   useEffect(() => {
     if (pendingQuickSendRef.current && selectedHelpType === pendingQuickSendRef.current) {
+      const type = pendingQuickSendRef.current;
       pendingQuickSendRef.current = null;
       const result = submitHelpRequest();
-      // Handle both sync and async submitHelpRequest
       const onSuccess = () => {
-        setHelpQuickSent(true);
-        setSendingCardId(null);
-        // Fix 3: Auto-close after 2s
-        setTimeout(() => { closeHelpDrawer(); }, 2000);
+        setRequestStates(prev => ({ ...prev, [type]: { ...prev[type], status: 'pending', sentAt: prev[type]?.sentAt || Date.now() } }));
       };
-      const onError = () => { setSendingCardId(null); };
+      const onError = () => {
+        setRequestStates(prev => {
+          const next = { ...prev };
+          delete next[type];
+          return next;
+        });
+      };
       if (result && typeof result.then === 'function') {
         result.then(onSuccess).catch(onError);
       } else {
         onSuccess();
       }
     }
-  }, [selectedHelpType, submitHelpRequest, closeHelpDrawer]);
+  }, [selectedHelpType, submitHelpRequest]);
+
+  // HD-02 + HD-03: Timer interval — update timers every 30s + check cooldown transitions
+  useEffect(() => {
+    const hasPendingOrSending = Object.values(requestStates).some(s => s.status === 'pending' || s.status === 'sending');
+    if (!hasPendingOrSending && !undoToast) return;
+    const interval = setInterval(() => {
+      setTimerTick(t => t + 1);
+      // HD-02: Check cooldown transitions pending → repeat
+      setRequestStates(prev => {
+        const now = Date.now();
+        let changed = false;
+        const next = { ...prev };
+        for (const [type, state] of Object.entries(next)) {
+          if (state.status === 'pending' && state.sentAt) {
+            const cooldownMs = (HELP_COOLDOWN_SECONDS[type] || 120) * 1000;
+            if ((now - state.sentAt) >= cooldownMs) {
+              next[type] = { ...state, status: 'repeat' };
+              changed = true;
+            }
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, undoToast ? 1000 : 30000);
+    return () => clearInterval(interval);
+  }, [requestStates, undoToast, HELP_COOLDOWN_SECONDS]);
+
+  // HD-03: Recalculate on visibility change (tab return)
+  useEffect(() => {
+    const handler = () => { if (!document.hidden) setTimerTick(t => t + 1); };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, []);
+
+  // HD-05: Persist requestStates to localStorage on change
+  useEffect(() => {
+    if (!currentTableId) return;
+    const key = `helpdrawer_${currentTableId}`;
+    const persistable = {};
+    for (const [type, state] of Object.entries(requestStates)) {
+      if (state.status === 'pending' || state.status === 'repeat') {
+        persistable[type] = state;
+      }
+    }
+    if (Object.keys(persistable).length === 0) {
+      localStorage.removeItem(key);
+    } else {
+      localStorage.setItem(key, JSON.stringify(persistable));
+    }
+  }, [requestStates, currentTableId]);
 
   // PM-125: Cart-to-help sequencing — close cart first, 300ms delay, then open help
   const handleHelpFromCart = useCallback(() => {
@@ -3713,13 +3839,21 @@ export default function X() {
 
       {/* Floating Help Button - only when table verified in Hall */}
       {orderMode === "hall" && isTableVerified && currentTableId && (
-        <HelpFab
-          fabSuccess={fabSuccess}
-          isSendingHelp={isSendingHelp}
-          isHelpModalOpen={isHelpModalOpen}
-          onOpen={openHelpDrawer}
-          t={t}
-        />
+        <div className="relative inline-block">
+          <HelpFab
+            fabSuccess={fabSuccess}
+            isSendingHelp={isSendingHelp}
+            isHelpModalOpen={isHelpModalOpen}
+            onOpen={openHelpDrawer}
+            t={t}
+          />
+          {/* HD-07: Badge showing active request count */}
+          {activeRequestCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-[#B5543A] text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-medium pointer-events-none z-10">
+              {activeRequestCount}
+            </span>
+          )}
+        </div>
       )}
 
       {/* PM-125: Help as Bottom Drawer (replaces HelpModal Dialog) */}
@@ -3745,82 +3879,170 @@ export default function X() {
                 <span>{currentTable?.name || currentTable?.code}</span>
               </div>
             )}
-            {hasActiveRequest && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2 text-sm text-blue-700">
-                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse flex-shrink-0" />
-                {t('help.active_request', 'У вас уже есть активный запрос')}
+            {/* HD-08: Active requests summary block */}
+            {pendingRequests.length > 0 && (
+              <div className="bg-[#F5E6E0] text-slate-700 text-sm rounded-lg p-3 space-y-1">
+                <div className="font-medium">{t('help.active_requests', 'Активные запросы')}: {pendingRequests.length}</div>
+                {pendingRequests.map(({ type, sentAt, message }) => (
+                  <div key={type} className="text-slate-600">
+                    {HELP_CARD_LABELS[type] || type}{message ? ` "${message.slice(0, 30)}${message.length > 30 ? '...' : ''}"` : ''} · {getRelativeTime(sentAt)}
+                  </div>
+                ))}
               </div>
             )}
-            {/* #150: One-tap quick-action cards */}
-            {helpQuickSent ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-8">
-                <CheckCircle2 className="w-12 h-12 text-green-500" />
-                <p className="text-lg font-semibold text-slate-900">{t('help.quick_sent_title', 'Запрос отправлен!')}</p>
-                <p className="text-sm text-slate-500">{t('help.quick_sent_desc', 'Официант скоро подойдёт')}</p>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { id: 'call_waiter', emoji: '\uD83D\uDE4B', label: t('help.call_waiter', 'Позвать официанта') },
-                    { id: 'bill', emoji: '\uD83E\uDDFE', label: t('help.bill', 'Принести счёт') },
-                    { id: 'napkins', emoji: '\uD83D\uDDD2\uFE0F', label: t('help.napkins', 'Салфетки') },
-                    { id: 'menu', emoji: '\uD83D\uDCC4', label: t('help.menu', 'Бумажное меню') },
-                  ].map(card => (
+            {/* HD-01: Per-card state help cards */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { id: 'call_waiter', emoji: '\uD83D\uDE4B', label: t('help.call_waiter', 'Позвать официанта') },
+                { id: 'bill', emoji: '\uD83E\uDDFE', label: t('help.bill', 'Принести счёт') },
+                { id: 'napkins', emoji: '\uD83D\uDDD2\uFE0F', label: t('help.napkins', 'Салфетки') },
+                { id: 'menu', emoji: '\uD83D\uDCC4', label: t('help.menu', 'Бумажное меню') },
+              ].map(card => {
+                const st = requestStates[card.id];
+                const status = st?.status || 'idle';
+                const isDisabled = status === 'sending' || status === 'pending';
+                return (
+                  <button
+                    key={card.id}
+                    onClick={() => status === 'idle' || status === 'repeat' ? handleCardTap(card.id) : null}
+                    disabled={isDisabled}
+                    className={`rounded-xl border min-h-[80px] flex flex-col items-center justify-center gap-1 ${
+                      status === 'pending' ? 'bg-[#F5E6E0] border-[#E8CFC7]' :
+                      status === 'sending' ? 'bg-slate-50 border-slate-200' :
+                      status === 'repeat' ? 'bg-white border-amber-300' :
+                      'bg-white border-slate-200 active:border-blue-400 active:bg-blue-50'
+                    } disabled:cursor-not-allowed`}
+                  >
+                    {status === 'sending' ? (
+                      <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                    ) : status === 'pending' ? (
+                      <Check className="w-6 h-6 text-[#B5543A]" />
+                    ) : (
+                      <span className="text-2xl">{card.emoji}</span>
+                    )}
+                    <span className="text-sm font-medium text-slate-700 text-center px-1">
+                      {status === 'sending' ? t('help.sending', 'Отправляем...') :
+                       status === 'pending' ? t('help.request_sent', 'Запрос отправлен') :
+                       status === 'repeat' ? t('help.remind_staff', 'Напомнить персоналу') :
+                       card.label}
+                    </span>
+                    {status === 'pending' && st?.sentAt && (
+                      <span className="text-xs text-slate-500">{getRelativeTime(st.sentAt)}</span>
+                    )}
+                  </button>
+                );
+              })}
+              {/* "Другое" card — col-span-2 with per-card state */}
+              {(() => {
+                const otherSt = requestStates['other'];
+                const otherStatus = otherSt?.status || 'idle';
+                const otherDisabled = otherStatus === 'sending' || otherStatus === 'pending';
+                return (
+                  <button
+                    onClick={() => {
+                      if (otherStatus === 'idle' || otherStatus === 'repeat') {
+                        setShowOtherForm(prev => !prev);
+                      }
+                    }}
+                    disabled={otherDisabled}
+                    className={`col-span-2 rounded-xl border min-h-[48px] flex flex-row items-center justify-center gap-2 ${
+                      otherStatus === 'pending' ? 'bg-[#F5E6E0] border-[#E8CFC7]' :
+                      otherStatus === 'sending' ? 'bg-slate-50 border-slate-200' :
+                      otherStatus === 'repeat' ? 'bg-white border-amber-300' :
+                      'bg-white border-slate-200 active:border-blue-400 active:bg-blue-50'
+                    } disabled:cursor-not-allowed`}
+                  >
+                    {otherStatus === 'sending' ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                    ) : otherStatus === 'pending' ? (
+                      <Check className="w-5 h-5 text-[#B5543A]" />
+                    ) : (
+                      <span className="text-xl">{'\u270F\uFE0F'}</span>
+                    )}
+                    <span className="text-sm font-medium text-slate-700">
+                      {otherStatus === 'sending' ? t('help.sending', 'Отправляем...') :
+                       otherStatus === 'pending' && otherSt?.message
+                         ? `${t('help.request_sent', 'Запрос отправлен')}: "${otherSt.message.slice(0, 30)}${otherSt.message.length > 30 ? '...' : ''}"`
+                         : otherStatus === 'pending' ? t('help.request_sent', 'Запрос отправлен') :
+                       otherStatus === 'repeat' ? t('help.remind_staff', 'Напомнить персоналу') :
+                       t('help.other', 'Другое...')}
+                    </span>
+                    {otherStatus === 'pending' && otherSt?.sentAt && (
+                      <span className="text-xs text-slate-500 ml-1">{getRelativeTime(otherSt.sentAt)}</span>
+                    )}
+                  </button>
+                );
+              })()}
+            </div>
+            {/* HD-04: "Другое" expanded form with chips + textarea */}
+            {showOtherForm && (!requestStates['other'] || requestStates['other']?.status === 'idle' || requestStates['other']?.status === 'repeat') && (
+              <div className="space-y-3 pt-1">
+                <div className="flex flex-wrap gap-2">
+                  {HELP_CHIPS.map(chip => (
                     <button
-                      key={card.id}
-                      onClick={() => handleQuickSend(card.id)}
-                      disabled={!!sendingCardId || hasActiveRequest}
-                      className="rounded-xl border border-slate-200 bg-white min-h-[80px] flex flex-col items-center justify-center gap-1 active:border-blue-400 active:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      key={chip}
+                      onClick={() => setHelpComment(prev => prev ? `${prev}, ${chip.toLowerCase()}` : chip)}
+                      className="px-3 py-1.5 rounded-full border border-slate-200 bg-white text-sm text-slate-700 active:bg-slate-100 min-h-[36px]"
                     >
-                      {sendingCardId === card.id ? (
-                        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-                      ) : (
-                        <span className="text-2xl">{card.emoji}</span>
-                      )}
-                      <span className="text-sm font-medium text-slate-700 text-center px-1">{card.label}</span>
+                      {chip}
                     </button>
                   ))}
-                  {/* "Другое" card — col-span-2 */}
-                  <button
-                    onClick={() => { setShowOtherForm(prev => !prev); handlePresetSelect('other'); }}
-                    disabled={!!sendingCardId}
-                    className="col-span-2 rounded-xl border border-slate-200 bg-white min-h-[48px] flex flex-row items-center justify-center gap-2 active:border-blue-400 active:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <span className="text-xl">{'\u270F\uFE0F'}</span>
-                    <span className="text-sm font-medium text-slate-700">{t('help.other', 'Другое...')}</span>
-                  </button>
                 </div>
-                {/* PM-134a+b: Conditional rendering + autoFocus for "Другое" textarea */}
-                {showOtherForm && (
-                  <div className="space-y-3 pt-1">
-                    <textarea
-                      autoFocus
-                      value={helpComment}
-                      onChange={(e) => setHelpComment(e.target.value)}
-                      placeholder={t('help.comment_placeholder_other', 'Расскажите, что случилось...')}
-                      className="w-full rounded-lg border border-slate-200 p-3 text-sm min-h-[80px] resize-none focus:outline-none focus:ring-2 focus:ring-blue-200"
-                    />
-                  </div>
-                )}
-                {helpSubmitError && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{helpSubmitError}</div>
-                )}
-              </>
+                <textarea
+                  autoFocus
+                  value={helpComment}
+                  onChange={(e) => setHelpComment(e.target.value.slice(0, 100))}
+                  maxLength={100}
+                  placeholder={t('help.comment_placeholder_other', 'Например: детский стул, приборы, убрать со стола')}
+                  className="w-full rounded-lg border border-slate-200 p-3 text-sm min-h-[80px] resize-none focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+                <div className="text-right text-xs text-slate-400">{helpComment.length} / 100</div>
+              </div>
+            )}
+            {/* HD-06: Undo toast */}
+            {undoToast && (
+              <div className="rounded-lg bg-slate-800 text-white px-4 py-3 flex items-center justify-between text-sm">
+                <span>{HELP_CARD_LABELS[undoToast.type] || undoToast.type} {t('help.sent_suffix', 'отправлено')}</span>
+                <button onClick={handleUndo} className="text-amber-300 font-medium ml-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                  {t('help.undo', 'Отменить')} ({Math.max(0, Math.ceil((undoToast.expiresAt - Date.now()) / 1000))})
+                </button>
+              </div>
+            )}
+            {helpSubmitError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{helpSubmitError}</div>
             )}
           </div>
-          {/* PM-134c: Sticky submit button outside scrollable area */}
-          {showOtherForm && !helpQuickSent && (
-            <div className="px-4 pb-4 pt-2 border-t border-slate-100">
+          {/* HD-04: Sticky submit area for "Другое" form — dual buttons */}
+          {showOtherForm && (!requestStates['other'] || requestStates['other']?.status === 'idle' || requestStates['other']?.status === 'repeat') && (
+            <div className="px-4 pb-4 pt-2 border-t border-slate-100 flex gap-3">
               <Button
-                className="w-full min-h-[44px] text-white"
-                style={{ backgroundColor: primaryColor }}
-                onClick={submitHelpRequest}
-                disabled={isSendingHelp || !helpComment.trim()}
+                variant="outline"
+                className="flex-1 min-h-[44px]"
+                onClick={() => { setShowOtherForm(false); setHelpComment(''); }}
               >
-                {isSendingHelp ? (
-                  <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />{t('common.loading', 'Отправка...')}</span>
-                ) : t('help.submit', 'Отправить')}
+                {t('common.cancel', 'Отмена')}
+              </Button>
+              <Button
+                className="flex-1 min-h-[44px] text-white"
+                style={{ backgroundColor: primaryColor }}
+                onClick={() => {
+                  if (!helpComment.trim()) return;
+                  const msg = helpComment.trim();
+                  // Use undo flow: set sending + schedule actual send
+                  if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId);
+                  setRequestStates(prev => ({ ...prev, other: { status: 'sending', sentAt: Date.now(), message: msg } }));
+                  const timeoutId = setTimeout(() => {
+                    pendingQuickSendRef.current = 'other';
+                    handlePresetSelect('other');
+                    setUndoToast(null);
+                  }, 5000);
+                  setUndoToast({ type: 'other', expiresAt: Date.now() + 5000, timeoutId });
+                  setShowOtherForm(false);
+                  setHelpComment('');
+                }}
+                disabled={!helpComment.trim()}
+              >
+                {t('help.submit_arrow', 'Отправить')}
               </Button>
             </div>
           )}
