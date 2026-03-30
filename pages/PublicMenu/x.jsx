@@ -3880,7 +3880,7 @@ export default function X() {
               </div>
             )}
             {/* HD-08: Active requests summary block */}
-            {pendingRequests.length > 0 && (
+            {pendingRequests.length >= 2 && (
               <div className="bg-[#F5E6E0] text-slate-700 text-sm rounded-lg p-3 space-y-1">
                 <div className="font-medium">{t('help.active_requests', 'Активные запросы')}: {pendingRequests.length}</div>
                 {pendingRequests.map(({ type, sentAt, message }) => (
@@ -3906,28 +3906,28 @@ export default function X() {
                     key={card.id}
                     onClick={() => status === 'idle' || status === 'repeat' ? handleCardTap(card.id) : null}
                     disabled={isDisabled}
-                    className={`rounded-xl border min-h-[80px] flex flex-col items-center justify-center gap-1 ${
+                    className={`relative rounded-xl border min-h-[80px] flex flex-col items-center justify-center gap-1 ${
                       status === 'pending' ? 'bg-[#F5E6E0] border-[#E8CFC7]' :
                       status === 'sending' ? 'bg-slate-50 border-slate-200' :
                       status === 'repeat' ? 'bg-white border-amber-300' :
                       'bg-white border-slate-200 active:border-blue-400 active:bg-blue-50'
                     } disabled:cursor-not-allowed`}
                   >
+                    {status === 'pending' && (
+                      <span className="absolute top-1.5 right-1.5 text-[10px] font-bold text-[#B5543A]">✓</span>
+                    )}
                     {status === 'sending' ? (
                       <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-                    ) : status === 'pending' ? (
-                      <Check className="w-6 h-6 text-[#B5543A]" />
                     ) : (
                       <span className="text-2xl">{card.emoji}</span>
                     )}
                     <span className="text-sm font-medium text-slate-700 text-center px-1">
                       {status === 'sending' ? t('help.sending', 'Отправляем...') :
-                       status === 'pending' ? t('help.request_sent', 'Запрос отправлен') :
                        status === 'repeat' ? t('help.remind_staff', 'Напомнить персоналу') :
                        card.label}
                     </span>
                     {status === 'pending' && st?.sentAt && (
-                      <span className="text-xs text-slate-500">{getRelativeTime(st.sentAt)}</span>
+                      <span className="text-[11px] text-[#B5543A] leading-none">✓ {getRelativeTime(st.sentAt)}</span>
                     )}
                   </button>
                 );
@@ -3945,30 +3945,31 @@ export default function X() {
                       }
                     }}
                     disabled={otherDisabled}
-                    className={`col-span-2 rounded-xl border min-h-[48px] flex flex-row items-center justify-center gap-2 ${
+                    className={`relative col-span-2 rounded-xl border min-h-[48px] flex flex-row items-center justify-center gap-2 ${
                       otherStatus === 'pending' ? 'bg-[#F5E6E0] border-[#E8CFC7]' :
                       otherStatus === 'sending' ? 'bg-slate-50 border-slate-200' :
                       otherStatus === 'repeat' ? 'bg-white border-amber-300' :
                       'bg-white border-slate-200 active:border-blue-400 active:bg-blue-50'
                     } disabled:cursor-not-allowed`}
                   >
+                    {otherStatus === 'pending' && (
+                      <span className="absolute top-1.5 right-1.5 text-[10px] font-bold text-[#B5543A]">✓</span>
+                    )}
                     {otherStatus === 'sending' ? (
                       <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-                    ) : otherStatus === 'pending' ? (
-                      <Check className="w-5 h-5 text-[#B5543A]" />
                     ) : (
                       <span className="text-xl">{'\u270F\uFE0F'}</span>
                     )}
                     <span className="text-sm font-medium text-slate-700">
                       {otherStatus === 'sending' ? t('help.sending', 'Отправляем...') :
-                       otherStatus === 'pending' && otherSt?.message
-                         ? `${t('help.request_sent', 'Запрос отправлен')}: "${otherSt.message.slice(0, 30)}${otherSt.message.length > 30 ? '...' : ''}"`
-                         : otherStatus === 'pending' ? t('help.request_sent', 'Запрос отправлен') :
                        otherStatus === 'repeat' ? t('help.remind_staff', 'Напомнить персоналу') :
-                       t('help.other', 'Другое...')}
+                       otherStatus === 'pending' && otherSt?.message
+                         ? `✓ "${otherSt.message.slice(0, 25)}${otherSt.message.length > 25 ? '...' : ''}"` :
+                       otherStatus === 'pending' ? t('help.other', 'Другое') :
+                       t('help.other', 'Другое')}
                     </span>
                     {otherStatus === 'pending' && otherSt?.sentAt && (
-                      <span className="text-xs text-slate-500 ml-1">{getRelativeTime(otherSt.sentAt)}</span>
+                      <span className="text-[11px] text-[#B5543A] ml-1 leading-none">✓ {getRelativeTime(otherSt.sentAt)}</span>
                     )}
                   </button>
                 );
