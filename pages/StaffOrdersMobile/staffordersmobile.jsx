@@ -1500,24 +1500,7 @@ function OrderGroupCard({
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['orders'] }),
   });
 
-  const handleAdvance = () => {
-    if (!nextAction || advanceMutation.isPending) return;
-    const { order, config } = nextAction;
-    const payload = {};
-    if (config.nextStageId) {
-      payload.stage_id = config.nextStageId;
-      if (config.derivedNextStatus) payload.status = config.derivedNextStatus;
-    }
-    else if (config.nextStatus) payload.status = config.nextStatus;
-    if (config.isFirstStage && effectiveUserId && !getAssigneeId(order)) {
-      payload.assignee = effectiveUserId;
-      payload.assigned_at = new Date().toISOString();
-    }
-    if (onClearNotified) onClearNotified(order.id);
-    advanceMutation.mutate({ id: order.id, payload });
-  };
-
-  // Batch action for "Принять все" / "Выдать все" (Fix 3B/3C)
+  // Batch action for "Принять все" / "Выдать все" / inline per-order buttons
   const handleBatchAction = (orders) => {
     if (advanceMutation.isPending) return;
     orders.forEach(order => {
@@ -1598,19 +1581,6 @@ function OrderGroupCard({
 
   const highlightRing = isHighlighted ? 'ring-2 ring-indigo-400 ring-offset-1' : '';
 
-  // Status transition text for Block B
-  const transitionText = useMemo(() => {
-    if (!nextAction) return '';
-    const { config } = nextAction;
-    const from = config.label || '';
-    let to = '';
-    if (config.nextStageId) {
-      to = config.actionLabel ? config.actionLabel.replace('\u2192 ', '') : '';
-    } else if (config.nextStatus) {
-      to = STATUS_FLOW[config.nextStatus]?.label || config.nextStatus || '';
-    }
-    return `${from} \u2192 ${to}`;
-  }, [nextAction]);
 
   return (
     <div
@@ -1772,6 +1742,16 @@ function OrderGroupCard({
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 ${config.badgeClass || ''}`} style={badgeStyle}>{config.label}</Badge>
                           <span className="text-red-500 text-sm font-bold">(!)</span>
+                          {config.actionLabel && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleBatchAction([order]); }}
+                              disabled={advanceMutation.isPending}
+                              className="text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 px-3 py-1 rounded min-h-[36px] disabled:opacity-60"
+                            >
+                              {config.actionLabel}
+                            </button>
+                          )}
                         </div>
                       </div>
                       <div className="text-sm text-slate-600">
@@ -1824,7 +1804,19 @@ function OrderGroupCard({
                           <span className="text-sm font-medium text-slate-800">{guestName(order)}</span>
                           <span className="text-xs text-slate-400">{orderTime}</span>
                         </div>
-                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 ${config.badgeClass || ''}`} style={badgeStyle}>{config.label}</Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 ${config.badgeClass || ''}`} style={badgeStyle}>{config.label}</Badge>
+                          {(config.actionLabel || config.isFinishStage) && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleBatchAction([order]); }}
+                              disabled={advanceMutation.isPending}
+                              className="text-xs font-semibold text-white bg-green-600 hover:bg-green-700 active:scale-95 px-3 py-1 rounded min-h-[36px] disabled:opacity-60"
+                            >
+                              {config.actionLabel || (group.type === 'table' ? '\u041F\u043E\u0434\u0430\u043D\u043E' : '\u0412\u044B\u0434\u0430\u0442\u044C')}
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="text-sm text-slate-600">
                         {orderItems.length > 0
@@ -1873,7 +1865,19 @@ function OrderGroupCard({
                             <span className="text-sm font-medium text-slate-800">{guestName(order)}</span>
                             <span className="text-xs text-slate-400">{orderTime}</span>
                           </div>
-                          <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 ${config.badgeClass || ''}`} style={badgeStyle}>{config.label}</Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 ${config.badgeClass || ''}`} style={badgeStyle}>{config.label}</Badge>
+                            {config.actionLabel && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleBatchAction([order]); }}
+                                disabled={advanceMutation.isPending}
+                                className="text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 active:scale-95 px-3 py-1 rounded min-h-[36px] disabled:opacity-60"
+                              >
+                                {config.actionLabel}
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <div className="text-sm text-slate-600">
                           {orderItems.length > 0
@@ -1931,30 +1935,6 @@ function OrderGroupCard({
             </div>
           )}
 
-          {/* ═══ Block B — Action Button ═══ */}
-          {nextAction && (
-            <div>
-              <button
-                type="button"
-                onClick={handleAdvance}
-                disabled={advanceMutation.isPending}
-                className={`w-full min-h-[48px] flex items-center justify-center font-semibold text-sm rounded-lg transition-all active:scale-[0.99] disabled:opacity-60 text-white ${
-                  nextAction.config.isFirstStage ? 'bg-blue-600 hover:bg-blue-700' : 'bg-amber-600 hover:bg-amber-700'
-                }`}
-              >
-                {advanceMutation.isPending
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : nextAction.label
-                }
-              </button>
-              {transitionText && (
-                <p className="text-[11px] text-slate-400 text-center mt-1">{transitionText}</p>
-              )}
-              {advanceMutation.isPending && (
-                <p className="text-[11px] text-slate-400 text-center mt-1">{'\u0421\u043E\u0445\u0440\u0430\u043D\u044F\u0435\u043C\u2026'}</p>
-              )}
-            </div>
-          )}
 
           {/* ═══ Block D — Close Table (Hall only) ═══ */}
           {group.type === 'table' && onCloseTable && (
