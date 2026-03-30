@@ -540,7 +540,7 @@ export default function CartView({
     const groups = Array.from(grouped.values());
 
     return (
-      <div className="space-y-1 mt-2 pt-2">
+      <div className="space-y-1 mt-1 pt-1">
         {groups.map(g => (
           <div key={g.name}>
             <div className="flex justify-between items-center text-sm py-1">
@@ -596,7 +596,7 @@ export default function CartView({
   return (
     <div className="max-w-2xl mx-auto px-4 mt-2 pb-4">
       {/* P0 Header: [🔔] Стол · Гость · [˅] — #140: chevron moved into table card, not sticky */}
-      <div className="bg-white rounded-lg shadow-sm border p-3 mb-4 mt-2">
+      <div className="bg-white rounded-lg shadow-sm border px-3 py-2 mb-4 mt-2">
         <div className="flex items-center justify-between">
           {/* Left: Call waiter */}
           {onCallWaiter && (
@@ -771,7 +771,7 @@ export default function CartView({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <span className="font-medium text-slate-700">{tr('cart.table_total', 'Счёт стола')}:</span>
-              <span className="text-xl font-bold text-slate-900">{formatPrice(tableTotal)}</span>
+              <span className="text-xl font-bold text-slate-900">{formatPrice(parseFloat(Number(tableTotal).toFixed(2)))}</span>
             </div>
           </CardContent>
         </Card>
@@ -797,7 +797,7 @@ export default function CartView({
 
               {/* Подано bucket — collapsed with accent chip */}
               <Card className="mb-4">
-                <CardContent className="px-3 py-2">
+                <CardContent className="px-3 py-1.5">
                   <button
                     type="button"
                     className="w-full flex items-center justify-between text-left min-h-[44px]"
@@ -908,7 +908,7 @@ export default function CartView({
 
           return (
             <Card key={key} className="mb-4">
-              <CardContent className="px-3 py-2">
+              <CardContent className="px-3 py-1.5">
                 <button
                   type="button"
                   className="w-full flex items-center justify-between text-left min-h-[44px]"
@@ -1060,7 +1060,7 @@ export default function CartView({
       )}
 
       {/* Spacer so sticky footer doesn't overlap last content */}
-      {(cart.length > 0 || todayMyOrders.length > 0) && <div className="h-20" />}
+      {(cart.length > 0 || todayMyOrders.length > 0) && <div className="h-14" />}
 
       {/* AC-08: Error state with retry */}
       {submitError && cart.length > 0 && (
