@@ -1,7 +1,7 @@
 ---
-version: "40.0"
+version: "41.0"
 updated: "2026-03-30"
-session: 204
+session: 205
 ---
 
 # PublicMenu — Bug Registry
@@ -138,6 +138,21 @@ session: 204
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-CHAIN-9b4e: CV-05 v2 Rating Flow — view/rating modes, autosave, email sheet + PM-164/PM-165 — FIXED S205
+- **Когда:** S205, chain publicmenu-260330-161543-9b4e
+- **Файлы:** CartView.jsx
+- **Фиксы:**
+  - CV-05-v2 (P1): View mode — removed empty stars, show rating text indicators (⭐N / Оценить) inline
+  - CV-05-chip (P1): Rating chip with counter `Оценить (N)` → `Готово` → `✓ Оценено` toggle
+  - CV-37 (P2): Bonus subline moved below header, amber banner removed
+  - CV-39 (P1): Autosave per row — removed re-rating guard, improved save state display
+  - CV-36 (P2): `✓ Оценено` chip with auto-exit from rating mode
+  - CV-38 (P2): Email bottom sheet after `Готово` for anonymous guests (replaces inline form)
+  - CV-40 (P2): Re-entry in rating mode with pre-filled stars
+  - CV-42 (P2): Star tap targets min-h-[44px]
+  - PM-164 (P3): Guest name button min-h-[44px] → min-h-[32px] for compact header
+  - PM-165 (P3): Removed pt-1 gap between bucket header and first item
 
 ### FIX-CHAIN-4324: Batch 8A CartView spacing polish + PM-163 float fix — FIXED S204
 - **Когда:** S204, chain publicmenu-260330-133908-4324

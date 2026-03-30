@@ -115,6 +115,10 @@ export default function CartView({
   const [rewardEmail, setRewardEmail] = React.useState('');
   const [rewardEmailSubmitting, setRewardEmailSubmitting] = React.useState(false);
   const [emailError, setEmailError] = React.useState('');
+  // CV-05 v2: Rating mode state (view mode vs rating mode)
+  const [isRatingMode, setIsRatingMode] = React.useState(false);
+  // CV-38: Post-rating email bottom sheet
+  const [showPostRatingEmailSheet, setShowPostRatingEmailSheet] = React.useState(false);
 
   // ===== P0: Table-code verification UX (mask + auto-verify + cooldown) =====
   const [infoModal, setInfoModal] = React.useState(null); // 'online' | 'tableCode' | null
@@ -507,6 +511,37 @@ export default function CartView({
     });
   }, [statusBuckets.served, itemsByOrder, safeReviewedItems, safeDraftRatings]);
 
+  // CV-05 v2: Auto-exit rating mode when all served items are rated
+  React.useEffect(() => {
+    if (allServedRated) setIsRatingMode(false);
+  }, [allServedRated]);
+
+  // CV-36: Count of unrated served items (for chip counter)
+  const unratedServedCount = React.useMemo(() => {
+    let count = 0;
+    statusBuckets.served.forEach(order => {
+      const orderItems = itemsByOrder.get(order.id) || [];
+      orderItems.forEach((item, idx) => {
+        const itemId = item.id || `${order.id}_${idx}`;
+        if (!safeReviewedItems.has(itemId) && !(safeDraftRatings[itemId] > 0)) count++;
+      });
+    });
+    return count;
+  }, [statusBuckets.served, itemsByOrder, safeReviewedItems, safeDraftRatings]);
+
+  // CV-38: Count of rated served items (for email sheet)
+  const ratedServedCount = React.useMemo(() => {
+    let count = 0;
+    statusBuckets.served.forEach(order => {
+      const orderItems = itemsByOrder.get(order.id) || [];
+      orderItems.forEach((item, idx) => {
+        const itemId = item.id || `${order.id}_${idx}`;
+        if (safeReviewedItems.has(itemId) || (safeDraftRatings[itemId] > 0)) count++;
+      });
+    });
+    return count;
+  }, [statusBuckets.served, itemsByOrder, safeReviewedItems, safeDraftRatings]);
+
   // CV-28: getOrderSummary/getOrderTime removed — flat dish list replaces per-order collapse
 
   // ===== CV-28: Render flat dish list for a status bucket (grouped by dish name) =====
@@ -540,25 +575,52 @@ export default function CartView({
     const groups = Array.from(grouped.values());
 
     return (
-      <div className="space-y-1 mt-1 pt-1">
+      <div className="space-y-1 mt-1">
         {groups.map(g => (
           <div key={g.name}>
             <div className="flex justify-between items-center text-sm py-1">
               <span className="text-slate-700">
                 {g.name}{g.totalQty > 1 ? ` ×${g.totalQty}` : ''}
               </span>
-              <span className="text-slate-600">{formatPrice(parseFloat(g.totalPrice.toFixed(2)))}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-600">{formatPrice(parseFloat(g.totalPrice.toFixed(2)))}</span>
+                {/* CV-05 v2 view mode: rating text indicators (no star widgets) */}
+                {showRating && reviewsEnabled && !isRatingMode && (() => {
+                  const anyRated = g.items.some(i => safeReviewedItems.has(i.itemId) || (safeDraftRatings[i.itemId] || 0) > 0);
+                  if (anyRated) {
+                    const bestRating = Math.max(...g.items.map(i => safeDraftRatings[i.itemId] || 0));
+                    return <span className="text-xs text-amber-500">⭐{bestRating}</span>;
+                  }
+                  return <span className="text-xs text-slate-400">{tr('review.rate_action', 'Оценить')}</span>;
+                })()}
+              </div>
             </div>
-            {/* CV-04/CV-05: Per-item ratings in served bucket */}
-            {showRating && reviewsEnabled && g.items.map(item => {
+            {/* CV-04/CV-05 v2: Per-item ratings — view mode vs rating mode */}
+            {showRating && reviewsEnabled && g.items.map((item, itemIdx) => {
               const hasReview = safeReviewedItems.has(item.itemId);
               const draftRating = safeDraftRatings[item.itemId] || 0;
+              const isRated = hasReview || draftRating > 0;
+              const isFirstUnrated = !isRated && itemIdx === g.items.findIndex(i => {
+                const dr = safeDraftRatings[i.itemId] || 0;
+                return !safeReviewedItems.has(i.itemId) && !(dr > 0);
+              });
+
+              if (!isRatingMode) {
+                // View mode: show text indicators inline, no star widgets
+                return null; // Rating text is shown inline in the dish row above
+              }
+
+              // Rating mode: show star widgets
               return (
-                <div key={item.itemId} className="flex items-center gap-2 pl-2 py-1">
+                <div
+                  key={item.itemId}
+                  className="flex items-center gap-2 pl-2 min-h-[44px]"
+                  {...(isFirstUnrated ? {'data-first-unrated': true} : {})}
+                >
                   <Rating
                     value={draftRating}
                     onChange={(val) => {
-                      if (draftRating > 0 || hasReview) return;
+                      if (ratingSavingByItemId?.[item.itemId] === true) return;
                       updateDraftRating(item.itemId, val);
                       if (val > 0 && handleRateDish) {
                         const dishId = typeof item.dish === 'object' ? item.dish?.id : item.dish;
@@ -571,13 +633,19 @@ export default function CartView({
                       }
                     }}
                     size="md"
-                    readonly={draftRating > 0 || hasReview || ratingSavingByItemId?.[item.itemId]}
+                    readonly={ratingSavingByItemId?.[item.itemId] === true}
                   />
-                  {ratingSavingByItemId?.[item.itemId] && (
-                    <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
+                  {ratingSavingByItemId?.[item.itemId] === true && (
+                    <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      {tr('review.saving', 'Сохраняем...')}
+                    </span>
                   )}
-                  {(draftRating > 0 || hasReview) && !ratingSavingByItemId?.[item.itemId] && (
-                    <span className="text-xs text-green-600">✓</span>
+                  {isRated && ratingSavingByItemId?.[item.itemId] !== true && (
+                    <span className="text-xs text-green-600">✓ {tr('review.saved', 'Сохранено')}</span>
+                  )}
+                  {ratingSavingByItemId?.[item.itemId] === 'error' && (
+                    <span className="text-xs text-red-500">{tr('review.save_error', 'Ошибка. Повторить')}</span>
                   )}
                 </div>
               );
@@ -634,7 +702,7 @@ export default function CartView({
               ) : (
                 <button
                   onClick={() => { setGuestNameInput(currentGuest?.name || ''); setIsEditingName(true); }}
-                  className="min-h-[44px] flex items-center hover:underline"
+                  className="min-h-[32px] flex items-center hover:underline"
                   style={{color: primaryColor}}
                 >
                   {guestDisplay} <span className="text-xs ml-0.5">›</span>
@@ -809,12 +877,28 @@ export default function CartView({
                       </span>
                       {reviewsEnabled && (
                         allServedRated
-                          ? <span className="ml-1 text-xs text-green-600 font-medium">{tr('review.all_rated', 'Оценено')}</span>
-                          : <button
-                              type="button"
-                              className="ml-1 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full"
-                              onClick={(e) => { e.stopPropagation(); setExpandedStatuses(prev => ({ ...prev, served: true })); }}
-                            >{tr('review.rate', 'Оценить')}</button>
+                          ? <span className="ml-1 text-xs text-green-600 font-medium">✓ {tr('review.all_rated_chip', 'Оценено')}</span>
+                          : isRatingMode
+                            ? <span
+                                role="button"
+                                tabIndex={0}
+                                className="ml-1 text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsRatingMode(false);
+                                  if (shouldShowReviewRewardNudge) setShowPostRatingEmailSheet(true);
+                                }}
+                              >{tr('review.done', 'Готово')}</span>
+                            : <span
+                                role="button"
+                                tabIndex={0}
+                                className="ml-1 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full cursor-pointer"
+                                onClick={() => {
+                                  setExpandedStatuses(prev => ({ ...prev, served: true }));
+                                  setIsRatingMode(true);
+                                  setTimeout(() => { document.querySelector('[data-first-unrated]')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 100);
+                                }}
+                              >{tr('review.rate', 'Оценить')} ({unratedServedCount})</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
@@ -824,69 +908,18 @@ export default function CartView({
                       </div>
                     </div>
                   </button>
+                  {/* CV-05 v2: Rating mode micro-label */}
+                  {isRatingMode && !allServedRated && (
+                    <p className="text-xs text-slate-500 mt-0.5">{tr('review.rating_mode', 'Режим оценки')}</p>
+                  )}
+                  {/* CV-37: Bonus subline below header (visible collapsed or expanded) */}
+                  {shouldShowReviewRewardHint && (
+                    <p className="text-xs text-slate-500 mt-0.5 pb-1">
+                      {tr('loyalty.review_bonus_hint', 'За отзыв можно получить')} +{reviewRewardPoints} {tr('loyalty.points_short', 'баллов')}
+                    </p>
+                  )}
                   {expandedStatuses.served && (
                     <>
-                      {shouldShowReviewRewardHint && (
-                        <div className="mt-2 text-xs text-amber-700 bg-amber-50 rounded-md px-3 py-2 flex items-center gap-2">
-                          <span>⭐</span>
-                          <span>{tr('loyalty.review_reward_hint', 'За отзыв')} +{reviewRewardPoints} {tr('loyalty.points_short', 'бонусов')}</span>
-                        </div>
-                      )}
-                      {shouldShowReviewRewardNudge && (
-                        <div className="mt-2 text-sm bg-green-50 border border-green-200 rounded-md p-3">
-                          {!showRewardEmailForm ? (
-                            <div className="flex items-center justify-between">
-                              <span className="text-slate-700">
-                                ✅ {tr('loyalty.thanks_for_rating', 'Спасибо за оценку!')}
-                              </span>
-                              <button
-                                type="button"
-                                className="hover:underline font-medium text-sm"
-                                style={{color: primaryColor}}
-                                onClick={() => setShowRewardEmailForm(true)}
-                              >
-                                {tr('loyalty.get_bonus', 'Получить бонусы')} →
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              <p className="text-slate-700 text-xs">
-                                {tr('loyalty.enter_email_for_bonus', 'Введите email для начисления бонусов:')}
-                              </p>
-                              <div className="flex gap-2">
-                                <Input
-                                  type="email"
-                                  value={rewardEmail}
-                                  onChange={(e) => setRewardEmail(e.target.value)}
-                                  placeholder="email@example.com"
-                                  className="flex-1 h-9 text-sm"
-                                />
-                                <Button
-                                  size="sm"
-                                  className="h-9"
-                                  disabled={!rewardEmail.trim() || rewardEmailSubmitting}
-                                  onClick={() => {
-                                    if (!rewardEmail.trim()) return;
-                                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rewardEmail.trim())) {
-                                      if (toast) toast.error(tr('loyalty.invalid_email', 'Введите корректный email'));
-                                      return;
-                                    }
-                                    setRewardEmailSubmitting(true);
-                                    if (setCustomerEmail) setCustomerEmail(rewardEmail);
-                                    if (toast) toast.success(tr('loyalty.email_saved', 'Email сохранён! Бонусы будут начислены.'));
-                                    rewardTimerRef.current = setTimeout(() => {
-                                      setRewardEmailSubmitting(false);
-                                      setShowRewardEmailForm(false);
-                                    }, 1000);
-                                  }}
-                                >
-                                  {rewardEmailSubmitting ? '...' : tr('common.save', 'Сохранить')}
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
                       {renderBucketOrders(statusBuckets.served, true)}
                     </>
                   )}
@@ -918,15 +951,31 @@ export default function CartView({
                     <span className="text-base font-semibold text-slate-800">
                       {bucketDisplayNames[key]} ({orders.length})
                     </span>
-                    {/* CV-05: Accent chip on Подано only */}
+                    {/* CV-05 v2: Accent chip on Подано only */}
                     {isServed && reviewsEnabled && (
                       allServedRated
-                        ? <span className="ml-1 text-xs text-green-600 font-medium">{tr('review.all_rated', 'Оценено')}</span>
-                        : <button
-                            type="button"
-                            className="ml-1 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full"
-                            onClick={(e) => { e.stopPropagation(); setExpandedStatuses(prev => ({ ...prev, served: true })); }}
-                          >{tr('review.rate', 'Оценить')}</button>
+                        ? <span className="ml-1 text-xs text-green-600 font-medium">✓ {tr('review.all_rated_chip', 'Оценено')}</span>
+                        : isRatingMode
+                          ? <span
+                              role="button"
+                              tabIndex={0}
+                              className="ml-1 text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsRatingMode(false);
+                                if (shouldShowReviewRewardNudge) setShowPostRatingEmailSheet(true);
+                              }}
+                            >{tr('review.done', 'Готово')}</span>
+                          : <span
+                              role="button"
+                              tabIndex={0}
+                              className="ml-1 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full cursor-pointer"
+                              onClick={() => {
+                                setExpandedStatuses(prev => ({ ...prev, served: true }));
+                                setIsRatingMode(true);
+                                setTimeout(() => { document.querySelector('[data-first-unrated]')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 100);
+                              }}
+                            >{tr('review.rate', 'Оценить')} ({unratedServedCount})</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
@@ -936,70 +985,15 @@ export default function CartView({
                     </div>
                   </div>
                 </button>
-                {isExpanded && isServed && (
-                  <>
-                    {shouldShowReviewRewardHint && (
-                      <div className="mt-2 text-xs text-amber-700 bg-amber-50 rounded-md px-3 py-2 flex items-center gap-2">
-                        <span>⭐</span>
-                        <span>{tr('loyalty.review_reward_hint', 'За отзыв')} +{reviewRewardPoints} {tr('loyalty.points_short', 'бонусов')}</span>
-                      </div>
-                    )}
-                    {shouldShowReviewRewardNudge && (
-                      <div className="mt-2 text-sm bg-green-50 border border-green-200 rounded-md p-3">
-                        {!showRewardEmailForm ? (
-                          <div className="flex items-center justify-between">
-                            <span className="text-slate-700">
-                              ✅ {tr('loyalty.thanks_for_rating', 'Спасибо за оценку!')}
-                            </span>
-                            <button
-                              type="button"
-                              className="hover:underline font-medium text-sm"
-                              style={{color: primaryColor}}
-                              onClick={() => setShowRewardEmailForm(true)}
-                            >
-                              {tr('loyalty.get_bonus', 'Получить бонусы')} →
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <p className="text-slate-700 text-xs">
-                              {tr('loyalty.enter_email_for_bonus', 'Введите email для начисления бонусов:')}
-                            </p>
-                            <div className="flex gap-2">
-                              <Input
-                                type="email"
-                                value={rewardEmail}
-                                onChange={(e) => setRewardEmail(e.target.value)}
-                                placeholder="email@example.com"
-                                className="flex-1 h-9 text-sm"
-                              />
-                              <Button
-                                size="sm"
-                                className="h-9"
-                                disabled={!rewardEmail.trim() || rewardEmailSubmitting}
-                                onClick={() => {
-                                  if (!rewardEmail.trim()) return;
-                                  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rewardEmail.trim())) {
-                                    if (toast) toast.error(tr('loyalty.invalid_email', 'Введите корректный email'));
-                                    return;
-                                  }
-                                  setRewardEmailSubmitting(true);
-                                  if (setCustomerEmail) setCustomerEmail(rewardEmail);
-                                  if (toast) toast.success(tr('loyalty.email_saved', 'Email сохранён! Бонусы будут начислены.'));
-                                  rewardTimerRef.current = setTimeout(() => {
-                                    setRewardEmailSubmitting(false);
-                                    setShowRewardEmailForm(false);
-                                  }, 1000);
-                                }}
-                              >
-                                {rewardEmailSubmitting ? '...' : tr('common.save', 'Сохранить')}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </>
+                {/* CV-05 v2: Rating mode micro-label */}
+                {isServed && isRatingMode && !allServedRated && (
+                  <p className="text-xs text-slate-500 mt-0.5">{tr('review.rating_mode', 'Режим оценки')}</p>
+                )}
+                {/* CV-37: Bonus subline below header (visible collapsed or expanded) */}
+                {isServed && shouldShowReviewRewardHint && (
+                  <p className="text-xs text-slate-500 mt-0.5 pb-1">
+                    {tr('loyalty.review_bonus_hint', 'За отзыв можно получить')} +{reviewRewardPoints} {tr('loyalty.points_short', 'баллов')}
+                  </p>
                 )}
                 {isExpanded && renderBucketOrders(orders, showRating)}
               </CardContent>
@@ -1069,6 +1063,49 @@ export default function CartView({
           <p className="text-xs text-red-500 mt-1">
             {tr('error.send.subtitle', 'Не удалось отправить. Попробуйте снова')}
           </p>
+        </div>
+      )}
+
+      {/* CV-38: Post-rating email bottom sheet */}
+      {showPostRatingEmailSheet && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30" onClick={() => setShowPostRatingEmailSheet(false)}>
+          <div className="bg-white rounded-t-xl w-full max-w-lg p-4 pb-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-slate-800 mb-2">{tr('review.get_bonus_title', 'Получить баллы за отзыв')}</h3>
+            <p className="text-sm text-slate-600 mb-1">{tr('review.rated_count', 'Вы оценили')} {ratedServedCount} {tr('review.dishes_word', 'блюд')}.</p>
+            <p className="text-sm text-slate-600 mb-3">{tr('review.enter_email_for_points', 'Введите email, чтобы получить')} {ratedServedCount * reviewRewardPoints} {tr('loyalty.points_short', 'баллов')}.</p>
+            <Input
+              type="email"
+              value={rewardEmail}
+              onChange={e => setRewardEmail(e.target.value)}
+              placeholder="email@example.com"
+              className="mb-3 h-10"
+            />
+            <Button
+              className="w-full h-11 mb-2 text-white"
+              style={{backgroundColor: primaryColor}}
+              disabled={!rewardEmail.trim() || rewardEmailSubmitting}
+              onClick={() => {
+                if (!rewardEmail.trim()) return;
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rewardEmail.trim())) {
+                  if (toast) toast.error(tr('loyalty.invalid_email', 'Введите корректный email'));
+                  return;
+                }
+                setRewardEmailSubmitting(true);
+                if (setCustomerEmail) setCustomerEmail(rewardEmail);
+                if (toast) toast.success(tr('loyalty.email_saved', 'Email сохранён! Бонусы будут начислены.'));
+                rewardTimerRef.current = setTimeout(() => {
+                  setRewardEmailSubmitting(false);
+                  setShowPostRatingEmailSheet(false);
+                }, 1000);
+              }}
+            >
+              {rewardEmailSubmitting ? '...' : tr('review.get_bonus_btn', 'Получить баллы')}
+            </Button>
+            <button type="button" className="w-full text-center text-sm text-slate-500 py-2" onClick={() => setShowPostRatingEmailSheet(false)}>
+              {tr('review.skip', 'Пропустить')}
+            </button>
+            <p className="text-xs text-slate-400 text-center mt-1">{tr('review.ratings_saved_note', 'Оценки уже сохранены')}</p>
+          </div>
         </div>
       )}
 
