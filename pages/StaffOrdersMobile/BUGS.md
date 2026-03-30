@@ -163,6 +163,30 @@
 - **Chain:** staffordersmobile-260330-120021-e9aa
 - **Status:** FIXED
 
+### SOM-S203-01 (P2) -- DollarSign icon in bill summary shows "$" text
+- **Function:** Bill section (Block E), line ~1893
+- **Root cause:** `<DollarSign>` icon rendered as "$" glyph — looks like raw text to waiter.
+- **Fix:** Replaced with `<Receipt>` icon (already imported). One-line change.
+- **Commit:** `008189b`
+- **Chain:** staffordersmobile-260330-172614-cb49
+- **Status:** FIXED
+
+### SOM-S203-02 (P3) -- Double "Стол" prefix in table card title
+- **Function:** TableGroupCard identifier, line ~1406
+- **Root cause:** `tableData.name` from B44 already contains "Стол 2", code prepends another "Стол " → "Стол Стол 2".
+- **Fix:** Added `startsWith('Стол')` guard before prepending prefix.
+- **Commit:** `008189b`
+- **Chain:** staffordersmobile-260330-172614-cb49
+- **Status:** FIXED
+
+### SOM-S208-01 (P1) -- Inline action button missing for custom-stage orders + handleAction no-op fallback
+- **Function:** OrderCard showActionButton (line ~1141), handleAction (line ~1039)
+- **Root cause:** `showActionButton` was false when `nextStageId` and `nextStatus` were both null (custom B44 stages). `handleAction` also early-returned in the same case.
+- **Fix:** (1) Extended `showActionButton` with `|| !!(statusConfig.actionLabel && !statusConfig.isFinishStage)`. (2) Added finish-stage fallback in `handleAction`: sets `status='served'` mirroring batch path.
+- **Commit:** `008189b`
+- **Chain:** staffordersmobile-260330-172614-cb49
+- **Status:** FIXED
+
 ---
 
 ## Active Bugs
