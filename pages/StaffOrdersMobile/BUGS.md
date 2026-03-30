@@ -187,6 +187,22 @@
 - **Chain:** staffordersmobile-260330-172614-cb49
 - **Status:** FIXED
 
+### #168 Fix 1-3 (P1) -- No inline per-order action buttons in expanded card sections
+- **Function:** OrderGroupCard sections НОВЫЕ / ГОТОВО К ВЫДАЧЕ / В РАБОТЕ
+- **Root cause:** Each order row only showed Badge + optional (!) indicator. Waiter had to tap row → scroll to bottom Block B → tap action. Two taps + scroll.
+- **Fix:** Added inline action buttons (blue/green/amber) to each order row header, calling `handleBatchAction([order])` with `e.stopPropagation()`. Fix 2 enhanced with `config.isFinishStage` fallback for stage-mode orders where `actionLabel` is null.
+- **Commit:** `064e8d3`
+- **Chain:** staffordersmobile-260330-184402-3037
+- **Status:** FIXED
+
+### #168 Fix 4 (P1) -- Block B bottom action button redundant after inline buttons
+- **Function:** OrderGroupCard Block B (`nextAction && (...)` section)
+- **Root cause:** Block B was the original 2-tap pattern. With per-order inline buttons, it became redundant and confusing.
+- **Fix:** Removed Block B JSX, `handleAdvance` function, and `transitionText` useMemo. Kept `nextAction` and `advanceMutation` (used by inline buttons and group buttons).
+- **Commit:** `064e8d3`
+- **Chain:** staffordersmobile-260330-184402-3037
+- **Status:** FIXED
+
 ---
 
 ## Active Bugs
