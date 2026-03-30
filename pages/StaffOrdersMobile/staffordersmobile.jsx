@@ -1035,8 +1035,15 @@ function OrderCard({
   const handleAction = (e) => {
     e.stopPropagation(); // P0-3: prevent card toggle
     
-    // Нет следующего статуса/этапа — ничего не делаем
-    if (!statusConfig.nextStageId && !statusConfig.nextStatus) return;
+    // Нет следующего статуса/этапа — fallback для finish-stage
+    if (!statusConfig.nextStageId && !statusConfig.nextStatus) {
+      if (statusConfig.isFinishStage) {
+        const payload = { status: 'served' };
+        if (onClearNotified) onClearNotified(order.id);
+        updateStatusMutation.mutate({ id: order.id, payload });
+      }
+      return;
+    }
     
     const payload = {};
     
@@ -1131,7 +1138,8 @@ function OrderCard({
   }
 
   // Determine if action button should be shown
-  const showActionButton = !!(statusConfig.nextStageId || statusConfig.nextStatus);
+  const showActionButton = !!(statusConfig.nextStageId || statusConfig.nextStatus)
+    || !!(statusConfig.actionLabel && !statusConfig.isFinishStage);
   const isServeStep = statusConfig.nextStatus === "served" || statusConfig.isFinishStage;
   const actionDisabled = updateStatusMutation.isPending || (disableServe && isServeStep);
 
@@ -1395,7 +1403,9 @@ function OrderGroupCard({
   // Row 1 identifier
   let identifier;
   if (group.type === 'table') {
-    identifier = tableData?.name ? `\u0421\u0442\u043E\u043B ${tableData.name}` : group.displayName;
+    identifier = tableData?.name
+      ? (tableData.name.startsWith('\u0421\u0442\u043E\u043B') ? tableData.name : `\u0421\u0442\u043E\u043B ${tableData.name}`)
+      : group.displayName;
   } else {
     const order = group.orders[0];
     const prefix = group.type === 'pickup' ? '\u0421\u0412' : '\u0414\u041E\u0421';
@@ -1890,7 +1900,7 @@ function OrderGroupCard({
                 onClick={() => setBillExpanded(!billExpanded)}
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <DollarSign className="w-4 h-4 text-slate-500 shrink-0" />
+                  <Receipt className="w-4 h-4 text-slate-500 shrink-0" />
                   <span className="text-sm font-medium text-slate-700 truncate">
                     {'\u0421\u0447\u0451\u0442: '}
                     {billData.guests.length === 1
