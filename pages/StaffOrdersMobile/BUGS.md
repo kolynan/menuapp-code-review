@@ -135,6 +135,34 @@
 - **Chain:** staffordersmobile-260329-155109-3e10
 - **Status:** FIXED
 
+### #164 (P0) -- Collapsed card shows dish text instead of actionable status summary
+- **Function:** OrderGroupCard collapsed render (Row 3 + Row 4)
+- **Root cause:** Row 3 showed `itemsPreview` (dish names), Row 4 showed request badges separately — waiter couldn't see at a glance what needs action.
+- **Fix:** Replaced Row 3+4 with two-line summary: "СЕЙЧАС: N новых · N выдать · 🧾 Счёт" + "ЕЩЁ: N готовится · NNN ₸". Empty state fallback added.
+- **Chain:** staffordersmobile-260330-120021-e9aa
+- **Status:** FIXED
+
+### PM-142 (P0) -- Shift filter fallback shows orders from previous day
+- **Function:** getShiftStartTime fallback returns
+- **Root cause:** `FALLBACK_HOURS = 12` meant at 8am the filter showed orders from 8pm yesterday. Both fallback returns used `now - 12h`.
+- **Fix:** Changed both fallback returns to use start of current calendar day (`setHours(0,0,0,0)`). `FALLBACK_HOURS` constant kept but unused in returns.
+- **Chain:** staffordersmobile-260330-120021-e9aa
+- **Status:** FIXED
+
+### #166 (P0) -- Expanded card shows flat order list instead of status sections
+- **Function:** OrderGroupCard expanded content (Block A + Block F)
+- **Root cause:** All `activeOrders` shown as flat list under "ЗАКАЗЫ" header. `completedOrders` (isFinishStage = ready to serve) hidden in collapsed "Завершённые" at bottom.
+- **Fix:** Replaced with 3 sections: "Новые (N)" [open] + "Готово к выдаче (N)" [open] + "В работе (N)" [collapsed]. Added "Принять все" / "Выдать все" batch action buttons. Removed Block F.
+- **Chain:** staffordersmobile-260330-120021-e9aa
+- **Status:** FIXED
+
+### #167 (P0) -- Service requests hidden below orders + wrong icon + extra tap
+- **Function:** Block C position, request button text, bill icon
+- **Root cause:** (a) Block C below Block A — easy to miss. (b) Button showed "В работе" → "Готово" (2-tap flow). (c) Bill requests used Bell icon instead of Receipt.
+- **Fix:** (a) Moved Block C to top of expanded content. (b) Single "Выполнено" button, callback always sets `done`. (c) Replaced Bell with Receipt for bill type in both collapsed and expanded views. Touch target increased to 44px.
+- **Chain:** staffordersmobile-260330-120021-e9aa
+- **Status:** FIXED
+
 ---
 
 ## Active Bugs
