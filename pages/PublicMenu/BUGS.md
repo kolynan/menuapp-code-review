@@ -1,7 +1,7 @@
 ---
-version: "39.0"
-updated: "2026-03-29"
-session: 198
+version: "40.0"
+updated: "2026-03-30"
+session: 204
 ---
 
 # PublicMenu — Bug Registry
@@ -138,6 +138,17 @@ session: 198
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-CHAIN-4324: Batch 8A CartView spacing polish + PM-163 float fix — FIXED S204
+- **Когда:** S204, chain publicmenu-260330-133908-4324
+- **Файлы:** CartView.jsx
+- **Фиксы:**
+  - CV-spacing-01 (P2): Bucket header vertical padding `py-2` → `py-1.5` (lines 800, 911)
+  - CV-spacing-02 (P2): Bell header card padding `p-3` → `px-3 py-2` (line 599)
+  - CV-spacing-03 (P2): renderBucketOrders gap `mt-2 pt-2` → `mt-1 pt-1` (line 543)
+  - CV-spacing-04 (P2): Bottom spacer `h-20` → `h-14` (line 1063)
+  - PM-163 (P3): Table total float fix `formatPrice(parseFloat(Number(tableTotal).toFixed(2)))` (line 774)
+- **Коммит:** 45b8319
 
 ### FIX-CHAIN-0279: Batch 7 CartView polish + PM-162 verification — FIXED S198
 - **Когда:** S198, chain publicmenu-260329-232408-0279
