@@ -1661,13 +1661,14 @@ export default function X() {
   const HELP_CHIPS = useMemo(() => ['Детский стул', 'Приборы', 'Соус', 'Убрать со стола', 'Вода'], []);
 
   const [requestStates, setRequestStates] = useState({});
+  const hasLoadedHelpStatesRef = useRef(false); // HD-10: prevent save effect from wiping localStorage before load
   // HD-05: Load requestStates from localStorage on mount (restore badge + card state after refresh)
   useEffect(() => {
     if (!currentTableId) return;
     try {
       const key = `helpdrawer_${currentTableId}`;
       const stored = localStorage.getItem(key);
-      if (!stored) return;
+      if (!stored) { hasLoadedHelpStatesRef.current = true; return; }
       const parsed = JSON.parse(stored);
       const now = Date.now();
       const updated = {};
@@ -1686,6 +1687,7 @@ export default function X() {
         setRequestStates(updated);
       }
     } catch (e) { /* ignore corrupted storage */ }
+    hasLoadedHelpStatesRef.current = true;
   }, [currentTableId, HELP_COOLDOWN_SECONDS]);
   const [cardActionModal, setCardActionModal] = useState(null); // HD-01v3: null or card type string
   // Structure: { call_waiter: { status: 'idle'|'sending'|'pending'|'repeat'|'resolved', sentAt: timestamp, message?: string }, ... }
@@ -1847,7 +1849,7 @@ export default function X() {
 
   // HD-05: Persist requestStates to localStorage on change
   useEffect(() => {
-    if (!currentTableId) return;
+    if (!currentTableId || !hasLoadedHelpStatesRef.current) return; // HD-10: skip until load completes
     const key = `helpdrawer_${currentTableId}`;
     const persistable = {};
     for (const [type, state] of Object.entries(requestStates)) {
@@ -3914,7 +3916,7 @@ export default function X() {
             {/* HD-08: Active requests summary block */}
             {pendingRequests.length >= 2 && (
               <div className="bg-[#F5E6E0] text-slate-700 text-sm rounded-lg p-3 space-y-1">
-                <div className="font-medium">{t('help.active_requests', 'Активные запросы')}: {pendingRequests.length}</div>
+                <div className="font-medium">Активные запросы · {pendingRequests.length}</div>
                 {pendingRequests.map(({ type, sentAt, message }) => (
                   <div key={type} className="text-slate-600">
                     {HELP_CARD_LABELS[type] || type}{message ? ` "${message.slice(0, 30)}${message.length > 30 ? '...' : ''}"` : ''} · {getRelativeTime(sentAt)}
@@ -3945,9 +3947,6 @@ export default function X() {
                       'bg-white border-slate-200 active:border-blue-400 active:bg-blue-50'
                     } disabled:cursor-not-allowed`}
                   >
-                    {status === 'pending' && (
-                      <span className="absolute top-1.5 right-1.5 text-[10px] font-bold text-[#B5543A]">✓</span>
-                    )}
                     {status === 'sending' ? (
                       <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
                     ) : card.id === 'napkins' ? (
@@ -3986,9 +3985,6 @@ export default function X() {
                       'bg-white border-slate-200 active:border-blue-400 active:bg-blue-50'
                     } disabled:cursor-not-allowed`}
                   >
-                    {otherStatus === 'pending' && (
-                      <span className="absolute top-1.5 right-1.5 text-[10px] font-bold text-[#B5543A]">✓</span>
-                    )}
                     {otherStatus === 'sending' ? (
                       <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
                     ) : (
