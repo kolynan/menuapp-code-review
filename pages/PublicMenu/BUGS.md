@@ -139,6 +139,19 @@ session: 205
 
 ## Fixed Bugs (исправлены)
 
+### FIX-CHAIN-8992: Help Drawer Phase 1 — Ticket Board Architecture (#214) — FIXED S211
+- **Когда:** S211, chain publicmenu-260331-221017-8992
+- **Файлы:** x.jsx
+- **Фиксы:**
+  - Fix 1 (P1-CRIT): Architecture — ticket board "Мои запросы" section replaces HD-08 summary, cards always idle, cardActionModal removed
+  - Fix 2 (P1-CRIT): State model expanded — lastReminderAt, reminderCount, remindCooldownUntil; "other" type converted to array
+  - Fix 3 (P1): Smart redirect — re-tap scrolls to ticket board with amber highlight + toast
+  - Fix 4 (P1): Anti-spam — handleRemind with 40s cooldown, countdown in ticket row, handleResolve for manual dismissal
+  - Fix 5 (P2): Anxiety copy "Статус обновляется автоматически"
+  - Fix 6 (P1): Collapse at 4+ threshold (show 2 + toggle), sort by sentAt ascending
+  - Fix 7 (SKIP): Paid gate — partner.plan not available in x.jsx
+  - Extra: getRelativeTime "Ждёте X мин" after 10min, timer granularity 1s for remind cooldowns, pendingRequests replaced by activeRequests
+
 ### FIX-CHAIN-a1d6: Help Drawer Mini-Ticket Board UX (HD-01..HD-08) — FIXED S207
 - **Когда:** S207, chain publicmenu-260330-213949-a1d6
 - **Файлы:** x.jsx

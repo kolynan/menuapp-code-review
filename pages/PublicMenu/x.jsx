@@ -1673,12 +1673,26 @@ export default function X() {
       const now = Date.now();
       const updated = {};
       for (const [type, state] of Object.entries(parsed)) {
+        if (type === 'other' && Array.isArray(state)) {
+          const validEntries = state.filter(entry => {
+            if (!entry.sentAt) return false;
+            const cooldownMs = (HELP_COOLDOWN_SECONDS['other'] || 120) * 1000;
+            const elapsed = now - entry.sentAt;
+            return elapsed < cooldownMs + 60000;
+          }).map(entry => {
+            const cooldownMs = (HELP_COOLDOWN_SECONDS['other'] || 120) * 1000;
+            const elapsed = now - entry.sentAt;
+            return elapsed >= cooldownMs ? { ...entry, status: 'repeat' } : { ...entry };
+          });
+          if (validEntries.length > 0) updated.other = validEntries;
+          continue;
+        }
         const cooldownMs = (HELP_COOLDOWN_SECONDS[type] || 120) * 1000;
         if ((state.status === 'pending' || state.status === 'repeat') && state.sentAt) {
           const elapsed = now - state.sentAt;
           if (elapsed < cooldownMs + 60000) {
             updated[type] = elapsed >= cooldownMs
-              ? { status: 'repeat', sentAt: state.sentAt }
+              ? { ...state, status: 'repeat' }
               : { ...state };
           }
         }
@@ -1689,31 +1703,51 @@ export default function X() {
     } catch (e) { /* ignore corrupted storage */ }
     hasLoadedHelpStatesRef.current = true;
   }, [currentTableId, HELP_COOLDOWN_SECONDS]);
-  const [cardActionModal, setCardActionModal] = useState(null); // HD-01v3: null or card type string
-  // Structure: { call_waiter: { status: 'idle'|'sending'|'pending'|'repeat'|'resolved', sentAt: timestamp, message?: string }, ... }
+  // Structure: { call_waiter: { status: 'idle'|'sending'|'pending'|'repeat', sentAt, lastReminderAt, reminderCount, remindCooldownUntil, message? }, other: [...array of entries...] }
   const [undoToast, setUndoToast] = useState(null); // { type, expiresAt, timeoutId }
   const [showOtherForm, setShowOtherForm] = useState(false);
   const [timerTick, setTimerTick] = useState(0);
   const pendingQuickSendRef = useRef(null);
+  const ticketBoardRef = useRef(null); // Fix 3: ref for scroll-to-ticket-board
+  const [highlightedTicket, setHighlightedTicket] = useState(null); // Fix 3: amber highlight on re-tap
+  const [isTicketExpanded, setIsTicketExpanded] = useState(false); // Fix 6: collapse toggle
 
   // HD-03: Relative time helper
   const getRelativeTime = useCallback((sentAtMs) => {
     const seconds = Math.floor((Date.now() - sentAtMs) / 1000);
     if (seconds < 60) return t('help.just_now', 'Только что');
-    return `${Math.floor(seconds / 60)} ${t('help.min_ago', 'мин назад')}`;
+    const mins = Math.floor(seconds / 60);
+    if (seconds >= 600) return `${t('help.waiting', 'Ждёте')} ${mins} ${t('help.min_short', 'мин')}`;
+    return `${mins} ${t('help.min_ago', 'мин назад')}`;
   }, [t, timerTick]);
 
-  // HD-07: Active request count for badge
-  const activeRequestCount = useMemo(() =>
-    Object.values(requestStates).filter(s => s.status === 'pending' || s.status === 'sending').length,
-  [requestStates]);
+  // HD-07: Active request count for badge (uses activeRequests)
+  const activeRequestCount = useMemo(() => activeRequests.length, [activeRequests]);
 
-  // HD-08: Pending requests list for summary
-  const pendingRequests = useMemo(() =>
-    Object.entries(requestStates)
-      .filter(([_, s]) => s.status === 'pending')
-      .map(([type, s]) => ({ type, sentAt: s.sentAt, message: s.message })),
-  [requestStates]);
+  // Ticket board: active requests list (pending, sending, repeat) sorted by sentAt ascending
+  const activeRequests = useMemo(() => {
+    const list = [];
+    for (const [type, state] of Object.entries(requestStates)) {
+      if (type === 'other') {
+        // other is an array of entries
+        if (Array.isArray(state)) {
+          state.forEach(entry => {
+            if (entry.status === 'pending' || entry.status === 'sending' || entry.status === 'repeat') {
+              list.push({ type: 'other', id: entry.id, ...entry });
+            }
+          });
+        } else if (state && (state.status === 'pending' || state.status === 'sending' || state.status === 'repeat')) {
+          // backward compat: single object
+          list.push({ type: 'other', id: 'other-0', ...state });
+        }
+        continue;
+      }
+      if (state && (state.status === 'pending' || state.status === 'sending' || state.status === 'repeat')) {
+        list.push({ type, id: type, ...state });
+      }
+    }
+    return list.sort((a, b) => (a.sentAt || 0) - (b.sentAt || 0));
+  }, [requestStates]);
 
   // PM-126/PM-125: Help drawer open/close with overlay stack integration
   // PM-133: Guard for null currentTableId — redirect to table code entry
@@ -1730,6 +1764,14 @@ export default function X() {
       const now = Date.now();
       const filtered = {};
       for (const [type, state] of Object.entries(stored)) {
+        if (type === 'other' && Array.isArray(state)) {
+          const validEntries = state.filter(e => e.sentAt && (now - e.sentAt) < maxCooldownMs).map(e => {
+            const cooldownMs = (HELP_COOLDOWN_SECONDS['other'] || 120) * 1000;
+            return { ...e, status: (now - e.sentAt) >= cooldownMs ? 'repeat' : e.status };
+          });
+          if (validEntries.length > 0) filtered.other = validEntries;
+          continue;
+        }
         if (state.sentAt && (now - state.sentAt) < maxCooldownMs) {
           const cooldownMs = (HELP_COOLDOWN_SECONDS[type] || 120) * 1000;
           filtered[type] = {
@@ -1765,7 +1807,7 @@ export default function X() {
     if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId);
 
     // Set card to sending visually immediately
-    setRequestStates(prev => ({ ...prev, [type]: { status: 'sending', sentAt: Date.now() } }));
+    setRequestStates(prev => ({ ...prev, [type]: { status: 'sending', sentAt: Date.now(), lastReminderAt: null, reminderCount: 0, remindCooldownUntil: null } }));
 
     // Schedule actual send after 5s (undo window)
     const timeoutId = setTimeout(() => {
@@ -1783,12 +1825,50 @@ export default function X() {
     if (!undoToast) return;
     clearTimeout(undoToast.timeoutId);
     setRequestStates(prev => {
+      if (undoToast.type === 'other' && undoToast.otherId && Array.isArray(prev.other)) {
+        const otherArr = prev.other.filter(e => e.id !== undoToast.otherId);
+        return { ...prev, other: otherArr.length > 0 ? otherArr : [] };
+      }
       const next = { ...prev };
       delete next[undoToast.type];
       return next;
     });
     setUndoToast(null);
   }, [undoToast]);
+
+  // Fix 4A: handleRemind — send reminder without undo, update cooldown
+  const REMIND_COOLDOWN_MS = 40000; // 40 seconds
+  const handleRemind = useCallback((type, otherId) => {
+    const now = Date.now();
+    setRequestStates(prev => {
+      if (type === 'other' && otherId && Array.isArray(prev.other)) {
+        const otherArr = prev.other.map(e => e.id === otherId ? {
+          ...e, lastReminderAt: now, reminderCount: (e.reminderCount || 0) + 1, remindCooldownUntil: now + REMIND_COOLDOWN_MS
+        } : e);
+        return { ...prev, other: otherArr };
+      }
+      const current = prev[type];
+      if (!current) return prev;
+      return { ...prev, [type]: { ...current, lastReminderAt: now, reminderCount: (current.reminderCount || 0) + 1, remindCooldownUntil: now + REMIND_COOLDOWN_MS } };
+    });
+    // Send reminder immediately (no undo)
+    pendingQuickSendRef.current = type;
+    handlePresetSelect(type);
+    toast({ description: t('help.reminder_sent', 'Напоминание отправлено'), duration: 2000 });
+  }, [handlePresetSelect, t, toast]);
+
+  // Fix 3: Handle resolve (mark request as done by guest)
+  const handleResolve = useCallback((type, otherId) => {
+    setRequestStates(prev => {
+      if (type === 'other' && otherId && Array.isArray(prev.other)) {
+        const otherArr = prev.other.filter(e => e.id !== otherId);
+        return { ...prev, other: otherArr.length > 0 ? otherArr : [] };
+      }
+      const next = { ...prev };
+      delete next[type];
+      return next;
+    });
+  }, []);
 
   // HD-01: Auto-submit when selectedHelpType matches pending quick send
   useEffect(() => {
@@ -1797,10 +1877,22 @@ export default function X() {
       pendingQuickSendRef.current = null;
       const result = submitHelpRequest();
       const onSuccess = () => {
-        setRequestStates(prev => ({ ...prev, [type]: { ...prev[type], status: 'pending', sentAt: prev[type]?.sentAt || Date.now() } }));
+        setRequestStates(prev => {
+          if (type === 'other' && Array.isArray(prev.other)) {
+            // Mark the latest sending entry as pending
+            const otherArr = prev.other.map(e => e.status === 'sending' ? { ...e, status: 'pending' } : e);
+            return { ...prev, other: otherArr };
+          }
+          return { ...prev, [type]: { ...prev[type], status: 'pending', sentAt: prev[type]?.sentAt || Date.now(), lastReminderAt: prev[type]?.lastReminderAt || null, reminderCount: prev[type]?.reminderCount || 0, remindCooldownUntil: prev[type]?.remindCooldownUntil || null } };
+        });
       };
       const onError = () => {
         setRequestStates(prev => {
+          if (type === 'other' && Array.isArray(prev.other)) {
+            // Remove sending entries on error
+            const otherArr = prev.other.filter(e => e.status !== 'sending');
+            return { ...prev, other: otherArr.length > 0 ? otherArr : [] };
+          }
           const next = { ...prev };
           delete next[type];
           return next;
@@ -1814,10 +1906,22 @@ export default function X() {
     }
   }, [selectedHelpType, submitHelpRequest]);
 
-  // HD-02 + HD-03: Timer interval — update timers every 30s + check cooldown transitions
+  // HD-02 + HD-03: Timer interval — update timers + check cooldown transitions + remind countdown
+  const hasAnyRemindCooldown = useMemo(() => {
+    const now = Date.now();
+    for (const [type, state] of Object.entries(requestStates)) {
+      if (type === 'other' && Array.isArray(state)) {
+        if (state.some(e => e.remindCooldownUntil && e.remindCooldownUntil > now)) return true;
+        continue;
+      }
+      if (state?.remindCooldownUntil && state.remindCooldownUntil > now) return true;
+    }
+    return false;
+  }, [requestStates, timerTick]);
+
   useEffect(() => {
-    const hasPendingOrSending = Object.values(requestStates).some(s => s.status === 'pending' || s.status === 'sending');
-    if (!hasPendingOrSending && !undoToast) return;
+    const hasActive = activeRequests.length > 0;
+    if (!hasActive && !undoToast && !hasAnyRemindCooldown) return;
     const interval = setInterval(() => {
       setTimerTick(t => t + 1);
       // HD-02: Check cooldown transitions pending → repeat
@@ -1826,7 +1930,21 @@ export default function X() {
         let changed = false;
         const next = { ...prev };
         for (const [type, state] of Object.entries(next)) {
-          if (state.status === 'pending' && state.sentAt) {
+          if (type === 'other' && Array.isArray(state)) {
+            const updatedOther = state.map(entry => {
+              if (entry.status === 'pending' && entry.sentAt) {
+                const cooldownMs = (HELP_COOLDOWN_SECONDS['other'] || 120) * 1000;
+                if ((now - entry.sentAt) >= cooldownMs) {
+                  changed = true;
+                  return { ...entry, status: 'repeat' };
+                }
+              }
+              return entry;
+            });
+            if (changed) next.other = updatedOther;
+            continue;
+          }
+          if (state && state.status === 'pending' && state.sentAt) {
             const cooldownMs = (HELP_COOLDOWN_SECONDS[type] || 120) * 1000;
             if ((now - state.sentAt) >= cooldownMs) {
               next[type] = { ...state, status: 'repeat' };
@@ -1836,9 +1954,9 @@ export default function X() {
         }
         return changed ? next : prev;
       });
-    }, undoToast ? 1000 : 30000);
+    }, (undoToast || hasAnyRemindCooldown) ? 1000 : 30000);
     return () => clearInterval(interval);
-  }, [requestStates, undoToast, HELP_COOLDOWN_SECONDS]);
+  }, [requestStates, undoToast, HELP_COOLDOWN_SECONDS, hasAnyRemindCooldown, activeRequests.length]);
 
   // HD-03: Recalculate on visibility change (tab return)
   useEffect(() => {
@@ -1853,7 +1971,12 @@ export default function X() {
     const key = `helpdrawer_${currentTableId}`;
     const persistable = {};
     for (const [type, state] of Object.entries(requestStates)) {
-      if (state.status === 'pending' || state.status === 'repeat') {
+      if (type === 'other' && Array.isArray(state)) {
+        const activeOthers = state.filter(e => e.status === 'pending' || e.status === 'repeat');
+        if (activeOthers.length > 0) persistable.other = activeOthers;
+        continue;
+      }
+      if (state && (state.status === 'pending' || state.status === 'repeat')) {
         persistable[type] = state;
       }
     }
@@ -3913,18 +4036,93 @@ export default function X() {
                 <span>{currentTable?.name || currentTable?.code}</span>
               </div>
             )}
-            {/* HD-08: Active requests summary block */}
-            {pendingRequests.length >= 2 && (
-              <div className="bg-[#F5E6E0] text-slate-700 text-sm rounded-lg p-3 space-y-1">
-                <div className="font-medium">Активные запросы · {pendingRequests.length}</div>
-                {pendingRequests.map(({ type, sentAt, message }) => (
-                  <div key={type} className="text-slate-600">
-                    {HELP_CARD_LABELS[type] || type}{message ? ` "${message.slice(0, 30)}${message.length > 30 ? '...' : ''}"` : ''} · {getRelativeTime(sentAt)}
-                  </div>
-                ))}
+            {/* Ticket board: "Мои запросы" section (Fix 1E + Fix 5 + Fix 6) */}
+            {activeRequests.length > 0 && (
+              <div ref={ticketBoardRef} className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-gray-700">{t('help.my_requests', 'Мои запросы')}</span>
+                  <span className="text-xs text-gray-400">{activeRequests.length} {t('help.active_count', 'активных')}</span>
+                </div>
+                {/* Ticket rows — sorted by sentAt asc, collapse at 4+ */}
+                {(() => {
+                  const showAll = activeRequests.length <= 3 || isTicketExpanded;
+                  const visibleRequests = showAll ? activeRequests : activeRequests.slice(0, 2);
+                  return (
+                    <>
+                      {visibleRequests.map(req => {
+                        const isHighlighted = highlightedTicket === req.id;
+                        const cooldownActive = req.remindCooldownUntil && req.remindCooldownUntil > Date.now();
+                        const cooldownSec = cooldownActive ? Math.ceil((req.remindCooldownUntil - Date.now()) / 1000) : 0;
+                        const cooldownMin = Math.floor(cooldownSec / 60);
+                        const cooldownSecRem = cooldownSec % 60;
+                        return (
+                          <div
+                            key={req.id}
+                            className={`rounded-lg border p-3 mb-2 transition-colors duration-300 ${isHighlighted ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200'}`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium text-slate-800">
+                                  {HELP_CARD_LABELS[req.type] || req.type}
+                                  {req.message ? ` — "${req.message.slice(0, 30)}${req.message.length > 30 ? '...' : ''}"` : ''}
+                                </div>
+                                <div className="text-xs text-slate-500 mt-0.5">
+                                  {getRelativeTime(req.sentAt)}
+                                  {req.reminderCount > 0 && (
+                                    <span className="ml-2">{req.reminderCount} {t('help.reminders', 'напоминаний')}{req.lastReminderAt ? ` · ${t('help.last', 'последнее')} ${getRelativeTime(req.lastReminderAt)}` : ''}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 ml-2 shrink-0">
+                                {/* Fix 4B: Remind button with cooldown */}
+                                <button
+                                  onClick={() => handleRemind(req.type, req.type === 'other' ? req.id : undefined)}
+                                  disabled={cooldownActive}
+                                  className={`text-xs font-medium px-3 min-h-[44px] rounded-lg ${cooldownActive ? 'text-slate-400 bg-slate-100' : 'text-[#B5543A] bg-[#F5E6E0] active:bg-[#EEDDD7]'}`}
+                                >
+                                  {cooldownActive ? `${t('help.retry_in', 'Повторить через')} ${cooldownMin > 0 ? `${cooldownMin}:` : ''}${String(cooldownSecRem).padStart(2, '0')}` : t('help.remind', 'Напомнить')}
+                                </button>
+                                {/* Resolve button */}
+                                <button
+                                  onClick={() => handleResolve(req.type, req.type === 'other' ? req.id : undefined)}
+                                  className="text-xs text-slate-400 px-2 min-h-[44px] rounded-lg active:bg-slate-100"
+                                >
+                                  {t('help.resolved', 'Готово')}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {/* Fix 6A: Collapse toggle */}
+                      {activeRequests.length >= 4 && !isTicketExpanded && (
+                        <button
+                          onClick={() => setIsTicketExpanded(true)}
+                          className="w-full text-center text-xs text-blue-500 py-2 min-h-[36px]"
+                        >
+                          {t('help.show_more', 'Ещё')} {activeRequests.length - 2} {t('help.requests', 'запросов')}
+                        </button>
+                      )}
+                      {activeRequests.length >= 4 && isTicketExpanded && (
+                        <button
+                          onClick={() => setIsTicketExpanded(false)}
+                          className="w-full text-center text-xs text-blue-500 py-2 min-h-[36px]"
+                        >
+                          {t('help.show_less', 'Свернуть')}
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
+                {/* Fix 5: Anxiety copy */}
+                <p className="text-xs text-gray-400 mt-1 text-center">{t('help.status_auto_update', 'Статус обновляется автоматически')}</p>
               </div>
             )}
-            {/* HD-01: Per-card state help cards */}
+            {/* Fix 1F: Conditional "Отправить ещё" header */}
+            {activeRequests.length > 0 && (
+              <span className="text-sm font-semibold text-gray-700">{t('help.send_more', 'Отправить ещё')}</span>
+            )}
+            {/* HD-01: Per-card state help cards — always idle (Fix 1C/1D) */}
             <div className="grid grid-cols-2 gap-3">
               {[
                 { id: 'call_waiter', emoji: '\uD83D\uDE4B', label: t('help.call_waiter', 'Позвать официанта') },
@@ -3934,79 +4132,46 @@ export default function X() {
               ].map(card => {
                 const st = requestStates[card.id];
                 const status = st?.status || 'idle';
-                const isDisabled = status === 'sending';
                 return (
                   <button
                     key={card.id}
-                    onClick={() => status === 'pending' ? setCardActionModal(card.id) : (status === 'idle' || status === 'repeat' ? handleCardTap(card.id) : null)}
-                    disabled={isDisabled}
-                    className={`relative rounded-xl border min-h-[80px] flex flex-col items-center justify-center gap-1 ${
-                      status === 'pending' ? 'bg-[#F5E6E0] border-[#E8CFC7]' :
-                      status === 'sending' ? 'bg-slate-50 border-slate-200' :
-                      status === 'repeat' ? 'bg-white border-amber-300' :
-                      'bg-white border-slate-200 active:border-blue-400 active:bg-blue-50'
-                    } disabled:cursor-not-allowed`}
+                    onClick={() => {
+                      // Fix 3: Smart redirect — if active, scroll to ticket board
+                      if (status !== 'idle') {
+                        ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth' });
+                        setHighlightedTicket(card.id);
+                        setTimeout(() => setHighlightedTicket(null), 1500);
+                        toast({ description: t('help.already_sent', 'Запрос уже отправлен — смотри выше'), duration: 2000 });
+                        return;
+                      }
+                      handleCardTap(card.id);
+                    }}
+                    className="relative rounded-xl border min-h-[80px] flex flex-col items-center justify-center gap-1 bg-white border-slate-200 active:border-blue-400 active:bg-blue-50"
                   >
-                    {status === 'sending' ? (
-                      <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-                    ) : card.id === 'napkins' ? (
+                    {card.id === 'napkins' ? (
                       <Layers className="w-6 h-6 text-slate-500" />
                     ) : (
                       <span className="text-2xl">{card.emoji}</span>
                     )}
                     <span className="text-sm font-medium text-slate-700 text-center px-1">
-                      {status === 'sending' ? t('help.sending', 'Отправляем...') :
-                       status === 'repeat' ? t('help.remind_staff', 'Напомнить персоналу') :
-                       card.label}
+                      {card.label}
                     </span>
-                    {status === 'pending' && st?.sentAt && (
-                      <span className="text-[11px] text-[#B5543A] leading-none">✓ {getRelativeTime(st.sentAt)}</span>
-                    )}
                   </button>
                 );
               })}
-              {/* "Другое" card — col-span-2 with per-card state */}
-              {(() => {
-                const otherSt = requestStates['other'];
-                const otherStatus = otherSt?.status || 'idle';
-                const otherDisabled = otherStatus === 'sending' || otherStatus === 'pending';
-                return (
-                  <button
-                    onClick={() => {
-                      if (otherStatus === 'idle' || otherStatus === 'repeat') {
-                        setShowOtherForm(prev => !prev);
-                      }
-                    }}
-                    disabled={otherDisabled}
-                    className={`relative col-span-2 rounded-xl border min-h-[48px] flex flex-row items-center justify-center gap-2 ${
-                      otherStatus === 'pending' ? 'bg-[#F5E6E0] border-[#E8CFC7]' :
-                      otherStatus === 'sending' ? 'bg-slate-50 border-slate-200' :
-                      otherStatus === 'repeat' ? 'bg-white border-amber-300' :
-                      'bg-white border-slate-200 active:border-blue-400 active:bg-blue-50'
-                    } disabled:cursor-not-allowed`}
-                  >
-                    {otherStatus === 'sending' ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-                    ) : (
-                      <span className="text-xl">{'\u270F\uFE0F'}</span>
-                    )}
-                    <span className="text-sm font-medium text-slate-700">
-                      {otherStatus === 'sending' ? t('help.sending', 'Отправляем...') :
-                       otherStatus === 'repeat' ? t('help.remind_staff', 'Напомнить персоналу') :
-                       otherStatus === 'pending' && otherSt?.message
-                         ? `✓ "${otherSt.message.slice(0, 25)}${otherSt.message.length > 25 ? '...' : ''}"` :
-                       otherStatus === 'pending' ? t('help.other', 'Другое') :
-                       t('help.other', 'Другое')}
-                    </span>
-                    {otherStatus === 'pending' && otherSt?.sentAt && (
-                      <span className="text-[11px] text-[#B5543A] ml-1 leading-none">✓ {getRelativeTime(otherSt.sentAt)}</span>
-                    )}
-                  </button>
-                );
-              })()}
+              {/* "Другое" card — always idle (Fix 1D), always toggles form */}
+              <button
+                onClick={() => setShowOtherForm(prev => !prev)}
+                className="relative col-span-2 rounded-xl border min-h-[48px] flex flex-row items-center justify-center gap-2 bg-white border-slate-200 active:border-blue-400 active:bg-blue-50"
+              >
+                <span className="text-xl">{'\u270F\uFE0F'}</span>
+                <span className="text-sm font-medium text-slate-700">
+                  {t('help.other', 'Другое')}
+                </span>
+              </button>
             </div>
             {/* HD-04: "Другое" expanded form with chips + textarea */}
-            {showOtherForm && (!requestStates['other'] || requestStates['other']?.status === 'idle' || requestStates['other']?.status === 'repeat') && (
+            {showOtherForm && (
               <div className="space-y-3 pt-1">
                 <div className="flex flex-wrap gap-2">
                   {HELP_CHIPS.map(chip => (
@@ -4044,7 +4209,7 @@ export default function X() {
             )}
           </div>
           {/* HD-04: Sticky submit area for "Другое" form — dual buttons */}
-          {showOtherForm && (!requestStates['other'] || requestStates['other']?.status === 'idle' || requestStates['other']?.status === 'repeat') && (
+          {showOtherForm && (
             <div className="px-4 pb-4 pt-2 border-t border-slate-100 flex gap-3">
               <Button
                 variant="outline"
@@ -4061,13 +4226,17 @@ export default function X() {
                   const msg = helpComment.trim();
                   // Use undo flow: set sending + schedule actual send
                   if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId);
-                  setRequestStates(prev => ({ ...prev, other: { status: 'sending', sentAt: Date.now(), message: msg } }));
+                  const entryId = Date.now().toString();
+                  setRequestStates(prev => {
+                    const otherArr = Array.isArray(prev.other) ? prev.other : (prev.other ? [prev.other] : []);
+                    return { ...prev, other: [...otherArr, { id: entryId, status: 'sending', sentAt: Date.now(), lastReminderAt: null, reminderCount: 0, remindCooldownUntil: null, message: msg }] };
+                  });
                   const timeoutId = setTimeout(() => {
                     pendingQuickSendRef.current = 'other';
                     handlePresetSelect('other');
                     setUndoToast(null);
                   }, 5000);
-                  setUndoToast({ type: 'other', expiresAt: Date.now() + 5000, timeoutId });
+                  setUndoToast({ type: 'other', otherId: entryId, expiresAt: Date.now() + 5000, timeoutId });
                   setShowOtherForm(false);
                   setHelpComment('');
                 }}
@@ -4077,56 +4246,7 @@ export default function X() {
               </Button>
             </div>
           )}
-          {/* HD-01v3: Card action modal — shown when tapping a pending card */}
-          {cardActionModal && (() => {
-            const cardState = requestStates[cardActionModal];
-            const cardLabel = HELP_CARD_LABELS[cardActionModal] || cardActionModal;
-            return (
-              <div
-                className="fixed inset-0 z-[70] flex flex-col justify-end bg-black/30"
-                onClick={() => setCardActionModal(null)}
-              >
-                <div
-                  className="bg-white rounded-t-2xl px-4 pt-4 pb-8 space-y-2"
-                  onClick={e => e.stopPropagation()}
-                >
-                  <div className="text-center pb-2">
-                    <p className="font-semibold text-slate-900">{cardLabel}</p>
-                    {cardState?.sentAt && (
-                      <p className="text-sm text-slate-500">{t('help.sent_suffix', 'отправлено')} {getRelativeTime(cardState.sentAt)}</p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => { handleCardTap(cardActionModal); setCardActionModal(null); }}
-                    className="w-full rounded-xl bg-[#F5E6E0] py-4 text-sm font-medium text-[#B5543A] flex items-center justify-center gap-2 min-h-[52px]"
-                  >
-                    <Bell className="w-4 h-4" />
-                    {t('help.remind_staff', 'Напомнить персоналу')}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setRequestStates(prev => {
-                        const next = { ...prev };
-                        delete next[cardActionModal];
-                        return next;
-                      });
-                      setCardActionModal(null);
-                    }}
-                    className="w-full rounded-xl bg-red-50 py-4 text-sm font-medium text-red-600 flex items-center justify-center gap-2 min-h-[52px]"
-                  >
-                    <XIcon className="w-4 h-4" />
-                    {t('help.cancel_request', 'Больше не надо')}
-                  </button>
-                  <button
-                    onClick={() => setCardActionModal(null)}
-                    className="w-full py-3 text-sm text-slate-400 min-h-[44px]"
-                  >
-                    {t('common.close', 'Закрыть')}
-                  </button>
-                </div>
-              </div>
-            );
-          })()}
+          {/* cardActionModal removed — replaced by ticket board + smart redirect (Fix 1B) */}
         </DrawerContent>
       </Drawer>
 
