@@ -1317,6 +1317,7 @@ function OrderGroupCard({
   activeRequests,
   onCloseAllOrders,
   onCloseRequest,
+  orderStages = [],
 }) {
   const queryClient = useQueryClient();
 
@@ -1340,6 +1341,28 @@ function OrderGroupCard({
   // Section arrays for expanded card (Fix 3)
   const newOrders = useMemo(() => activeOrders.filter(o => getStatusConfig(o).isFirstStage), [activeOrders, getStatusConfig]);
   const inProgressOrders = useMemo(() => activeOrders.filter(o => !getStatusConfig(o).isFirstStage), [activeOrders, getStatusConfig]);
+
+  // Sub-group inProgressOrders by stage_id (Fix 1B)
+  const subGroups = useMemo(() => {
+    const groups = {};
+    for (const order of inProgressOrders) {
+      const sid = getLinkId(order.stage_id) || '__null__';
+      if (!groups[sid]) groups[sid] = [];
+      groups[sid].push(order);
+    }
+    return Object.entries(groups)
+      .map(([sid, orders]) => {
+        const cfg = getStatusConfig(orders[0]);
+        return { sid, orders, cfg };
+      })
+      .sort((a, b) => {
+        if (a.sid === '__null__') return 1;
+        if (b.sid === '__null__') return -1;
+        const idxA = orderStages.length > 0 ? orderStages.findIndex(s => getLinkId(s.id) === a.sid) : -1;
+        const idxB = orderStages.length > 0 ? orderStages.findIndex(s => getLinkId(s.id) === b.sid) : -1;
+        return idxB - idxA;
+      });
+  }, [inProgressOrders, getStatusConfig, orderStages]);
 
   // Fetch items only when expanded (lazy load — prevents API rate limit on mount)
   const itemResults = useQueries({
@@ -1453,6 +1476,14 @@ function OrderGroupCard({
   const [billExpanded, setBillExpanded] = useState(false);
   const [completedExpanded, setCompletedExpanded] = useState(false);
   const [inProgressExpanded, setInProgressExpanded] = useState(false);
+  const [expandedSubGroups, setExpandedSubGroups] = useState({});
+
+  // Auto-expand first sub-group when section opens
+  useEffect(() => {
+    if (inProgressExpanded && Object.keys(expandedSubGroups).length === 0 && subGroups.length > 0) {
+      setExpandedSubGroups({ [subGroups[0].sid]: true });
+    }
+  }, [inProgressExpanded, subGroups]);
 
   // Auto-select most urgent order (new > ready > cooking, oldest first)
   const autoSelected = useMemo(() => {
@@ -1742,24 +1773,39 @@ function OrderGroupCard({
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 ${config.badgeClass || ''}`} style={badgeStyle}>{config.label}</Badge>
                           <span className="text-red-500 text-sm font-bold">(!)</span>
-                          {config.actionLabel && (
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); handleBatchAction([order]); }}
-                              disabled={advanceMutation.isPending}
-                              className="text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 px-3 py-1 rounded min-h-[36px] disabled:opacity-60"
-                            >
-                              {config.actionLabel}
-                            </button>
-                          )}
                         </div>
                       </div>
-                      <div className="text-sm text-slate-600">
-                        {orderItems.length > 0
-                          ? orderItems.map(i => `${i.dish_name}\u00D7${i.quantity}`).join(', ')
-                          : <span className="text-slate-400 italic">{'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430...'}</span>
-                        }
-                      </div>
+                      {orderItems.length > 0 ? (
+                        <div className="mt-1 space-y-0.5">
+                          {orderItems.map((item, idx) => (
+                            <div key={item.id || idx} className="text-xs text-slate-500">
+                              · {item.dish_name} ×{item.quantity}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-400 mt-1">{'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430...'}</div>
+                      )}
+                      {(config.actionLabel || config.isFinishStage) && (() => {
+                        const n = orderItems.length;
+                        const dishWord = n === 1 ? '\u0431\u043B\u044E\u0434\u043E' : (n >= 2 && n <= 4) ? '\u0431\u043B\u044E\u0434\u0430' : '\u0431\u043B\u044E\u0434';
+                        return (
+                          <div className="mt-2 pt-1.5 border-t border-slate-100 flex justify-end">
+                            <button
+                              className="text-xs px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium min-h-[36px]"
+                              onClick={(e) => { e.stopPropagation(); handleBatchAction([order]); }}
+                              disabled={advanceMutation.isPending}
+                            >
+                              {advanceMutation.isPending
+                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                : n > 0
+                                  ? `\u0412\u0441\u0435 ${n} ${dishWord}`
+                                  : (config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')
+                              }
+                            </button>
+                          </div>
+                        );
+                      })()}
                       {order.order_number && (
                         <div className="text-[10px] text-slate-400 mt-1 text-right">{order.order_number}</div>
                       )}
@@ -1804,26 +1850,39 @@ function OrderGroupCard({
                           <span className="text-sm font-medium text-slate-800">{guestName(order)}</span>
                           <span className="text-xs text-slate-400">{orderTime}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 ${config.badgeClass || ''}`} style={badgeStyle}>{config.label}</Badge>
-                          {(config.actionLabel || config.isFinishStage) && (
+                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 ${config.badgeClass || ''}`} style={badgeStyle}>{config.label}</Badge>
+                      </div>
+                      {orderItems.length > 0 ? (
+                        <div className="mt-1 space-y-0.5">
+                          {orderItems.map((item, idx) => (
+                            <div key={item.id || idx} className="text-xs text-slate-500">
+                              · {item.dish_name} ×{item.quantity}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-400 mt-1">{'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430...'}</div>
+                      )}
+                      {(config.actionLabel || config.isFinishStage) && (() => {
+                        const n = orderItems.length;
+                        const dishWord = n === 1 ? '\u0431\u043B\u044E\u0434\u043E' : (n >= 2 && n <= 4) ? '\u0431\u043B\u044E\u0434\u0430' : '\u0431\u043B\u044E\u0434';
+                        return (
+                          <div className="mt-2 pt-1.5 border-t border-slate-100 flex justify-end">
                             <button
-                              type="button"
+                              className="text-xs px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium min-h-[36px]"
                               onClick={(e) => { e.stopPropagation(); handleBatchAction([order]); }}
                               disabled={advanceMutation.isPending}
-                              className="text-xs font-semibold text-white bg-green-600 hover:bg-green-700 active:scale-95 px-3 py-1 rounded min-h-[36px] disabled:opacity-60"
                             >
-                              {config.actionLabel || (group.type === 'table' ? '\u041F\u043E\u0434\u0430\u043D\u043E' : '\u0412\u044B\u0434\u0430\u0442\u044C')}
+                              {advanceMutation.isPending
+                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                : n > 0
+                                  ? `\u0412\u0441\u0435 ${n} ${dishWord}`
+                                  : (config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')
+                              }
                             </button>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-sm text-slate-600">
-                        {orderItems.length > 0
-                          ? orderItems.map(i => `${i.dish_name}\u00D7${i.quantity}`).join(', ')
-                          : <span className="text-slate-400 italic">{'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430...'}</span>
-                        }
-                      </div>
+                          </div>
+                        );
+                      })()}
                       {order.order_number && (
                         <div className="text-[10px] text-slate-400 mt-1 text-right">{order.order_number}</div>
                       )}
@@ -1834,7 +1893,7 @@ function OrderGroupCard({
             </div>
           )}
 
-          {/* ═══ Section 3 — В работе (collapsed by default) ═══ */}
+          {/* ═══ Section 3 — В работе (collapsed by default, with sub-grouping) ═══ */}
           {inProgressOrders.length > 0 && (
             <div>
               <div
@@ -1847,46 +1906,161 @@ function OrderGroupCard({
                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${inProgressExpanded ? 'rotate-180' : ''}`} />
               </div>
               {inProgressExpanded && (
-                <div className="space-y-2">
-                  {inProgressOrders.map(order => {
-                    const config = getStatusConfig(order);
-                    const isSelected = selectedOrder?.id === order.id;
-                    const orderItems = itemsByOrder[order.id] || [];
-                    const orderTime = new Date(safeParseDate(order.created_date)).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
-                    const badgeStyle = config.color ? { backgroundColor: `${config.color}20`, borderColor: config.color, color: config.color } : undefined;
-                    return (
-                      <div
-                        key={order.id}
-                        className={`p-2.5 rounded-lg border cursor-pointer transition-colors ${isSelected ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
-                        onClick={() => setSelectedOrderId(order.id)}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-slate-800">{guestName(order)}</span>
-                            <span className="text-xs text-slate-400">{orderTime}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 ${config.badgeClass || ''}`} style={badgeStyle}>{config.label}</Badge>
-                            {config.actionLabel && (
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); handleBatchAction([order]); }}
-                                disabled={advanceMutation.isPending}
-                                className="text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 active:scale-95 px-3 py-1 rounded min-h-[36px] disabled:opacity-60"
+                <div className="space-y-3">
+                  {subGroups.map(({ sid, orders: sgOrders, cfg }) => {
+                    // Flatten rule: if only 1 sub-group, render flat without sub-headers
+                    if (subGroups.length === 1) {
+                      return (
+                        <div key={sid} className="space-y-2">
+                          {sgOrders.map(order => {
+                            const config = getStatusConfig(order);
+                            const isSelected = selectedOrder?.id === order.id;
+                            const orderItems = itemsByOrder[order.id] || [];
+                            const orderTime = new Date(safeParseDate(order.created_date)).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
+                            const badgeStyle = config.color ? { backgroundColor: `${config.color}20`, borderColor: config.color, color: config.color } : undefined;
+                            const n = orderItems.length;
+                            const dishWord = n === 1 ? '\u0431\u043B\u044E\u0434\u043E' : (n >= 2 && n <= 4) ? '\u0431\u043B\u044E\u0434\u0430' : '\u0431\u043B\u044E\u0434';
+                            return (
+                              <div
+                                key={order.id}
+                                className={`p-2.5 rounded-lg border cursor-pointer transition-colors ${isSelected ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                                onClick={() => setSelectedOrderId(order.id)}
                               >
-                                {config.actionLabel}
-                              </button>
-                            )}
+                                <div className="flex items-center justify-between mb-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-slate-800">{guestName(order)}</span>
+                                    <span className="text-xs text-slate-400">{orderTime}</span>
+                                  </div>
+                                  <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 ${config.badgeClass || ''}`} style={badgeStyle}>{config.label}</Badge>
+                                </div>
+                                {orderItems.length > 0 ? (
+                                  <div className="mt-1 space-y-0.5">
+                                    {orderItems.map((item, idx) => (
+                                      <div key={item.id || idx} className="text-xs text-slate-500">
+                                        · {item.dish_name} ×{item.quantity}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-slate-400 mt-1">{'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430...'}</div>
+                                )}
+                                {(config.actionLabel || config.isFinishStage) && (
+                                  <div className="mt-2 pt-1.5 border-t border-slate-100 flex justify-end">
+                                    <button
+                                      className="text-xs px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium min-h-[36px]"
+                                      onClick={(e) => { e.stopPropagation(); handleBatchAction([order]); }}
+                                      disabled={advanceMutation.isPending}
+                                    >
+                                      {advanceMutation.isPending
+                                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                                        : n > 0
+                                          ? `\u0412\u0441\u0435 ${n} ${dishWord}`
+                                          : (config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')
+                                      }
+                                    </button>
+                                  </div>
+                                )}
+                                {order.order_number && (
+                                  <div className="text-[10px] text-slate-400 mt-1 text-right">{order.order_number}</div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    }
+
+                    // Multiple sub-groups: render with sub-section headers
+                    const isSubExpanded = !!expandedSubGroups[sid];
+                    const raw = cfg.actionLabel || '';
+                    const actionName = raw.startsWith('\u2192 ') ? raw.slice(2) : raw;
+                    const subGroupLabel = sid === '__null__' ? '\u0412 \u0420\u0410\u0411\u041E\u0422\u0415' : cfg.label;
+                    const orderCountWord = sgOrders.length === 1 ? '\u0437\u0430\u043A\u0430\u0437' : sgOrders.length < 5 ? '\u0437\u0430\u043A\u0430\u0437\u0430' : '\u0437\u0430\u043A\u0430\u0437\u043E\u0432';
+
+                    return (
+                      <div key={sid}>
+                        <div
+                          className="flex items-center justify-between mb-1.5 cursor-pointer min-h-[44px]"
+                          onClick={() => setExpandedSubGroups(prev => ({ ...prev, [sid]: !prev[sid] }))}
+                        >
+                          <div className="flex items-center gap-2">
+                            <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isSubExpanded ? 'rotate-180' : ''}`} />
+                            <span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">
+                              {subGroupLabel} ({sgOrders.length})
+                            </span>
                           </div>
+                          {actionName && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleBatchAction(sgOrders); }}
+                              disabled={advanceMutation.isPending}
+                              className="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded min-h-[36px] active:scale-95 disabled:opacity-60"
+                            >
+                              {`\u0412\u0441\u0435 \u2192 ${actionName}`}
+                            </button>
+                          )}
                         </div>
-                        <div className="text-sm text-slate-600">
-                          {orderItems.length > 0
-                            ? orderItems.map(i => `${i.dish_name}\u00D7${i.quantity}`).join(', ')
-                            : <span className="text-slate-400 italic">{'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430...'}</span>
-                          }
-                        </div>
-                        {order.order_number && (
-                          <div className="text-[10px] text-slate-400 mt-1 text-right">{order.order_number}</div>
+                        {isSubExpanded ? (
+                          <div className="space-y-2">
+                            {sgOrders.map(order => {
+                              const config = getStatusConfig(order);
+                              const isSelected = selectedOrder?.id === order.id;
+                              const orderItems = itemsByOrder[order.id] || [];
+                              const orderTime = new Date(safeParseDate(order.created_date)).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
+                              const badgeStyle = config.color ? { backgroundColor: `${config.color}20`, borderColor: config.color, color: config.color } : undefined;
+                              const n = orderItems.length;
+                              const dishWord = n === 1 ? '\u0431\u043B\u044E\u0434\u043E' : (n >= 2 && n <= 4) ? '\u0431\u043B\u044E\u0434\u0430' : '\u0431\u043B\u044E\u0434';
+                              return (
+                                <div
+                                  key={order.id}
+                                  className={`p-2.5 rounded-lg border cursor-pointer transition-colors ${isSelected ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                                  onClick={() => setSelectedOrderId(order.id)}
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium text-slate-800">{guestName(order)}</span>
+                                      <span className="text-xs text-slate-400">{orderTime}</span>
+                                    </div>
+                                    <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 ${config.badgeClass || ''}`} style={badgeStyle}>{config.label}</Badge>
+                                  </div>
+                                  {orderItems.length > 0 ? (
+                                    <div className="mt-1 space-y-0.5">
+                                      {orderItems.map((item, idx) => (
+                                        <div key={item.id || idx} className="text-xs text-slate-500">
+                                          · {item.dish_name} ×{item.quantity}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="text-xs text-slate-400 mt-1">{'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430...'}</div>
+                                  )}
+                                  {(config.actionLabel || config.isFinishStage) && (
+                                    <div className="mt-2 pt-1.5 border-t border-slate-100 flex justify-end">
+                                      <button
+                                        className="text-xs px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium min-h-[36px]"
+                                        onClick={(e) => { e.stopPropagation(); handleBatchAction([order]); }}
+                                        disabled={advanceMutation.isPending}
+                                      >
+                                        {advanceMutation.isPending
+                                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                                          : n > 0
+                                            ? `\u0412\u0441\u0435 ${n} ${dishWord}`
+                                            : (config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')
+                                        }
+                                      </button>
+                                    </div>
+                                  )}
+                                  {order.order_number && (
+                                    <div className="text-[10px] text-slate-400 mt-1 text-right">{order.order_number}</div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-slate-400 pl-5">
+                            {sgOrders.length} {orderCountWord}
+                          </div>
                         )}
                       </div>
                     );
@@ -3025,11 +3199,15 @@ export default function StaffOrdersMobile() {
       // Determine if this is first or finish stage
       const isFirstStage = stage.internal_code === 'start' || currentIndex === 0;
       const isFinishStage = stage.internal_code === 'finish' || currentIndex === relevantStages.length - 1;
-      
+      const nextIsFinish = nextStage && (
+        nextStage.internal_code === 'finish' ||
+        (currentIndex + 1) === relevantStages.length - 1
+      );
+
       return {
         label: getStageName(stage, t),
         color: stage.color,
-        actionLabel: nextStage ? `→ ${getStageName(nextStage, t)}` : null,
+        actionLabel: nextStage ? (nextIsFinish ? 'Выдать' : `→ ${getStageName(nextStage, t)}`) : null,
         nextStageId: nextStage?.id || null,
         derivedNextStatus: (() => {
           if (!nextStage) return null;
@@ -3982,6 +4160,7 @@ export default function StaffOrdersMobile() {
                   onCloseAllOrders={handleCloseAllOrders}
                   activeRequests={activeRequests}
                   onCloseRequest={(reqId, status) => updateRequestMutation.mutate({ id: reqId, status: 'done' })}
+                  orderStages={sortedStages}
                 />
               ))
             )}
