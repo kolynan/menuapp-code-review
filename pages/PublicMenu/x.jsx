@@ -46,6 +46,7 @@ import {
   Package,
   Truck,
   Users,
+  Layers,
 } from "lucide-react";
 
 import {
@@ -505,6 +506,10 @@ const I18N_FALLBACKS = {
   "status.cancelled": "Отменён",
   // CartView — misc
   "help.call_waiter": "Позвать официанта",
+  "help.active_requests": "Активные запросы",
+  "help.sent_suffix": "отправлено",
+  "help.undo": "Отменить",
+  "help.cancel_request": "Больше не надо",
   "form.table": "Стол",
   // Mode-switch toast
   "cart.items_removed_mode_switch": "Убрано {count} блюд, недоступных в этом режиме",
@@ -1656,6 +1661,33 @@ export default function X() {
   const HELP_CHIPS = useMemo(() => ['Детский стул', 'Приборы', 'Соус', 'Убрать со стола', 'Вода'], []);
 
   const [requestStates, setRequestStates] = useState({});
+  // HD-05: Load requestStates from localStorage on mount (restore badge + card state after refresh)
+  useEffect(() => {
+    if (!currentTableId) return;
+    try {
+      const key = `helpdrawer_${currentTableId}`;
+      const stored = localStorage.getItem(key);
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      const now = Date.now();
+      const updated = {};
+      for (const [type, state] of Object.entries(parsed)) {
+        const cooldownMs = (HELP_COOLDOWN_SECONDS[type] || 120) * 1000;
+        if ((state.status === 'pending' || state.status === 'repeat') && state.sentAt) {
+          const elapsed = now - state.sentAt;
+          if (elapsed < cooldownMs + 60000) {
+            updated[type] = elapsed >= cooldownMs
+              ? { status: 'repeat', sentAt: state.sentAt }
+              : { ...state };
+          }
+        }
+      }
+      if (Object.keys(updated).length > 0) {
+        setRequestStates(updated);
+      }
+    } catch (e) { /* ignore corrupted storage */ }
+  }, [currentTableId, HELP_COOLDOWN_SECONDS]);
+  const [cardActionModal, setCardActionModal] = useState(null); // HD-01v3: null or card type string
   // Structure: { call_waiter: { status: 'idle'|'sending'|'pending'|'repeat'|'resolved', sentAt: timestamp, message?: string }, ... }
   const [undoToast, setUndoToast] = useState(null); // { type, expiresAt, timeoutId }
   const [showOtherForm, setShowOtherForm] = useState(false);
@@ -3858,7 +3890,7 @@ export default function X() {
 
       {/* PM-125: Help as Bottom Drawer (replaces HelpModal Dialog) */}
       <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
-        <DrawerContent className="max-h-[85vh] rounded-t-2xl flex flex-col">
+        <DrawerContent className="relative max-h-[85vh] rounded-t-2xl flex flex-col">
           <div className="relative">
             <button
               onClick={closeHelpDrawer}
@@ -3895,16 +3927,16 @@ export default function X() {
               {[
                 { id: 'call_waiter', emoji: '\uD83D\uDE4B', label: t('help.call_waiter', 'Позвать официанта') },
                 { id: 'bill', emoji: '\uD83E\uDDFE', label: t('help.bill', 'Принести счёт') },
-                { id: 'napkins', emoji: '\uD83D\uDDD2\uFE0F', label: t('help.napkins', 'Салфетки') },
+                { id: 'napkins', emoji: null, label: t('help.napkins', 'Салфетки') },
                 { id: 'menu', emoji: '\uD83D\uDCC4', label: t('help.menu', 'Бумажное меню') },
               ].map(card => {
                 const st = requestStates[card.id];
                 const status = st?.status || 'idle';
-                const isDisabled = status === 'sending' || status === 'pending';
+                const isDisabled = status === 'sending';
                 return (
                   <button
                     key={card.id}
-                    onClick={() => status === 'idle' || status === 'repeat' ? handleCardTap(card.id) : null}
+                    onClick={() => status === 'pending' ? setCardActionModal(card.id) : (status === 'idle' || status === 'repeat' ? handleCardTap(card.id) : null)}
                     disabled={isDisabled}
                     className={`relative rounded-xl border min-h-[80px] flex flex-col items-center justify-center gap-1 ${
                       status === 'pending' ? 'bg-[#F5E6E0] border-[#E8CFC7]' :
@@ -3918,6 +3950,8 @@ export default function X() {
                     )}
                     {status === 'sending' ? (
                       <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                    ) : card.id === 'napkins' ? (
+                      <Layers className="w-6 h-6 text-slate-500" />
                     ) : (
                       <span className="text-2xl">{card.emoji}</span>
                     )}
@@ -4047,6 +4081,56 @@ export default function X() {
               </Button>
             </div>
           )}
+          {/* HD-01v3: Card action modal — shown when tapping a pending card */}
+          {cardActionModal && (() => {
+            const cardState = requestStates[cardActionModal];
+            const cardLabel = HELP_CARD_LABELS[cardActionModal] || cardActionModal;
+            return (
+              <div
+                className="absolute inset-0 z-20 flex flex-col justify-end rounded-t-2xl bg-black/30"
+                onClick={() => setCardActionModal(null)}
+              >
+                <div
+                  className="bg-white rounded-t-2xl px-4 pt-4 pb-8 space-y-2"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="text-center pb-2">
+                    <p className="font-semibold text-slate-900">{cardLabel}</p>
+                    {cardState?.sentAt && (
+                      <p className="text-sm text-slate-500">{t('help.sent_suffix', 'отправлено')} {getRelativeTime(cardState.sentAt)}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => { handleCardTap(cardActionModal); setCardActionModal(null); }}
+                    className="w-full rounded-xl bg-[#F5E6E0] py-4 text-sm font-medium text-[#B5543A] flex items-center justify-center gap-2 min-h-[52px]"
+                  >
+                    <Bell className="w-4 h-4" />
+                    {t('help.remind_staff', 'Напомнить персоналу')}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setRequestStates(prev => {
+                        const next = { ...prev };
+                        delete next[cardActionModal];
+                        return next;
+                      });
+                      setCardActionModal(null);
+                    }}
+                    className="w-full rounded-xl bg-red-50 py-4 text-sm font-medium text-red-600 flex items-center justify-center gap-2 min-h-[52px]"
+                  >
+                    <XIcon className="w-4 h-4" />
+                    {t('help.cancel_request', 'Больше не надо')}
+                  </button>
+                  <button
+                    onClick={() => setCardActionModal(null)}
+                    className="w-full py-3 text-sm text-slate-400 min-h-[44px]"
+                  >
+                    {t('common.close', 'Закрыть')}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         </DrawerContent>
       </Drawer>
 
