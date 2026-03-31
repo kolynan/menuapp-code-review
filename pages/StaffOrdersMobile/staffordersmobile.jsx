@@ -1600,6 +1600,55 @@ function OrderGroupCard({
   const serveCount = completedOrders.length;
   const inProgressCount = activeOrders.filter(o => !getStatusConfig(o).isFirstStage).length;
 
+  // SOM-UX-23: per-stage lines for collapsed card
+  const summaryLines = useMemo(() => {
+    const lines = [];
+
+    // 1. Request line (always first, if any active requests)
+    if (tableRequests.length > 0) {
+      const oldestReq = Math.min(...tableRequests.map(r => safeParseDate(r.created_date).getTime()));
+      const ageMin = Math.floor((Date.now() - oldestReq) / 60000);
+      lines.push({ type: 'request', count: tableRequests.length, ageMin, label: null });
+    }
+
+    // 2. Group active orders by stage
+    const stageMap = new Map();
+    activeOrders.forEach(order => {
+      const cfg = getStatusConfig(order);
+      if (cfg.show_in_summary === false) return;
+      const key = order.stage_id ? getLinkId(order.stage_id) : (cfg.derivedNextStatus || '__nostage');
+      if (!stageMap.has(key)) {
+        stageMap.set(key, { label: cfg.label, orders: [], isFirst: cfg.isFirstStage, isFinish: cfg.isFinishStage });
+      }
+      stageMap.get(key).orders.push(order);
+    });
+
+    // Sort: finish > mid > first (most urgent first)
+    const sorted = [...stageMap.values()].sort((a, b) => {
+      if (a.isFinish && !b.isFinish) return -1;
+      if (!a.isFinish && b.isFinish) return 1;
+      if (!a.isFirst && b.isFirst) return -1;
+      if (a.isFirst && !b.isFirst) return 1;
+      return 0;
+    });
+
+    sorted.forEach(({ label, orders }) => {
+      const oldestTs = Math.min(...orders.map(o => safeParseDate(o.stage_entered_at || o.created_date).getTime()));
+      const ageMin = Math.floor((Date.now() - oldestTs) / 60000);
+      lines.push({ type: 'stage', count: orders.length, ageMin, label });
+    });
+
+    return lines;
+  }, [activeOrders, tableRequests, getStatusConfig]);
+
+  // Color helper for summary lines
+  const getSummaryLineColor = (type, ageMin) => {
+    if (type === 'request') return ageMin >= 3 ? 'text-red-600' : 'text-slate-700';
+    if (ageMin >= 15) return 'text-red-600';
+    if (ageMin >= 5) return 'text-amber-600';
+    return 'text-slate-700';
+  };
+
   // Block D: close table checks
   const hasNewOrders = activeOrders.some(o => getStatusConfig(o).isFirstStage);
   const hasCookingOrders = activeOrders.some(o => {
@@ -1698,25 +1747,25 @@ function OrderGroupCard({
           )}
         </div>
 
-        {/* Row 3: status summary (СЕЙЧАС / ЕЩЁ) */}
-        {(newCount > 0 || serveCount > 0 || requestBadges.length > 0) && (
-          <div className="text-sm text-slate-700 leading-snug">
-            <span className="font-semibold">{'\u0421\u0415\u0419\u0427\u0410\u0421: '}</span>
-            {[
-              newCount > 0 && `${newCount} \u043D\u043E\u0432\u044B\u0445`,
-              serveCount > 0 && `${serveCount} \u0432\u044B\u0434\u0430\u0442\u044C`,
-              ...requestBadges.map(b => b.type === 'bill' ? '\uD83E\uDDFE \u0421\u0447\u0451\u0442' : b.type === 'waiter' ? '\uD83D\uDCDE \u041E\u0444\u0438\u0446\u0438\u0430\u043D\u0442' : '\u2757 \u0417\u0430\u043F\u0440\u043E\u0441'),
-            ].filter(Boolean).join(' \u00B7 ')}
+        {/* Row 3: per-stage summary lines (SOM-UX-23) */}
+        {summaryLines.length > 0 ? (
+          <div className="space-y-0.5 mt-0.5">
+            {summaryLines.map((line, idx) => {
+              const colorClass = getSummaryLineColor(line.type, line.ageMin);
+              const reqWord = line.count === 1 ? '\u0437\u0430\u043F\u0440\u043E\u0441' : line.count < 5 ? '\u0437\u0430\u043F\u0440\u043E\u0441\u0430' : '\u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432';
+              const countLabel = line.type === 'request'
+                ? `${line.count} ${reqWord}`
+                : `${line.count} ${line.label}`;
+              return (
+                <div key={idx} className={`text-xs ${colorClass} flex items-center gap-1 leading-snug`}>
+                  <span className="font-medium">{countLabel}</span>
+                  <span className="text-slate-300">{'\u00B7'}</span>
+                  <span>{`${line.ageMin} \u043C\u0438\u043D`}</span>
+                </div>
+              );
+            })}
           </div>
-        )}
-        {inProgressCount > 0 && (
-          <div className="text-sm text-slate-500 leading-snug">
-            <span className="font-semibold">{'\u0415\u0429\u0401: '}</span>
-            {`${inProgressCount} \u0433\u043E\u0442\u043E\u0432\u0438\u0442\u0441\u044F`}
-            {billData && billData.total > 0 && ` \u00B7 ${billData.total.toLocaleString()} \u20B8`}
-          </div>
-        )}
-        {newCount === 0 && serveCount === 0 && requestBadges.length === 0 && inProgressCount === 0 && (
+        ) : (
           <div className="text-xs text-slate-400">{'\u041D\u0435\u0442 \u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0445 \u0437\u0430\u043A\u0430\u0437\u043E\u0432'}</div>
         )}
       </div>

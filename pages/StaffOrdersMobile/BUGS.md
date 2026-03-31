@@ -7,6 +7,13 @@
 
 ## Fixed Bugs
 
+### SOM-UX-23 (P1) -- Collapsed card Row 3: replace СЕЙЧАС/ЕЩЁ with per-stage lines
+- **Function:** TableCard collapsed view, Row 3
+- **Root cause:** Old Row 3 showed hardcoded «СЕЙЧАС/ЕЩЁ» labels with static stage names and total sum — noise for waiter, no urgency info
+- **Fix:** Added `summaryLines` useMemo grouping activeOrders by stage via `getStatusConfig`, with per-line age from `stage_entered_at || created_date`. Color coding: red >15min / amber 5-15min / neutral <5min (requests: red ≥3min). Forward-compatible `show_in_summary` filter for #218.
+- **Chain:** staffordersmobile-260331-225506-fac7
+- **Status:** FIXED (pending test)
+
 ### BUG-S66-01 (P1) -- Detail view doesn't open on card tap (Sprint B broken)
 - **Function:** TableDetailScreen render / CSS animation
 - **Root cause:** CSS `translate-x-full` → `translate-x-0` transition with `requestAnimationFrame` timing was unreliable in Base44 platform container. Detail screen mounted but stayed off-screen.
