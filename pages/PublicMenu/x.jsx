@@ -1721,9 +1721,6 @@ export default function X() {
     return `${mins} ${t('help.min_ago', 'мин назад')}`;
   }, [t, timerTick]);
 
-  // HD-07: Active request count for badge (uses activeRequests)
-  const activeRequestCount = useMemo(() => activeRequests.length, [activeRequests]);
-
   // Ticket board: active requests list (pending, sending, repeat) sorted by sentAt ascending
   const activeRequests = useMemo(() => {
     const list = [];
@@ -1748,6 +1745,9 @@ export default function X() {
     }
     return list.sort((a, b) => (a.sentAt || 0) - (b.sentAt || 0));
   }, [requestStates]);
+
+  // HD-07: Active request count for badge (uses activeRequests)
+  const activeRequestCount = useMemo(() => activeRequests.length, [activeRequests]);
 
   // PM-126/PM-125: Help drawer open/close with overlay stack integration
   // PM-133: Guard for null currentTableId — redirect to table code entry
