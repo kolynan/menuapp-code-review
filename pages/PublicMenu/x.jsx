@@ -4060,36 +4060,35 @@ export default function X() {
                             key={req.id}
                             className={`rounded-lg border p-3 mb-2 transition-colors duration-300 ${isHighlighted ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200'}`}
                           >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium text-slate-800">
-                                  {HELP_CARD_LABELS[req.type] || req.type}
-                                  {req.message ? ` — "${req.message.slice(0, 30)}${req.message.length > 30 ? '...' : ''}"` : ''}
-                                </div>
-                                <div className="text-xs text-slate-500 mt-0.5">
-                                  {getRelativeTime(req.sentAt)}
-                                  {req.reminderCount > 0 && (
-                                    <span className="ml-2">{req.reminderCount} {t('help.reminders', 'напоминаний')}{req.lastReminderAt ? ` · ${t('help.last', 'последнее')} ${getRelativeTime(req.lastReminderAt)}` : ''}</span>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 ml-2 shrink-0">
-                                {/* Fix 4B: Remind button with cooldown */}
-                                <button
-                                  onClick={() => handleRemind(req.type, req.type === 'other' ? req.id : undefined)}
-                                  disabled={cooldownActive}
-                                  className={`text-xs font-medium px-3 min-h-[44px] rounded-lg ${cooldownActive ? 'text-slate-400 bg-slate-100' : 'text-[#B5543A] bg-[#F5E6E0] active:bg-[#EEDDD7]'}`}
-                                >
-                                  {cooldownActive ? `${t('help.retry_in', 'Повторить через')} ${cooldownMin > 0 ? `${cooldownMin}:` : ''}${String(cooldownSecRem).padStart(2, '0')}` : t('help.remind', 'Напомнить')}
-                                </button>
-                                {/* Resolve button */}
-                                <button
-                                  onClick={() => handleResolve(req.type, req.type === 'other' ? req.id : undefined)}
-                                  className="text-xs text-slate-400 px-2 min-h-[44px] rounded-lg active:bg-slate-100"
-                                >
-                                  {t('help.resolved', 'Готово')}
-                                </button>
-                              </div>
+                            {/* Row title */}
+                            <div className="text-sm font-medium text-slate-800 mb-0.5">
+                              {HELP_CARD_LABELS[req.type] || req.type}
+                              {req.message ? ` — "${req.message.slice(0, 30)}${req.message.length > 30 ? '...' : ''}"` : ''}
+                            </div>
+                            {/* Timestamp */}
+                            <div className="text-xs text-slate-500 mb-2">
+                              {getRelativeTime(req.sentAt)}
+                              {req.reminderCount > 0 && (
+                                <span className="ml-1">· {req.reminderCount} {t('help.reminders', 'напоминаний')}</span>
+                              )}
+                            </div>
+                            {/* Action buttons — full width, side by side */}
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleRemind(req.type, req.type === 'other' ? req.id : undefined)}
+                                disabled={cooldownActive}
+                                className={`flex-1 text-xs font-medium py-2 min-h-[36px] rounded-lg ${cooldownActive ? 'text-slate-400 bg-slate-100' : 'text-[#B5543A] bg-[#F5E6E0] active:bg-[#EEDDD7]'}`}
+                              >
+                                {cooldownActive
+                                  ? `${t('help.retry_in', 'Повторить через')} ${String(cooldownMin).padStart(2,'0')}:${String(cooldownSecRem).padStart(2,'0')}`
+                                  : t('help.remind', 'Напомнить')}
+                              </button>
+                              <button
+                                onClick={() => handleResolve(req.type, req.type === 'other' ? req.id : undefined)}
+                                className="flex-1 text-xs font-medium py-2 min-h-[36px] rounded-lg text-slate-500 bg-slate-100 active:bg-slate-200"
+                              >
+                                {t('help.resolved', 'Уже помогли')}
+                              </button>
                             </div>
                           </div>
                         );
