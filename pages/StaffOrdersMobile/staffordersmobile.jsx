@@ -1478,10 +1478,16 @@ function OrderGroupCard({
   const [inProgressExpanded, setInProgressExpanded] = useState(false);
   const [expandedSubGroups, setExpandedSubGroups] = useState({});
 
-  // Auto-expand first sub-group when section opens
+  // Auto-expand first sub-group when section opens; reset on close so reopen works
   useEffect(() => {
-    if (inProgressExpanded && Object.keys(expandedSubGroups).length === 0 && subGroups.length > 0) {
-      setExpandedSubGroups({ [subGroups[0].sid]: true });
+    if (!inProgressExpanded) {
+      setExpandedSubGroups({});
+      return;
+    }
+    if (subGroups.length > 0) {
+      setExpandedSubGroups(prev =>
+        Object.keys(prev).length === 0 ? { [subGroups[0].sid]: true } : prev
+      );
     }
   }, [inProgressExpanded, subGroups]);
 
