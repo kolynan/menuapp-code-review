@@ -1477,6 +1477,7 @@ function OrderGroupCard({
   const [completedExpanded, setCompletedExpanded] = useState(false);
   const [inProgressExpanded, setInProgressExpanded] = useState(false);
   const [expandedSubGroups, setExpandedSubGroups] = useState({});
+  const [undoToast, setUndoToast] = useState(null);
 
   // Auto-expand first sub-group when section opens; reset on close so reopen works
   useEffect(() => {
@@ -1561,6 +1562,18 @@ function OrderGroupCard({
       if (onClearNotified) onClearNotified(order.id);
       advanceMutation.mutate({ id: order.id, payload });
     });
+  };
+
+  // Undo handler for finish-stage batch action
+  const handleUndo = () => {
+    if (!undoToast) return;
+    clearTimeout(undoToast.timerId);
+    undoToast.snapshots.forEach(({ orderId, prevStatus, prevStageId }) => {
+      const payload = { status: prevStatus };
+      if (prevStageId) payload.stage_id = prevStageId;
+      advanceMutation.mutate({ id: orderId, payload });
+    });
+    setUndoToast(null);
   };
 
   // Bill data (Block E)
@@ -1794,19 +1807,31 @@ function OrderGroupCard({
                       )}
                       {(config.actionLabel || config.isFinishStage) && (() => {
                         const n = orderItems.length;
-                        const dishWord = n === 1 ? '\u0431\u043B\u044E\u0434\u043E' : (n >= 2 && n <= 4) ? '\u0431\u043B\u044E\u0434\u0430' : '\u0431\u043B\u044E\u0434';
                         return (
                           <div className="mt-2 pt-1.5 border-t border-slate-100 flex justify-end">
                             <button
                               className="text-xs px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium min-h-[36px]"
-                              onClick={(e) => { e.stopPropagation(); handleBatchAction([order]); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (config.isFinishStage) {
+                                  const snapshots = [order].map(o => ({ orderId: o.id, prevStatus: o.status, prevStageId: getLinkId(o.stage_id) }));
+                                  if (undoToast?.timerId) clearTimeout(undoToast.timerId);
+                                  handleBatchAction([order]);
+                                  const timerId = setTimeout(() => setUndoToast(null), 5000);
+                                  setUndoToast({ snapshots, timerId });
+                                } else {
+                                  handleBatchAction([order]);
+                                }
+                              }}
                               disabled={advanceMutation.isPending}
                             >
                               {advanceMutation.isPending
                                 ? <Loader2 className="w-3 h-3 animate-spin" />
                                 : n > 0
-                                  ? `\u0412\u0441\u0435 ${n} ${dishWord}`
-                                  : (config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')
+                                  ? config.isFinishStage
+                                    ? `\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})`
+                                    : `${(config.actionLabel || '').replace(/^\u2192\s*/, '')} \u0432\u0441\u0451 (${n})`
+                                  : (config.isFinishStage ? '\u0412\u044B\u0434\u0430\u0442\u044C' : (config.actionLabel || '\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435').replace(/^\u2192\s*/, ''))
                               }
                             </button>
                           </div>
@@ -1871,19 +1896,31 @@ function OrderGroupCard({
                       )}
                       {(config.actionLabel || config.isFinishStage) && (() => {
                         const n = orderItems.length;
-                        const dishWord = n === 1 ? '\u0431\u043B\u044E\u0434\u043E' : (n >= 2 && n <= 4) ? '\u0431\u043B\u044E\u0434\u0430' : '\u0431\u043B\u044E\u0434';
                         return (
                           <div className="mt-2 pt-1.5 border-t border-slate-100 flex justify-end">
                             <button
                               className="text-xs px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium min-h-[36px]"
-                              onClick={(e) => { e.stopPropagation(); handleBatchAction([order]); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (config.isFinishStage) {
+                                  const snapshots = [order].map(o => ({ orderId: o.id, prevStatus: o.status, prevStageId: getLinkId(o.stage_id) }));
+                                  if (undoToast?.timerId) clearTimeout(undoToast.timerId);
+                                  handleBatchAction([order]);
+                                  const timerId = setTimeout(() => setUndoToast(null), 5000);
+                                  setUndoToast({ snapshots, timerId });
+                                } else {
+                                  handleBatchAction([order]);
+                                }
+                              }}
                               disabled={advanceMutation.isPending}
                             >
                               {advanceMutation.isPending
                                 ? <Loader2 className="w-3 h-3 animate-spin" />
                                 : n > 0
-                                  ? `\u0412\u0441\u0435 ${n} ${dishWord}`
-                                  : (config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')
+                                  ? config.isFinishStage
+                                    ? `\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})`
+                                    : `${(config.actionLabel || '').replace(/^\u2192\s*/, '')} \u0432\u0441\u0451 (${n})`
+                                  : (config.isFinishStage ? '\u0412\u044B\u0434\u0430\u0442\u044C' : (config.actionLabel || '\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435').replace(/^\u2192\s*/, ''))
                               }
                             </button>
                           </div>
@@ -1925,7 +1962,6 @@ function OrderGroupCard({
                             const orderTime = new Date(safeParseDate(order.created_date)).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
                             const badgeStyle = config.color ? { backgroundColor: `${config.color}20`, borderColor: config.color, color: config.color } : undefined;
                             const n = orderItems.length;
-                            const dishWord = n === 1 ? '\u0431\u043B\u044E\u0434\u043E' : (n >= 2 && n <= 4) ? '\u0431\u043B\u044E\u0434\u0430' : '\u0431\u043B\u044E\u0434';
                             return (
                               <div
                                 key={order.id}
@@ -1954,14 +1990,27 @@ function OrderGroupCard({
                                   <div className="mt-2 pt-1.5 border-t border-slate-100 flex justify-end">
                                     <button
                                       className="text-xs px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium min-h-[36px]"
-                                      onClick={(e) => { e.stopPropagation(); handleBatchAction([order]); }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (config.isFinishStage) {
+                                          const snapshots = [order].map(o => ({ orderId: o.id, prevStatus: o.status, prevStageId: getLinkId(o.stage_id) }));
+                                          if (undoToast?.timerId) clearTimeout(undoToast.timerId);
+                                          handleBatchAction([order]);
+                                          const timerId = setTimeout(() => setUndoToast(null), 5000);
+                                          setUndoToast({ snapshots, timerId });
+                                        } else {
+                                          handleBatchAction([order]);
+                                        }
+                                      }}
                                       disabled={advanceMutation.isPending}
                                     >
                                       {advanceMutation.isPending
                                         ? <Loader2 className="w-3 h-3 animate-spin" />
                                         : n > 0
-                                          ? `\u0412\u0441\u0435 ${n} ${dishWord}`
-                                          : (config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')
+                                          ? config.isFinishStage
+                                            ? `\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})`
+                                            : `${(config.actionLabel || '').replace(/^\u2192\s*/, '')} \u0432\u0441\u0451 (${n})`
+                                          : (config.isFinishStage ? '\u0412\u044B\u0434\u0430\u0442\u044C' : (config.actionLabel || '\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435').replace(/^\u2192\s*/, ''))
                                       }
                                     </button>
                                   </div>
@@ -2015,7 +2064,6 @@ function OrderGroupCard({
                               const orderTime = new Date(safeParseDate(order.created_date)).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
                               const badgeStyle = config.color ? { backgroundColor: `${config.color}20`, borderColor: config.color, color: config.color } : undefined;
                               const n = orderItems.length;
-                              const dishWord = n === 1 ? '\u0431\u043B\u044E\u0434\u043E' : (n >= 2 && n <= 4) ? '\u0431\u043B\u044E\u0434\u0430' : '\u0431\u043B\u044E\u0434';
                               return (
                                 <div
                                   key={order.id}
@@ -2044,14 +2092,27 @@ function OrderGroupCard({
                                     <div className="mt-2 pt-1.5 border-t border-slate-100 flex justify-end">
                                       <button
                                         className="text-xs px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium min-h-[36px]"
-                                        onClick={(e) => { e.stopPropagation(); handleBatchAction([order]); }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (config.isFinishStage) {
+                                            const snapshots = [order].map(o => ({ orderId: o.id, prevStatus: o.status, prevStageId: getLinkId(o.stage_id) }));
+                                            if (undoToast?.timerId) clearTimeout(undoToast.timerId);
+                                            handleBatchAction([order]);
+                                            const timerId = setTimeout(() => setUndoToast(null), 5000);
+                                            setUndoToast({ snapshots, timerId });
+                                          } else {
+                                            handleBatchAction([order]);
+                                          }
+                                        }}
                                         disabled={advanceMutation.isPending}
                                       >
                                         {advanceMutation.isPending
                                           ? <Loader2 className="w-3 h-3 animate-spin" />
                                           : n > 0
-                                            ? `\u0412\u0441\u0435 ${n} ${dishWord}`
-                                            : (config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')
+                                            ? config.isFinishStage
+                                              ? `\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})`
+                                              : `${(config.actionLabel || '').replace(/^\u2192\s*/, '')} \u0432\u0441\u0451 (${n})`
+                                            : (config.isFinishStage ? '\u0412\u044B\u0434\u0430\u0442\u044C' : (config.actionLabel || '\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435').replace(/^\u2192\s*/, ''))
                                         }
                                       </button>
                                     </div>
@@ -2159,6 +2220,13 @@ function OrderGroupCard({
                   <span className="text-slate-600">{contactInfo.address}</span>
                 </div>
               )}
+            </div>
+          )}
+
+          {undoToast && (
+            <div className="flex items-center justify-between bg-slate-800 text-white text-xs rounded-lg px-3 py-2 mt-2 mx-1">
+              <span>{'\u0412\u044B\u0434\u0430\u043D \u0433\u043E\u0441\u0442\u044E'}</span>
+              <button onClick={handleUndo} className="ml-3 font-semibold text-amber-300 underline min-h-[44px] flex items-center">{'\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C'}</button>
             </div>
           )}
 

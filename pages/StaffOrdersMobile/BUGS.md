@@ -229,6 +229,20 @@
 
 ---
 
+### SOM-S210-01a (P1) -- Per-card footer buttons show generic "Все N блюд" instead of verb-first labels
+- **Function:** Per-card footer button label (4 sites in OrderGroupCard expanded sections)
+- **Root cause:** Button labels used `Все ${n} ${dishWord}` pattern — tells the waiter how many dishes but not WHAT action. Unclear UX.
+- **Fix:** Replaced with verb-first labels: `Выдать всё (N)` for finish-stage, `[ActionVerb] всё (N)` for other stages. Removed unused `dishWord` variable from all 4 sites.
+- **Chain:** staffordersmobile-260331-204431-401b
+- **Status:** FIXED
+
+### SOM-S210-01b (P1) -- No undo mechanism after "Выдать" batch action on per-card button
+- **Function:** OrderGroupCard finish-stage per-card button click
+- **Root cause:** When waiter taps finish-stage button, orders are immediately marked as served with no way to revert accidental tap.
+- **Fix:** Added `undoToast` state, `handleUndo` function, and 5-second undo toast with "Отменить" button. Snapshots captured before action, restored on undo via `advanceMutation.mutate`. Touch target on "Отменить" button set to min-h-[44px].
+- **Chain:** staffordersmobile-260331-204431-401b
+- **Status:** FIXED
+
 ## Active Bugs
 
 ### BUG-SM-001 (P1 -- deferred) -- Complete absence of i18n
