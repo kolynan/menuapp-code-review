@@ -203,6 +203,30 @@
 - **Chain:** staffordersmobile-260330-184402-3037
 - **Status:** FIXED
 
+### #18 (P1) -- В РАБОТЕ section has no sub-grouping by stage
+- **Function:** OrderGroupCard «В работе» section
+- **Root cause:** All intermediate-stage orders rendered as one flat list, mixing orders at different stages (e.g., ПРИНЯТО and ГОТОВИТСЯ together).
+- **Fix:** Added `subGroups` useMemo that groups by `stage_id`, sorts closest-to-finish first. Per-sub-group expand/collapse state. Sub-group headers with «Все → [action]» batch buttons. Flatten rule: single sub-group renders without sub-headers.
+- **Commit:** `b9b6cd2`
+- **Chain:** staffordersmobile-260331-044239-b1e5
+- **Status:** FIXED
+
+### #19 (P1) -- Finish-stage button label shows «→ [FinishStageName]» instead of «Выдать»
+- **Function:** getStatusConfig stage-mode branch, `actionLabel` line
+- **Root cause:** `actionLabel` always used `→ ${getStageName(nextStage, t)}` even when next stage is finish. Shows «→ Выдан гостю» (completed state) instead of action verb.
+- **Fix:** Added `nextIsFinish` check (internal_code === 'finish' || last-index). Action label now shows «Выдать» for finish-adjacent stage.
+- **Commit:** `b9b6cd2`
+- **Chain:** staffordersmobile-260331-044239-b1e5
+- **Status:** FIXED
+
+### #20-Phase1 (P1) -- Dish items comma-joined + action button in card header
+- **Function:** OrderGroupCard sections (НОВЫЕ, ГОТОВО К ВЫДАЧЕ, В РАБОТЕ)
+- **Root cause:** Items rendered as `dish_name×qty` joined with commas on single line. Action button sat in card header adjacent to badge.
+- **Fix:** Items now render as vertical list (`· dish_name ×qty` per row). Action button moved to card footer with border separator. Includes Russian pluralization for dish count. Applied in all 3 sections.
+- **Commit:** `b9b6cd2`
+- **Chain:** staffordersmobile-260331-044239-b1e5
+- **Status:** FIXED
+
 ---
 
 ## Active Bugs
