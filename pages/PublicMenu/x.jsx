@@ -3890,7 +3890,7 @@ export default function X() {
 
       {/* PM-125: Help as Bottom Drawer (replaces HelpModal Dialog) */}
       <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
-        <DrawerContent className="relative max-h-[85vh] rounded-t-2xl flex flex-col">
+        <DrawerContent className="max-h-[85vh] rounded-t-2xl flex flex-col">
           <div className="relative">
             <button
               onClick={closeHelpDrawer}
@@ -4087,7 +4087,7 @@ export default function X() {
             const cardLabel = HELP_CARD_LABELS[cardActionModal] || cardActionModal;
             return (
               <div
-                className="absolute inset-0 z-20 flex flex-col justify-end rounded-t-2xl bg-black/30"
+                className="fixed inset-0 z-[70] flex flex-col justify-end bg-black/30"
                 onClick={() => setCardActionModal(null)}
               >
                 <div
