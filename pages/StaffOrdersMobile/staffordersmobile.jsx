@@ -1318,6 +1318,7 @@ function OrderGroupCard({
   onCloseAllOrders,
   onCloseRequest,
   orderStages = [],
+  setUndoToast,
 }) {
   const queryClient = useQueryClient();
 
@@ -1477,7 +1478,6 @@ function OrderGroupCard({
   const [completedExpanded, setCompletedExpanded] = useState(false);
   const [inProgressExpanded, setInProgressExpanded] = useState(false);
   const [expandedSubGroups, setExpandedSubGroups] = useState({});
-  const [undoToast, setUndoToast] = useState(null);
 
   // Auto-expand first sub-group when section opens; reset on close so reopen works
   useEffect(() => {
@@ -1562,18 +1562,6 @@ function OrderGroupCard({
       if (onClearNotified) onClearNotified(order.id);
       advanceMutation.mutate({ id: order.id, payload });
     });
-  };
-
-  // Undo handler for finish-stage batch action
-  const handleUndo = () => {
-    if (!undoToast) return;
-    clearTimeout(undoToast.timerId);
-    undoToast.snapshots.forEach(({ orderId, prevStatus, prevStageId }) => {
-      const payload = { status: prevStatus };
-      if (prevStageId) payload.stage_id = prevStageId;
-      advanceMutation.mutate({ id: orderId, payload });
-    });
-    setUndoToast(null);
   };
 
   // Bill data (Block E)
@@ -1864,10 +1852,19 @@ function OrderGroupCard({
                                 e.stopPropagation();
                                 if (config.isFinishStage) {
                                   const snapshots = [order].map(o => ({ orderId: o.id, prevStatus: o.status, prevStageId: getLinkId(o.stage_id) }));
-                                  if (undoToast?.timerId) clearTimeout(undoToast.timerId);
                                   handleBatchAction([order]);
                                   const timerId = setTimeout(() => setUndoToast(null), 5000);
-                                  setUndoToast({ snapshots, timerId });
+                                  setUndoToast({
+                                    snapshots,
+                                    timerId,
+                                    onUndo: () => {
+                                      snapshots.forEach(({ orderId, prevStatus, prevStageId }) => {
+                                        const payload = { status: prevStatus };
+                                        if (prevStageId) payload.stage_id = prevStageId;
+                                        advanceMutation.mutate({ id: orderId, payload });
+                                      });
+                                    }
+                                  });
                                 } else {
                                   handleBatchAction([order]);
                                 }
@@ -1953,10 +1950,19 @@ function OrderGroupCard({
                                 e.stopPropagation();
                                 if (config.isFinishStage) {
                                   const snapshots = [order].map(o => ({ orderId: o.id, prevStatus: o.status, prevStageId: getLinkId(o.stage_id) }));
-                                  if (undoToast?.timerId) clearTimeout(undoToast.timerId);
                                   handleBatchAction([order]);
                                   const timerId = setTimeout(() => setUndoToast(null), 5000);
-                                  setUndoToast({ snapshots, timerId });
+                                  setUndoToast({
+                                    snapshots,
+                                    timerId,
+                                    onUndo: () => {
+                                      snapshots.forEach(({ orderId, prevStatus, prevStageId }) => {
+                                        const payload = { status: prevStatus };
+                                        if (prevStageId) payload.stage_id = prevStageId;
+                                        advanceMutation.mutate({ id: orderId, payload });
+                                      });
+                                    }
+                                  });
                                 } else {
                                   handleBatchAction([order]);
                                 }
@@ -2043,10 +2049,19 @@ function OrderGroupCard({
                                         e.stopPropagation();
                                         if (config.isFinishStage) {
                                           const snapshots = [order].map(o => ({ orderId: o.id, prevStatus: o.status, prevStageId: getLinkId(o.stage_id) }));
-                                          if (undoToast?.timerId) clearTimeout(undoToast.timerId);
                                           handleBatchAction([order]);
                                           const timerId = setTimeout(() => setUndoToast(null), 5000);
-                                          setUndoToast({ snapshots, timerId });
+                                          setUndoToast({
+                                            snapshots,
+                                            timerId,
+                                            onUndo: () => {
+                                              snapshots.forEach(({ orderId, prevStatus, prevStageId }) => {
+                                                const payload = { status: prevStatus };
+                                                if (prevStageId) payload.stage_id = prevStageId;
+                                                advanceMutation.mutate({ id: orderId, payload });
+                                              });
+                                            }
+                                          });
                                         } else {
                                           handleBatchAction([order]);
                                         }
@@ -2145,10 +2160,19 @@ function OrderGroupCard({
                                           e.stopPropagation();
                                           if (config.isFinishStage) {
                                             const snapshots = [order].map(o => ({ orderId: o.id, prevStatus: o.status, prevStageId: getLinkId(o.stage_id) }));
-                                            if (undoToast?.timerId) clearTimeout(undoToast.timerId);
                                             handleBatchAction([order]);
                                             const timerId = setTimeout(() => setUndoToast(null), 5000);
-                                            setUndoToast({ snapshots, timerId });
+                                            setUndoToast({
+                                              snapshots,
+                                              timerId,
+                                              onUndo: () => {
+                                                snapshots.forEach(({ orderId, prevStatus, prevStageId }) => {
+                                                  const payload = { status: prevStatus };
+                                                  if (prevStageId) payload.stage_id = prevStageId;
+                                                  advanceMutation.mutate({ id: orderId, payload });
+                                                });
+                                              }
+                                            });
                                           } else {
                                             handleBatchAction([order]);
                                           }
@@ -2269,13 +2293,6 @@ function OrderGroupCard({
                   <span className="text-slate-600">{contactInfo.address}</span>
                 </div>
               )}
-            </div>
-          )}
-
-          {undoToast && (
-            <div className="flex items-center justify-between bg-slate-800 text-white text-xs rounded-lg px-3 py-2 mt-2 mx-1">
-              <span>{'\u0412\u044B\u0434\u0430\u043D \u0433\u043E\u0441\u0442\u044E'}</span>
-              <button onClick={handleUndo} className="ml-3 font-semibold text-amber-300 underline min-h-[44px] flex items-center">{'\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C'}</button>
             </div>
           )}
 
@@ -2837,6 +2854,7 @@ export default function StaffOrdersMobile() {
 
   // v3.6.0: Close table confirmation dialog state
   const [closeTableConfirm, setCloseTableConfirm] = useState(null); // { sessionId, tableName } | null
+  const [undoToast, setUndoToast] = useState(null); // lifted from OrderGroupCard — survives card unmount
 
   const updateNotifPrefs = (patch) => {
     setNotifPrefs((prev) => {
@@ -3093,6 +3111,14 @@ export default function StaffOrdersMobile() {
     const t = setInterval(tick, 60000);
     return () => clearInterval(t);
   }, [isTokenMode, tokenState, rateLimitHit, queryClient]);
+
+  // Global undo handler — works after OrderGroupCard unmounts
+  const handleUndoGlobal = () => {
+    if (!undoToast) return;
+    clearTimeout(undoToast.timerId);
+    undoToast.onUndo();
+    setUndoToast(null);
+  };
 
   useEffect(() => {
     if (didUpdateLastActiveRef.current) return;
@@ -4284,8 +4310,16 @@ export default function StaffOrdersMobile() {
                   activeRequests={activeRequests}
                   onCloseRequest={(reqId, status) => updateRequestMutation.mutate({ id: reqId, status: 'done' })}
                   orderStages={sortedStages}
+                  setUndoToast={setUndoToast}
                 />
               ))
+            )}
+
+            {undoToast && (
+              <div className="flex items-center justify-between bg-slate-800 text-white text-xs rounded-lg px-3 py-2 mt-2 mx-1">
+                <span>{'\u0412\u044B\u0434\u0430\u043D \u0433\u043E\u0441\u0442\u044E'}</span>
+                <button onClick={handleUndoGlobal} className="ml-3 font-semibold text-amber-300 underline min-h-[44px] flex items-center">{'\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C'}</button>
+              </div>
             )}
           </React.Fragment>
         )}
