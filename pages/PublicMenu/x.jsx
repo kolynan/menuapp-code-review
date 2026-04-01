@@ -4077,17 +4077,17 @@ export default function X() {
                               <button
                                 onClick={() => handleRemind(req.type, req.type === 'other' ? req.id : undefined)}
                                 disabled={cooldownActive}
-                                className={`flex-1 text-xs font-medium py-2 min-h-[36px] rounded-lg ${cooldownActive ? 'text-slate-400 bg-slate-100' : 'text-[#B5543A] bg-[#F5E6E0] active:bg-[#EEDDD7]'}`}
+                                className={`flex-1 text-xs font-medium py-2 min-h-[36px] rounded-lg ${cooldownActive ? 'text-slate-400 bg-slate-100' : 'text-orange-800 bg-orange-50 active:bg-orange-100'}`}
                               >
                                 {cooldownActive
-                                  ? `${tr('help.retry_in', 'Повторить через')} ${String(cooldownMin).padStart(2,'0')}:${String(cooldownSecRem).padStart(2,'0')}`
+                                  ? `${tr('help.retry_in', 'Через')} ${String(cooldownMin).padStart(2,'0')}:${String(cooldownSecRem).padStart(2,'0')}`
                                   : tr('help.remind', 'Напомнить')}
                               </button>
                               <button
                                 onClick={() => handleResolve(req.type, req.type === 'other' ? req.id : undefined)}
                                 className="flex-1 text-xs font-medium py-2 min-h-[36px] rounded-lg text-slate-500 bg-slate-100 active:bg-slate-200"
                               >
-                                {tr('help.resolved', 'Уже помогли')}
+                                {tr('help.resolved', 'Не нужно')}
                               </button>
                             </div>
                           </div>
@@ -4422,4 +4422,4 @@ export default function X() {
       })()}
     </div>
   );
-}                                                                                                                                                                                                                       
+}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
