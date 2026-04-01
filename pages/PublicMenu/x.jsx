@@ -4069,7 +4069,7 @@ export default function X() {
                             <div className="text-xs text-slate-500 mb-2">
                               {getRelativeTime(req.sentAt)}
                               {req.reminderCount > 0 && (
-                                <span className="ml-1">· {req.reminderCount} {t('help.reminders', 'напоминаний')}</span>
+                                <span className="ml-1">· {req.reminderCount} {tr('help.reminders', 'напоминаний')}</span>
                               )}
                             </div>
                             {/* Action buttons — full width, side by side */}
@@ -4080,14 +4080,14 @@ export default function X() {
                                 className={`flex-1 text-xs font-medium py-2 min-h-[36px] rounded-lg ${cooldownActive ? 'text-slate-400 bg-slate-100' : 'text-[#B5543A] bg-[#F5E6E0] active:bg-[#EEDDD7]'}`}
                               >
                                 {cooldownActive
-                                  ? `${t('help.retry_in', 'Повторить через')} ${String(cooldownMin).padStart(2,'0')}:${String(cooldownSecRem).padStart(2,'0')}`
-                                  : t('help.remind', 'Напомнить')}
+                                  ? `${tr('help.retry_in', 'Повторить через')} ${String(cooldownMin).padStart(2,'0')}:${String(cooldownSecRem).padStart(2,'0')}`
+                                  : tr('help.remind', 'Напомнить')}
                               </button>
                               <button
                                 onClick={() => handleResolve(req.type, req.type === 'other' ? req.id : undefined)}
                                 className="flex-1 text-xs font-medium py-2 min-h-[36px] rounded-lg text-slate-500 bg-slate-100 active:bg-slate-200"
                               >
-                                {t('help.resolved', 'Уже помогли')}
+                                {tr('help.resolved', 'Уже помогли')}
                               </button>
                             </div>
                           </div>
