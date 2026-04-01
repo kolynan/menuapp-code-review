@@ -1803,8 +1803,7 @@ export default function X() {
 
   // HD-01 + HD-06: Card tap with 5s undo delay before actual server send
   const handleCardTap = useCallback((type) => {
-    // Cancel previous undo if any
-    if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId);
+    // HD-17b: Do NOT cancel previous card's timer — both must fire independently
 
     // Set card to sending visually immediately
     setRequestStates(prev => ({ ...prev, [type]: { status: 'sending', sentAt: Date.now(), lastReminderAt: null, reminderCount: 0, remindCooldownUntil: null } }));
@@ -1814,6 +1813,7 @@ export default function X() {
       // Actually send to server via existing hook chain
       pendingQuickSendRef.current = type;
       handlePresetSelect(type);
+      setIsHelpModalOpen(true); // HD-17a: re-open drawer after handlePresetSelect closes it
       setUndoToast(null);
     }, 5000);
 
