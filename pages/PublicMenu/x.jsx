@@ -1814,7 +1814,7 @@ export default function X() {
       pendingQuickSendRef.current = type;
       handlePresetSelect(type);
       setIsHelpModalOpen(true); // HD-17a: re-open drawer after handlePresetSelect closes it
-      setUndoToast(null);
+      setUndoToast(prev => prev?.timeoutId === timeoutId ? null : prev);
     }, 5000);
 
     setUndoToast({ type, expiresAt: Date.now() + 5000, timeoutId });
