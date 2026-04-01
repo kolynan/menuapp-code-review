@@ -4315,15 +4315,16 @@ export default function StaffOrdersMobile() {
               ))
             )}
 
-            {undoToast && (
-              <div className="flex items-center justify-between bg-slate-800 text-white text-xs rounded-lg px-3 py-2 mt-2 mx-1">
-                <span>{'\u0412\u044B\u0434\u0430\u043D \u0433\u043E\u0441\u0442\u044E'}</span>
-                <button onClick={handleUndoGlobal} className="ml-3 font-semibold text-amber-300 underline min-h-[44px] flex items-center">{'\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C'}</button>
-              </div>
-            )}
           </React.Fragment>
         )}
       </div>
+
+      {undoToast && (
+        <div className="fixed bottom-4 left-4 right-4 z-50 flex items-center justify-between bg-slate-800 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
+          <span>{'\u0412\u044B\u0434\u0430\u043D \u0433\u043E\u0441\u0442\u044E'}</span>
+          <button onClick={handleUndoGlobal} className="ml-3 font-semibold text-amber-300 underline min-h-[44px] flex items-center">{'\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C'}</button>
+        </div>
+      )}
 
       {/* Modals */}
       <MyTablesModal
