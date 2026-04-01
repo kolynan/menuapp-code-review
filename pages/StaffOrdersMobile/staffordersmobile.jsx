@@ -2066,13 +2066,15 @@ function OrderGroupCard({
                                 ) : (
                                   <div className="text-xs text-slate-400 mt-1">{'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430...'}</div>
                                 )}
-                                {(config.actionLabel || config.isFinishStage) && (
+                                {(() => {
+                                const willServe = config.isFinishStage || config.derivedNextStatus === 'served';
+                                return (config.actionLabel || willServe) && (
                                   <div className="mt-2 pt-1.5 border-t border-slate-100 flex justify-end">
                                     <button
                                       className="text-xs px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium min-h-[36px]"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        if (config.isFinishStage) {
+                                        if (willServe) {
                                           const snapshots = [order].map(o => ({ orderId: o.id, prevStatus: o.status, prevStageId: getLinkId(o.stage_id) }));
                                           handleBatchAction([order]);
                                           const timerId = setTimeout(() => setUndoToast(null), 5000);
@@ -2096,14 +2098,15 @@ function OrderGroupCard({
                                       {advanceMutation.isPending
                                         ? <Loader2 className="w-3 h-3 animate-spin" />
                                         : n > 0
-                                          ? config.isFinishStage
+                                          ? willServe
                                             ? `\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})`
                                             : `${(config.actionLabel || '').replace(/^\u2192\s*/, '')} \u0432\u0441\u0451 (${n})`
-                                          : (config.isFinishStage ? '\u0412\u044B\u0434\u0430\u0442\u044C' : (config.actionLabel || '\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435').replace(/^\u2192\s*/, ''))
+                                          : (willServe ? '\u0412\u044B\u0434\u0430\u0442\u044C' : (config.actionLabel || '\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435').replace(/^\u2192\s*/, ''))
                                       }
                                     </button>
                                   </div>
-                                )}
+                                );
+                                })()}
                                 {order.order_number && (
                                   <div className="text-[10px] text-slate-400 mt-1 text-right">{order.order_number}</div>
                                 )}
@@ -2199,13 +2202,15 @@ function OrderGroupCard({
                                   ) : (
                                     <div className="text-xs text-slate-400 mt-1">{'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430...'}</div>
                                   )}
-                                  {(config.actionLabel || config.isFinishStage) && (
+                                  {(() => {
+                                  const willServe = config.isFinishStage || config.derivedNextStatus === 'served';
+                                  return (config.actionLabel || willServe) && (
                                     <div className="mt-2 pt-1.5 border-t border-slate-100 flex justify-end">
                                       <button
                                         className="text-xs px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium min-h-[36px]"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          if (config.isFinishStage) {
+                                          if (willServe) {
                                             const snapshots = [order].map(o => ({ orderId: o.id, prevStatus: o.status, prevStageId: getLinkId(o.stage_id) }));
                                             handleBatchAction([order]);
                                             const timerId = setTimeout(() => setUndoToast(null), 5000);
@@ -2229,14 +2234,15 @@ function OrderGroupCard({
                                         {advanceMutation.isPending
                                           ? <Loader2 className="w-3 h-3 animate-spin" />
                                           : n > 0
-                                            ? config.isFinishStage
+                                            ? willServe
                                               ? `\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})`
                                               : `${(config.actionLabel || '').replace(/^\u2192\s*/, '')} \u0432\u0441\u0451 (${n})`
-                                            : (config.isFinishStage ? '\u0412\u044B\u0434\u0430\u0442\u044C' : (config.actionLabel || '\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435').replace(/^\u2192\s*/, ''))
+                                            : (willServe ? '\u0412\u044B\u0434\u0430\u0442\u044C' : (config.actionLabel || '\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435').replace(/^\u2192\s*/, ''))
                                         }
                                       </button>
                                     </div>
-                                  )}
+                                  );
+                                  })()}
                                   {order.order_number && (
                                     <div className="text-[10px] text-slate-400 mt-1 text-right">{order.order_number}</div>
                                   )}
