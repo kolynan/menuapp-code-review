@@ -1852,13 +1852,14 @@ function OrderGroupCard({
                       )}
                       {(config.actionLabel || config.isFinishStage) && (() => {
                         const n = orderItems.length;
+                        const willServe = config.isFinishStage || config.derivedNextStatus === 'served';
                         return (
                           <div className="mt-2 pt-1.5 border-t border-slate-100 flex justify-end">
                             <button
                               className="text-xs px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium min-h-[36px]"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (config.isFinishStage) {
+                                if (willServe) {
                                   const snapshots = [order].map(o => ({ orderId: o.id, prevStatus: o.status, prevStageId: getLinkId(o.stage_id) }));
                                   handleBatchAction([order]);
                                   const timerId = setTimeout(() => setUndoToast(null), 5000);
@@ -1882,10 +1883,10 @@ function OrderGroupCard({
                               {advanceMutation.isPending
                                 ? <Loader2 className="w-3 h-3 animate-spin" />
                                 : n > 0
-                                  ? config.isFinishStage
+                                  ? willServe
                                     ? `\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})`
                                     : `${(config.actionLabel || '').replace(/^\u2192\s*/, '')} \u0432\u0441\u0451 (${n})`
-                                  : (config.isFinishStage ? '\u0412\u044B\u0434\u0430\u0442\u044C' : (config.actionLabel || '\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435').replace(/^\u2192\s*/, ''))
+                                  : (willServe ? '\u0412\u044B\u0434\u0430\u0442\u044C' : (config.actionLabel || '\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435').replace(/^\u2192\s*/, ''))
                               }
                             </button>
                           </div>
@@ -1965,13 +1966,14 @@ function OrderGroupCard({
                       )}
                       {(config.actionLabel || config.isFinishStage) && (() => {
                         const n = orderItems.length;
+                        const willServe = config.isFinishStage || config.derivedNextStatus === 'served';
                         return (
                           <div className="mt-2 pt-1.5 border-t border-slate-100 flex justify-end">
                             <button
                               className="text-xs px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium min-h-[36px]"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (config.isFinishStage) {
+                                if (willServe) {
                                   const snapshots = [order].map(o => ({ orderId: o.id, prevStatus: o.status, prevStageId: getLinkId(o.stage_id) }));
                                   handleBatchAction([order]);
                                   const timerId = setTimeout(() => setUndoToast(null), 5000);
@@ -1995,10 +1997,10 @@ function OrderGroupCard({
                               {advanceMutation.isPending
                                 ? <Loader2 className="w-3 h-3 animate-spin" />
                                 : n > 0
-                                  ? config.isFinishStage
+                                  ? willServe
                                     ? `\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})`
                                     : `${(config.actionLabel || '').replace(/^\u2192\s*/, '')} \u0432\u0441\u0451 (${n})`
-                                  : (config.isFinishStage ? '\u0412\u044B\u0434\u0430\u0442\u044C' : (config.actionLabel || '\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435').replace(/^\u2192\s*/, ''))
+                                  : (willServe ? '\u0412\u044B\u0434\u0430\u0442\u044C' : (config.actionLabel || '\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435').replace(/^\u2192\s*/, ''))
                               }
                             </button>
                           </div>
@@ -2134,7 +2136,29 @@ function OrderGroupCard({
                           {actionName && (
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); handleBatchAction(sgOrders); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const sgWillServe = sgOrders.length > 0 && (() => {
+                                  const c = getStatusConfig(sgOrders[0]);
+                                  return c.isFinishStage || c.derivedNextStatus === 'served';
+                                })();
+                                handleBatchAction(sgOrders);
+                                if (sgWillServe) {
+                                  const snapshots = sgOrders.map(o => ({ orderId: o.id, prevStatus: o.status, prevStageId: getLinkId(o.stage_id) }));
+                                  const timerId = setTimeout(() => setUndoToast(null), 5000);
+                                  setUndoToast({
+                                    snapshots,
+                                    timerId,
+                                    onUndo: () => {
+                                      snapshots.forEach(({ orderId, prevStatus, prevStageId }) => {
+                                        const payload = { status: prevStatus };
+                                        if (prevStageId) payload.stage_id = prevStageId;
+                                        advanceMutation.mutate({ id: orderId, payload });
+                                      });
+                                    }
+                                  });
+                                }
+                              }}
                               disabled={advanceMutation.isPending}
                               className="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded min-h-[36px] active:scale-95 disabled:opacity-60"
                             >
