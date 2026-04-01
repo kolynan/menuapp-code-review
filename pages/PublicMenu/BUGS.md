@@ -1,7 +1,7 @@
 ---
 version: "41.0"
-updated: "2026-03-30"
-session: 205
+updated: "2026-04-01"
+session: 214
 ---
 
 # PublicMenu — Bug Registry
@@ -138,6 +138,20 @@ session: 205
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-HD-17a: Help Drawer auto-closes 5s after card tap — FIXED S214
+- **Приоритет:** P1
+- **Когда:** S214 (chain publicmenu-260401-125045-ef92)
+- **Файл:** x.jsx, handleCardTap ~line 1816
+- **Симптом:** After tapping a help request card, drawer auto-closed after 5s because `handlePresetSelect` internally called `setIsHelpModalOpen(false)`.
+- **Фикс:** Added `setIsHelpModalOpen(true)` after `handlePresetSelect(type)` in the setTimeout callback. Commit d6a0b29 + 80b22ae.
+
+### FIX-HD-17b: Multi-tap only sends 1 of 2 requests — FIXED S214
+- **Приоритет:** P1
+- **Когда:** S214 (chain publicmenu-260401-125045-ef92)
+- **Файл:** x.jsx, handleCardTap ~line 1807
+- **Симптом:** Tapping card 2 cancelled card 1's timer via `clearTimeout(undoToast.timeoutId)`, leaving card 1 stuck in `sending` state.
+- **Фикс:** Removed the `clearTimeout` line — both timers run independently. Added toast guard (`prev?.timeoutId === timeoutId ? null : prev`) to prevent card A's timer from clearing card B's undo toast. Commit d6a0b29 + 80b22ae.
 
 ### FIX-CHAIN-8992: Help Drawer Phase 1 — Ticket Board Architecture (#214) — FIXED S211
 - **Когда:** S211, chain publicmenu-260331-221017-8992
