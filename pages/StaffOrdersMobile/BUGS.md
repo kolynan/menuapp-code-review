@@ -1,18 +1,32 @@
 # StaffOrdersMobile Bug Tracker
 
-**Page:** `pages/StaffOrdersMobile/260306-04 StaffOrdersMobile RELEASE.jsx`
-**Last updated:** 2026-03-06 (Session 90 — restored from 260305-00 + re-applied SO-S89-01)
+**Page:** `pages/StaffOrdersMobile/260331-04 StaffOrdersMobile RELEASE.jsx`
+**Last updated:** 2026-04-01 (Chain 9ed3 — #219 batch undo toast + #220 ВЫДАНО section)
 
 ---
 
 ## Fixed Bugs
+
+### SOM-S213-01 (P1) -- Batch "Выдать всё" button does not trigger undo toast
+- **Function:** OrderGroupCard, Section 2 batch button onClick handler
+- **Root cause:** The batch "Выдать всё" button called `handleBatchAction(completedOrders)` directly without building snapshots or calling `setUndoToast`. Individual per-order buttons had the correct undo pattern, but the batch button was missing it.
+- **Fix:** Replaced onClick handler to build snapshots array from completedOrders, call handleBatchAction, then call setUndoToast with snapshots/timerId/onUndo callback (same pattern as individual order buttons ~line 1951-1965).
+- **Chain:** staffordersmobile-260401-114201-9ed3
+- **Status:** 🟡 Fixed (pending test)
+
+### SOM-UX-24 (P2) -- No "ВЫДАНО" section for served orders
+- **Function:** OrderGroupCard, new Section 4
+- **Root cause:** Once orders reach `served` status, they are excluded from `activeOrders` filter. The table card disappears entirely when all orders are served. No way for waiter to see what was already delivered.
+- **Fix:** Added `servedExpanded` state, `servedOrders` useQuery (lazy, enabled when expanded + table type), and collapsed-by-default ВЫДАНО section with slate-400 muted styling, 44px touch target header, toggle show/hide, read-only rows with guestName + time.
+- **Chain:** staffordersmobile-260401-114201-9ed3
+- **Status:** 🟡 Fixed (pending test)
 
 ### SOM-UX-23 (P1) -- Collapsed card Row 3: replace СЕЙЧАС/ЕЩЁ with per-stage lines
 - **Function:** TableCard collapsed view, Row 3
 - **Root cause:** Old Row 3 showed hardcoded «СЕЙЧАС/ЕЩЁ» labels with static stage names and total sum — noise for waiter, no urgency info
 - **Fix:** Added `summaryLines` useMemo grouping activeOrders by stage via `getStatusConfig`, with per-line age from `stage_entered_at || created_date`. Color coding: red >15min / amber 5-15min / neutral <5min (requests: red ≥3min). Forward-compatible `show_in_summary` filter for #218.
 - **Chain:** staffordersmobile-260331-225506-fac7
-- **Status:** FIXED (pending test)
+- **Status:** ✅ TESTED S212 (collapsed card shows per-stage lines with urgency color)
 
 ### BUG-S66-01 (P1) -- Detail view doesn't open on card tap (Sprint B broken)
 - **Function:** TableDetailScreen render / CSS animation
@@ -327,17 +341,4 @@
 
 **Known limitations:**
 - i18n still fully deferred (BUG-SM-001)
-- Preparing-to-Ready animation → implemented in Sprint C (v3.2.0)
-- Static urgency sort with position stability → implemented in Sprint C (v3.2.0)
-
----
-
-## Sprint A Notes (v3.0.0, 2026-03-02)
-
-**Changes implemented:**
-- V2-01: Compact card (table name + zone, status badge, guest/order count, elapsed time, 1 CTA)
-- V2-05: Color-coded left borders via `TABLE_STATUS_STYLES` mapping (Tailwind classes, no inline styles)
-- V2-06: Muted Preparing cards (gray bg, 2px border, no CTA button)
-- V2-08: Guest-labeled CTA button ("Принять (Гость 1)")
-- V2-10: 52px min-height primary CTA, full-width
-- Sort: BILL_REQUESTED > NEW > READY > ALL_SERVED > PREPARING (oldest first)
+- Preparing-to-Re

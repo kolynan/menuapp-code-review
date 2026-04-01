@@ -1376,6 +1376,13 @@ function OrderGroupCard({
     })),
   });
 
+  const { data: servedOrders = [] } = useQuery({
+    queryKey: ['servedOrders', group.id],
+    queryFn: () => base44.entities.Order.filter({ table: group.id, status: 'served' }),
+    enabled: isExpanded && group.type === 'table',
+    staleTime: 30000,
+  });
+
   const itemsByOrder = useMemo(() => {
     const map = {};
     group.orders.forEach((order, idx) => {
@@ -1478,6 +1485,7 @@ function OrderGroupCard({
   const [completedExpanded, setCompletedExpanded] = useState(false);
   const [inProgressExpanded, setInProgressExpanded] = useState(false);
   const [expandedSubGroups, setExpandedSubGroups] = useState({});
+  const [servedExpanded, setServedExpanded] = useState(false);
 
   // Auto-expand first sub-group when section opens; reset on close so reopen works
   useEffect(() => {
@@ -1902,7 +1910,22 @@ function OrderGroupCard({
                 </p>
                 <button
                   type="button"
-                  onClick={() => handleBatchAction(completedOrders)}
+                  onClick={() => {
+                    const snapshots = completedOrders.map(o => ({ orderId: o.id, prevStatus: o.status, prevStageId: getLinkId(o.stage_id) }));
+                    handleBatchAction(completedOrders);
+                    const timerId = setTimeout(() => setUndoToast(null), 5000);
+                    setUndoToast({
+                      snapshots,
+                      timerId,
+                      onUndo: () => {
+                        snapshots.forEach(({ orderId, prevStatus, prevStageId }) => {
+                          const payload = { status: prevStatus };
+                          if (prevStageId) payload.stage_id = prevStageId;
+                          advanceMutation.mutate({ id: orderId, payload });
+                        });
+                      }
+                    });
+                  }}
                   disabled={advanceMutation.isPending}
                   className="text-xs font-semibold text-green-600 bg-green-50 border border-green-200 px-3 py-1 rounded min-h-[44px] active:scale-95 disabled:opacity-60"
                 >
@@ -2202,6 +2225,36 @@ function OrderGroupCard({
                             {sgOrders.length} {orderCountWord}
                           </div>
                         )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ═══ Section 4 — ВЫДАНО (collapsed by default, read-only history) ═══ */}
+          {group.type === 'table' && servedOrders.length > 0 && (
+            <div>
+              <div
+                className="flex items-center justify-between mb-2 cursor-pointer min-h-[44px]"
+                onClick={() => setServedExpanded(!servedExpanded)}
+              >
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  {`\u0412\u042B\u0414\u0410\u041D\u041E (${servedOrders.length})`}
+                </p>
+                <span className="text-xs text-slate-400">
+                  {servedExpanded ? '\u0421\u043A\u0440\u044B\u0442\u044C \u25B4' : '\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u25B8'}
+                </span>
+              </div>
+              {servedExpanded && (
+                <div className="space-y-1">
+                  {servedOrders.map(order => {
+                    const orderTime = new Date(safeParseDate(order.created_date)).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
+                    return (
+                      <div key={order.id} className="flex items-center justify-between px-2 py-1.5 text-sm text-slate-500">
+                        <span>{guestName(order)}</span>
+                        <span className="text-xs text-slate-400">{orderTime}</span>
                       </div>
                     );
                   })}
