@@ -1,5 +1,5 @@
 // ======================================================
-// pages/x.jsx — PUBLIC MENU with i18n + Channels Visibility + Gating
+// pages/x.jsx â€” PUBLIC MENU with i18n + Channels Visibility + Gating
 // UPDATED: Simplified Hall logic (TASK-260123-01b)
 // FIXED: P0-1..P0-7 security and functionality fixes
 // UPDATED: TASK-260127-01 - session restore, UI cleanup
@@ -187,7 +187,7 @@ const getCartFromStorage = (partnerId) => {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    // Migrate legacy format (plain array) — accept but rewrite with timestamp
+    // Migrate legacy format (plain array) â€” accept but rewrite with timestamp
     if (Array.isArray(data)) {
       try {
         localStorage.setItem(key, JSON.stringify({ items: data, ts: Date.now() }));
@@ -195,7 +195,7 @@ const getCartFromStorage = (partnerId) => {
       return data;
     }
     if (!data || !Array.isArray(data.items)) return null;
-    // TTL check — require valid ts
+    // TTL check â€” require valid ts
     if (!data.ts || typeof data.ts !== 'number' || (Date.now() - data.ts) > CART_TTL_MS) {
       localStorage.removeItem(key);
       return null;
@@ -295,11 +295,11 @@ const setBillCooldownStorage = (tableId) => {
   try {
     const key = getBillCooldownKey(tableId);
     localStorage.setItem(key, String(Date.now()));
-  } catch { /* private browsing — ignore */ }
+  } catch { /* private browsing â€” ignore */ }
 };
 
 /**
- * Находит стартовый этап для заказа
+ * ÐÐ°Ñ…Ð¾Ð´Ð¸Ñ‚ ÑÑ‚Ð°Ñ€Ñ‚Ð¾Ð²Ñ‹Ð¹ ÑÑ‚Ð°Ð¿ Ð´Ð»Ñ Ð·Ð°ÐºÐ°Ð·Ð°
  */
 function getStartStage(stages, orderType) {
   if (!stages?.length) return null;
@@ -321,207 +321,251 @@ function getStartStage(stages, orderType) {
 }
 
 // ============================================================
-// i18n FALLBACK MAP — prevents raw keys from showing to guests
-// Chain: selected lang → EN fallback → RU fallback → empty string
+// i18n FALLBACK MAP â€” prevents raw keys from showing to guests
+// Chain: selected lang â†’ EN fallback â†’ RU fallback â†’ empty string
 // ============================================================
 const I18N_FALLBACKS = {
   // Order statuses (OrderStatusBadge)
-  "status.new": "Новый",
-  "status.cooking": "Готовится",
-  "status.ready": "Готов",
-  "status.accepted": "Принят",
-  "status.served": "Подан",
+  "status.new": "ÐÐ¾Ð²Ñ‹Ð¹",
+  "status.cooking": "Ð“Ð¾Ñ‚Ð¾Ð²Ð¸Ñ‚ÑÑ",
+  "status.ready": "Ð“Ð¾Ñ‚Ð¾Ð²",
+  "status.accepted": "ÐŸÑ€Ð¸Ð½ÑÑ‚",
+  "status.served": "ÐŸÐ¾Ð´Ð°Ð½",
   // Order Status Screen
-  "order_status.status_new": "Принят",
-  "order_status.status_preparing": "Готовится",
-  "order_status.status_ready": "Готов",
-  "order_status.status_served": "Выполнен",
-  "order_status.status_cancelled": "Отменён",
-  "order_status.step_received": "Получен",
-  "order_status.step_preparing": "Готовится",
-  "order_status.step_ready": "Готов",
-  "order_status.no_token": "Ссылка на заказ отсутствует",
-  "order_status.check_link": "Проверьте ссылку и попробуйте снова",
-  "order_status.back_to_menu": "Вернуться в меню",
-  "order_status.not_found": "Заказ не найден",
-  "order_status.expired": "Заказ устарел",
-  "order_status.order_number": "Заказ",
-  "order_status.last_updated": "Обновлено",
-  "order_status.just_now": "только что",
-  "order_status.seconds_ago": "{seconds} сек. назад",
-  "order_status.your_order": "Ваш заказ",
-  "order_status.total": "Итого",
-  "order_status.discount": "Скидка",
-  "order_status.questions": "Есть вопросы?",
-  "order_status.order_cancelled_info": "Заказ отменён",
-  "order_status.order_complete_info": "Спасибо! Ваш заказ выполнен",
-  "order_status.refresh": "Обновить",
+  "order_status.status_new": "ÐŸÑ€Ð¸Ð½ÑÑ‚",
+  "order_status.status_preparing": "Ð“Ð¾Ñ‚Ð¾Ð²Ð¸Ñ‚ÑÑ",
+  "order_status.status_ready": "Ð“Ð¾Ñ‚Ð¾Ð²",
+  "order_status.status_served": "Ð’Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½",
+  "order_status.status_cancelled": "ÐžÑ‚Ð¼ÐµÐ½Ñ‘Ð½",
+  "order_status.step_received": "ÐŸÐ¾Ð»ÑƒÑ‡ÐµÐ½",
+  "order_status.step_preparing": "Ð“Ð¾Ñ‚Ð¾Ð²Ð¸Ñ‚ÑÑ",
+  "order_status.step_ready": "Ð“Ð¾Ñ‚Ð¾Ð²",
+  "order_status.no_token": "Ð¡ÑÑ‹Ð»ÐºÐ° Ð½Ð° Ð·Ð°ÐºÐ°Ð· Ð¾Ñ‚ÑÑƒÑ‚ÑÑ‚Ð²ÑƒÐµÑ‚",
+  "order_status.check_link": "ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ ÑÑÑ‹Ð»ÐºÑƒ Ð¸ Ð¿Ð¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ ÑÐ½Ð¾Ð²Ð°",
+  "order_status.back_to_menu": "Ð’ÐµÑ€Ð½ÑƒÑ‚ÑŒÑÑ Ð² Ð¼ÐµÐ½ÑŽ",
+  "order_status.not_found": "Ð—Ð°ÐºÐ°Ð· Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½",
+  "order_status.expired": "Ð—Ð°ÐºÐ°Ð· ÑƒÑÑ‚Ð°Ñ€ÐµÐ»",
+  "order_status.order_number": "Ð—Ð°ÐºÐ°Ð·",
+  "order_status.last_updated": "ÐžÐ±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾",
+  "order_status.just_now": "Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ‡Ñ‚Ð¾",
+  "order_status.seconds_ago": "{seconds} ÑÐµÐº. Ð½Ð°Ð·Ð°Ð´",
+  "order_status.your_order": "Ð’Ð°Ñˆ Ð·Ð°ÐºÐ°Ð·",
+  "order_status.total": "Ð˜Ñ‚Ð¾Ð³Ð¾",
+  "order_status.discount": "Ð¡ÐºÐ¸Ð´ÐºÐ°",
+  "order_status.questions": "Ð•ÑÑ‚ÑŒ Ð²Ð¾Ð¿Ñ€Ð¾ÑÑ‹?",
+  "order_status.order_cancelled_info": "Ð—Ð°ÐºÐ°Ð· Ð¾Ñ‚Ð¼ÐµÐ½Ñ‘Ð½",
+  "order_status.order_complete_info": "Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾! Ð’Ð°Ñˆ Ð·Ð°ÐºÐ°Ð· Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½",
+  "order_status.refresh": "ÐžÐ±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ",
   // Mode labels
-  "mode.hall": "В зале",
-  "mode.pickup": "С собой",
-  "mode.delivery": "Доставка",
-  "mode.hall.desc": "Заказ в зале",
-  "mode.pickup.desc": "Заберу с собой",
-  "mode.delivery.desc": "Доставка по адресу",
+  "mode.hall": "Ð’ Ð·Ð°Ð»Ðµ",
+  "mode.pickup": "Ð¡ ÑÐ¾Ð±Ð¾Ð¹",
+  "mode.delivery": "Ð”Ð¾ÑÑ‚Ð°Ð²ÐºÐ°",
+  "mode.hall.desc": "Ð—Ð°ÐºÐ°Ð· Ð² Ð·Ð°Ð»Ðµ",
+  "mode.pickup.desc": "Ð—Ð°Ð±ÐµÑ€Ñƒ Ñ ÑÐ¾Ð±Ð¾Ð¹",
+  "mode.delivery.desc": "Ð”Ð¾ÑÑ‚Ð°Ð²ÐºÐ° Ð¿Ð¾ Ð°Ð´Ñ€ÐµÑÑƒ",
   // Hall verification
-  "hall.verify.title": "Чтобы официант получил заказ сразу",
-  "hall.verify.subtitle": "Введите код со стола или назовите его официанту",
-  "hall.verify.benefit": "После этого заказы будут приходить официанту напрямую",
-  "hall.verify.online_benefits": "Бонусы и скидки за онлайн-заказы",
+  "hall.verify.title": "Ð§Ñ‚Ð¾Ð±Ñ‹ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚ Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ð» Ð·Ð°ÐºÐ°Ð· ÑÑ€Ð°Ð·Ñƒ",
+  "hall.verify.subtitle": "Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÐºÐ¾Ð´ ÑÐ¾ ÑÑ‚Ð¾Ð»Ð° Ð¸Ð»Ð¸ Ð½Ð°Ð·Ð¾Ð²Ð¸Ñ‚Ðµ ÐµÐ³Ð¾ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ",
+  "hall.verify.benefit": "ÐŸÐ¾ÑÐ»Ðµ ÑÑ‚Ð¾Ð³Ð¾ Ð·Ð°ÐºÐ°Ð·Ñ‹ Ð±ÑƒÐ´ÑƒÑ‚ Ð¿Ñ€Ð¸Ñ…Ð¾Ð´Ð¸Ñ‚ÑŒ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ Ð½Ð°Ð¿Ñ€ÑÐ¼ÑƒÑŽ",
+  "hall.verify.online_benefits": "Ð‘Ð¾Ð½ÑƒÑÑ‹ Ð¸ ÑÐºÐ¸Ð´ÐºÐ¸ Ð·Ð° Ð¾Ð½Ð»Ð°Ð¹Ð½-Ð·Ð°ÐºÐ°Ð·Ñ‹",
   // Errors
-  "error.invalid_link": "Неверная ссылка",
-  "error.save_failed": "Ошибка сохранения",
-  "error.phone_invalid": "Неверный формат",
-  "error.phone_short": "Слишком короткий номер",
-  "error.phone_long": "Слишком длинный номер",
-  "error.table_required": "Выберите стол",
-  "error.name_required": "Введите имя",
-  "error.phone_required": "Введите телефон",
-  "error.address_required": "Введите адрес",
-  "error.submit_failed": "Ошибка отправки",
-  "error.session_expired": "Сессия истекла",
-  "error.rate_limit": "Слишком много запросов, попробуйте позже",
-  "error.partner_missing": "Ресторан не указан",
-  "error.partner_hint": "Добавьте параметр",
-  "error.partner_not_found": "Ресторан не найден",
+  "error.invalid_link": "ÐÐµÐ²ÐµÑ€Ð½Ð°Ñ ÑÑÑ‹Ð»ÐºÐ°",
+  "error.save_failed": "ÐžÑˆÐ¸Ð±ÐºÐ° ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ",
+  "error.phone_invalid": "ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚",
+  "error.phone_short": "Ð¡Ð»Ð¸ÑˆÐºÐ¾Ð¼ ÐºÐ¾Ñ€Ð¾Ñ‚ÐºÐ¸Ð¹ Ð½Ð¾Ð¼ÐµÑ€",
+  "error.phone_long": "Ð¡Ð»Ð¸ÑˆÐºÐ¾Ð¼ Ð´Ð»Ð¸Ð½Ð½Ñ‹Ð¹ Ð½Ð¾Ð¼ÐµÑ€",
+  "error.table_required": "Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ ÑÑ‚Ð¾Ð»",
+  "error.name_required": "Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ Ð¸Ð¼Ñ",
+  "error.phone_required": "Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ Ñ‚ÐµÐ»ÐµÑ„Ð¾Ð½",
+  "error.address_required": "Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ Ð°Ð´Ñ€ÐµÑ",
+  "error.submit_failed": "ÐžÑˆÐ¸Ð±ÐºÐ° Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸",
+  "error.session_expired": "Ð¡ÐµÑÑÐ¸Ñ Ð¸ÑÑ‚ÐµÐºÐ»Ð°",
+  "error.rate_limit": "Ð¡Ð»Ð¸ÑˆÐºÐ¾Ð¼ Ð¼Ð½Ð¾Ð³Ð¾ Ð·Ð°Ð¿Ñ€Ð¾ÑÐ¾Ð², Ð¿Ð¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ Ð¿Ð¾Ð·Ð¶Ðµ",
+  "error.partner_missing": "Ð ÐµÑÑ‚Ð¾Ñ€Ð°Ð½ Ð½Ðµ ÑƒÐºÐ°Ð·Ð°Ð½",
+  "error.partner_hint": "Ð”Ð¾Ð±Ð°Ð²ÑŒÑ‚Ðµ Ð¿Ð°Ñ€Ð°Ð¼ÐµÑ‚Ñ€",
+  "error.partner_not_found": "Ð ÐµÑÑ‚Ð¾Ñ€Ð°Ð½ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½",
   // Loyalty
-  "loyalty.insufficient_points": "Недостаточно баллов",
-  "loyalty.transaction.redeem": "Списание баллов",
-  "loyalty.transaction.earn_order": "Начисление за заказ #{orderNumber}",
+  "loyalty.insufficient_points": "ÐÐµÐ´Ð¾ÑÑ‚Ð°Ñ‚Ð¾Ñ‡Ð½Ð¾ Ð±Ð°Ð»Ð»Ð¾Ð²",
+  "loyalty.transaction.redeem": "Ð¡Ð¿Ð¸ÑÐ°Ð½Ð¸Ðµ Ð±Ð°Ð»Ð»Ð¾Ð²",
+  "loyalty.transaction.earn_order": "ÐÐ°Ñ‡Ð¸ÑÐ»ÐµÐ½Ð¸Ðµ Ð·Ð° Ð·Ð°ÐºÐ°Ð· #{orderNumber}",
   // Cart / checkout
-  "cart.checkout": "Оформить заказ",
-  "cart.my_bill": "Мой счёт",
-  "cart.table_orders": "Заказы стола",
-  "cart.your_orders": "Ваши заказы",
-  "cart.view": "Открыть",
-  "cart.empty": "Корзина пуста",
-  "cart.bill_already_requested": "Счёт уже запрошен",
-  "cart.bill_requested": "Официант скоро принесёт счёт",
-  "cart.title": "Корзина",
-  "cart.your_order": "Ваш заказ",
-  "cart.back_to_menu": "Назад к меню",
-  "cart.total": "Итого",
-  "cart.expected_savings": "Ожидаемая выгода",
-  "cart.submitting": "Отправка...",
-  "cta.sending": "Отправляем...",
-  "cta.retry": "Повторить отправку",
-  "error.send.title": "Не удалось отправить",
-  "error.send.subtitle": "Попробуйте отправить ещё раз",
-  "cart.item_added": "Добавлено",
-  "cart.send_to_waiter": "Отправить официанту",
-  "cart.send_order": "Отправить заказ",
+  "cart.checkout": "ÐžÑ„Ð¾Ñ€Ð¼Ð¸Ñ‚ÑŒ Ð·Ð°ÐºÐ°Ð·",
+  "cart.my_bill": "ÐœÐ¾Ð¹ ÑÑ‡Ñ‘Ñ‚",
+  "cart.table_orders": "Ð—Ð°ÐºÐ°Ð·Ñ‹ ÑÑ‚Ð¾Ð»Ð°",
+  "cart.your_orders": "Ð’Ð°ÑˆÐ¸ Ð·Ð°ÐºÐ°Ð·Ñ‹",
+  "cart.view": "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ",
+  "cart.empty": "ÐšÐ¾Ñ€Ð·Ð¸Ð½Ð° Ð¿ÑƒÑÑ‚Ð°",
+  "cart.bill_already_requested": "Ð¡Ñ‡Ñ‘Ñ‚ ÑƒÐ¶Ðµ Ð·Ð°Ð¿Ñ€Ð¾ÑˆÐµÐ½",
+  "cart.bill_requested": "ÐžÑ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚ ÑÐºÐ¾Ñ€Ð¾ Ð¿Ñ€Ð¸Ð½ÐµÑÑ‘Ñ‚ ÑÑ‡Ñ‘Ñ‚",
+  "cart.title": "ÐšÐ¾Ñ€Ð·Ð¸Ð½Ð°",
+  "cart.your_order": "Ð’Ð°Ñˆ Ð·Ð°ÐºÐ°Ð·",
+  "cart.back_to_menu": "ÐÐ°Ð·Ð°Ð´ Ðº Ð¼ÐµÐ½ÑŽ",
+  "cart.total": "Ð˜Ñ‚Ð¾Ð³Ð¾",
+  "cart.expected_savings": "ÐžÐ¶Ð¸Ð´Ð°ÐµÐ¼Ð°Ñ Ð²Ñ‹Ð³Ð¾Ð´Ð°",
+  "cart.submitting": "ÐžÑ‚Ð¿Ñ€Ð°Ð²ÐºÐ°...",
+  "cta.sending": "ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð»ÑÐµÐ¼...",
+  "cta.retry": "ÐŸÐ¾Ð²Ñ‚Ð¾Ñ€Ð¸Ñ‚ÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÑƒ",
+  "error.send.title": "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ",
+  "error.send.subtitle": "ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ ÐµÑ‰Ñ‘ Ñ€Ð°Ð·",
+  "cart.item_added": "Ð”Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð¾",
+  "cart.send_to_waiter": "ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ",
+  "cart.send_order": "ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð·Ð°ÐºÐ°Ð·",
   // Checkout form (CheckoutView)
-  "checkout.currency_note": "Конвертация валюты",
-  "form.name": "Имя",
+  "checkout.currency_note": "ÐšÐ¾Ð½Ð²ÐµÑ€Ñ‚Ð°Ñ†Ð¸Ñ Ð²Ð°Ð»ÑŽÑ‚Ñ‹",
+  "form.name": "Ð˜Ð¼Ñ",
   "form.required": "*",
-  "form.phone": "Телефон",
+  "form.phone": "Ð¢ÐµÐ»ÐµÑ„Ð¾Ð½",
   "form.phone_placeholder": "+7...",
-  "form.address": "Адрес доставки",
-  "form.comment": "Комментарий",
-  "form.comment_placeholder": "Пожелания к заказу",
+  "form.address": "ÐÐ´Ñ€ÐµÑ Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ¸",
+  "form.comment": "ÐšÐ¾Ð¼Ð¼ÐµÐ½Ñ‚Ð°Ñ€Ð¸Ð¹",
+  "form.comment_placeholder": "ÐŸÐ¾Ð¶ÐµÐ»Ð°Ð½Ð¸Ñ Ðº Ð·Ð°ÐºÐ°Ð·Ñƒ",
   // Menu (MenuView)
-  "menu.add": "Добавить",
-  "menu.remove": "Убрать",
-  "menu.tile": "Плитка",
-  "menu.list": "Список",
-  "menu.no_items": "Нет блюд в этой категории",
+  "menu.add": "Ð”Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ",
+  "menu.remove": "Ð£Ð±Ñ€Ð°Ñ‚ÑŒ",
+  "menu.tile": "ÐŸÐ»Ð¸Ñ‚ÐºÐ°",
+  "menu.list": "Ð¡Ð¿Ð¸ÑÐ¾Ðº",
+  "menu.no_items": "ÐÐµÑ‚ Ð±Ð»ÑŽÐ´ Ð² ÑÑ‚Ð¾Ð¹ ÐºÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ð¸",
   // Mode tabs
-  "mode.coming_soon": "Скоро",
+  "mode.coming_soon": "Ð¡ÐºÐ¾Ñ€Ð¾",
   // Confirmation screen
-  "confirmation.title": "Заказ отправлен!",
-  "confirmation.your_order": "Ваш заказ",
-  "confirmation.total": "Итого",
-  "confirmation.guest_label": "Гость",
-  "confirmation.client_name": "Имя",
-  "confirmation.back_to_menu": "Вернуться в меню",
-  "confirmation.my_orders": "Мои заказы",
-  "confirmation.track_order": "Отследить заказ",
+  "confirmation.title": "Ð—Ð°ÐºÐ°Ð· Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½!",
+  "confirmation.your_order": "Ð’Ð°Ñˆ Ð·Ð°ÐºÐ°Ð·",
+  "confirmation.total": "Ð˜Ñ‚Ð¾Ð³Ð¾",
+  "confirmation.guest_label": "Ð“Ð¾ÑÑ‚ÑŒ",
+  "confirmation.client_name": "Ð˜Ð¼Ñ",
+  "confirmation.back_to_menu": "Ð’ÐµÑ€Ð½ÑƒÑ‚ÑŒÑÑ Ð² Ð¼ÐµÐ½ÑŽ",
+  "confirmation.my_orders": "ÐœÐ¾Ð¸ Ð·Ð°ÐºÐ°Ð·Ñ‹",
+  "confirmation.track_order": "ÐžÑ‚ÑÐ»ÐµÐ´Ð¸Ñ‚ÑŒ Ð·Ð°ÐºÐ°Ð·",
   // Reviews & misc
-  "review.thanks": "Спасибо за оценку!",
-  "review.add_comments": "Добавить комментарии",
-  "review.points": "баллов",
-  "review.rate_others": "Оценить блюда гостей",
-  "guest.name_saved": "Имя сохранено",
-  "guest.name_placeholder": "Имя",
-  "toast.error": "Ошибка",
-  "common.loading": "Загрузка...",
-  "common.close": "Закрыть",
-  "common.info": "Информация",
-  "common.of": "из",
-  "common.or": "или",
-  "common.save": "Сохранить",
-  // CartView — cart details
-  "cart.enter_table_code_hint": "Введите код стола чтобы отправить заказ",
-  "cart.for_all": "На всех",
-  "cart.guest": "Гость",
-  "cart.new_order": "Новый заказ",
-  "cart.no_orders_yet": "Заказов пока нет",
-  "cart.only_me": "Только я",
-  "cart.order_total": "Сумма заказа",
-  "cart.split_disabled_hint": "(2+ гостей)",
-  "cart.split_pick_guests_soon": "Выбрать гостей (скоро)",
-  "cart.split_title": "Для кого заказ",
-  "cart.table_total": "Счёт стола",
-  "cart.tell_code_to_waiter": "Назовите официанту этот код",
-  "cart.you": "Вы",
-  // CartView — table verification
-  "cart.verify.attempts": "Попытки",
-  "cart.verify.bonus_label": "Бонусы за онлайн-заказ",
-  "cart.verify.discount_label": "Скидка за онлайн-заказ",
-  "cart.verify.enter_code_placeholder": "Введите код",
-  "cart.verify.enter_table_code": "Введите код стола",
-  "cart.verify.info_online_point1": "Заказ сразу попадает официанту",
-  "cart.verify.info_online_point2": "Обычно быстрее",
-  "cart.verify.info_online_point3": "Скидка и бонусы (если есть) применяются автоматически",
-  "cart.verify.info_online_title": "Онлайн-заказ официанту",
-  "cart.verify.info_table_code_point1": "Код обычно указан на столе",
-  "cart.verify.info_table_code_point2": "Если не видно — спросите у официанта",
-  "cart.verify.info_table_code_title": "Код стола",
-  "cart.verify.locked": "Слишком много попыток. Повторите через",
-  "cart.verify.online_order_title": "Онлайн-заказ официанту",
-  "cart.verify.points_discount_label": "Списание баллов",
-  "cart.verify.table_verified": "Стол подтверждён",
-  // CartView — loyalty
-  "loyalty.apply": "Применить",
-  "loyalty.email_label": "Email для бонусов",
+  "review.thanks": "Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° Ð¾Ñ†ÐµÐ½ÐºÑƒ!",
+  "review.add_comments": "Ð”Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ ÐºÐ¾Ð¼Ð¼ÐµÐ½Ñ‚Ð°Ñ€Ð¸Ð¸",
+  "review.points": "Ð±Ð°Ð»Ð»Ð¾Ð²",
+  "review.rate_others": "ÐžÑ†ÐµÐ½Ð¸Ñ‚ÑŒ Ð±Ð»ÑŽÐ´Ð° Ð³Ð¾ÑÑ‚ÐµÐ¹",
+  "guest.name_saved": "Ð˜Ð¼Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¾",
+  "guest.name_placeholder": "Ð˜Ð¼Ñ",
+  "toast.error": "ÐžÑˆÐ¸Ð±ÐºÐ°",
+  "common.loading": "Ð—Ð°Ð³Ñ€ÑƒÐ·ÐºÐ°...",
+  "common.close": "Ð—Ð°ÐºÑ€Ñ‹Ñ‚ÑŒ",
+  "common.info": "Ð˜Ð½Ñ„Ð¾Ñ€Ð¼Ð°Ñ†Ð¸Ñ",
+  "common.of": "Ð¸Ð·",
+  "common.or": "Ð¸Ð»Ð¸",
+  "common.save": "Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ",
+  // CartView â€” cart details
+  "cart.enter_table_code_hint": "Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÐºÐ¾Ð´ ÑÑ‚Ð¾Ð»Ð° Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð·Ð°ÐºÐ°Ð·",
+  "cart.for_all": "ÐÐ° Ð²ÑÐµÑ…",
+  "cart.guest": "Ð“Ð¾ÑÑ‚ÑŒ",
+  "cart.new_order": "ÐÐ¾Ð²Ñ‹Ð¹ Ð·Ð°ÐºÐ°Ð·",
+  "cart.no_orders_yet": "Ð—Ð°ÐºÐ°Ð·Ð¾Ð² Ð¿Ð¾ÐºÐ° Ð½ÐµÑ‚",
+  "cart.only_me": "Ð¢Ð¾Ð»ÑŒÐºÐ¾ Ñ",
+  "cart.order_total": "Ð¡ÑƒÐ¼Ð¼Ð° Ð·Ð°ÐºÐ°Ð·Ð°",
+  "cart.split_disabled_hint": "(2+ Ð³Ð¾ÑÑ‚ÐµÐ¹)",
+  "cart.split_pick_guests_soon": "Ð’Ñ‹Ð±Ñ€Ð°Ñ‚ÑŒ Ð³Ð¾ÑÑ‚ÐµÐ¹ (ÑÐºÐ¾Ñ€Ð¾)",
+  "cart.split_title": "Ð”Ð»Ñ ÐºÐ¾Ð³Ð¾ Ð·Ð°ÐºÐ°Ð·",
+  "cart.table_total": "Ð¡Ñ‡Ñ‘Ñ‚ ÑÑ‚Ð¾Ð»Ð°",
+  "cart.tell_code_to_waiter": "ÐÐ°Ð·Ð¾Ð²Ð¸Ñ‚Ðµ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ ÑÑ‚Ð¾Ñ‚ ÐºÐ¾Ð´",
+  "cart.you": "Ð’Ñ‹",
+  // CartView â€” table verification
+  "cart.verify.attempts": "ÐŸÐ¾Ð¿Ñ‹Ñ‚ÐºÐ¸",
+  "cart.verify.bonus_label": "Ð‘Ð¾Ð½ÑƒÑÑ‹ Ð·Ð° Ð¾Ð½Ð»Ð°Ð¹Ð½-Ð·Ð°ÐºÐ°Ð·",
+  "cart.verify.discount_label": "Ð¡ÐºÐ¸Ð´ÐºÐ° Ð·Ð° Ð¾Ð½Ð»Ð°Ð¹Ð½-Ð·Ð°ÐºÐ°Ð·",
+  "cart.verify.enter_code_placeholder": "Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÐºÐ¾Ð´",
+  "cart.verify.enter_table_code": "Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÐºÐ¾Ð´ ÑÑ‚Ð¾Ð»Ð°",
+  "cart.verify.info_online_point1": "Ð—Ð°ÐºÐ°Ð· ÑÑ€Ð°Ð·Ñƒ Ð¿Ð¾Ð¿Ð°Ð´Ð°ÐµÑ‚ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ",
+  "cart.verify.info_online_point2": "ÐžÐ±Ñ‹Ñ‡Ð½Ð¾ Ð±Ñ‹ÑÑ‚Ñ€ÐµÐµ",
+  "cart.verify.info_online_point3": "Ð¡ÐºÐ¸Ð´ÐºÐ° Ð¸ Ð±Ð¾Ð½ÑƒÑÑ‹ (ÐµÑÐ»Ð¸ ÐµÑÑ‚ÑŒ) Ð¿Ñ€Ð¸Ð¼ÐµÐ½ÑÑŽÑ‚ÑÑ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸",
+  "cart.verify.info_online_title": "ÐžÐ½Ð»Ð°Ð¹Ð½-Ð·Ð°ÐºÐ°Ð· Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ",
+  "cart.verify.info_table_code_point1": "ÐšÐ¾Ð´ Ð¾Ð±Ñ‹Ñ‡Ð½Ð¾ ÑƒÐºÐ°Ð·Ð°Ð½ Ð½Ð° ÑÑ‚Ð¾Ð»Ðµ",
+  "cart.verify.info_table_code_point2": "Ð•ÑÐ»Ð¸ Ð½Ðµ Ð²Ð¸Ð´Ð½Ð¾ â€” ÑÐ¿Ñ€Ð¾ÑÐ¸Ñ‚Ðµ Ñƒ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ð°",
+  "cart.verify.info_table_code_title": "ÐšÐ¾Ð´ ÑÑ‚Ð¾Ð»Ð°",
+  "cart.verify.locked": "Ð¡Ð»Ð¸ÑˆÐºÐ¾Ð¼ Ð¼Ð½Ð¾Ð³Ð¾ Ð¿Ð¾Ð¿Ñ‹Ñ‚Ð¾Ðº. ÐŸÐ¾Ð²Ñ‚Ð¾Ñ€Ð¸Ñ‚Ðµ Ñ‡ÐµÑ€ÐµÐ·",
+  "cart.verify.online_order_title": "ÐžÐ½Ð»Ð°Ð¹Ð½-Ð·Ð°ÐºÐ°Ð· Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ",
+  "cart.verify.points_discount_label": "Ð¡Ð¿Ð¸ÑÐ°Ð½Ð¸Ðµ Ð±Ð°Ð»Ð»Ð¾Ð²",
+  "cart.verify.table_verified": "Ð¡Ñ‚Ð¾Ð» Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´Ñ‘Ð½",
+  // CartView â€” loyalty
+  "loyalty.apply": "ÐŸÑ€Ð¸Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ",
+  "loyalty.email_label": "Email Ð´Ð»Ñ Ð±Ð¾Ð½ÑƒÑÐ¾Ð²",
   "loyalty.email_placeholder": "email@example.com",
-  "loyalty.email_saved": "Email сохранён! Бонусы будут начислены.",
-  "loyalty.enter_email_for_bonus": "Введите email для начисления бонусов:",
-  "loyalty.enter_email_hint": "Введите email для начисления бонусов",
-  "loyalty.get_bonus": "Получить бонусы",
-  "loyalty.new_customer": "Вы получите {points} бонусов за первый заказ",
-  "loyalty.your_balance": "Ваш баланс: {points} баллов",
-  "loyalty.max_redeem": "Максимум {max} баллов ({percent}% от заказа)",
-  "loyalty.instant_discount": "Скидка {percent}% применена",
-  "loyalty.enter_email_for_discount": "Введите email для скидки {percent}%",
-  "loyalty.online_bonus_label": "Бонусы за онлайн-заказ",
-  "loyalty.points_applied": "Баллы применены",
-  "loyalty.points_short": "баллов",
-  "loyalty.redeem_points": "Списать баллы",
-  "loyalty.review_reward_hint": "За отзыв",
-  "loyalty.review_reward_prefix": "за отзыв",
-  "loyalty.thanks_for_rating": "Спасибо за оценку!",
-  "loyalty.title": "Бонусы",
-  // CartView — status (for getSafeStatus)
-  "status.cancelled": "Отменён",
-  // CartView — misc
-  "help.call_waiter": "Позвать официанта",
-  "help.active_requests": "Активные запросы",
-  "help.sent_suffix": "отправлено",
-  "help.undo": "Отменить",
-  "help.cancel_request": "Больше не надо",
-  "form.table": "Стол",
+  "loyalty.email_saved": "Email ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½! Ð‘Ð¾Ð½ÑƒÑÑ‹ Ð±ÑƒÐ´ÑƒÑ‚ Ð½Ð°Ñ‡Ð¸ÑÐ»ÐµÐ½Ñ‹.",
+  "loyalty.enter_email_for_bonus": "Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ email Ð´Ð»Ñ Ð½Ð°Ñ‡Ð¸ÑÐ»ÐµÐ½Ð¸Ñ Ð±Ð¾Ð½ÑƒÑÐ¾Ð²:",
+  "loyalty.enter_email_hint": "Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ email Ð´Ð»Ñ Ð½Ð°Ñ‡Ð¸ÑÐ»ÐµÐ½Ð¸Ñ Ð±Ð¾Ð½ÑƒÑÐ¾Ð²",
+  "loyalty.get_bonus": "ÐŸÐ¾Ð»ÑƒÑ‡Ð¸Ñ‚ÑŒ Ð±Ð¾Ð½ÑƒÑÑ‹",
+  "loyalty.new_customer": "Ð’Ñ‹ Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ñ‚Ðµ {points} Ð±Ð¾Ð½ÑƒÑÐ¾Ð² Ð·Ð° Ð¿ÐµÑ€Ð²Ñ‹Ð¹ Ð·Ð°ÐºÐ°Ð·",
+  "loyalty.your_balance": "Ð’Ð°Ñˆ Ð±Ð°Ð»Ð°Ð½Ñ: {points} Ð±Ð°Ð»Ð»Ð¾Ð²",
+  "loyalty.max_redeem": "ÐœÐ°ÐºÑÐ¸Ð¼ÑƒÐ¼ {max} Ð±Ð°Ð»Ð»Ð¾Ð² ({percent}% Ð¾Ñ‚ Ð·Ð°ÐºÐ°Ð·Ð°)",
+  "loyalty.instant_discount": "Ð¡ÐºÐ¸Ð´ÐºÐ° {percent}% Ð¿Ñ€Ð¸Ð¼ÐµÐ½ÐµÐ½Ð°",
+  "loyalty.enter_email_for_discount": "Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ email Ð´Ð»Ñ ÑÐºÐ¸Ð´ÐºÐ¸ {percent}%",
+  "loyalty.online_bonus_label": "Ð‘Ð¾Ð½ÑƒÑÑ‹ Ð·Ð° Ð¾Ð½Ð»Ð°Ð¹Ð½-Ð·Ð°ÐºÐ°Ð·",
+  "loyalty.points_applied": "Ð‘Ð°Ð»Ð»Ñ‹ Ð¿Ñ€Ð¸Ð¼ÐµÐ½ÐµÐ½Ñ‹",
+  "loyalty.points_short": "Ð±Ð°Ð»Ð»Ð¾Ð²",
+  "loyalty.redeem_points": "Ð¡Ð¿Ð¸ÑÐ°Ñ‚ÑŒ Ð±Ð°Ð»Ð»Ñ‹",
+  "loyalty.review_reward_hint": "Ð—Ð° Ð¾Ñ‚Ð·Ñ‹Ð²",
+  "loyalty.review_reward_prefix": "Ð·Ð° Ð¾Ñ‚Ð·Ñ‹Ð²",
+  "loyalty.thanks_for_rating": "Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° Ð¾Ñ†ÐµÐ½ÐºÑƒ!",
+  "loyalty.title": "Ð‘Ð¾Ð½ÑƒÑÑ‹",
+  // CartView â€” status (for getSafeStatus)
+  "status.cancelled": "ÐžÑ‚Ð¼ÐµÐ½Ñ‘Ð½",
+  // CartView â€” misc
+  "help.call_waiter": "Call a waiter",
+  "help.active_requests": "Active requests",
+  "help.sent_suffix": "sent",
+  "help.undo": "Undo",
+  "help.cancel_request": "Not needed",
+  "help.modal_title": "Need help?",
+  "help.modal_desc": "Choose how we can help",
+  "help.my_requests": "My requests",
+  "help.active_count": "active",
+  "help.bill": "Bring the bill",
+  "help.napkins": "Napkins",
+  "help.menu": "Paper menu",
+  "help.other": "Other",
+  "help.other_label": "Other",
+  "help.send_more": "Send more",
+  "help.all_requests_cta": "All requests ({count})",
+  "help.back_to_help": "Back to help",
+  "help.show_more": "More",
+  "help.show_less": "Less",
+  "help.requests": "requests",
+  "help.already_sent_short": "Already sent",
+  "help.comment_placeholder_other": "E.g.: high chair, cutlery, clear the table",
+  "help.submit_arrow": "Send",
+  "help.closed_by_guest": "✅ No longer needed",
+  "help.sending_now": "Sending…",
+  "help.retry": "Retry",
+  "help.remind": "Remind",
+  "help.retry_in": "In",
+  "help.just_sent": "Just sent",
+  "help.waiting_prefix": "Waiting",
+  "help.minutes_short": "min",
+  "help.reminded_just_now": "Just reminded",
+  "help.reminded_prefix": "Reminded",
+  "help.last_reminder_prefix": "Last",
+  "help.reminder_sent": "Reminder sent",
+  "help.resolved_call_waiter": "✅ Waiter came · Thank you!",
+  "help.resolved_bill": "✅ Bill brought · Thank you!",
+  "help.resolved_napkins": "✅ Napkins brought · Thank you!",
+  "help.resolved_menu": "✅ Menu brought · Thank you!",
+  "help.resolved_other": "✅ Done · Thank you!",
+  "help.no_connection": "No connection",
+  "help.try_again": "Try again",
+  "help.remind_failed": "Failed to send reminder",
+  "help.send_failed": "Failed to send",
+  "help.restoring_status": "Restoring status…",
+  "help.offline_status": "No connection · will retry automatically",
+  "help.stale_status": "Data may be outdated · no update",
+  "help.seconds_short": "sec",
+  "help.updated_label": "Updated",
+  "form.table": "Ð¡Ñ‚Ð¾Ð»",
   // Mode-switch toast
-  "cart.items_removed_mode_switch": "Убрано {count} блюд, недоступных в этом режиме",
+  "cart.items_removed_mode_switch": "Ð£Ð±Ñ€Ð°Ð½Ð¾ {count} Ð±Ð»ÑŽÐ´, Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ñ‹Ñ… Ð² ÑÑ‚Ð¾Ð¼ Ñ€ÐµÐ¶Ð¸Ð¼Ðµ",
   // Table confirmation Bottom Sheet (just-in-time)
-  "cart.confirm_table.title": "Подтвердите стол",
-  "cart.confirm_table.subtitle": "Чтобы отправить заказ официанту",
-  "cart.confirm_table.benefit_loyalty": "По онлайн-заказу вы получите бонусы / скидку",
-  "cart.confirm_table.benefit_default": "Так официант быстрее найдёт ваш заказ",
-  "cart.confirm_table.submit": "Отправить",
-  // Menu — dish actions (PM-102, PM-103)
-  "menu.added_to_cart": "Добавлено в корзину",
-  "menu.add_to_cart": "Добавить в корзину",
+  "cart.confirm_table.title": "ÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚Ðµ ÑÑ‚Ð¾Ð»",
+  "cart.confirm_table.subtitle": "Ð§Ñ‚Ð¾Ð±Ñ‹ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð·Ð°ÐºÐ°Ð· Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ",
+  "cart.confirm_table.benefit_loyalty": "ÐŸÐ¾ Ð¾Ð½Ð»Ð°Ð¹Ð½-Ð·Ð°ÐºÐ°Ð·Ñƒ Ð²Ñ‹ Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ñ‚Ðµ Ð±Ð¾Ð½ÑƒÑÑ‹ / ÑÐºÐ¸Ð´ÐºÑƒ",
+  "cart.confirm_table.benefit_default": "Ð¢Ð°Ðº Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚ Ð±Ñ‹ÑÑ‚Ñ€ÐµÐµ Ð½Ð°Ð¹Ð´Ñ‘Ñ‚ Ð²Ð°Ñˆ Ð·Ð°ÐºÐ°Ð·",
+  "cart.confirm_table.submit": "ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ",
+  // Menu â€” dish actions (PM-102, PM-103)
+  "menu.added_to_cart": "Ð”Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð¾ Ð² ÐºÐ¾Ñ€Ð·Ð¸Ð½Ñƒ",
+  "menu.add_to_cart": "Ð”Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ Ð² ÐºÐ¾Ñ€Ð·Ð¸Ð½Ñƒ",
 };
 
 /**
@@ -570,8 +614,8 @@ function OrderStatusBadge({ status, stageId, stages, t }) {
   if (stageIdNorm && stages?.length) {
     const stage = stages.find(s => String(s.id) === String(stageIdNorm));
     if (stage) {
-      const icon = stage.internal_code === 'finish' ? '✅' : 
-                   stage.internal_code === 'start' ? '🔵' : '🟠';
+      const icon = stage.internal_code === 'finish' ? 'âœ…' : 
+                   stage.internal_code === 'start' ? 'ðŸ”µ' : 'ðŸŸ ';
       const label = STAGE_LABELS[stage.internal_code] || t('status.new');
       const color = stage.color || '#64748b';
       return (
@@ -587,11 +631,11 @@ function OrderStatusBadge({ status, stageId, stages, t }) {
   
   // Fallback to status
   const STATUS_CONFIG = {
-    new: { icon: '🔵', label: t('status.new'), bg: 'bg-blue-100', color: 'text-blue-700' },
-    accepted: { icon: '🔵', label: t('status.accepted'), bg: 'bg-blue-100', color: 'text-blue-700' },
-    in_progress: { icon: '🟠', label: t('status.cooking'), bg: 'bg-orange-100', color: 'text-orange-700' },
-    ready: { icon: '✅', label: t('status.ready'), bg: 'bg-green-100', color: 'text-green-700' },
-    served: { icon: '✅', label: t('status.served'), bg: 'bg-green-100', color: 'text-green-700' },
+    new: { icon: 'ðŸ”µ', label: t('status.new'), bg: 'bg-blue-100', color: 'text-blue-700' },
+    accepted: { icon: 'ðŸ”µ', label: t('status.accepted'), bg: 'bg-blue-100', color: 'text-blue-700' },
+    in_progress: { icon: 'ðŸŸ ', label: t('status.cooking'), bg: 'bg-orange-100', color: 'text-orange-700' },
+    ready: { icon: 'âœ…', label: t('status.ready'), bg: 'bg-green-100', color: 'text-green-700' },
+    served: { icon: 'âœ…', label: t('status.served'), bg: 'bg-green-100', color: 'text-green-700' },
   };
   
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.new;
@@ -636,7 +680,7 @@ function OrderConfirmationScreen({
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto" style={{backgroundColor:'#faf9f7'}}>
     <div className="px-4 py-8 max-w-md mx-auto animate-[fadeInUp_0.3s_ease-out]">
-      {/* CSS-only animations — respects prefers-reduced-motion */}
+      {/* CSS-only animations â€” respects prefers-reduced-motion */}
       <style>{`
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(12px); }
@@ -698,7 +742,7 @@ function OrderConfirmationScreen({
 
       {/* Title */}
       <h2 className="text-xl font-semibold text-center text-slate-800 mb-6">
-        {tr("confirmation.title", "Заказ отправлен!")}
+        {tr("confirmation.title", "Ð—Ð°ÐºÐ°Ð· Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½!")}
       </h2>
 
       {/* Order summary card */}
@@ -726,7 +770,7 @@ function OrderConfirmationScreen({
           <div className="border-t border-slate-200 pt-3 mt-3">
             <div className="flex justify-between items-center">
               <span className="font-medium text-slate-800">
-                {tr("confirmation.total", "Итого")}
+                {tr("confirmation.total", "Ð˜Ñ‚Ð¾Ð³Ð¾")}
               </span>
               <span className="font-semibold text-slate-800 tabular-nums">
                 {formatPrice(parseFloat(Number(totalAmount).toFixed(2)))}
@@ -737,7 +781,7 @@ function OrderConfirmationScreen({
           {/* Client name (pickup/delivery) */}
           {clientName && orderMode !== "hall" && (
             <p className="text-sm text-slate-500 mt-1">
-              {tr("confirmation.client_name", "Имя")}: {clientName}
+              {tr("confirmation.client_name", "Ð˜Ð¼Ñ")}: {clientName}
             </p>
           )}
         </CardContent>
@@ -750,7 +794,7 @@ function OrderConfirmationScreen({
           style={{backgroundColor: primaryColor}}
           onClick={onBackToMenu}
         >
-          {tr("confirmation.back_to_menu", "Вернуться в меню")}
+          {tr("confirmation.back_to_menu", "Ð’ÐµÑ€Ð½ÑƒÑ‚ÑŒÑÑ Ð² Ð¼ÐµÐ½ÑŽ")}
         </Button>
 
         <Button
@@ -758,10 +802,10 @@ function OrderConfirmationScreen({
           className="w-full h-12"
           onClick={onOpenOrders}
         >
-          {tr("confirmation.my_orders", "Мои заказы")}
+          {tr("confirmation.my_orders", "ÐœÐ¾Ð¸ Ð·Ð°ÐºÐ°Ð·Ñ‹")}
         </Button>
 
-        {/* Track order — pickup/delivery only (GAP-02: navigate to embedded status view) */}
+        {/* Track order â€” pickup/delivery only (GAP-02: navigate to embedded status view) */}
         {orderMode !== "hall" && publicToken && (
           <Button
             variant="ghost"
@@ -771,7 +815,7 @@ function OrderConfirmationScreen({
               onTrackOrder(publicToken);
             }}
           >
-            {tr("confirmation.track_order", "Отследить заказ")}
+            {tr("confirmation.track_order", "ÐžÑ‚ÑÐ»ÐµÐ´Ð¸Ñ‚ÑŒ Ð·Ð°ÐºÐ°Ð·")}
           </Button>
         )}
       </div>
@@ -783,7 +827,7 @@ function OrderConfirmationScreen({
 /* ============================================================
    GAP-02: ORDER STATUS SCREEN (embedded)
    Pickup/delivery guests track their order status.
-   Renders inside x.jsx as a view — no separate /orderstatus route.
+   Renders inside x.jsx as a view â€” no separate /orderstatus route.
    Polls every 10s for status updates.
    ============================================================ */
 
@@ -970,7 +1014,7 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
     if (order && !lastUpdated) setLastUpdated(new Date());
   }, [order, lastUpdated]);
 
-  // "seconds ago" counter — stops when order is terminal (P0 fix)
+  // "seconds ago" counter â€” stops when order is terminal (P0 fix)
   useEffect(() => {
     if (!lastUpdated || isTerminal) return;
     const tick = () => setSecondsAgo(Math.floor((Date.now() - lastUpdated.getTime()) / 1000));
@@ -1028,7 +1072,7 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
     );
   }
 
-  // Network/backend error — retryable (PM-074)
+  // Network/backend error â€” retryable (PM-074)
   if (orderError) {
     return (
       <div className="fixed inset-0 z-[60] overflow-y-auto" style={{backgroundColor:'#faf9f7'}}>
@@ -1321,7 +1365,7 @@ export default function X() {
     return window.matchMedia("(max-width: 767px)").matches;
   });
 
-  // Mobile layout preference (tile | list) — S72: default list for mobile-first UX
+  // Mobile layout preference (tile | list) â€” S72: default list for mobile-first UX
   const [mobileLayout, setMobileLayout] = useState('list');
 
   // Redirect banner state
@@ -1381,7 +1425,7 @@ export default function X() {
         primaryError = e;
       }
 
-      // Fallback lookup — let errors propagate to React Query (PM-070)
+      // Fallback lookup â€” let errors propagate to React Query (PM-070)
       const res2 = await base44.entities.Partner.filter(byIdFirst ? { slug: p } : { id: p });
       if (res2?.[0]) return res2[0];
       if (primaryError) throw primaryError;
@@ -1420,13 +1464,13 @@ export default function X() {
       if (saved === 'tile' || saved === 'list') {
         setMobileLayout(saved);
       } else {
-        // Default based on partner setting — S72: default list unless partner set 2-col grid
+        // Default based on partner setting â€” S72: default list unless partner set 2-col grid
         const mobileGrid = Number(partner.menu_grid_mobile ?? 1);
         const defaultLayout = mobileGrid === 2 ? 'tile' : 'list';
         setMobileLayout(defaultLayout);
       }
     } catch (e) {
-      // Failed to load mobile layout preference — silent in prod
+      // Failed to load mobile layout preference â€” silent in prod
     }
   }, [partner?.id, partner?._id, partner?.slug, partner?.code]);
 
@@ -1443,7 +1487,7 @@ export default function X() {
       const storageKey = `menuMobileLayout:${partnerKey}`;
       localStorage.setItem(storageKey, layout);
     } catch (e) {
-      // Failed to save mobile layout preference — silent in prod
+      // Failed to save mobile layout preference â€” silent in prod
     }
   };
 
@@ -1498,7 +1542,7 @@ export default function X() {
     setView("menu");
   }, []);
 
-  // GAP-01: Show confirmation screen (no auto-dismiss — user navigates via buttons)
+  // GAP-01: Show confirmation screen (no auto-dismiss â€” user navigates via buttons)
   const showConfirmation = useCallback((data) => {
     setConfirmationData(data);
     setView("confirmation");
@@ -1591,7 +1635,7 @@ export default function X() {
         JSON.stringify({ partnerId, tableId, timestamp: Date.now() })
       );
     } catch (e) {
-      /* silent — localStorage save is best-effort */
+      /* silent â€” localStorage save is best-effort */
     }
   };
 
@@ -1619,7 +1663,7 @@ export default function X() {
   // Removed hasTableInUrl from condition - URL param alone doesn't mean verified
   const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
 
-  // Table code config (for Bottom Sheet — PM-064)
+  // Table code config (for Bottom Sheet â€” PM-064)
   const tableCodeLength = useMemo(() => {
     const n = Number(partner?.table_code_length);
     return (Number.isFinite(n) && n > 0) ? Math.max(3, Math.min(8, Math.round(n))) : 4;
@@ -1650,312 +1694,929 @@ export default function X() {
   } = useHelpRequests({ partner, currentTableId, t, toast, isRateLimitError, saveTableSelection });
 
   // HD-01..HD-08: Help drawer mini-ticket board state
+  const HELP_SYNC_INTERVAL_MS = 5000;
+  const HELP_STALE_AFTER_MS = HELP_SYNC_INTERVAL_MS * 3;
+  const HELP_RESTORE_TTL_MS = 6 * 60 * 60 * 1000;
+  const HELP_MATCH_GRACE_MS = 2 * 60 * 1000;
+  const HELP_RESOLVED_HIDE_MS = 4000;
+  const HELP_CLOSED_HIDE_MS = 2000;
+  const HELP_PREVIEW_LIMIT = 2;
+  const HELP_REQUEST_TYPES = useMemo(() => new Set(['call_waiter', 'bill', 'napkins', 'menu', 'other']), []);
+  const HELP_ACTIVE_SERVER_STATUSES = useMemo(() => new Set(['new', 'in_progress']), []);
+  const HELP_DONE_SERVER_STATUSES = useMemo(() => new Set(['done']), []);
   const HELP_COOLDOWN_SECONDS = useMemo(() => ({ call_waiter: 90, bill: 150, napkins: 240, menu: 240, other: 120 }), []);
   const HELP_CARD_LABELS = useMemo(() => ({
-    call_waiter: t('help.call_waiter', 'Позвать официанта'),
-    bill: t('help.bill', 'Принести счёт'),
-    napkins: t('help.napkins', 'Салфетки'),
-    menu: t('help.menu', 'Бумажное меню'),
-    other: t('help.other_label', 'Другое'),
-  }), [t]);
+    call_waiter: tr('help.call_waiter', 'Call a waiter'),
+    bill: tr('help.bill', 'Bring the bill'),
+    napkins: tr('help.napkins', 'Napkins'),
+    menu: tr('help.menu', 'Paper menu'),
+    other: tr('help.other_label', 'Other'),
+  }), [tr]);
   const HELP_CHIPS = useMemo(() => ['Детский стул', 'Приборы', 'Соус', 'Убрать со стола', 'Вода'], []);
 
   const [requestStates, setRequestStates] = useState({});
-  const hasLoadedHelpStatesRef = useRef(false); // HD-10: prevent save effect from wiping localStorage before load
-  // HD-05: Load requestStates from localStorage on mount (restore badge + card state after refresh)
+  const hasLoadedHelpStatesRef = useRef(false);
+  const [undoToast, setUndoToast] = useState(null); // { type, rowId, message?, tableId, expiresAt, timeoutId }
+  const [showOtherForm, setShowOtherForm] = useState(false);
+  const [timerTick, setTimerTick] = useState(0);
+  const pendingQuickSendRef = useRef(null); // { type, action, rowId, message }
+  const [pendingHelpActionTick, setPendingHelpActionTick] = useState(0);
+  const currentTableIdRef = useRef(currentTableId);
+  const [isHelpRestoring, setIsHelpRestoring] = useState(false);
+  const [isHelpOnline, setIsHelpOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
+  const ticketBoardRef = useRef(null);
+  const [highlightedTicket, setHighlightedTicket] = useState(null);
+  const [isTicketExpanded, setIsTicketExpanded] = useState(false);
+
   useEffect(() => {
-    if (!currentTableId) return;
+    currentTableIdRef.current = currentTableId;
+  }, [currentTableId]);
+
+  useEffect(() => {
+    const handleOnline = () => setIsHelpOnline(true);
+    const handleOffline = () => setIsHelpOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const getHelpCooldownMs = useCallback((type) => {
+    return (HELP_COOLDOWN_SECONDS[type] || HELP_COOLDOWN_SECONDS.other || 120) * 1000;
+  }, [HELP_COOLDOWN_SECONDS]);
+
+  const normalizeHelpMessage = useCallback((value) => String(value || '').trim(), []);
+  const getHelpMessageKey = useCallback((value) => normalizeHelpMessage(value).toLowerCase(), [normalizeHelpMessage]);
+
+  const parseHelpTimestamp = useCallback((value) => {
+    const ms = value ? new Date(value).getTime() : NaN;
+    return Number.isFinite(ms) ? ms : null;
+  }, []);
+
+  const getNormalizedHelpState = useCallback((type, state, now = Date.now()) => {
+    if (!state) return null;
+
+    const message = normalizeHelpMessage(state.message || state.comment);
+    const sentAt = Number(state.sentAt) || parseHelpTimestamp(state.sentAt) || null;
+    const reminderCount = Math.max(0, Number(state.reminderCount) || 0);
+    const lastReminderAt = Number(state.lastReminderAt) || parseHelpTimestamp(state.lastReminderAt) || null;
+    const remindCooldownUntil =
+      Number(state.remindCooldownUntil) ||
+      parseHelpTimestamp(state.remindCooldownUntil) ||
+      ((lastReminderAt || sentAt) ? (lastReminderAt || sentAt) + getHelpCooldownMs(type) : null);
+
+    if (!sentAt && state.status !== 'closed_by_guest' && state.status !== 'resolved') return null;
+
+    if (state.status === 'closed_by_guest' || state.status === 'resolved') {
+      return {
+        ...state,
+        id: state.id || (type === 'other' ? `other-${sentAt || now}` : type),
+        message,
+        sentAt: sentAt || now,
+        reminderCount,
+        lastReminderAt,
+        remindCooldownUntil,
+        isActive: false,
+        isVisible: !state.terminalHideAt || state.terminalHideAt > now,
+      };
+    }
+
+    if (state.status === 'sending') {
+      return {
+        ...state,
+        id: state.id || (type === 'other' ? `other-${sentAt || now}` : type),
+        message,
+        sentAt,
+        reminderCount,
+        lastReminderAt,
+        remindCooldownUntil,
+        isActive: true,
+        isVisible: true,
+      };
+    }
+
+    const cooldownActive = Boolean(remindCooldownUntil && remindCooldownUntil > now);
+    const normalizedStatus = cooldownActive
+      ? (reminderCount > 0 ? 'reminded' : 'sent')
+      : 'remind_available';
+
+    return {
+      ...state,
+      id: state.id || (type === 'other' ? `other-${sentAt}` : type),
+      status: normalizedStatus,
+      message,
+      sentAt,
+      reminderCount,
+      lastReminderAt,
+      remindCooldownUntil,
+      isActive: true,
+      isVisible: true,
+    };
+  }, [getHelpCooldownMs, normalizeHelpMessage, parseHelpTimestamp]);
+
+  const ticketRows = useMemo(() => {
+    const now = Date.now();
+    const list = [];
+
+    Object.entries(requestStates).forEach(([type, state]) => {
+      if (type === 'other') {
+        const rows = Array.isArray(state) ? state : [state].filter(Boolean);
+        rows.forEach((entry) => {
+          const normalized = getNormalizedHelpState('other', entry, now);
+          if (normalized && (normalized.isVisible || normalized.isActive)) {
+            list.push({ ...normalized, type: 'other', id: normalized.id });
+          }
+        });
+        return;
+      }
+
+      const normalized = getNormalizedHelpState(type, state, now);
+      if (normalized && (normalized.isVisible || normalized.isActive)) {
+        list.push({ ...normalized, type, id: normalized.id || type });
+      }
+    });
+
+    return list.sort((a, b) => {
+      if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+      return (b.sentAt || 0) - (a.sentAt || 0);
+    });
+  }, [getNormalizedHelpState, requestStates, timerTick]);
+
+  const activeRequests = useMemo(() => ticketRows.filter((row) => row.isActive), [ticketRows]);
+  const activeRequestCount = useMemo(() => activeRequests.length, [activeRequests]);
+
+  // HD-05: Load requestStates from localStorage on mount / table change
+  useEffect(() => {
+    if (!currentTableId) {
+      setRequestStates({});
+      setUndoToast((prev) => {
+        if (prev?.timeoutId) clearTimeout(prev.timeoutId);
+        return null;
+      });
+      pendingQuickSendRef.current = null;
+      setPendingHelpActionTick(0);
+      setIsHelpRestoring(false);
+      hasLoadedHelpStatesRef.current = true;
+      return;
+    }
+
     try {
       const key = `helpdrawer_${currentTableId}`;
       const stored = localStorage.getItem(key);
-      if (!stored) { hasLoadedHelpStatesRef.current = true; return; }
+      if (!stored) {
+        setRequestStates({});
+        setIsHelpRestoring(false);
+        hasLoadedHelpStatesRef.current = true;
+        return;
+      }
+
       const parsed = JSON.parse(stored);
       const now = Date.now();
-      const updated = {};
-      for (const [type, state] of Object.entries(parsed)) {
-        if (type === 'other' && Array.isArray(state)) {
-          const validEntries = state.filter(entry => {
-            if (!entry.sentAt) return false;
-            const cooldownMs = (HELP_COOLDOWN_SECONDS['other'] || 120) * 1000;
-            const elapsed = now - entry.sentAt;
-            return elapsed < cooldownMs + 60000;
-          }).map(entry => {
-            const cooldownMs = (HELP_COOLDOWN_SECONDS['other'] || 120) * 1000;
-            const elapsed = now - entry.sentAt;
-            return elapsed >= cooldownMs ? { ...entry, status: 'repeat' } : { ...entry };
-          });
-          if (validEntries.length > 0) updated.other = validEntries;
+      const restored = {};
+      const restoreEntry = (type, rawEntry, fallbackId) => {
+        if (!rawEntry) return null;
+        const sentAt = Number(rawEntry.sentAt) || parseHelpTimestamp(rawEntry.sentAt) || null;
+        if (!sentAt || rawEntry.status === 'sending' || (now - sentAt) > HELP_RESTORE_TTL_MS) return null;
+
+        const mappedStatus =
+          rawEntry.status === 'pending'
+            ? 'sent'
+            : rawEntry.status === 'repeat'
+              ? 'remind_available'
+              : rawEntry.status;
+
+        if (mappedStatus === 'resolved' || mappedStatus === 'closed_by_guest') return null;
+
+        return {
+          id: rawEntry.id || fallbackId,
+          status: mappedStatus || 'sent',
+          message: normalizeHelpMessage(rawEntry.message || rawEntry.comment),
+          sentAt,
+          reminderCount: Math.max(0, Number(rawEntry.reminderCount) || 0),
+          lastReminderAt: Number(rawEntry.lastReminderAt) || parseHelpTimestamp(rawEntry.lastReminderAt) || null,
+          remindCooldownUntil: Number(rawEntry.remindCooldownUntil) || parseHelpTimestamp(rawEntry.remindCooldownUntil) || null,
+          pendingAction: null,
+          errorKind: null,
+          errorMessage: '',
+          terminalHideAt: null,
+          syncSource: 'local',
+        };
+      };
+
+      for (const [type, state] of Object.entries(parsed || {})) {
+        if (type === 'other') {
+          const otherRows = (Array.isArray(state) ? state : [state])
+            .map((entry, index) => restoreEntry('other', entry, entry?.id || `other-${index}`))
+            .filter(Boolean);
+          if (otherRows.length > 0) restored.other = otherRows;
           continue;
         }
-        const cooldownMs = (HELP_COOLDOWN_SECONDS[type] || 120) * 1000;
-        if ((state.status === 'pending' || state.status === 'repeat') && state.sentAt) {
-          const elapsed = now - state.sentAt;
-          if (elapsed < cooldownMs + 60000) {
-            updated[type] = elapsed >= cooldownMs
-              ? { ...state, status: 'repeat' }
-              : { ...state };
-          }
-        }
-      }
-      if (Object.keys(updated).length > 0) {
-        setRequestStates(updated);
-      }
-    } catch (e) { /* ignore corrupted storage */ }
-    hasLoadedHelpStatesRef.current = true;
-  }, [currentTableId, HELP_COOLDOWN_SECONDS]);
-  // Structure: { call_waiter: { status: 'idle'|'sending'|'pending'|'repeat', sentAt, lastReminderAt, reminderCount, remindCooldownUntil, message? }, other: [...array of entries...] }
-  const [undoToast, setUndoToast] = useState(null); // { type, expiresAt, timeoutId }
-  const [showOtherForm, setShowOtherForm] = useState(false);
-  const [timerTick, setTimerTick] = useState(0);
-  const pendingQuickSendRef = useRef(null);
-  const ticketBoardRef = useRef(null); // Fix 3: ref for scroll-to-ticket-board
-  const [highlightedTicket, setHighlightedTicket] = useState(null); // Fix 3: amber highlight on re-tap
-  const [isTicketExpanded, setIsTicketExpanded] = useState(false); // Fix 6: collapse toggle
 
-  // HD-03: Relative time helper
-  const getRelativeTime = useCallback((sentAtMs) => {
-    const seconds = Math.floor((Date.now() - sentAtMs) / 1000);
-    if (seconds < 60) return t('help.just_now', 'Только что');
-    const mins = Math.floor(seconds / 60);
-    if (seconds >= 600) return `${t('help.waiting', 'Ждёте')} ${mins} ${t('help.min_short', 'мин')}`;
-    return `${mins} ${t('help.min_ago', 'мин назад')}`;
-  }, [t, timerTick]);
+        const restoredEntry = restoreEntry(type, state, type);
+        if (restoredEntry) restored[type] = restoredEntry;
+      }
 
-  // Ticket board: active requests list (pending, sending, repeat) sorted by sentAt ascending
-  const activeRequests = useMemo(() => {
-    const list = [];
-    for (const [type, state] of Object.entries(requestStates)) {
-      if (type === 'other') {
-        // other is an array of entries
-        if (Array.isArray(state)) {
-          state.forEach(entry => {
-            if (entry.status === 'pending' || entry.status === 'sending' || entry.status === 'repeat') {
-              list.push({ type: 'other', id: entry.id, ...entry });
-            }
-          });
-        } else if (state && (state.status === 'pending' || state.status === 'sending' || state.status === 'repeat')) {
-          // backward compat: single object
-          list.push({ type: 'other', id: 'other-0', ...state });
-        }
-        continue;
-      }
-      if (state && (state.status === 'pending' || state.status === 'sending' || state.status === 'repeat')) {
-        list.push({ type, id: type, ...state });
-      }
+      setRequestStates(restored);
+      setIsHelpRestoring(Object.keys(restored).length > 0);
+    } catch (e) {
+      setRequestStates({});
+      setIsHelpRestoring(false);
     }
-    return list.sort((a, b) => (a.sentAt || 0) - (b.sentAt || 0));
-  }, [requestStates]);
 
-  // HD-07: Active request count for badge (uses activeRequests)
-  const activeRequestCount = useMemo(() => activeRequests.length, [activeRequests]);
+    hasLoadedHelpStatesRef.current = true;
+  }, [currentTableId, normalizeHelpMessage, parseHelpTimestamp]);
+
+  const hasAnyHelpState = useMemo(() => {
+    const now = Date.now();
+    return Object.entries(requestStates).some(([type, state]) => {
+      if (type === 'other') {
+        const rows = Array.isArray(state) ? state : [state].filter(Boolean);
+        return rows.some((entry) => {
+          const normalized = getNormalizedHelpState('other', entry, now);
+          return normalized && (normalized.isActive || normalized.isVisible || normalized.pendingAction || normalized.errorKind);
+        });
+      }
+      const normalized = getNormalizedHelpState(type, state, now);
+      return normalized && (normalized.isActive || normalized.isVisible || normalized.pendingAction || normalized.errorKind);
+    });
+  }, [getNormalizedHelpState, requestStates, timerTick]);
+
+  const helpSyncEnabled = Boolean(partner?.id && currentTableId && (isHelpModalOpen || hasAnyHelpState || isHelpRestoring));
+  const { data: helpRequestFeed = [], isError: isHelpSyncError, dataUpdatedAt: helpSyncUpdatedAt } = useQuery({
+    queryKey: ['helpDrawerRequests', partner?.id, currentTableId],
+    enabled: helpSyncEnabled,
+    retry: shouldRetry,
+    refetchInterval: helpSyncEnabled ? HELP_SYNC_INTERVAL_MS : false,
+    refetchIntervalInBackground: false,
+    queryFn: async () => {
+      const rows = await base44.entities.ServiceRequest.filter({ partner: partner.id, table: currentTableId });
+      return Array.isArray(rows) ? rows.filter((row) => HELP_REQUEST_TYPES.has(row?.request_type)) : [];
+    },
+  });
+
+  const normalizedHelpRequests = useMemo(() => {
+    return (helpRequestFeed || [])
+      .map((request) => {
+        const type = request?.request_type;
+        if (!HELP_REQUEST_TYPES.has(type)) return null;
+        return {
+          id: String(request.id || `${type}-${request.created_date || Math.random()}`),
+          type,
+          status: String(request.status || '').toLowerCase(),
+          createdAt: parseHelpTimestamp(request.updated_date) || parseHelpTimestamp(request.created_date) || Date.now(),
+          message: normalizeHelpMessage(request.comment),
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.createdAt - b.createdAt);
+  }, [HELP_REQUEST_TYPES, helpRequestFeed, normalizeHelpMessage, parseHelpTimestamp]);
+
+  const groupOtherServerEntries = useCallback((entries) => {
+    const groups = [];
+
+    entries
+      .filter((entry) => entry.type === 'other')
+      .forEach((entry) => {
+        const messageKey = getHelpMessageKey(entry.message) || `other:${entry.id}`;
+        const lastGroup = groups[groups.length - 1];
+        const canReuse =
+          lastGroup &&
+          lastGroup.messageKey === messageKey &&
+          (entry.createdAt - lastGroup.lastCreatedAt) <= HELP_MATCH_GRACE_MS;
+
+        if (canReuse) {
+          lastGroup.entries.push(entry);
+          lastGroup.lastCreatedAt = entry.createdAt;
+          return;
+        }
+
+        groups.push({
+          key: `${messageKey}:${entry.createdAt}`,
+          messageKey,
+          message: entry.message,
+          startedAt: entry.createdAt,
+          lastCreatedAt: entry.createdAt,
+          entries: [entry],
+        });
+      });
+
+    return groups.map((group) => ({
+      ...group,
+      activeEntries: group.entries.filter((entry) => HELP_ACTIVE_SERVER_STATUSES.has(entry.status)),
+      doneEntries: group.entries.filter((entry) => HELP_DONE_SERVER_STATUSES.has(entry.status)),
+    }));
+  }, [getHelpMessageKey, HELP_ACTIVE_SERVER_STATUSES, HELP_DONE_SERVER_STATUSES]);
+
+  const findMatchingOtherLocalIndex = useCallback((localRows, group) => {
+    return localRows.findIndex((entry) => {
+      if (!entry) return false;
+      if ((entry.serverRequestIds || []).some((id) => group.entries.some((serverEntry) => serverEntry.id === id))) {
+        return true;
+      }
+      if (getHelpMessageKey(entry.message) !== group.messageKey) return false;
+      if (!entry.sentAt) return true;
+      return Math.abs(entry.sentAt - group.startedAt) <= (HELP_MATCH_GRACE_MS * 2);
+    });
+  }, [getHelpMessageKey]);
+
+  useEffect(() => {
+    if (!helpSyncUpdatedAt) return;
+
+    setIsHelpRestoring(false);
+
+    setRequestStates((prev) => {
+      const now = Date.now();
+      const next = {};
+      const nonOtherTypes = ['call_waiter', 'bill', 'napkins', 'menu'];
+
+      nonOtherTypes.forEach((type) => {
+        const current = prev[type];
+        const relevantEntries = normalizedHelpRequests.filter((entry) => (
+          entry.type === type &&
+          (!current?.sentAt || entry.createdAt >= (current.sentAt - HELP_MATCH_GRACE_MS))
+        ));
+        const activeEntries = relevantEntries.filter((entry) => HELP_ACTIVE_SERVER_STATUSES.has(entry.status));
+        const doneEntries = relevantEntries.filter((entry) => HELP_DONE_SERVER_STATUSES.has(entry.status));
+
+        if (current?.status === 'closed_by_guest') {
+          next[type] = current;
+          return;
+        }
+
+        if (activeEntries.length > 0) {
+          const sortedEntries = [...activeEntries].sort((a, b) => a.createdAt - b.createdAt);
+          next[type] = {
+            id: current?.id || type,
+            status: current?.status === 'sending' ? 'sent' : (current?.status || 'sent'),
+            message: current?.message || '',
+            sentAt: Number(current?.sentAt) || sortedEntries[0]?.createdAt || now,
+            reminderCount: Math.max(Number(current?.reminderCount) || 0, Math.max(0, sortedEntries.length - 1)),
+            lastReminderAt:
+              Number(current?.lastReminderAt) ||
+              (sortedEntries.length > 1 ? sortedEntries[sortedEntries.length - 1]?.createdAt : null),
+            remindCooldownUntil:
+              current?.pendingAction === 'remind'
+                ? current.remindCooldownUntil
+                : (Number(current?.remindCooldownUntil) || ((Number(current?.lastReminderAt) || Number(current?.sentAt) || sortedEntries[0]?.createdAt || now) + getHelpCooldownMs(type))),
+            pendingAction: null,
+            errorKind: null,
+            errorMessage: '',
+            terminalHideAt: null,
+            serverRequestIds: sortedEntries.map((entry) => entry.id),
+            lastServerCreatedAt: sortedEntries[sortedEntries.length - 1]?.createdAt || now,
+            syncSource: 'server',
+          };
+          return;
+        }
+
+        if (doneEntries.length > 0 && current) {
+          next[type] = {
+            ...current,
+            status: 'resolved',
+            pendingAction: null,
+            errorKind: null,
+            errorMessage: '',
+            terminalHideAt: current?.status === 'resolved' && current?.terminalHideAt ? current.terminalHideAt : now + HELP_RESOLVED_HIDE_MS,
+            serverRequestIds: doneEntries.map((entry) => entry.id),
+            lastServerCreatedAt: doneEntries[doneEntries.length - 1]?.createdAt || current?.lastServerCreatedAt || now,
+            syncSource: 'server',
+          };
+          return;
+        }
+
+        if (current) {
+          next[type] = current;
+        }
+      });
+
+      const localOtherRows = Array.isArray(prev.other) ? [...prev.other] : (prev.other ? [prev.other] : []);
+      const groupedOtherRows = groupOtherServerEntries(normalizedHelpRequests);
+      const consumedLocalIndexes = new Set();
+      const nextOtherRows = [];
+
+      groupedOtherRows.forEach((group) => {
+        const localIndex = findMatchingOtherLocalIndex(localOtherRows, group);
+        const current = localIndex >= 0 ? localOtherRows[localIndex] : null;
+
+        if (localIndex >= 0) consumedLocalIndexes.add(localIndex);
+
+        if (current?.status === 'closed_by_guest') {
+          nextOtherRows.push(current);
+          return;
+        }
+
+        if (group.activeEntries.length > 0) {
+          const sortedEntries = [...group.activeEntries].sort((a, b) => a.createdAt - b.createdAt);
+          nextOtherRows.push({
+            id: current?.id || `other-${group.startedAt}`,
+            status: current?.status === 'sending' ? 'sent' : (current?.status || 'sent'),
+            message: current?.message || group.message,
+            sentAt: Number(current?.sentAt) || sortedEntries[0]?.createdAt || now,
+            reminderCount: Math.max(Number(current?.reminderCount) || 0, Math.max(0, sortedEntries.length - 1)),
+            lastReminderAt:
+              Number(current?.lastReminderAt) ||
+              (sortedEntries.length > 1 ? sortedEntries[sortedEntries.length - 1]?.createdAt : null),
+            remindCooldownUntil:
+              current?.pendingAction === 'remind'
+                ? current.remindCooldownUntil
+                : (Number(current?.remindCooldownUntil) || ((Number(current?.lastReminderAt) || Number(current?.sentAt) || sortedEntries[0]?.createdAt || now) + getHelpCooldownMs('other'))),
+            pendingAction: null,
+            errorKind: null,
+            errorMessage: '',
+            terminalHideAt: null,
+            serverRequestIds: sortedEntries.map((entry) => entry.id),
+            lastServerCreatedAt: sortedEntries[sortedEntries.length - 1]?.createdAt || now,
+            syncSource: 'server',
+          });
+          return;
+        }
+
+        if (group.doneEntries.length > 0 && current) {
+          nextOtherRows.push({
+            ...current,
+            status: 'resolved',
+            pendingAction: null,
+            errorKind: null,
+            errorMessage: '',
+            terminalHideAt: current?.status === 'resolved' && current?.terminalHideAt ? current.terminalHideAt : now + HELP_RESOLVED_HIDE_MS,
+            serverRequestIds: group.doneEntries.map((entry) => entry.id),
+            lastServerCreatedAt: group.doneEntries[group.doneEntries.length - 1]?.createdAt || current?.lastServerCreatedAt || now,
+            syncSource: 'server',
+          });
+        }
+      });
+
+      localOtherRows.forEach((entry, index) => {
+        if (consumedLocalIndexes.has(index)) return;
+        nextOtherRows.push(entry);
+      });
+
+      if (nextOtherRows.length > 0) {
+        next.other = nextOtherRows.sort((a, b) => (a.sentAt || 0) - (b.sentAt || 0));
+      }
+
+      return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+    });
+  }, [findMatchingOtherLocalIndex, getHelpCooldownMs, groupOtherServerEntries, helpSyncUpdatedAt, normalizedHelpRequests, HELP_ACTIVE_SERVER_STATUSES, HELP_DONE_SERVER_STATUSES]);
 
   // PM-126/PM-125: Help drawer open/close with overlay stack integration
-  // PM-133: Guard for null currentTableId — redirect to table code entry
-  // PM-135: Reset all help drawer state before opening
+  // PM-133: Guard for null currentTableId â€” redirect to table code entry
   const openHelpDrawer = useCallback(() => {
     if (!currentTableId) {
       setShowTableConfirmSheet(true);
       return;
     }
-    // HD-05: Load requestStates from localStorage on open
-    try {
-      const stored = JSON.parse(localStorage.getItem(`helpdrawer_${currentTableId}`) || '{}');
-      const maxCooldownMs = 240 * 1000;
-      const now = Date.now();
-      const filtered = {};
-      for (const [type, state] of Object.entries(stored)) {
-        if (type === 'other' && Array.isArray(state)) {
-          const validEntries = state.filter(e => e.sentAt && (now - e.sentAt) < maxCooldownMs).map(e => {
-            const cooldownMs = (HELP_COOLDOWN_SECONDS['other'] || 120) * 1000;
-            return { ...e, status: (now - e.sentAt) >= cooldownMs ? 'repeat' : e.status };
-          });
-          if (validEntries.length > 0) filtered.other = validEntries;
-          continue;
-        }
-        if (state.sentAt && (now - state.sentAt) < maxCooldownMs) {
-          const cooldownMs = (HELP_COOLDOWN_SECONDS[type] || 120) * 1000;
-          filtered[type] = {
-            ...state,
-            status: (now - state.sentAt) >= cooldownMs ? 'repeat' : state.status
-          };
-        }
-      }
-      if (Object.keys(filtered).length > 0) setRequestStates(filtered);
-      else setRequestStates({});
-    } catch (e) { setRequestStates({}); }
     setShowOtherForm(false);
     setHelpComment('');
-    setUndoToast(null);
+    setIsTicketExpanded(false);
     setIsHelpModalOpen(true);
     pushOverlay('help');
-  }, [pushOverlay, currentTableId, setShowTableConfirmSheet, setHelpComment, HELP_COOLDOWN_SECONDS]);
+  }, [currentTableId, pushOverlay, setHelpComment, setShowTableConfirmSheet]);
 
-  // HD-01: closeHelpDrawer resets UI state, keeps requestStates (persisted in localStorage)
   const closeHelpDrawer = useCallback(() => {
     popOverlay('help');
     setIsHelpModalOpen(false);
+    setIsTicketExpanded(false);
     setShowOtherForm(false);
     setHelpComment('');
-    // Clean up any pending undo timeout
-    if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId);
-    setUndoToast(null);
-  }, [popOverlay, setHelpComment, undoToast]);
+  }, [popOverlay, setHelpComment]);
 
   // HD-01 + HD-06: Card tap with 5s undo delay before actual server send
   const handleCardTap = useCallback((type) => {
-    // HD-17b: Do NOT cancel previous card's timer — both must fire independently
+    if (!currentTableId) return;
+    if (undoToast?.type === type && undoToast?.tableId === currentTableId) return;
+    if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId);
 
-    // Set card to sending visually immediately
-    setRequestStates(prev => ({ ...prev, [type]: { status: 'sending', sentAt: Date.now(), lastReminderAt: null, reminderCount: 0, remindCooldownUntil: null } }));
-
-    // Schedule actual send after 5s (undo window)
     const timeoutId = setTimeout(() => {
-      // Actually send to server via existing hook chain
-      pendingQuickSendRef.current = type;
+      if (currentTableIdRef.current !== currentTableId) return;
+      const now = Date.now();
+      setRequestStates((prev) => ({
+        ...prev,
+        [type]: {
+          id: type,
+          status: 'sending',
+          message: '',
+          sentAt: now,
+          reminderCount: 0,
+          lastReminderAt: null,
+          remindCooldownUntil: null,
+          pendingAction: 'send',
+          errorKind: null,
+          errorMessage: '',
+          terminalHideAt: null,
+          syncSource: 'local',
+        },
+      }));
+      pendingQuickSendRef.current = { type, action: 'send', rowId: type, message: '' };
       handlePresetSelect(type);
-      setUndoToast(prev => prev?.timeoutId === timeoutId ? null : prev);
+      setPendingHelpActionTick((value) => value + 1);
+      setUndoToast((prev) => (prev?.timeoutId === timeoutId ? null : prev));
     }, 5000);
 
-    setUndoToast({ type, expiresAt: Date.now() + 5000, timeoutId });
-  }, [handlePresetSelect, undoToast]);
+    setUndoToast({ type, rowId: type, tableId: currentTableId, expiresAt: Date.now() + 5000, timeoutId });
+  }, [currentTableId, handlePresetSelect, undoToast]);
 
-  // HD-06: Undo handler — cancel pending send, return card to idle
+  // HD-06: Undo handler â€” cancel pending send, return card to idle
   const handleUndo = useCallback(() => {
     if (!undoToast) return;
     clearTimeout(undoToast.timeoutId);
-    setRequestStates(prev => {
-      if (undoToast.type === 'other' && undoToast.otherId && Array.isArray(prev.other)) {
-        const otherArr = prev.other.filter(e => e.id !== undoToast.otherId);
-        return { ...prev, other: otherArr.length > 0 ? otherArr : [] };
-      }
-      const next = { ...prev };
-      delete next[undoToast.type];
-      return next;
-    });
     setUndoToast(null);
   }, [undoToast]);
 
-  // Fix 4A: handleRemind — send reminder without undo, update cooldown
-  const REMIND_COOLDOWN_MS = 40000; // 40 seconds
+  // Fix 4A: handleRemind â€” send reminder without undo, update cooldown
   const handleRemind = useCallback((type, otherId) => {
-    const now = Date.now();
-    setRequestStates(prev => {
-      if (type === 'other' && otherId && Array.isArray(prev.other)) {
-        const otherArr = prev.other.map(e => e.id === otherId ? {
-          ...e, lastReminderAt: now, reminderCount: (e.reminderCount || 0) + 1, remindCooldownUntil: now + REMIND_COOLDOWN_MS
-        } : e);
-        return { ...prev, other: otherArr };
+    const row = type === 'other'
+      ? (Array.isArray(requestStates.other) ? requestStates.other.find((entry) => entry.id === otherId) : null)
+      : requestStates[type];
+    const normalized = getNormalizedHelpState(type, row);
+    if (!normalized || normalized.pendingAction) return;
+    if (normalized.remindCooldownUntil && normalized.remindCooldownUntil > Date.now()) return;
+
+    setRequestStates((prev) => {
+      if (type === 'other') {
+        const otherRows = Array.isArray(prev.other) ? prev.other : [];
+        return {
+          ...prev,
+          other: otherRows.map((entry) => (
+            entry.id === otherId
+              ? { ...entry, pendingAction: 'remind', errorKind: null, errorMessage: '' }
+              : entry
+          )),
+        };
       }
+
       const current = prev[type];
       if (!current) return prev;
-      return { ...prev, [type]: { ...current, lastReminderAt: now, reminderCount: (current.reminderCount || 0) + 1, remindCooldownUntil: now + REMIND_COOLDOWN_MS } };
+      return {
+        ...prev,
+        [type]: { ...current, pendingAction: 'remind', errorKind: null, errorMessage: '' },
+      };
     });
-    // Send reminder immediately (no undo)
-    pendingQuickSendRef.current = type;
+
+    pendingQuickSendRef.current = {
+      type,
+      action: 'remind',
+      rowId: type === 'other' ? otherId : type,
+      message: normalized.message,
+    };
+    if (type === 'other' && normalized.message) {
+      setHelpComment(normalized.message);
+    }
     handlePresetSelect(type);
-    toast({ description: t('help.reminder_sent', 'Напоминание отправлено'), duration: 2000 });
-  }, [handlePresetSelect, t, toast]);
+    setPendingHelpActionTick((value) => value + 1);
+  }, [getNormalizedHelpState, handlePresetSelect, requestStates, setHelpComment]);
 
   // Fix 3: Handle resolve (mark request as done by guest)
   const handleResolve = useCallback((type, otherId) => {
-    setRequestStates(prev => {
-      if (type === 'other' && otherId && Array.isArray(prev.other)) {
-        const otherArr = prev.other.filter(e => e.id !== otherId);
-        return { ...prev, other: otherArr.length > 0 ? otherArr : [] };
+    const now = Date.now();
+
+    setRequestStates((prev) => {
+      if (type === 'other') {
+        const otherRows = Array.isArray(prev.other) ? prev.other : [];
+        return {
+          ...prev,
+          other: otherRows.map((entry) => (
+            entry.id === otherId
+              ? {
+                  ...entry,
+                  status: 'closed_by_guest',
+                  pendingAction: null,
+                  errorKind: null,
+                  errorMessage: '',
+                  terminalHideAt: now + HELP_CLOSED_HIDE_MS,
+                  syncSource: 'local',
+                }
+              : entry
+          )),
+        };
       }
-      const next = { ...prev };
-      delete next[type];
-      return next;
+
+      const current = prev[type] || { id: type, sentAt: now };
+      return {
+        ...prev,
+        [type]: {
+          ...current,
+          status: 'closed_by_guest',
+          pendingAction: null,
+          errorKind: null,
+          errorMessage: '',
+          terminalHideAt: now + HELP_CLOSED_HIDE_MS,
+          syncSource: 'local',
+        },
+      };
     });
   }, []);
 
   // HD-01: Auto-submit when selectedHelpType matches pending quick send
   useEffect(() => {
-    if (pendingQuickSendRef.current && selectedHelpType === pendingQuickSendRef.current) {
-      const type = pendingQuickSendRef.current;
-      pendingQuickSendRef.current = null;
-      const result = submitHelpRequest();
-      const onSuccess = () => {
-        setRequestStates(prev => {
-          if (type === 'other' && Array.isArray(prev.other)) {
-            // Mark the latest sending entry as pending
-            const otherArr = prev.other.map(e => e.status === 'sending' ? { ...e, status: 'pending' } : e);
-            return { ...prev, other: otherArr };
-          }
-          return { ...prev, [type]: { ...prev[type], status: 'pending', sentAt: prev[type]?.sentAt || Date.now(), lastReminderAt: prev[type]?.lastReminderAt || null, reminderCount: prev[type]?.reminderCount || 0, remindCooldownUntil: prev[type]?.remindCooldownUntil || null } };
-        });
-      };
-      const onError = () => {
-        setRequestStates(prev => {
-          if (type === 'other' && Array.isArray(prev.other)) {
-            // Remove sending entries on error
-            const otherArr = prev.other.filter(e => e.status !== 'sending');
-            return { ...prev, other: otherArr.length > 0 ? otherArr : [] };
-          }
-          const next = { ...prev };
-          delete next[type];
-          return next;
-        });
-      };
-      if (result && typeof result.then === 'function') {
-        result.then(onSuccess).catch(onError);
-      } else {
-        onSuccess();
-      }
-    }
-  }, [selectedHelpType, submitHelpRequest]);
+    const action = pendingQuickSendRef.current;
+    if (!action) return;
+    if (selectedHelpType !== action.type) return;
+    if (action.type === 'other' && action.message && normalizeHelpMessage(helpComment) !== normalizeHelpMessage(action.message)) return;
 
-  // HD-02 + HD-03: Timer interval — update timers + check cooldown transitions + remind countdown
-  const hasAnyRemindCooldown = useMemo(() => {
-    const now = Date.now();
-    for (const [type, state] of Object.entries(requestStates)) {
-      if (type === 'other' && Array.isArray(state)) {
-        if (state.some(e => e.remindCooldownUntil && e.remindCooldownUntil > now)) return true;
-        continue;
+    pendingQuickSendRef.current = null;
+
+    const onSuccess = () => {
+      const now = Date.now();
+
+      setRequestStates((prev) => {
+        if (action.type === 'other') {
+          const otherRows = Array.isArray(prev.other) ? prev.other : [];
+          return {
+            ...prev,
+            other: otherRows.map((entry) => {
+              if (entry.id !== action.rowId) return entry;
+              const sentAt = entry.sentAt || now;
+              const reminderCount = action.action === 'remind' ? (Number(entry.reminderCount) || 0) + 1 : 0;
+              const lastReminderAt = action.action === 'remind' ? now : null;
+              const cooldownAnchor = action.action === 'remind' ? now : sentAt;
+              return {
+                ...entry,
+                status: action.action === 'remind' ? 'reminded' : 'sent',
+                message: action.action === 'send' ? (normalizeHelpMessage(action.message) || entry.message) : entry.message,
+                sentAt,
+                reminderCount,
+                lastReminderAt,
+                remindCooldownUntil: cooldownAnchor + getHelpCooldownMs('other'),
+                pendingAction: null,
+                errorKind: null,
+                errorMessage: '',
+                terminalHideAt: null,
+                syncSource: 'local',
+              };
+            }),
+          };
+        }
+
+        const current = prev[action.type];
+        const sentAt = current?.sentAt || now;
+        const reminderCount = action.action === 'remind' ? (Number(current?.reminderCount) || 0) + 1 : 0;
+        const lastReminderAt = action.action === 'remind' ? now : null;
+        const cooldownAnchor = action.action === 'remind' ? now : sentAt;
+
+        return {
+          ...prev,
+          [action.type]: {
+            ...(current || {}),
+            id: action.type,
+            status: action.action === 'remind' ? 'reminded' : 'sent',
+            sentAt,
+            reminderCount,
+            lastReminderAt,
+            remindCooldownUntil: cooldownAnchor + getHelpCooldownMs(action.type),
+            pendingAction: null,
+            errorKind: null,
+            errorMessage: '',
+            terminalHideAt: null,
+            syncSource: 'local',
+          },
+        };
+      });
+
+      if (action.type === 'other') {
+        setHelpComment('');
       }
-      if (state?.remindCooldownUntil && state.remindCooldownUntil > now) return true;
+
+      if (action.action === 'send') {
+        setIsTicketExpanded(false);
+        setShowOtherForm(false);
+        ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setHighlightedTicket(action.rowId || action.type);
+        setTimeout(() => setHighlightedTicket((prev) => (prev === (action.rowId || action.type) ? null : prev)), 1500);
+      }
+
+      if (action.action === 'remind') {
+        toast({ description: tr('help.reminder_sent', 'Reminder sent'), duration: 2000 });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['helpDrawerRequests', partner?.id, currentTableIdRef.current] });
+    };
+
+    const onError = (err) => {
+      const msg = String(err?.message || '').toLowerCase();
+      const errorMessage = (!isHelpOnline || msg.includes('network') || msg.includes('offline') || msg.includes('fetch')) ? 'offline' : 'generic';
+
+      setRequestStates((prev) => {
+        if (action.type === 'other') {
+          const otherRows = Array.isArray(prev.other) ? prev.other : [];
+          return {
+            ...prev,
+            other: otherRows.map((entry) => {
+              if (entry.id !== action.rowId) return entry;
+              return {
+                ...entry,
+                status: action.action === 'send' ? 'sending' : entry.status,
+                pendingAction: null,
+                errorKind: action.action,
+                errorMessage,
+              };
+            }),
+          };
+        }
+
+        const current = prev[action.type] || {
+          id: action.type,
+          sentAt: Date.now(),
+          reminderCount: 0,
+          lastReminderAt: null,
+          remindCooldownUntil: null,
+        };
+
+        return {
+          ...prev,
+          [action.type]: {
+            ...current,
+            status: action.action === 'send' ? 'sending' : current.status,
+            pendingAction: null,
+            errorKind: action.action,
+            errorMessage,
+          },
+        };
+      });
+    };
+
+    try {
+      const result = submitHelpRequest();
+      Promise.resolve(result).then(onSuccess).catch(onError);
+    } catch (err) {
+      onError(err);
     }
-    return false;
-  }, [requestStates, timerTick]);
+  }, [selectedHelpType, submitHelpRequest, pendingHelpActionTick, helpComment, normalizeHelpMessage, getHelpCooldownMs, partner?.id, queryClient, tr, isHelpOnline]);
+
+  const getHelpReminderWord = useCallback((count) => {
+    const mod10 = count % 10;
+    const mod100 = count % 100;
+    if (mod10 === 1 && mod100 !== 11) return 'напоминание';
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'напоминания';
+    return 'напоминаний';
+  }, []);
+
+  const getMinutesAgo = useCallback((timestamp) => {
+    return Math.max(1, Math.floor((Date.now() - timestamp) / 60000));
+  }, [timerTick]);
+
+  const getHelpWaitLabel = useCallback((row) => {
+    if (!row?.sentAt) return '';
+    const seconds = Math.max(0, Math.floor((Date.now() - row.sentAt) / 1000));
+    if (seconds < 60) return tr('help.just_sent', 'Just sent');
+    return `${tr('help.waiting_prefix', 'Waiting')} ${getMinutesAgo(row.sentAt)} ${tr('help.minutes_short', 'min')}`;
+  }, [getMinutesAgo, tr]);
+
+  const getHelpReminderLabel = useCallback((row) => {
+    if (!row?.lastReminderAt || !row?.reminderCount) return '';
+    const minutesAgo = getMinutesAgo(row.lastReminderAt);
+    const latestLabel = minutesAgo <= 1
+      ? tr('help.reminded_just_now', 'Just reminded')
+      : `${tr('help.reminded_prefix', 'Reminded')} ${minutesAgo} ${tr('help.minutes_short', 'min')} назад`;
+
+    if (row.reminderCount === 1) return latestLabel;
+    return `${row.reminderCount} ${getHelpReminderWord(row.reminderCount)} · ${tr('help.last_reminder_prefix', 'Last')} ${minutesAgo} ${tr('help.minutes_short', 'min')} назад`;
+  }, [getHelpReminderWord, getMinutesAgo, tr]);
+
+  const getHelpResolvedLabel = useCallback((type) => {
+    const byType = {
+      call_waiter: tr('help.resolved_call_waiter', '✅ Waiter came · Thank you!'),
+      bill: tr('help.resolved_bill', '✅ Bill brought · Thank you!'),
+      napkins: tr('help.resolved_napkins', '✅ Napkins brought · Thank you!'),
+      menu: tr('help.resolved_menu', '✅ Menu brought · Thank you!'),
+      other: tr('help.resolved_other', '✅ Done · Thank you!'),
+    };
+    return byType[type] || byType.other;
+  }, [tr]);
+
+  const getHelpErrorCopy = useCallback((row) => {
+    if (!row?.errorKind) return null;
+    if (row.errorMessage === 'offline') {
+      return {
+        title: tr('help.no_connection', 'No connection'),
+        detail: tr('help.try_again', 'Try again'),
+      };
+    }
+    return {
+      title: row.errorKind === 'remind'
+        ? tr('help.remind_failed', 'Failed to send reminder')
+        : tr('help.send_failed', 'Failed to send'),
+      detail: tr('help.try_again', 'Try again'),
+    };
+  }, [tr]);
+
+  const getHelpFreshnessLabel = useCallback(() => {
+    if (!activeRequests.length) return '';
+    if (isHelpRestoring) return tr('help.restoring_status', 'Restoring status…');
+    if (!isHelpOnline || isHelpSyncError) return tr('help.offline_status', 'No connection · will retry automatically');
+    if (!helpSyncUpdatedAt) return '';
+
+    const seconds = Math.max(0, Math.floor((Date.now() - helpSyncUpdatedAt) / 1000));
+    if (seconds >= Math.floor(HELP_STALE_AFTER_MS / 1000)) {
+      return `${tr('help.stale_status', 'Data may be outdated · no update')} ${seconds} ${tr('help.seconds_short', 'sec')}`;
+    }
+    return `${tr('help.updated_label', 'Updated')} ${seconds} ${tr('help.seconds_short', 'sec')} назад`;
+  }, [activeRequests.length, helpSyncUpdatedAt, isHelpOnline, isHelpRestoring, isHelpSyncError, timerTick, tr]);
+
+  const handleRetry = useCallback((row) => {
+    if (!row) return;
+
+    if (row.errorKind === 'remind') {
+      setRequestStates((prev) => {
+        if (row.type === 'other') {
+          const otherRows = Array.isArray(prev.other) ? prev.other : [];
+          return {
+            ...prev,
+            other: otherRows.map((entry) => (
+              entry.id === row.id
+                ? { ...entry, pendingAction: 'remind', errorKind: null, errorMessage: '' }
+                : entry
+            )),
+          };
+        }
+
+        const current = prev[row.type];
+        if (!current) return prev;
+        return {
+          ...prev,
+          [row.type]: { ...current, pendingAction: 'remind', errorKind: null, errorMessage: '' },
+        };
+      });
+
+      pendingQuickSendRef.current = { type: row.type, action: 'remind', rowId: row.id, message: row.message };
+      if (row.type === 'other' && row.message) {
+        setHelpComment(row.message);
+      }
+      handlePresetSelect(row.type);
+      setPendingHelpActionTick((value) => value + 1);
+      return;
+    }
+
+    const now = Date.now();
+    setRequestStates((prev) => {
+      if (row.type === 'other') {
+        const otherRows = Array.isArray(prev.other) ? prev.other : [];
+        return {
+          ...prev,
+          other: otherRows.map((entry) => (
+            entry.id === row.id
+              ? {
+                  ...entry,
+                  status: 'sending',
+                  sentAt: now,
+                  reminderCount: 0,
+                  lastReminderAt: null,
+                  remindCooldownUntil: null,
+                  pendingAction: 'send',
+                  errorKind: null,
+                  errorMessage: '',
+                  terminalHideAt: null,
+                  syncSource: 'local',
+                }
+              : entry
+          )),
+        };
+      }
+
+      return {
+        ...prev,
+        [row.type]: {
+          id: row.type,
+          status: 'sending',
+          message: '',
+          sentAt: now,
+          reminderCount: 0,
+          lastReminderAt: null,
+          remindCooldownUntil: null,
+          pendingAction: 'send',
+          errorKind: null,
+          errorMessage: '',
+          terminalHideAt: null,
+          syncSource: 'local',
+        },
+      };
+    });
+
+    pendingQuickSendRef.current = { type: row.type, action: 'send', rowId: row.id, message: row.message || '' };
+    if (row.type === 'other' && row.message) {
+      setHelpComment(row.message);
+    }
+    handlePresetSelect(row.type);
+    setPendingHelpActionTick((value) => value + 1);
+  }, [handlePresetSelect, setHelpComment]);
+
+  const focusHelpRow = useCallback((rowId) => {
+    const rowIndex = activeRequests.findIndex((row) => row.id === rowId);
+    setIsTicketExpanded(rowIndex >= HELP_PREVIEW_LIMIT);
+    setShowOtherForm(false);
+    ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setHighlightedTicket(rowId);
+    setTimeout(() => setHighlightedTicket((prev) => (prev === rowId ? null : prev)), 1500);
+  }, [activeRequests, setShowOtherForm]);
 
   useEffect(() => {
-    const hasActive = activeRequests.length > 0;
-    if (!hasActive && !undoToast && !hasAnyRemindCooldown) return;
-    const interval = setInterval(() => {
-      setTimerTick(t => t + 1);
-      // HD-02: Check cooldown transitions pending → repeat
-      setRequestStates(prev => {
-        const now = Date.now();
-        let changed = false;
-        const next = { ...prev };
-        for (const [type, state] of Object.entries(next)) {
-          if (type === 'other' && Array.isArray(state)) {
-            const updatedOther = state.map(entry => {
-              if (entry.status === 'pending' && entry.sentAt) {
-                const cooldownMs = (HELP_COOLDOWN_SECONDS['other'] || 120) * 1000;
-                if ((now - entry.sentAt) >= cooldownMs) {
-                  changed = true;
-                  return { ...entry, status: 'repeat' };
-                }
-              }
-              return entry;
-            });
-            if (changed) next.other = updatedOther;
-            continue;
-          }
-          if (state && state.status === 'pending' && state.sentAt) {
-            const cooldownMs = (HELP_COOLDOWN_SECONDS[type] || 120) * 1000;
-            if ((now - state.sentAt) >= cooldownMs) {
-              next[type] = { ...state, status: 'repeat' };
-              changed = true;
-            }
-          }
-        }
-        return changed ? next : prev;
-      });
-    }, (undoToast || hasAnyRemindCooldown) ? 1000 : 30000);
+    const shouldTick = isHelpModalOpen || !!undoToast || ticketRows.length > 0 || isHelpRestoring;
+    if (!shouldTick) return;
+    const interval = setInterval(() => setTimerTick((value) => value + 1), 1000);
     return () => clearInterval(interval);
-  }, [requestStates, undoToast, HELP_COOLDOWN_SECONDS, hasAnyRemindCooldown, activeRequests.length]);
+  }, [isHelpModalOpen, isHelpRestoring, ticketRows.length, undoToast]);
 
   // HD-03: Recalculate on visibility change (tab return)
   useEffect(() => {
@@ -1966,27 +2627,49 @@ export default function X() {
 
   // HD-05: Persist requestStates to localStorage on change
   useEffect(() => {
-    if (!currentTableId || !hasLoadedHelpStatesRef.current) return; // HD-10: skip until load completes
+    if (!currentTableId || !hasLoadedHelpStatesRef.current) return;
+
     const key = `helpdrawer_${currentTableId}`;
     const persistable = {};
-    for (const [type, state] of Object.entries(requestStates)) {
-      if (type === 'other' && Array.isArray(state)) {
-        const activeOthers = state.filter(e => e.status === 'pending' || e.status === 'repeat');
-        if (activeOthers.length > 0) persistable.other = activeOthers;
-        continue;
+    const now = Date.now();
+
+    const toPersistedEntry = (type, rawEntry) => {
+      const normalized = getNormalizedHelpState(type, rawEntry, now);
+      if (!normalized || !normalized.isActive || normalized.status === 'sending' || normalized.pendingAction || normalized.errorKind) return null;
+      if ((now - normalized.sentAt) > HELP_RESTORE_TTL_MS) return null;
+
+      return {
+        id: normalized.id,
+        status: normalized.status,
+        message: normalized.message,
+        sentAt: normalized.sentAt,
+        reminderCount: normalized.reminderCount || 0,
+        lastReminderAt: normalized.lastReminderAt || null,
+        remindCooldownUntil: normalized.remindCooldownUntil || null,
+      };
+    };
+
+    Object.entries(requestStates).forEach(([type, state]) => {
+      if (type === 'other') {
+        const rows = (Array.isArray(state) ? state : [state].filter(Boolean))
+          .map((entry) => toPersistedEntry('other', entry))
+          .filter(Boolean);
+        if (rows.length > 0) persistable.other = rows;
+        return;
       }
-      if (state && (state.status === 'pending' || state.status === 'repeat')) {
-        persistable[type] = state;
-      }
-    }
+
+      const persisted = toPersistedEntry(type, state);
+      if (persisted) persistable[type] = persisted;
+    });
+
     if (Object.keys(persistable).length === 0) {
       localStorage.removeItem(key);
     } else {
       localStorage.setItem(key, JSON.stringify(persistable));
     }
-  }, [requestStates, currentTableId]);
+  }, [currentTableId, getNormalizedHelpState, requestStates]);
 
-  // PM-125: Cart-to-help sequencing — close cart first, 300ms delay, then open help
+  // PM-125: Cart-to-help sequencing â€” close cart first, 300ms delay, then open help
   const handleHelpFromCart = useCallback(() => {
     popOverlay('cart');
     setDrawerMode(null);
@@ -2025,10 +2708,10 @@ export default function X() {
   // P0-4: Warning if limit reached
   useEffect(() => {
     if (allDishes?.length === 100) {
-      // Dish limit reached (100) — silent in prod
+      // Dish limit reached (100) â€” silent in prod
     }
     if (allCategories?.length === 100) {
-      // Category limit reached (100) — silent in prod
+      // Category limit reached (100) â€” silent in prod
     }
   }, [allDishes?.length, allCategories?.length]);
 
@@ -2060,7 +2743,7 @@ export default function X() {
           lang: lang
         });
       } catch (e) {
-        // Failed to fetch category translations — silent in prod
+        // Failed to fetch category translations â€” silent in prod
         return [];
       }
     },
@@ -2078,7 +2761,7 @@ export default function X() {
           lang: lang
         });
       } catch (e) {
-        // Failed to fetch dish translations — silent in prod
+        // Failed to fetch dish translations â€” silent in prod
         return [];
       }
     },
@@ -2483,8 +3166,8 @@ export default function X() {
   };
 
   // Show cart button in hall mode: always when table verified, or when cart has items (even before verification)
-  // TASK-260201-01: StickyBar виден ВСЕГДА при верифицированном столе
-  // Это решает проблему F5 — не нужно ждать восстановления session/orders
+  // TASK-260201-01: StickyBar Ð²Ð¸Ð´ÐµÐ½ Ð’Ð¡Ð•Ð“Ð”Ð Ð¿Ñ€Ð¸ Ð²ÐµÑ€Ð¸Ñ„Ð¸Ñ†Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð½Ð¾Ð¼ ÑÑ‚Ð¾Ð»Ðµ
+  // Ð­Ñ‚Ð¾ Ñ€ÐµÑˆÐ°ÐµÑ‚ Ð¿Ñ€Ð¾Ð±Ð»ÐµÐ¼Ñƒ F5 â€” Ð½Ðµ Ð½ÑƒÐ¶Ð½Ð¾ Ð¶Ð´Ð°Ñ‚ÑŒ Ð²Ð¾ÑÑÑ‚Ð°Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ñ session/orders
   const showCartButton = isHallMode && (isTableVerified || (cart?.length || 0) > 0);
 
   // After F5, table is verified from localStorage but session data is still loading from server
@@ -2512,7 +3195,7 @@ export default function X() {
     };
   }, [isTableVerified, currentTableId]);
 
-  // PM-128: Deferred pushOverlay for table confirm drawer — avoids disrupting vaul animation
+  // PM-128: Deferred pushOverlay for table confirm drawer â€” avoids disrupting vaul animation
   useEffect(() => {
     if (showTableConfirmSheet) {
       const id = setTimeout(() => pushOverlay('tableConfirm'), 50);
@@ -2520,7 +3203,7 @@ export default function X() {
     }
   }, [showTableConfirmSheet, pushOverlay]);
 
-  // Hall StickyBar mode: определяем что показывать
+  // Hall StickyBar mode: Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÑÐµÐ¼ Ñ‡Ñ‚Ð¾ Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°Ñ‚ÑŒ
   const hallStickyMode =
     (cart?.length || 0) > 0
       ? "cart"
@@ -2530,27 +3213,27 @@ export default function X() {
           ? "tableOrders"
           : "cartEmpty";
 
-  // Hall StickyBar label: текст кнопки
+  // Hall StickyBar label: Ñ‚ÐµÐºÑÑ‚ ÐºÐ½Ð¾Ð¿ÐºÐ¸
   const hallStickyButtonLabel =
     hallStickyMode === "cart"
-      ? tr("cart.checkout", "Оформить заказ")
+      ? tr("cart.checkout", "ÐžÑ„Ð¾Ñ€Ð¼Ð¸Ñ‚ÑŒ Ð·Ð°ÐºÐ°Ð·")
       : hallStickyMode === "myBill"
-        ? tr("cart.my_bill", "Мой счёт")
+        ? tr("cart.my_bill", "ÐœÐ¾Ð¹ ÑÑ‡Ñ‘Ñ‚")
         : hallStickyMode === "tableOrders"
-          ? tr("cart.table_orders", "Заказы стола")
+          ? tr("cart.table_orders", "Ð—Ð°ÐºÐ°Ð·Ñ‹ ÑÑ‚Ð¾Ð»Ð°")
           : isSessionLoading
-            ? tr("common.loading", "Загрузка...")
-            : tr("cart.view", "Открыть");
+            ? tr("common.loading", "Ð—Ð°Ð³Ñ€ÑƒÐ·ÐºÐ°...")
+            : tr("cart.view", "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ");
 
-  // Hall StickyBar: заголовок (для режимов без корзины)
+  // Hall StickyBar: Ð·Ð°Ð³Ð¾Ð»Ð¾Ð²Ð¾Ðº (Ð´Ð»Ñ Ñ€ÐµÐ¶Ð¸Ð¼Ð¾Ð² Ð±ÐµÐ· ÐºÐ¾Ñ€Ð·Ð¸Ð½Ñ‹)
   const hallStickyModeLabel =
     hallStickyMode === "myBill"
-      ? tr("cart.my_bill", "Мой счёт")
+      ? tr("cart.my_bill", "ÐœÐ¾Ð¹ ÑÑ‡Ñ‘Ñ‚")
       : hallStickyMode === "tableOrders"
-        ? tr("cart.table_orders", "Заказы стола")
-        : tr("cart.your_orders", "Ваши заказы");
+        ? tr("cart.table_orders", "Ð—Ð°ÐºÐ°Ð·Ñ‹ ÑÑ‚Ð¾Ð»Ð°")
+        : tr("cart.your_orders", "Ð’Ð°ÑˆÐ¸ Ð·Ð°ÐºÐ°Ð·Ñ‹");
 
-  // Hall StickyBar: сумма для показа
+  // Hall StickyBar: ÑÑƒÐ¼Ð¼Ð° Ð´Ð»Ñ Ð¿Ð¾ÐºÐ°Ð·Ð°
   const hallStickyBillTotal =
     hallStickyMode === "myBill"
       ? formatPrice(parseFloat((myBill.total || 0).toFixed(2)))
@@ -2558,7 +3241,7 @@ export default function X() {
         ? formatPrice(parseFloat((tableTotal || 0).toFixed(2)))
         : "";
 
-  // Hall StickyBar: показывать ли сумму
+  // Hall StickyBar: Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°Ñ‚ÑŒ Ð»Ð¸ ÑÑƒÐ¼Ð¼Ñƒ
   const hallStickyShowBillAmount = hallStickyMode === "myBill" || hallStickyMode === "tableOrders";
 
   // Hall StickyBar: loading state
@@ -2671,7 +3354,7 @@ export default function X() {
       localStorage.setItem("menu_preview_mode", normalized);
     } catch {}
 
-    // FIX P1: Revalidate cart on mode change — drop items not available in new mode
+    // FIX P1: Revalidate cart on mode change â€” drop items not available in new mode
     setCart((prev) => {
       if (!allDishes || prev.length === 0) return prev;
       const filtered = prev.filter((cartItem) => {
@@ -2732,7 +3415,7 @@ export default function X() {
     }
   }, [currentTableId]);
 
-  // PM-152: Clear guest name when table changes — localStorage-based (survives Chrome kill)
+  // PM-152: Clear guest name when table changes â€” localStorage-based (survives Chrome kill)
   useEffect(() => {
     if (!tableCodeParam) return;
     try {
@@ -2751,13 +3434,13 @@ export default function X() {
   // PM-S81-15 + PM-105: Android back button closes topmost overlay (stack-based)
   useEffect(() => {
     const handlePopState = () => {
-      // PM-107: If popOverlay triggered this back, skip — sheet already closed
+      // PM-107: If popOverlay triggered this back, skip â€” sheet already closed
       if (isProgrammaticCloseRef.current) {
         isProgrammaticCloseRef.current = false;
         return;
       }
       const stack = overlayStackRef.current;
-      if (stack.length === 0) return; // No overlay open — let browser handle normally
+      if (stack.length === 0) return; // No overlay open â€” let browser handle normally
 
       isPopStateClosingRef.current = true;
       const topOverlay = stack[stack.length - 1];
@@ -2956,7 +3639,7 @@ export default function X() {
       const order = await base44.entities.Order.create(orderData);
       let orderCreated = true;
 
-      // FIX P0: Create order items FIRST — commit point before loyalty side effects
+      // FIX P0: Create order items FIRST â€” commit point before loyalty side effects
       const newItems = cart.map((item) => ({
         order: order.id,
         dish: item.dishId,
@@ -2969,7 +3652,7 @@ export default function X() {
 
       await base44.entities.OrderItem.bulkCreate(newItems);
 
-      // Post-create side effects — best-effort after items exist
+      // Post-create side effects â€” best-effort after items exist
       try {
         // Process points redemption AFTER items created (BUG-PM-032, P0 fix)
         if (loyaltyAccountToUse && redeemedPoints > 0) {
@@ -2989,7 +3672,7 @@ export default function X() {
         // silent
       }
 
-      // Earn points after order creation — best-effort
+      // Earn points after order creation â€” best-effort
       try {
         if (loyaltyAccountToUse && loyaltyEnabled && earnedPoints > 0) {
           const expiresAt = new Date();
@@ -3020,7 +3703,7 @@ export default function X() {
         // silent
       }
 
-      // Update partner counters — best-effort
+      // Update partner counters â€” best-effort
       try { await base44.entities.Partner.update(partner.id, updatedCounters); } catch (e) { /* silent */ }
       
       // Update local partner cache
@@ -3107,7 +3790,7 @@ export default function X() {
 
     // Empty cart guard
     if (cart.length === 0) {
-      toast.error(tr('cart.empty', 'Корзина пуста'), { id: 'mm1' });
+      toast.error(tr('cart.empty', 'ÐšÐ¾Ñ€Ð·Ð¸Ð½Ð° Ð¿ÑƒÑÑ‚Ð°'), { id: 'mm1' });
       return;
     }
 
@@ -3121,7 +3804,7 @@ export default function X() {
         // P0-2: Validate existing session is still valid
         let session = tableSession;
         if (session && isSessionExpired(session)) {
-          // Session expired — close it in DB and force new one
+          // Session expired â€” close it in DB and force new one
           try {
             await base44.entities.TableSession.update(session.id, {
               status: 'expired',
@@ -3138,7 +3821,7 @@ export default function X() {
           sessionIdRef.current = session?.id;
         }
 
-        // P0-2: Hard guard — reject order if no valid session
+        // P0-2: Hard guard â€” reject order if no valid session
         if (!session?.id) {
           toast.error(t('error.session_expired'), { id: 'session-err' });
           submitLockRef.current = false;
@@ -3147,7 +3830,7 @@ export default function X() {
         }
 
         // ============================================================
-        // FIX-260131-07 FINAL: SAFEGUARD — try restore guest before creating new
+        // FIX-260131-07 FINAL: SAFEGUARD â€” try restore guest before creating new
         // This prevents "submit races restore" bug where guest is created
         // because currentGuest hasn't been set yet
         // ============================================================
@@ -3223,7 +3906,7 @@ export default function X() {
               }
             }
 
-            // If restored → sync state + storage
+            // If restored â†’ sync state + storage
             if (guest) {
               const gid = normalizeId(guest);
               setCurrentGuest(guest);
@@ -3241,7 +3924,7 @@ export default function X() {
           }
         }
 
-        // If still no guest after safeguard — create new
+        // If still no guest after safeguard â€” create new
         if (!guest) {
           const deviceId = getDeviceId();
           guest = await addGuestToSession(session.id, null, deviceId);
@@ -3334,7 +4017,7 @@ export default function X() {
 
         const order = await base44.entities.Order.create(orderData);
 
-        // FIX P0: Create order items FIRST — commit point before loyalty side effects
+        // FIX P0: Create order items FIRST â€” commit point before loyalty side effects
         const orderItemsData = cart.map((item) => ({
           order: order.id,
           dish: item.dishId,
@@ -3346,7 +4029,7 @@ export default function X() {
 
         await base44.entities.OrderItem.bulkCreate(orderItemsData);
 
-        // Post-create side effects — best-effort after items exist
+        // Post-create side effects â€” best-effort after items exist
         try {
           // Process points redemption AFTER items created (BUG-PM-032, P0 fix)
           if (loyaltyAccountToUse && redeemedPoints > 0) {
@@ -3366,7 +4049,7 @@ export default function X() {
           // silent
         }
 
-        // Earn points after order creation — best-effort
+        // Earn points after order creation â€” best-effort
         try {
           if (loyaltyAccountToUse && loyaltyEnabled && earnedPoints > 0) {
             const expiresAt = new Date();
@@ -3468,7 +4151,7 @@ export default function X() {
 
   const handleRequestBill = async () => {
     if (billCooldown || billRequested) {
-      toast.info(tr('cart.bill_already_requested', 'Счёт уже запрошен'), { id: 'mm1' });
+      toast.info(tr('cart.bill_already_requested', 'Ð¡Ñ‡Ñ‘Ñ‚ ÑƒÐ¶Ðµ Ð·Ð°Ð¿Ñ€Ð¾ÑˆÐµÐ½'), { id: 'mm1' });
       return;
     }
     
@@ -3485,7 +4168,7 @@ export default function X() {
       
       setBillCooldownStorage(currentTableId);
       setBillCooldown(true);
-      toast.success(tr('cart.bill_requested', 'Официант скоро принесёт счёт'), { id: 'mm1' });
+      toast.success(tr('cart.bill_requested', 'ÐžÑ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚ ÑÐºÐ¾Ñ€Ð¾ Ð¿Ñ€Ð¸Ð½ÐµÑÑ‘Ñ‚ ÑÑ‡Ñ‘Ñ‚'), { id: 'mm1' });
     } catch (err) {
       // silent
       toast.error(t('toast.error'), { id: 'mm1' });
@@ -3586,7 +4269,7 @@ export default function X() {
   };
 
   // ============================================================
-  // HALL CHECKOUT SCREEN (TASK-260127-01: removed "Стол подтверждён" block)
+  // HALL CHECKOUT SCREEN (TASK-260127-01: removed "Ð¡Ñ‚Ð¾Ð» Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´Ñ‘Ð½" block)
   // ============================================================
   const renderHallCheckoutContent = () => {
     // Table already verified - nothing special needed here
@@ -3892,28 +4575,28 @@ export default function X() {
             popOverlay('tableConfirm');
             setShowTableConfirmSheet(false);
             if (!isTableVerified) {
-              toast(tr('cart.confirm_table.dismissed', 'Для отправки заказа нужно подтвердить стол'), { id: 'table-dismiss' });
+              toast(tr('cart.confirm_table.dismissed', 'Ð”Ð»Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð·Ð°ÐºÐ°Ð·Ð° Ð½ÑƒÐ¶Ð½Ð¾ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ ÑÑ‚Ð¾Ð»'), { id: 'table-dismiss' });
             }
           }
         }}
       >
         <DrawerContent className="max-h-[85dvh] rounded-t-3xl z-[60]">
           <div className="relative">
-            {/* #143: Chevron close button — top-right */}
+            {/* #143: Chevron close button â€” top-right */}
             <button
               onClick={() => { popOverlay('tableConfirm'); pendingSubmitRef.current = false; setShowTableConfirmSheet(false); }}
               className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 z-10"
-              aria-label={t('common.close', 'Закрыть')}
+              aria-label={t('common.close', 'Ð—Ð°ÐºÑ€Ñ‹Ñ‚ÑŒ')}
             >
               <ChevronDown className="w-6 h-6" />
             </button>
             <DrawerHeader className="text-center pb-2">
 
               <DrawerTitle className="text-lg font-semibold text-slate-900">
-                {tr('cart.verify.enter_table_code', 'Введите код стола')}
+                {tr('cart.verify.enter_table_code', 'Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÐºÐ¾Ð´ ÑÑ‚Ð¾Ð»Ð°')}
               </DrawerTitle>
               <p className="text-xs text-gray-400 mt-2 px-4">
-                {tr('cart.verify.helper_text', 'Код указан на табличке вашего стола. Он нужен, чтобы официант знал куда нести заказ.')}
+                {tr('cart.verify.helper_text', 'ÐšÐ¾Ð´ ÑƒÐºÐ°Ð·Ð°Ð½ Ð½Ð° Ñ‚Ð°Ð±Ð»Ð¸Ñ‡ÐºÐµ Ð²Ð°ÑˆÐµÐ³Ð¾ ÑÑ‚Ð¾Ð»Ð°. ÐžÐ½ Ð½ÑƒÐ¶ÐµÐ½, Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚ Ð·Ð½Ð°Ð» ÐºÑƒÐ´Ð° Ð½ÐµÑÑ‚Ð¸ Ð·Ð°ÐºÐ°Ð·.')}
               </p>
             </DrawerHeader>
           </div>
@@ -3950,7 +4633,7 @@ export default function X() {
                 }}
                 className="sr-only"
                 placeholder=""
-                aria-label={tr('cart.verify.enter_table_code', 'Введите код стола')}
+                aria-label={tr('cart.verify.enter_table_code', 'Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÐºÐ¾Ð´ ÑÑ‚Ð¾Ð»Ð°')}
               />
               {isVerifyingCode && (
                 <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -3969,7 +4652,7 @@ export default function X() {
               if (motivationPoints <= 0) return null;
               return (
                 <p className="text-center text-sm text-emerald-600 mt-4">
-                  {tr('cart.motivation_bonus_short', `+${motivationPoints} бонусов за этот заказ`)}
+                  {tr('cart.motivation_bonus_short', `+${motivationPoints} Ð±Ð¾Ð½ÑƒÑÐ¾Ð² Ð·Ð° ÑÑ‚Ð¾Ñ‚ Ð·Ð°ÐºÐ°Ð·`)}
                 </p>
               );
             })()}
@@ -3987,7 +4670,7 @@ export default function X() {
             >
               {isVerifyingCode
                 ? t('common.loading')
-                : tr('cart.confirm_table.submit', 'Отправить')}
+                : tr('cart.confirm_table.submit', 'ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ')}
             </Button>
           </div>
         </DrawerContent>
@@ -4016,6 +4699,15 @@ export default function X() {
       <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
         <DrawerContent className="max-h-[85vh] rounded-t-2xl flex flex-col">
           <div className="relative">
+            {isTicketExpanded && (
+              <button
+                onClick={() => { setIsTicketExpanded(false); }}
+                className="absolute top-3 left-3 min-h-[44px] px-3 flex items-center gap-1 rounded-full bg-slate-100 text-slate-700 z-10 text-sm font-medium"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>{t('help.back_to_help')}</span>
+              </button>
+            )}
             <button
               onClick={closeHelpDrawer}
               className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 z-10"
@@ -4024,8 +4716,10 @@ export default function X() {
               <ChevronDown className="w-6 h-6" />
             </button>
             <DrawerHeader className="text-center pb-2">
-              <DrawerTitle className="text-lg font-semibold text-slate-900">{t('help.modal_title', 'Нужна помощь?')}</DrawerTitle>
-              <p className="text-sm text-slate-500 mt-1">{t('help.modal_desc', 'Выберите, чем мы можем помочь')}</p>
+              <DrawerTitle className="text-lg font-semibold text-slate-900">{isTicketExpanded ? t('help.my_requests') : t('help.modal_title')}</DrawerTitle>
+              {!isTicketExpanded && (
+                <p className="text-sm text-slate-500 mt-1">{t('help.modal_desc')}</p>
+              )}
             </DrawerHeader>
           </div>
           <div className="px-4 pb-6 space-y-4 overflow-y-auto flex-1">
@@ -4035,17 +4729,21 @@ export default function X() {
                 <span>{currentTable?.name || currentTable?.code}</span>
               </div>
             )}
-            {/* Ticket board: "Мои запросы" section (Fix 1E + Fix 5 + Fix 6) */}
-            {activeRequests.length > 0 && (
+            {ticketRows.length > 0 && (
               <div ref={ticketBoardRef} className="mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold text-gray-700">{t('help.my_requests', 'Мои запросы')}</span>
-                  <span className="text-xs text-gray-400">{activeRequests.length} {t('help.active_count', 'активных')}</span>
-                </div>
-                {/* Ticket rows — sorted by sentAt asc, collapse at 4+ */}
+                {!isTicketExpanded && (
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-gray-700">{t('help.my_requests')}</span>
+                    {activeRequestCount > 0 && (
+                      <span className="text-xs text-gray-400">{activeRequestCount} {t('help.active_count')}</span>
+                    )}
+                  </div>
+                )}
                 {(() => {
-                  const showAll = activeRequests.length <= 3 || isTicketExpanded;
-                  const visibleRequests = showAll ? activeRequests : activeRequests.slice(0, 2);
+                  const visibleRequests = isTicketExpanded
+                    ? (activeRequests.length > 0 ? activeRequests : ticketRows)
+                    : (activeRequests.length > 0 ? activeRequests.slice(0, HELP_PREVIEW_LIMIT) : ticketRows.slice(0, HELP_PREVIEW_LIMIT));
+                  const freshnessLabel = getHelpFreshnessLabel();
                   return (
                     <>
                       {visibleRequests.map(req => {
@@ -4054,167 +4752,206 @@ export default function X() {
                         const cooldownSec = cooldownActive ? Math.ceil((req.remindCooldownUntil - Date.now()) / 1000) : 0;
                         const cooldownMin = Math.floor(cooldownSec / 60);
                         const cooldownSecRem = cooldownSec % 60;
+                        const reminderLabel = getHelpReminderLabel(req);
+                        const errorCopy = getHelpErrorCopy(req);
+                        const isSending = req.status === 'sending' || req.pendingAction === 'send' || req.pendingAction === 'remind';
+                        const isResolved = req.status === 'resolved';
+                        const isClosed = req.status === 'closed_by_guest';
                         return (
                           <div
                             key={req.id}
-                            className={`rounded-lg border p-3 mb-2 transition-colors duration-300 ${isHighlighted ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200'}`}
+                            className={`rounded-lg border p-3 mb-2 transition-colors duration-300 ${
+                              isHighlighted
+                                ? 'bg-amber-50 border-amber-300'
+                                : errorCopy
+                                  ? 'bg-red-50 border-red-200'
+                                  : isResolved || isClosed
+                                    ? 'bg-emerald-50 border-emerald-200'
+                                    : 'bg-white border-slate-200'
+                            }`}
                           >
-                            {/* Row title */}
-                            <div className="text-sm font-medium text-slate-800 mb-0.5">
+                            <div className="text-sm font-medium text-slate-800">
                               {HELP_CARD_LABELS[req.type] || req.type}
-                              {req.message ? ` — "${req.message.slice(0, 30)}${req.message.length > 30 ? '...' : ''}"` : ''}
                             </div>
-                            {/* Timestamp */}
-                            <div className="text-xs text-slate-500 mb-2">
-                              {getRelativeTime(req.sentAt)}
-                              {req.reminderCount > 0 && (
-                                <span className="ml-1">· {req.reminderCount} {tr('help.reminders', 'напоминаний')}</span>
+                            {req.message && (
+                              <div className="text-xs text-slate-500 mt-1 break-words">{req.message}</div>
+                            )}
+                            <div className="mt-2">
+                              {isClosed ? (
+                                <div className="text-sm font-medium text-emerald-700">{tr('help.closed_by_guest', '✅ No longer needed')}</div>
+                              ) : isResolved ? (
+                                <div className="text-sm font-medium text-emerald-700">{getHelpResolvedLabel(req.type)}</div>
+                              ) : errorCopy ? (
+                                <>
+                                  <div className="text-sm font-medium text-red-700">{errorCopy.title}</div>
+                                  <div className="text-xs text-red-600 mt-1">{errorCopy.detail}</div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="text-sm text-slate-700">
+                                    {isSending ? tr('help.sending_now', 'Sending…') : getHelpWaitLabel(req)}
+                                  </div>
+                                  {reminderLabel && (
+                                    <div className="text-xs text-slate-500 mt-1">{reminderLabel}</div>
+                                  )}
+                                </>
                               )}
                             </div>
-                            {/* Action buttons — full width, side by side */}
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleRemind(req.type, req.type === 'other' ? req.id : undefined)}
-                                disabled={cooldownActive}
-                                className={`flex-1 text-xs font-medium py-2 min-h-[36px] rounded-lg ${cooldownActive ? 'text-slate-400 bg-slate-100' : 'text-orange-800 bg-orange-50 active:bg-orange-100'}`}
-                              >
-                                {cooldownActive
-                                  ? `${tr('help.retry_in', 'Через')} ${String(cooldownMin).padStart(2,'0')}:${String(cooldownSecRem).padStart(2,'0')}`
-                                  : tr('help.remind', 'Напомнить')}
-                              </button>
-                              <button
-                                onClick={() => handleResolve(req.type, req.type === 'other' ? req.id : undefined)}
-                                className="flex-1 text-xs font-medium py-2 min-h-[36px] rounded-lg text-slate-500 bg-slate-100 active:bg-slate-200"
-                              >
-                                {tr('help.resolved', 'Не нужно')}
-                              </button>
-                            </div>
+                            {!isClosed && !isResolved && (
+                              <div className="flex gap-2 mt-3">
+                                {errorCopy ? (
+                                  <button
+                                    onClick={() => handleRetry(req)}
+                                    className="flex-1 text-xs font-medium py-2 min-h-[36px] rounded-lg text-red-700 bg-red-100 active:bg-red-200"
+                                  >
+                                    {tr('help.retry', 'Retry')}
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleRemind(req.type, req.type === 'other' ? req.id : undefined)}
+                                    disabled={isSending || cooldownActive}
+                                    className={`flex-1 text-xs font-medium py-2 min-h-[36px] rounded-lg ${
+                                      isSending || cooldownActive
+                                        ? 'text-slate-400 bg-slate-100'
+                                        : 'text-orange-800 bg-orange-50 active:bg-orange-100'
+                                    }`}
+                                  >
+                                    {isSending
+                                      ? tr('help.sending_now', 'Sending…')
+                                      : cooldownActive
+                                        ? `${tr('help.retry_in', 'In')} ${String(cooldownMin).padStart(2, '0')}:${String(cooldownSecRem).padStart(2, '0')}`
+                                        : tr('help.remind', 'Remind')}
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleResolve(req.type, req.type === 'other' ? req.id : undefined)}
+                                  className="flex-1 text-xs font-medium py-2 min-h-[36px] rounded-lg text-slate-600 bg-slate-100 active:bg-slate-200"
+                                >
+                                  {t('help.cancel_request')}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
-                      {/* Fix 6A: Collapse toggle */}
-                      {activeRequests.length >= 4 && !isTicketExpanded && (
+                      {!isTicketExpanded && activeRequestCount > HELP_PREVIEW_LIMIT && (
                         <button
-                          onClick={() => setIsTicketExpanded(true)}
-                          className="w-full text-center text-xs text-blue-500 py-2 min-h-[36px]"
+                          onClick={() => { setIsTicketExpanded(true); setShowOtherForm(false); }}
+                          className="w-full text-center text-sm font-medium text-blue-600 py-2 min-h-[40px]"
                         >
-                          {t('help.show_more', 'Ещё')} {activeRequests.length - 2} {t('help.requests', 'запросов')}
+                          {t('help.all_requests_cta', { count: activeRequestCount })}
                         </button>
                       )}
-                      {activeRequests.length >= 4 && isTicketExpanded && (
-                        <button
-                          onClick={() => setIsTicketExpanded(false)}
-                          className="w-full text-center text-xs text-blue-500 py-2 min-h-[36px]"
-                        >
-                          {t('help.show_less', 'Свернуть')}
-                        </button>
+                      {freshnessLabel && (
+                        <p className="text-xs text-gray-400 mt-1 text-center break-words">{freshnessLabel}</p>
                       )}
                     </>
                   );
                 })()}
-                {/* Fix 5: Anxiety copy */}
-                <p className="text-xs text-gray-400 mt-1 text-center">{t('help.status_auto_update', 'Статус обновляется автоматически')}</p>
               </div>
             )}
-            {/* Fix 1F: Conditional "Отправить ещё" header */}
-            {activeRequests.length > 0 && (
-              <span className="text-sm font-semibold text-gray-700">{t('help.send_more', 'Отправить ещё')}</span>
+            {!isTicketExpanded && activeRequests.length > 0 && (
+              <span className="text-sm font-semibold text-gray-700">{t('help.send_more')}</span>
             )}
-            {/* HD-01: Per-card state help cards — always idle (Fix 1C/1D) */}
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { id: 'call_waiter', emoji: '\uD83D\uDE4B', label: t('help.call_waiter', 'Позвать официанта') },
-                { id: 'bill', emoji: '\uD83E\uDDFE', label: t('help.bill', 'Принести счёт') },
-                { id: 'napkins', emoji: null, label: t('help.napkins', 'Салфетки') },
-                { id: 'menu', emoji: '\uD83D\uDCC4', label: t('help.menu', 'Бумажное меню') },
-              ].map(card => {
-                const st = requestStates[card.id];
-                const status = st?.status || 'idle';
-                return (
+            {!isTicketExpanded && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: 'call_waiter', emoji: '\uD83D\uDE4B', label: t('help.call_waiter') },
+                    { id: 'bill', emoji: '\uD83E\uDDFE', label: t('help.bill') },
+                    { id: 'napkins', emoji: null, label: t('help.napkins') },
+                    { id: 'menu', emoji: '\uD83D\uDCC4', label: t('help.menu') },
+                  ].map(card => {
+                    const activeRow = activeRequests.find((row) => row.type === card.id);
+                    const isSubdued = Boolean(activeRow);
+                    return (
+                      <button
+                        key={card.id}
+                        onClick={() => {
+                          if (activeRow) {
+                            focusHelpRow(activeRow.id);
+                            return;
+                          }
+                          handleCardTap(card.id);
+                        }}
+                        className={`relative rounded-xl border min-h-[80px] flex flex-col items-center justify-center gap-1 px-2 ${
+                          isSubdued
+                            ? 'bg-slate-50 border-slate-200 text-slate-500'
+                            : 'bg-white border-slate-200 active:border-blue-400 active:bg-blue-50'
+                        }`}
+                      >
+                        {card.id === 'napkins' ? (
+                          <Layers className={`w-6 h-6 ${isSubdued ? 'text-slate-400' : 'text-slate-500'}`} />
+                        ) : (
+                          <span className={`text-2xl ${isSubdued ? 'opacity-60' : ''}`}>{card.emoji}</span>
+                        )}
+                        <span className={`text-sm font-medium text-center ${isSubdued ? 'text-slate-500' : 'text-slate-700'}`}>
+                          {card.label}
+                        </span>
+                        {isSubdued && (
+                          <span className="text-[11px] font-medium text-slate-400">
+                            {t('help.already_sent_short')}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                   <button
-                    key={card.id}
-                    onClick={() => {
-                      // Fix 3: Smart redirect — if active, scroll to ticket board
-                      if (status !== 'idle') {
-                        ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth' });
-                        setHighlightedTicket(card.id);
-                        setTimeout(() => setHighlightedTicket(null), 1500);
-                        toast({ description: t('help.already_sent', 'Запрос уже отправлен — смотри выше'), duration: 2000 });
-                        return;
-                      }
-                      handleCardTap(card.id);
-                    }}
-                    className="relative rounded-xl border min-h-[80px] flex flex-col items-center justify-center gap-1 bg-white border-slate-200 active:border-blue-400 active:bg-blue-50"
+                    onClick={() => setShowOtherForm(prev => !prev)}
+                    className="relative col-span-2 rounded-xl border min-h-[48px] flex flex-row items-center justify-center gap-2 bg-white border-slate-200 active:border-blue-400 active:bg-blue-50"
                   >
-                    {card.id === 'napkins' ? (
-                      <Layers className="w-6 h-6 text-slate-500" />
-                    ) : (
-                      <span className="text-2xl">{card.emoji}</span>
-                    )}
-                    <span className="text-sm font-medium text-slate-700 text-center px-1">
-                      {card.label}
+                    <span className="text-xl">{'\u270F\uFE0F'}</span>
+                    <span className="text-sm font-medium text-slate-700">
+                      {t('help.other')}
                     </span>
                   </button>
-                );
-              })}
-              {/* "Другое" card — always idle (Fix 1D), always toggles form */}
-              <button
-                onClick={() => setShowOtherForm(prev => !prev)}
-                className="relative col-span-2 rounded-xl border min-h-[48px] flex flex-row items-center justify-center gap-2 bg-white border-slate-200 active:border-blue-400 active:bg-blue-50"
-              >
-                <span className="text-xl">{'\u270F\uFE0F'}</span>
-                <span className="text-sm font-medium text-slate-700">
-                  {t('help.other', 'Другое')}
-                </span>
-              </button>
-            </div>
-            {/* HD-04: "Другое" expanded form with chips + textarea */}
-            {showOtherForm && (
-              <div className="space-y-3 pt-1">
-                <div className="flex flex-wrap gap-2">
-                  {HELP_CHIPS.map(chip => (
-                    <button
-                      key={chip}
-                      onClick={() => setHelpComment(prev => prev ? `${prev}, ${chip.toLowerCase()}` : chip)}
-                      className="px-3 py-1.5 rounded-full border border-slate-200 bg-white text-sm text-slate-700 active:bg-slate-100 min-h-[36px]"
-                    >
-                      {chip}
-                    </button>
-                  ))}
                 </div>
-                <textarea
-                  autoFocus
-                  value={helpComment}
-                  onChange={(e) => setHelpComment(e.target.value.slice(0, 100))}
-                  maxLength={100}
-                  placeholder={t('help.comment_placeholder_other', 'Например: детский стул, приборы, убрать со стола')}
-                  className="w-full rounded-lg border border-slate-200 p-3 text-sm min-h-[80px] resize-none focus:outline-none focus:ring-2 focus:ring-blue-200"
-                />
-                <div className="text-right text-xs text-slate-400">{helpComment.length} / 100</div>
-              </div>
+                {showOtherForm && (
+                  <div className="space-y-3 pt-1">
+                    <div className="flex flex-wrap gap-2">
+                      {HELP_CHIPS.map(chip => (
+                        <button
+                          key={chip}
+                          onClick={() => setHelpComment(prev => prev ? `${prev}, ${chip.toLowerCase()}` : chip)}
+                          className="px-3 py-1.5 rounded-full border border-slate-200 bg-white text-sm text-slate-700 active:bg-slate-100 min-h-[36px]"
+                        >
+                          {chip}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      autoFocus
+                      value={helpComment}
+                      onChange={(e) => setHelpComment(e.target.value.slice(0, 100))}
+                      maxLength={100}
+                      placeholder={t('help.comment_placeholder_other')}
+                      className="w-full rounded-lg border border-slate-200 p-3 text-sm min-h-[80px] resize-none focus:outline-none focus:ring-2 focus:ring-blue-200"
+                    />
+                    <div className="text-right text-xs text-slate-400">{helpComment.length} / 100</div>
+                  </div>
+                )}
+              </>
             )}
-            {/* HD-06: Undo toast */}
             {undoToast && (
               <div className="rounded-lg bg-slate-800 text-white px-4 py-3 flex items-center justify-between text-sm">
-                <span>{HELP_CARD_LABELS[undoToast.type] || undoToast.type} {t('help.sent_suffix', 'отправлено')}</span>
+                <span>{HELP_CARD_LABELS[undoToast.type] || undoToast.type} {t('help.sent_suffix')}</span>
                 <button onClick={handleUndo} className="text-amber-300 font-medium ml-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
-                  {t('help.undo', 'Отменить')} ({Math.max(0, Math.ceil((undoToast.expiresAt - Date.now()) / 1000))})
+                  {t('help.undo')} ({Math.max(0, Math.ceil((undoToast.expiresAt - Date.now()) / 1000))})
                 </button>
               </div>
             )}
-            {helpSubmitError && (
+            {helpSubmitError && !ticketRows.some((row) => row.errorKind) && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{helpSubmitError}</div>
             )}
           </div>
-          {/* HD-04: Sticky submit area for "Другое" form — dual buttons */}
-          {showOtherForm && (
+          {!isTicketExpanded && showOtherForm && (
             <div className="px-4 pb-4 pt-2 border-t border-slate-100 flex gap-3">
               <Button
                 variant="outline"
                 className="flex-1 min-h-[44px]"
                 onClick={() => { setShowOtherForm(false); setHelpComment(''); }}
               >
-                {t('common.cancel', 'Отмена')}
+                {tr('common.cancel', 'Отмена')}
               </Button>
               <Button
                 className="flex-1 min-h-[44px] text-white"
@@ -4222,29 +4959,51 @@ export default function X() {
                 onClick={() => {
                   if (!helpComment.trim()) return;
                   const msg = helpComment.trim();
-                  // Use undo flow: set sending + schedule actual send
                   if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId);
-                  const entryId = Date.now().toString();
-                  setRequestStates(prev => {
-                    const otherArr = Array.isArray(prev.other) ? prev.other : (prev.other ? [prev.other] : []);
-                    return { ...prev, other: [...otherArr, { id: entryId, status: 'sending', sentAt: Date.now(), lastReminderAt: null, reminderCount: 0, remindCooldownUntil: null, message: msg }] };
-                  });
+                  const entryId = `other-${Date.now()}`;
                   const timeoutId = setTimeout(() => {
-                    pendingQuickSendRef.current = 'other';
+                    if (currentTableIdRef.current !== currentTableId) return;
+                    const now = Date.now();
+                    setRequestStates(prev => {
+                      const otherArr = Array.isArray(prev.other) ? prev.other : (prev.other ? [prev.other] : []);
+                      return {
+                        ...prev,
+                        other: [
+                          ...otherArr,
+                          {
+                            id: entryId,
+                            status: 'sending',
+                            sentAt: now,
+                            lastReminderAt: null,
+                            reminderCount: 0,
+                            remindCooldownUntil: null,
+                            message: msg,
+                            pendingAction: 'send',
+                            errorKind: null,
+                            errorMessage: '',
+                            terminalHideAt: null,
+                            syncSource: 'local',
+                          },
+                        ],
+                      };
+                    });
+                    setHelpComment(msg);
+                    pendingQuickSendRef.current = { type: 'other', action: 'send', rowId: entryId, message: msg };
                     handlePresetSelect('other');
-                    setUndoToast(null);
+                    setPendingHelpActionTick((value) => value + 1);
+                    setUndoToast(prev => (prev?.timeoutId === timeoutId ? null : prev));
                   }, 5000);
-                  setUndoToast({ type: 'other', otherId: entryId, expiresAt: Date.now() + 5000, timeoutId });
+                  setUndoToast({ type: 'other', rowId: entryId, tableId: currentTableId, message: msg, expiresAt: Date.now() + 5000, timeoutId });
                   setShowOtherForm(false);
                   setHelpComment('');
                 }}
                 disabled={!helpComment.trim()}
               >
-                {t('help.submit_arrow', 'Отправить')}
+                {t('help.submit_arrow')}
               </Button>
             </div>
           )}
-          {/* cardActionModal removed — replaced by ticket board + smart redirect (Fix 1B) */}
+          {/* cardActionModal removed â€” replaced by ticket board + smart redirect (Fix 1B) */}
         </DrawerContent>
       </Drawer>
 
@@ -4300,12 +5059,12 @@ export default function X() {
                 <button
                   onClick={() => { popOverlay('detailDish'); setDetailDish(null); }}
                   className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-black/40 text-white"
-                  aria-label={t('common.close', 'Закрыть')}
+                  aria-label={t('common.close', 'Ð—Ð°ÐºÑ€Ñ‹Ñ‚ÑŒ')}
                 >
                   <ChevronDown className="w-6 h-6" />
                 </button>
               </div>
-              {/* Scrollable content: PM-123 order: Title → Description → Price+Discount → Rating */}
+              {/* Scrollable content: PM-123 order: Title â†’ Description â†’ Price+Discount â†’ Rating */}
               <div className="overflow-y-auto flex-1 p-4 space-y-3">
                 <h2 className="text-lg font-bold text-slate-900">
                   {getDishName(detailDish)}
@@ -4315,7 +5074,7 @@ export default function X() {
                     {getDishDescription(detailDish)}
                   </p>
                 )}
-                {/* PM-118: Discount display — partner-level pattern (matches MenuView.jsx) */}
+                {/* PM-118: Discount display â€” partner-level pattern (matches MenuView.jsx) */}
                 <div className="flex items-baseline gap-2">
                   {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
                     <>
@@ -4353,7 +5112,7 @@ export default function X() {
                   style={{ backgroundColor: partner?.primary_color || '#1A1A1A', color: '#FFFFFF' }}
                   onClick={() => { addToCart(detailDish); popOverlay('detailDish'); setDetailDish(null); }}
                 >
-                  {t('menu.add_to_cart', 'Добавить в корзину')}
+                  {t('menu.add_to_cart', 'Ð”Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ Ð² ÐºÐ¾Ñ€Ð·Ð¸Ð½Ñƒ')}
                 </Button>
               </div>
             </div>
@@ -4361,7 +5120,7 @@ export default function X() {
         </DrawerContent>
       </Drawer>
 
-      {/* PM-156: Floating bell removed — bell accessible via CartView header + help drawer */}
+      {/* PM-156: Floating bell removed â€” bell accessible via CartView header + help drawer */}
 
       {/* Sticky cart bar - updated for TableSession */}
       {view === "menu" && (() => {
@@ -4411,7 +5170,7 @@ export default function X() {
               isLoadingBill={false}
               formattedBillTotal=""
               onButtonClick={handleCheckoutClick}
-              buttonLabel={tr('cart.checkout', 'Оформить заказ')}
+              buttonLabel={tr('cart.checkout', 'ÐžÑ„Ð¾Ñ€Ð¼Ð¸Ñ‚ÑŒ Ð·Ð°ÐºÐ°Ð·')}
               primaryColor={primaryColor}
             />
           );
@@ -4421,4 +5180,5 @@ export default function X() {
       })()}
     </div>
   );
-}                                                                                                                                                                                                                                                                                                                                                              
+}
+
