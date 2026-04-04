@@ -139,6 +139,14 @@ session: 214
 
 ## Fixed Bugs (исправлены)
 
+### FIX-#235: EN i18n — Russian fallbacks replaced with English — FIXED S219
+- **Приоритет:** P1
+- **Когда:** S219 (chain publicmenu-260404-054037-ad20)
+- **Файл:** x.jsx, lines 327–569 (I18N_FALLBACKS), line 1715 (HELP_CHIPS), lines 2448–2454 (getHelpReminderWord), lines 2472/2475/2515 ("назад")
+- **Симптом:** EN mode showed Russian text for ~170 keys because I18N_FALLBACKS had Russian values. HELP_CHIPS hardcoded in Russian. getHelpReminderWord returned Russian plurals. Three "назад" strings mixed Russian into EN labels.
+- **Фикс:** (1) Replaced entire I18N_FALLBACKS dictionary with 236-key English version (+15 new keys). (2) HELP_CHIPS uses tr() with EN fallbacks. (3) getHelpReminderWord uses tr() with EN singular/plural. (4) Three "назад" replaced with tr('help.ago', 'ago').
+- **Commit:** 56db694
+
 ### FIX-HD-17a: Help Drawer auto-closes 5s after card tap — FIXED S214
 - **Приоритет:** P1
 - **Когда:** S214 (chain publicmenu-260401-125045-ef92)
