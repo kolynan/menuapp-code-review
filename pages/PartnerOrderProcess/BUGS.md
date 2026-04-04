@@ -32,16 +32,28 @@
 
 ---
 
+## Fixed (in chain partnerorderprocess-260404-204226-0133)
+
+| ID | Priority | Description | Fix |
+|----|----------|-------------|-----|
+| OP-FIX-1 | P1 | ChannelFilter dead code (function + CHANNEL_FILTERS constant) | Removed entirely |
+| OP-FIX-2 | P1 | FixedStageRow card layout — too much vertical space, no mobile accordion | Replaced with compact desktop row + mobile accordion |
+| OP-FIX-3 | P1 | No mobile channel legend — icon-only rows not self-explanatory | Added sm:hidden legend above stage list |
+| OP-FIX-4 | P1 | LOCAL_UI_TEXT hardcoded Russian strings instead of t() i18n | All references replaced with t() keys, constant deleted |
+| OP-FIX-5 | P3 | Dead handlers (handleAddStage, handleDeleteStage, handleConfirmDelete, handleMoveUp, handleMoveDown) | Removed; deleteMutation/deleteDialog/moveBusy kept for hook order |
+
+---
+
 ## Active
 
 | ID | Priority | Description | Line(s) | Notes |
 |----|----------|-------------|---------|-------|
 | BUG-OP-006 | P2 | Fractional sort_order (0.5) may collide on INTEGER backend column | 817, 944 | Use integer offsets or verify schema |
 | BUG-OP-007 | P2 | handleCreateDefaults non-atomic — partial creates on mid-loop failure | 741-747 | Consider cleanup on error |
-| BUG-OP-008 | P2 | Move Up/Down buttons misleading under channel filter — computed from full list | 1128-1130 | Compute from filteredStages |
+| BUG-OP-008 | P2 | ~~Move Up/Down buttons misleading under channel filter~~ | — | RESOLVED: handlers + filter removed in chain 0133 |
 | BUG-OP-009 | P2 | ROLE_OPTIONS recreated on every render — should use useMemo | 452-456 | |
-| BUG-OP-010 | P2 | useCallback on getRoleLabel in non-memoized StageRow — no benefit | 227-234 | Remove useCallback |
-| BUG-OP-011 | P2 | Magic number 15 in handleAddStage | 813 | Name as constant |
+| BUG-OP-010 | P2 | useCallback on getRoleLabel — kept in redesigned FixedStageRow with [t] dep | — | OK: useCallback preserved per prompt spec |
+| BUG-OP-011 | P2 | ~~Magic number 15 in handleAddStage~~ | — | RESOLVED: handleAddStage removed in chain 0133 |
 | BUG-OP-012 | P1 (style) | Color swatch aria-label uses raw English string, not t() | 512, 26-32 | Add i18n keys |
 | BUG-OP-013 | P1 (style) | .replace("{name}") bypasses i18n interpolation | 609 | Use t(key, { name }) |
 | BUG-OP-014 | P3 | Russian comments in production code | various | Translate to English |

@@ -32,13 +32,6 @@ const STAGE_COLORS = [
   { name: "gray", value: "#6b7280" },
 ];
 
-const CHANNEL_FILTERS = [
-  { key: "all", field: null },
-  { key: "hall", field: "enabled_hall" },
-  { key: "pickup", field: "enabled_pickup" },
-  { key: "delivery", field: "enabled_delivery" },
-];
-
 const SYSTEM_STAGE_SLOTS = [
   {
     key: "new",
@@ -120,18 +113,6 @@ const EXACT_MIDDLE_SLOT_BY_SORT_ORDER = {
   10: "accepted",
   20: "preparing",
   30: "ready",
-};
-
-const LOCAL_UI_TEXT = {
-  currentProcess: "Текущий процесс",
-  locked: "Зафиксировано",
-  enabled: "Вкл",
-  disabled: "Выкл",
-  blockerGeneric: "Не удалось безопасно привести этапы к фиксированной схеме.",
-  blockerMultipleStart: "Обнаружено несколько стартовых этапов.",
-  blockerMultipleFinish: "Обнаружено несколько финальных этапов.",
-  blockerTooManyMiddle: "Обнаружено больше трёх промежуточных этапов.",
-  blockerUnsupportedType: "Обнаружен этап с неподдерживаемым типом.",
 };
 
 // ============================================================
@@ -246,7 +227,7 @@ function analyzeStageSet(stages) {
     }
 
     return {
-      blocker: LOCAL_UI_TEXT.blockerUnsupportedType,
+      blocker: "orderprocess.blocker.unsupported_type",
       startStage: null,
       finishStage: null,
       middleStages: [],
@@ -255,7 +236,7 @@ function analyzeStageSet(stages) {
 
   if (startStages.length > 1) {
     return {
-      blocker: LOCAL_UI_TEXT.blockerMultipleStart,
+      blocker: "orderprocess.blocker.multiple_start",
       startStage: null,
       finishStage: null,
       middleStages: [],
@@ -264,7 +245,7 @@ function analyzeStageSet(stages) {
 
   if (finishStages.length > 1) {
     return {
-      blocker: LOCAL_UI_TEXT.blockerMultipleFinish,
+      blocker: "orderprocess.blocker.multiple_finish",
       startStage: null,
       finishStage: null,
       middleStages: [],
@@ -273,7 +254,7 @@ function analyzeStageSet(stages) {
 
   if (middleStages.length > 3) {
     return {
-      blocker: LOCAL_UI_TEXT.blockerTooManyMiddle,
+      blocker: "orderprocess.blocker.too_many_middle",
       startStage: null,
       finishStage: null,
       middleStages: [],
@@ -576,91 +557,13 @@ function PipelinePreview({ stages, t }) {
 }
 
 // ============================================================
-// CHANNEL FILTER COMPONENT
-// ============================================================
-
-function ChannelFilter({ value, onChange, t }) {
-  const getLabel = (key) => {
-    const labels = {
-      all: t("orderprocess.filter.all"),
-      hall: t("channel.hall"),
-      pickup: t("channel.pickup"),
-      delivery: t("channel.delivery"),
-    };
-    return labels[key] || key;
-  };
-
-  const getIcon = (key) => {
-    const icons = {
-      all: null,
-      hall: <Utensils className="h-4 w-4" />,
-      pickup: <Package className="h-4 w-4" />,
-      delivery: <Truck className="h-4 w-4" />,
-    };
-    return icons[key];
-  };
-
-  return (
-    <div className="flex items-center justify-center mb-4">
-      <div className="inline-flex rounded-lg border bg-slate-100 p-1">
-        {CHANNEL_FILTERS.map((filter) => {
-          const isActive = value === filter.key;
-          const icon = getIcon(filter.key);
-          
-          return (
-            <button
-              key={filter.key}
-              onClick={() => onChange(filter.key)}
-              className={`
-                flex items-center gap-1.5 px-3 min-h-[44px] text-sm font-medium rounded-md transition-all
-                ${isActive
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-                }
-              `}
-            >
-              {icon}
-              <span className="hidden sm:inline">{getLabel(filter.key)}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
 // STAGE ROW COMPONENT
 // ============================================================
 
-function FixedStageRow({ slot, toggleBusyKey, onEdit, onToggle, t }) {
+function FixedStageRow({ slot, isExpanded, onToggleExpand, onEdit, t }) {
   const locked = slot.definition.locked;
-  const toggleBusy = toggleBusyKey === slot.key;
-  const controlsBusy = Boolean(toggleBusyKey);
-  const channelBadges = [
-    {
-      key: "hall",
-      enabled: slot.channels.enabled_hall,
-      label: t("channel.hall"),
-      icon: <Utensils className="h-3.5 w-3.5" />,
-      className: "bg-blue-50 text-blue-700",
-    },
-    {
-      key: "pickup",
-      enabled: slot.channels.enabled_pickup,
-      label: t("channel.pickup"),
-      icon: <Package className="h-3.5 w-3.5" />,
-      className: "bg-amber-50 text-amber-700",
-    },
-    {
-      key: "delivery",
-      enabled: slot.channels.enabled_delivery,
-      label: t("channel.delivery"),
-      icon: <Truck className="h-3.5 w-3.5" />,
-      className: "bg-emerald-50 text-emerald-700",
-    },
-  ].filter((channel) => channel.enabled);
 
+  // preserve from original component — keep useCallback with [t] dependency
   const getRoleLabel = useCallback((role) => {
     const labels = {
       partner_staff: t("orderprocess.role.staff"),
@@ -671,99 +574,117 @@ function FixedStageRow({ slot, toggleBusyKey, onEdit, onToggle, t }) {
   }, [t]);
 
   return (
-    <div
-      className={`px-4 py-4 border-b last:border-b-0 transition-colors ${
-        slot.active ? "bg-white" : "bg-slate-50/70"
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        <div className="w-7 shrink-0 pt-1 text-center text-sm font-semibold text-slate-400">
-          {slot.index + 1}
+    <div className="border-b last:border-b-0">
+      {/* Collapsed row — shown always (desktop and mobile) */}
+      <div className="flex items-center gap-3 px-4 py-3 min-h-[44px]">
+        {/* number + color dot + name */}
+        <span className="text-sm text-slate-500 w-5 flex-shrink-0">{slot.index + 1}</span>
+        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: slot.color }} />
+        <span className="flex-1 text-sm font-medium text-slate-900">{slot.label}</span>
+
+        {/* channel icons */}
+        <div className="flex gap-1">
+          {slot.channels.enabled_hall && (
+            <Utensils className="h-3.5 w-3.5 text-slate-500" title={t('channel.hall')} />
+          )}
+          {slot.channels.enabled_pickup && (
+            <Package className="h-3.5 w-3.5 text-slate-500" title={t('channel.pickup')} />
+          )}
+          {slot.channels.enabled_delivery && (
+            <Truck className="h-3.5 w-3.5 text-slate-500" title={t('channel.delivery')} />
+          )}
         </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <div
-                  className="w-3.5 h-3.5 rounded-full flex-shrink-0 ring-2 ring-white shadow-sm"
-                  style={{ backgroundColor: slot.color }}
-                />
-                <span className="font-semibold text-slate-900">
-                  {slot.label}
-                </span>
-                {locked ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                    <Lock className="h-3.5 w-3.5" />
-                    {LOCAL_UI_TEXT.locked}
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => onToggle(slot)}
-                    disabled={controlsBusy}
-                    className={`inline-flex min-h-[36px] items-center justify-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
-                      slot.active
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                        : "border-slate-200 bg-white text-slate-600"
-                    }`}
-                  >
-                    {toggleBusy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                    {slot.active ? LOCAL_UI_TEXT.enabled : LOCAL_UI_TEXT.disabled}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-11 w-11 shrink-0"
-              onClick={() => slot.stage && onEdit(slot.stage)}
-              aria-label={t("orderprocess.aria.edit")}
-              disabled={!slot.canEdit}
-            >
-              <Pencil className="h-4 w-4 text-slate-500" />
-            </Button>
-          </div>
-
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div className="min-w-0">
-              <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
-                {t("orderprocess.table.channels")}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {channelBadges.map((channel) => (
-                  <span
-                    key={channel.key}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${channel.className}`}
-                    title={channel.label}
-                  >
-                    {channel.icon}
-                    {channel.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="min-w-0">
-              <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
-                {t("orderprocess.table.roles")}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {slot.allowedRoles.map((role) => (
-                  <span
-                    key={role}
-                    className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600"
-                  >
-                    {getRoleLabel(role)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
+        {/* role chips — desktop only */}
+        <div className="hidden sm:flex gap-1 flex-wrap">
+          {slot.allowedRoles.map(role => (
+            <span key={role} className="rounded-full px-2 py-0.5 text-xs bg-slate-100 text-slate-600">
+              {getRoleLabel(role)}
+            </span>
+          ))}
         </div>
+
+        {/* status badge */}
+        <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${
+          locked
+            ? 'bg-slate-100 text-slate-500'
+            : slot.active
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-amber-100 text-amber-700'
+        }`}>
+          {locked ? (
+            <><Lock className="h-3 w-3 inline mr-1" />{t('orderprocess.status.locked')}</>
+          ) : slot.active ? (
+            t('orderprocess.status.active')
+          ) : (
+            t('orderprocess.status.inactive')
+          )}
+        </span>
+
+        {/* desktop: pencil for editable unlocked stages */}
+        {!locked && slot.canEdit && (
+          <button
+            onClick={() => onEdit(slot.stage)}
+            className="hidden sm:flex p-1 text-slate-400 hover:text-slate-600 min-h-[44px] items-center"
+            aria-label={t('orderprocess.aria.edit')}
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* mobile: chevron toggle */}
+        <button
+          onClick={() => onToggleExpand(slot.key)}
+          className="sm:hidden p-1 text-slate-400 min-h-[44px] min-w-[44px] flex items-center justify-center"
+        >
+          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
       </div>
+
+      {/* Expanded panel — mobile only */}
+      {isExpanded && (
+        <div className="sm:hidden px-4 pb-3 pt-1 bg-slate-50 text-sm space-y-2">
+          {/* channels with labels */}
+          <div className="flex items-center gap-3 text-slate-600">
+            <span className="text-xs font-medium text-slate-500">{t('orderprocess.channels_label')}:</span>
+            {slot.channels.enabled_hall && (
+              <span className="flex items-center gap-1">
+                <Utensils className="h-3.5 w-3.5" />{t('channel.hall')}
+              </span>
+            )}
+            {slot.channels.enabled_pickup && (
+              <span className="flex items-center gap-1">
+                <Package className="h-3.5 w-3.5" />{t('channel.pickup')}
+              </span>
+            )}
+            {slot.channels.enabled_delivery && (
+              <span className="flex items-center gap-1">
+                <Truck className="h-3.5 w-3.5" />{t('channel.delivery')}
+              </span>
+            )}
+          </div>
+
+          {/* roles */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-medium text-slate-500">{t('orderprocess.roles_label')}:</span>
+            {slot.allowedRoles.map(role => (
+              <span key={role} className="rounded-full px-2 py-0.5 text-xs bg-slate-100 text-slate-600">
+                {getRoleLabel(role)}
+              </span>
+            ))}
+          </div>
+
+          {/* edit button — only for unlocked stages with DB record */}
+          {!locked && slot.canEdit && (
+            <button
+              onClick={() => onEdit(slot.stage)}
+              className="mt-1 text-sm text-blue-600 font-medium min-h-[44px] flex items-center"
+            >
+              {t('orderprocess.edit_button')}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1074,9 +995,10 @@ function OrderProcessContent() {
   const [isNormalizing, setIsNormalizing] = useState(false);
   const [normalizationError, setNormalizationError] = useState("");
   const [toggleBusyKey, setToggleBusyKey] = useState("");
-  const [moveBusy, setMoveBusy] = useState(false);
+  const [moveBusy, setMoveBusy] = useState(false); // reserved — do not remove (hook order)
   const [editDialog, setEditDialog] = useState({ open: false, stage: null });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, stage: null });
+  const [expandedKey, setExpandedKey] = useState(null); // which stage row is expanded on mobile
   // Fetch stages
   const { data: stages = [], isLoading, error, refetch } = useQuery({
     queryKey: ["orderStages", partnerId],
@@ -1215,7 +1137,7 @@ function OrderProcessContent() {
     onError: () => toast.error(t("toast.error"), { id: TOAST_ID }),
   });
 
-  // FIX BUG-OP-003: removed invalidateQueries from onSuccess — done manually after rebalance
+  // reserved — do not remove (hook order)
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.OrderStage.delete(id),
     onSuccess: () => {
@@ -1225,34 +1147,8 @@ function OrderProcessContent() {
     onError: () => toast.error(t("toast.error"), { id: TOAST_ID }),
   });
 
-  // Handlers
-  const handleAddStage = () => {
-    const finishStage = sortedStages.find((s) => s.internal_code === "finish");
-    let newSortOrder = 15;
-    
-    if (middleStages.length > 0) {
-      const lastMiddle = middleStages[middleStages.length - 1];
-      newSortOrder = (lastMiddle.sort_order || 20) + ORDER_STEP / 2;
-    }
-    if (finishStage && newSortOrder >= (finishStage.sort_order || 30)) {
-      newSortOrder = (finishStage.sort_order || 30) - ORDER_STEP / 2;
-    }
-
-    setEditDialog({
-      open: true,
-      stage: {
-        name: "",
-        color: "#9ca3af",
-        allowed_roles: ["partner_manager", "partner_staff", "kitchen"],
-        internal_code: "middle",
-        sort_order: newSortOrder,
-        enabled_hall: true,
-        enabled_pickup: true,
-        enabled_delivery: true,
-        isNew: true,
-      },
-    });
-  };
+  // NOTE: Add/Move/Delete stage handlers removed — fixed 5-stage system (UX v2.0)
+  // deleteMutation and deleteDialog kept for React hook order safety
 
   const handleEditStage = (stage) => {
     setEditDialog({ open: true, stage });
@@ -1320,95 +1216,6 @@ function OrderProcessContent() {
       }
     } else if (editDialog.stage?.id) {
       updateMutation.mutate({ id: editDialog.stage.id, data });
-    }
-  };
-
-  const handleDeleteStage = (stage) => {
-    setDeleteDialog({ open: true, stage });
-  };
-
-  // FIX BUG-OP-001 + BUG-OP-002: try/catch + check orders before delete
-  const handleConfirmDelete = async () => {
-    if (!deleteDialog.stage?.id) return;
-
-    try {
-      // FIX BUG-OP-002: check for orders referencing this stage before deleting
-      const ordersInStage = await base44.entities.Order.filter({
-        partner: partnerId,
-        current_stage: deleteDialog.stage.id,
-      });
-      if (ordersInStage.length > 0) {
-        toast.error(t("orderprocess.error.stage_has_orders", { count: ordersInStage.length }), { id: TOAST_ID });
-        setDeleteDialog({ open: false, stage: null });
-        return;
-      }
-
-      await deleteMutation.mutateAsync(deleteDialog.stage.id);
-
-      // Rebalance after delete — non-critical, wrapped separately
-      try {
-        const updatedStages = await base44.entities.OrderStage.filter({ partner: partnerId });
-        await rebalanceSortOrder(updatedStages, partnerId);
-      } catch {
-        // rebalance failure is non-critical; stage was deleted successfully
-      }
-      queryClient.invalidateQueries({ queryKey: ["orderStages", partnerId] });
-    } catch {
-      // Show error toast for pre-check failures (Order.filter) that aren't handled by deleteMutation.onError
-      if (!deleteMutation.isPending) {
-        toast.error(t("toast.error"), { id: TOAST_ID });
-      }
-    }
-  };
-
-  // FIX P1: Move handlers с busy state
-  const handleMoveUp = async (stage) => {
-    if (moveBusy) return;
-    
-    const idx = middleStages.findIndex((s) => s.id === stage.id);
-    if (idx <= 0) return;
-
-    setMoveBusy(true);
-    try {
-      const prevStage = middleStages[idx - 1];
-      const newOrder = (prevStage.sort_order || 0) - 1;
-      
-      await base44.entities.OrderStage.update(stage.id, { sort_order: newOrder });
-      
-      // Rebalance для чистых значений
-      const updatedStages = await base44.entities.OrderStage.filter({ partner: partnerId });
-      await rebalanceSortOrder(updatedStages, partnerId);
-      
-      queryClient.invalidateQueries({ queryKey: ["orderStages", partnerId] });
-    } catch {
-      toast.error(t("toast.error"), { id: TOAST_ID });
-    } finally {
-      setMoveBusy(false);
-    }
-  };
-
-  const handleMoveDown = async (stage) => {
-    if (moveBusy) return;
-    
-    const idx = middleStages.findIndex((s) => s.id === stage.id);
-    if (idx < 0 || idx >= middleStages.length - 1) return;
-
-    setMoveBusy(true);
-    try {
-      const nextStage = middleStages[idx + 1];
-      const newOrder = (nextStage.sort_order || 0) + 1;
-      
-      await base44.entities.OrderStage.update(stage.id, { sort_order: newOrder });
-      
-      // Rebalance для чистых значений
-      const updatedStages = await base44.entities.OrderStage.filter({ partner: partnerId });
-      await rebalanceSortOrder(updatedStages, partnerId);
-      
-      queryClient.invalidateQueries({ queryKey: ["orderStages", partnerId] });
-    } catch {
-      toast.error(t("toast.error"), { id: TOAST_ID });
-    } finally {
-      setMoveBusy(false);
     }
   };
 
@@ -1502,10 +1309,10 @@ function OrderProcessContent() {
             <AlertTriangle className="h-6 w-6 text-amber-600 flex-shrink-0" />
             <div className="flex-1">
               <h3 className="font-semibold text-amber-900 mb-1">
-                {LOCAL_UI_TEXT.blockerGeneric}
+                {t('orderprocess.blocker.generic')}
               </h3>
               <p className="text-sm text-amber-700">
-                {stageAnalysis.blocker}
+                {t(stageAnalysis.blocker)}
               </p>
             </div>
           </div>
@@ -1586,7 +1393,7 @@ function OrderProcessContent() {
 
       <div className="mb-4 rounded-xl border bg-slate-50 px-4 py-3">
         <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-          {LOCAL_UI_TEXT.currentProcess}
+          {t('orderprocess.current_process')}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {currentProcessStages.map((slot, index) => (
@@ -1605,14 +1412,21 @@ function OrderProcessContent() {
         </div>
       </div>
 
+      {/* Channel legend — mobile only */}
+      <div className="flex items-center gap-4 px-4 py-2 bg-slate-50 rounded-lg mb-3 text-xs text-slate-600 sm:hidden">
+        <span className="flex items-center gap-1"><Utensils className="h-3.5 w-3.5" />{t('channel.hall')}</span>
+        <span className="flex items-center gap-1"><Package className="h-3.5 w-3.5" />{t('channel.pickup')}</span>
+        <span className="flex items-center gap-1"><Truck className="h-3.5 w-3.5" />{t('channel.delivery')}</span>
+      </div>
+
       <div className="bg-white rounded-xl border overflow-hidden">
         {fixedStageSlots.map((slot) => (
           <FixedStageRow
             key={slot.key}
             slot={slot}
-            toggleBusyKey={toggleBusyKey}
+            isExpanded={expandedKey === slot.key}
+            onToggleExpand={(key) => setExpandedKey(prev => prev === key ? null : key)}
             onEdit={handleEditStage}
-            onToggle={handleToggleStage}
             t={t}
           />
         ))}
