@@ -1,5 +1,5 @@
 // ======================================================
-// pages/x.jsx â€” PUBLIC MENU with i18n + Channels Visibility + Gating
+// pages/x.jsx â€" PUBLIC MENU with i18n + Channels Visibility + Gating
 // UPDATED: Simplified Hall logic (TASK-260123-01b)
 // FIXED: P0-1..P0-7 security and functionality fixes
 // UPDATED: TASK-260127-01 - session restore, UI cleanup
@@ -187,7 +187,7 @@ const getCartFromStorage = (partnerId) => {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    // Migrate legacy format (plain array) â€” accept but rewrite with timestamp
+    // Migrate legacy format (plain array) â€" accept but rewrite with timestamp
     if (Array.isArray(data)) {
       try {
         localStorage.setItem(key, JSON.stringify({ items: data, ts: Date.now() }));
@@ -195,7 +195,7 @@ const getCartFromStorage = (partnerId) => {
       return data;
     }
     if (!data || !Array.isArray(data.items)) return null;
-    // TTL check â€” require valid ts
+    // TTL check â€" require valid ts
     if (!data.ts || typeof data.ts !== 'number' || (Date.now() - data.ts) > CART_TTL_MS) {
       localStorage.removeItem(key);
       return null;
@@ -295,7 +295,7 @@ const setBillCooldownStorage = (tableId) => {
   try {
     const key = getBillCooldownKey(tableId);
     localStorage.setItem(key, String(Date.now()));
-  } catch { /* private browsing â€” ignore */ }
+  } catch { /* private browsing â€" ignore */ }
 };
 
 /**
@@ -321,266 +321,266 @@ function getStartStage(stages, orderType) {
 }
 
 // ============================================================
-// i18n FALLBACK MAP â€” prevents raw keys from showing to guests
+// i18n FALLBACK MAP â€" prevents raw keys from showing to guests
 // Chain: selected lang â†’ EN fallback â†’ RU fallback â†’ empty string
 // ============================================================
 const I18N_FALLBACKS = {
   // Order statuses (OrderStatusBadge)
-  “status.new”: “New”,
-  “status.cooking”: “Cooking”,
-  “status.ready”: “Ready”,
-  “status.accepted”: “Accepted”,
-  “status.served”: “Served”,
+  "status.new": "New",
+  "status.cooking": "Cooking",
+  "status.ready": "Ready",
+  "status.accepted": "Accepted",
+  "status.served": "Served",
   // Order Status Screen
-  “order_status.status_new”: “Accepted”,
-  “order_status.status_preparing”: “Preparing”,
-  “order_status.status_ready”: “Ready”,
-  “order_status.status_served”: “Completed”,
-  “order_status.status_cancelled”: “Cancelled”,
-  “order_status.step_received”: “Received”,
-  “order_status.step_preparing”: “Preparing”,
-  “order_status.step_ready”: “Ready”,
-  “order_status.no_token”: “Order link is missing”,
-  “order_status.check_link”: “Please check the link and try again”,
-  “order_status.back_to_menu”: “Back to menu”,
-  “order_status.not_found”: “Order not found”,
-  “order_status.expired”: “Order expired”,
-  “order_status.order_number”: “Order”,
-  “order_status.last_updated”: “Updated”,
-  “order_status.just_now”: “just now”,
-  “order_status.seconds_ago”: “{seconds} sec. ago”,
-  “order_status.your_order”: “Your order”,
-  “order_status.total”: “Total”,
-  “order_status.discount”: “Discount”,
-  “order_status.questions”: “Any questions?”,
-  “order_status.order_cancelled_info”: “Order cancelled”,
-  “order_status.order_complete_info”: “Thank you! Your order is complete”,
-  “order_status.refresh”: “Refresh”,
+  "order_status.status_new": "Accepted",
+  "order_status.status_preparing": "Preparing",
+  "order_status.status_ready": "Ready",
+  "order_status.status_served": "Completed",
+  "order_status.status_cancelled": "Cancelled",
+  "order_status.step_received": "Received",
+  "order_status.step_preparing": "Preparing",
+  "order_status.step_ready": "Ready",
+  "order_status.no_token": "Order link is missing",
+  "order_status.check_link": "Please check the link and try again",
+  "order_status.back_to_menu": "Back to menu",
+  "order_status.not_found": "Order not found",
+  "order_status.expired": "Order expired",
+  "order_status.order_number": "Order",
+  "order_status.last_updated": "Updated",
+  "order_status.just_now": "just now",
+  "order_status.seconds_ago": "{seconds} sec. ago",
+  "order_status.your_order": "Your order",
+  "order_status.total": "Total",
+  "order_status.discount": "Discount",
+  "order_status.questions": "Any questions?",
+  "order_status.order_cancelled_info": "Order cancelled",
+  "order_status.order_complete_info": "Thank you! Your order is complete",
+  "order_status.refresh": "Refresh",
   // Mode labels
-  “mode.hall”: “Dine in”,
-  “mode.pickup”: “Takeaway”,
-  “mode.delivery”: “Delivery”,
-  “mode.hall.desc”: “Order in the restaurant”,
-  “mode.pickup.desc”: “I'll take it to go”,
-  “mode.delivery.desc”: “Delivery to your address”,
+  "mode.hall": "Dine in",
+  "mode.pickup": "Takeaway",
+  "mode.delivery": "Delivery",
+  "mode.hall.desc": "Order in the restaurant",
+  "mode.pickup.desc": "I'll take it to go",
+  "mode.delivery.desc": "Delivery to your address",
   // Hall verification
-  “hall.verify.title”: “So the waiter receives your order right away”,
-  “hall.verify.subtitle”: “Enter the table code or tell it to the waiter”,
-  “hall.verify.benefit”: “After this, orders will go directly to the waiter”,
-  “hall.verify.online_benefits”: “Bonuses and discounts for online orders”,
+  "hall.verify.title": "So the waiter receives your order right away",
+  "hall.verify.subtitle": "Enter the table code or tell it to the waiter",
+  "hall.verify.benefit": "After this, orders will go directly to the waiter",
+  "hall.verify.online_benefits": "Bonuses and discounts for online orders",
   // Errors
-  “error.invalid_link”: “Invalid link”,
-  “error.save_failed”: “Save error”,
-  “error.phone_invalid”: “Invalid format”,
-  “error.phone_short”: “Number is too short”,
-  “error.phone_long”: “Number is too long”,
-  “error.table_required”: “Please select a table”,
-  “error.name_required”: “Please enter your name”,
-  “error.phone_required”: “Please enter your phone number”,
-  “error.address_required”: “Please enter your address”,
-  “error.submit_failed”: “Submission error”,
-  “error.session_expired”: “Session expired”,
-  “error.rate_limit”: “Too many requests, please try again later”,
-  “error.partner_missing”: “Restaurant not specified”,
-  “error.partner_hint”: “Add the parameter”,
-  “error.partner_not_found”: “Restaurant not found”,
-  “error.network_error”: “Network error”,
-  “error.check_connection”: “Check your connection”,
+  "error.invalid_link": "Invalid link",
+  "error.save_failed": "Save error",
+  "error.phone_invalid": "Invalid format",
+  "error.phone_short": "Number is too short",
+  "error.phone_long": "Number is too long",
+  "error.table_required": "Please select a table",
+  "error.name_required": "Please enter your name",
+  "error.phone_required": "Please enter your phone number",
+  "error.address_required": "Please enter your address",
+  "error.submit_failed": "Submission error",
+  "error.session_expired": "Session expired",
+  "error.rate_limit": "Too many requests, please try again later",
+  "error.partner_missing": "Restaurant not specified",
+  "error.partner_hint": "Add the parameter",
+  "error.partner_not_found": "Restaurant not found",
+  "error.network_error": "Network error",
+  "error.check_connection": "Check your connection",
   // Loyalty
-  “loyalty.insufficient_points”: “Insufficient points”,
-  “loyalty.transaction.redeem”: “Points redeemed”,
-  “loyalty.transaction.earn_order”: “Points earned for order #{orderNumber}”,
+  "loyalty.insufficient_points": "Insufficient points",
+  "loyalty.transaction.redeem": "Points redeemed",
+  "loyalty.transaction.earn_order": "Points earned for order #{orderNumber}",
   // Cart / checkout
-  “cart.checkout”: “Checkout”,
-  “cart.my_bill”: “My bill”,
-  “cart.table_orders”: “Table orders”,
-  “cart.your_orders”: “Your orders”,
-  “cart.view”: “Open”,
-  “cart.empty”: “Cart is empty”,
-  “cart.bill_already_requested”: “Bill already requested”,
-  “cart.bill_requested”: “Waiter will bring the bill shortly”,
-  “cart.title”: “Cart”,
-  “cart.your_order”: “Your order”,
-  “cart.back_to_menu”: “Back to menu”,
-  “cart.total”: “Total”,
-  “cart.expected_savings”: “Expected savings”,
-  “cart.submitting”: “Sending...”,
-  “cta.sending”: “Sending...”,
-  “cta.retry”: “Retry”,
-  “error.send.title”: “Failed to send”,
-  “error.send.subtitle”: “Please try again”,
-  “cart.item_added”: “Added”,
-  “cart.send_to_waiter”: “Send to waiter”,
-  “cart.send_order”: “Send order”,
+  "cart.checkout": "Checkout",
+  "cart.my_bill": "My bill",
+  "cart.table_orders": "Table orders",
+  "cart.your_orders": "Your orders",
+  "cart.view": "Open",
+  "cart.empty": "Cart is empty",
+  "cart.bill_already_requested": "Bill already requested",
+  "cart.bill_requested": "Waiter will bring the bill shortly",
+  "cart.title": "Cart",
+  "cart.your_order": "Your order",
+  "cart.back_to_menu": "Back to menu",
+  "cart.total": "Total",
+  "cart.expected_savings": "Expected savings",
+  "cart.submitting": "Sending...",
+  "cta.sending": "Sending...",
+  "cta.retry": "Retry",
+  "error.send.title": "Failed to send",
+  "error.send.subtitle": "Please try again",
+  "cart.item_added": "Added",
+  "cart.send_to_waiter": "Send to waiter",
+  "cart.send_order": "Send order",
   // Checkout form (CheckoutView)
-  “checkout.currency_note”: “Currency conversion”,
-  “form.name”: “Name”,
-  “form.required”: “*”,
-  “form.phone”: “Phone”,
-  “form.phone_placeholder”: “+7...”,
-  “form.address”: “Delivery address”,
-  “form.comment”: “Comment”,
-  “form.comment_placeholder”: “Special requests”,
-  “form.table”: “Table”,
+  "checkout.currency_note": "Currency conversion",
+  "form.name": "Name",
+  "form.required": "*",
+  "form.phone": "Phone",
+  "form.phone_placeholder": "+7...",
+  "form.address": "Delivery address",
+  "form.comment": "Comment",
+  "form.comment_placeholder": "Special requests",
+  "form.table": "Table",
   // Menu (MenuView)
-  “menu.add”: “Add”,
-  “menu.remove”: “Remove”,
-  “menu.tile”: “Grid”,
-  “menu.list”: “List”,
-  “menu.no_items”: “No items in this category”,
-  “menu.add_to_cart”: “Add to cart”,
-  “menu.added_to_cart”: “Added to cart”,
+  "menu.add": "Add",
+  "menu.remove": "Remove",
+  "menu.tile": "Grid",
+  "menu.list": "List",
+  "menu.no_items": "No items in this category",
+  "menu.add_to_cart": "Add to cart",
+  "menu.added_to_cart": "Added to cart",
   // Mode tabs
-  “mode.coming_soon”: “Coming soon”,
+  "mode.coming_soon": "Coming soon",
   // Confirmation screen
-  “confirmation.title”: “Order sent!”,
-  “confirmation.your_order”: “Your order”,
-  “confirmation.total”: “Total”,
-  “confirmation.guest_label”: “Guest”,
-  “confirmation.client_name”: “Name”,
-  “confirmation.back_to_menu”: “Back to menu”,
-  “confirmation.my_orders”: “My orders”,
-  “confirmation.track_order”: “Track order”,
+  "confirmation.title": "Order sent!",
+  "confirmation.your_order": "Your order",
+  "confirmation.total": "Total",
+  "confirmation.guest_label": "Guest",
+  "confirmation.client_name": "Name",
+  "confirmation.back_to_menu": "Back to menu",
+  "confirmation.my_orders": "My orders",
+  "confirmation.track_order": "Track order",
   // Reviews & misc
-  “review.thanks”: “Thank you for your rating!”,
-  “review.add_comments”: “Add comments”,
-  “review.points”: “points”,
-  “review.rate_others”: “Rate other guests' dishes”,
-  “guest.name_saved”: “Name saved”,
-  “guest.name_placeholder”: “Name”,
-  “toast.error”: “Error”,
-  “common.loading”: “Loading...”,
-  “common.close”: “Close”,
-  “common.info”: “Information”,
-  “common.of”: “of”,
-  “common.or”: “or”,
-  “common.save”: “Save”,
-  “common.cancel”: “Cancel”,
-  “common.retry”: “Retry”,
+  "review.thanks": "Thank you for your rating!",
+  "review.add_comments": "Add comments",
+  "review.points": "points",
+  "review.rate_others": "Rate other guests' dishes",
+  "guest.name_saved": "Name saved",
+  "guest.name_placeholder": "Name",
+  "toast.error": "Error",
+  "common.loading": "Loading...",
+  "common.close": "Close",
+  "common.info": "Information",
+  "common.of": "of",
+  "common.or": "or",
+  "common.save": "Save",
+  "common.cancel": "Cancel",
+  "common.retry": "Retry",
   // CartView — cart details
-  “cart.enter_table_code_hint”: “Enter table code to send your order”,
-  “cart.for_all”: “For everyone”,
-  “cart.guest”: “Guest”,
-  “cart.new_order”: “New order”,
-  “cart.no_orders_yet”: “No orders yet”,
-  “cart.only_me”: “Just me”,
-  “cart.order_total”: “Order total”,
-  “cart.split_disabled_hint”: “(2+ guests)”,
-  “cart.split_pick_guests_soon”: “Select guests (coming soon)”,
-  “cart.split_title”: “Who is this order for”,
-  “cart.table_total”: “Table bill”,
-  “cart.tell_code_to_waiter”: “Tell this code to the waiter”,
-  “cart.you”: “You”,
-  “cart.motivation_bonus_short”: “Earn bonuses”,
+  "cart.enter_table_code_hint": "Enter table code to send your order",
+  "cart.for_all": "For everyone",
+  "cart.guest": "Guest",
+  "cart.new_order": "New order",
+  "cart.no_orders_yet": "No orders yet",
+  "cart.only_me": "Just me",
+  "cart.order_total": "Order total",
+  "cart.split_disabled_hint": "(2+ guests)",
+  "cart.split_pick_guests_soon": "Select guests (coming soon)",
+  "cart.split_title": "Who is this order for",
+  "cart.table_total": "Table bill",
+  "cart.tell_code_to_waiter": "Tell this code to the waiter",
+  "cart.you": "You",
+  "cart.motivation_bonus_short": "Earn bonuses",
   // CartView — table verification
-  “cart.verify.attempts”: “Attempts”,
-  “cart.verify.bonus_label”: “Online order bonus”,
-  “cart.verify.discount_label”: “Online order discount”,
-  “cart.verify.enter_code_placeholder”: “Enter code”,
-  “cart.verify.enter_table_code”: “Enter table code”,
-  “cart.verify.helper_text”: “Enter code from your table”,
-  “cart.verify.info_online_point1”: “Order goes directly to the waiter”,
-  “cart.verify.info_online_point2”: “Usually faster”,
-  “cart.verify.info_online_point3”: “Discounts and bonuses (if any) are applied automatically”,
-  “cart.verify.info_online_title”: “Online order to waiter”,
-  “cart.verify.info_table_code_point1”: “Code is usually shown on the table”,
-  “cart.verify.info_table_code_point2”: “If not visible — ask your waiter”,
-  “cart.verify.info_table_code_title”: “Table code”,
-  “cart.verify.locked”: “Too many attempts. Try again in”,
-  “cart.verify.online_order_title”: “Online order to waiter”,
-  “cart.verify.points_discount_label”: “Points discount”,
-  “cart.verify.table_verified”: “Table confirmed”,
+  "cart.verify.attempts": "Attempts",
+  "cart.verify.bonus_label": "Online order bonus",
+  "cart.verify.discount_label": "Online order discount",
+  "cart.verify.enter_code_placeholder": "Enter code",
+  "cart.verify.enter_table_code": "Enter table code",
+  "cart.verify.helper_text": "Enter code from your table",
+  "cart.verify.info_online_point1": "Order goes directly to the waiter",
+  "cart.verify.info_online_point2": "Usually faster",
+  "cart.verify.info_online_point3": "Discounts and bonuses (if any) are applied automatically",
+  "cart.verify.info_online_title": "Online order to waiter",
+  "cart.verify.info_table_code_point1": "Code is usually shown on the table",
+  "cart.verify.info_table_code_point2": "If not visible — ask your waiter",
+  "cart.verify.info_table_code_title": "Table code",
+  "cart.verify.locked": "Too many attempts. Try again in",
+  "cart.verify.online_order_title": "Online order to waiter",
+  "cart.verify.points_discount_label": "Points discount",
+  "cart.verify.table_verified": "Table confirmed",
   // CartView — loyalty
-  “loyalty.apply”: “Apply”,
-  “loyalty.email_label”: “Email for bonuses”,
-  “loyalty.email_placeholder”: “email@example.com”,
-  “loyalty.email_saved”: “Email saved! Bonuses will be added.”,
-  “loyalty.enter_email_for_bonus”: “Enter your email to earn bonuses:”,
-  “loyalty.enter_email_hint”: “Enter your email to earn bonuses”,
-  “loyalty.get_bonus”: “Get bonuses”,
-  “loyalty.new_customer”: “You will get {points} bonus points for your first order”,
-  “loyalty.your_balance”: “Your balance: {points} points”,
-  “loyalty.max_redeem”: “Maximum {max} points ({percent}% of order)”,
-  “loyalty.instant_discount”: “{percent}% discount applied”,
-  “loyalty.enter_email_for_discount”: “Enter email for {percent}% discount”,
-  “loyalty.online_bonus_label”: “Online order bonus”,
-  “loyalty.points_applied”: “Points applied”,
-  “loyalty.points_short”: “points”,
-  “loyalty.redeem_points”: “Redeem points”,
-  “loyalty.review_reward_hint”: “For review”,
-  “loyalty.review_reward_prefix”: “for review”,
-  “loyalty.thanks_for_rating”: “Thank you for your rating!”,
-  “loyalty.title”: “Bonuses”,
+  "loyalty.apply": "Apply",
+  "loyalty.email_label": "Email for bonuses",
+  "loyalty.email_placeholder": "email@example.com",
+  "loyalty.email_saved": "Email saved! Bonuses will be added.",
+  "loyalty.enter_email_for_bonus": "Enter your email to earn bonuses:",
+  "loyalty.enter_email_hint": "Enter your email to earn bonuses",
+  "loyalty.get_bonus": "Get bonuses",
+  "loyalty.new_customer": "You will get {points} bonus points for your first order",
+  "loyalty.your_balance": "Your balance: {points} points",
+  "loyalty.max_redeem": "Maximum {max} points ({percent}% of order)",
+  "loyalty.instant_discount": "{percent}% discount applied",
+  "loyalty.enter_email_for_discount": "Enter email for {percent}% discount",
+  "loyalty.online_bonus_label": "Online order bonus",
+  "loyalty.points_applied": "Points applied",
+  "loyalty.points_short": "points",
+  "loyalty.redeem_points": "Redeem points",
+  "loyalty.review_reward_hint": "For review",
+  "loyalty.review_reward_prefix": "for review",
+  "loyalty.thanks_for_rating": "Thank you for your rating!",
+  "loyalty.title": "Bonuses",
   // CartView — status
-  “status.cancelled”: “Cancelled”,
+  "status.cancelled": "Cancelled",
   // CartView — misc
-  “cart.items_removed_mode_switch”: “Removed {count} items not available in this mode”,
+  "cart.items_removed_mode_switch": "Removed {count} items not available in this mode",
   // Table confirmation Bottom Sheet
-  “cart.confirm_table.title”: “Confirm your table”,
-  “cart.confirm_table.subtitle”: “To send the order to the waiter”,
-  “cart.confirm_table.benefit_loyalty”: “Online orders earn you bonuses / discount”,
-  “cart.confirm_table.benefit_default”: “This helps the waiter find your order faster”,
-  “cart.confirm_table.submit”: “Send”,
-  “cart.confirm_table.dismissed”: “Got it”,
+  "cart.confirm_table.title": "Confirm your table",
+  "cart.confirm_table.subtitle": "To send the order to the waiter",
+  "cart.confirm_table.benefit_loyalty": "Online orders earn you bonuses / discount",
+  "cart.confirm_table.benefit_default": "This helps the waiter find your order faster",
+  "cart.confirm_table.submit": "Send",
+  "cart.confirm_table.dismissed": "Got it",
   // Help Drawer (help.*) — English, do not change these
-  “help.call_waiter”: “Call a waiter”,
-  “help.active_requests”: “Active requests”,
-  “help.sent_suffix”: “sent”,
-  “help.undo”: “Undo”,
-  “help.cancel_request”: “Not needed”,
-  “help.modal_title”: “Need help?”,
-  “help.modal_desc”: “Choose how we can help”,
-  “help.my_requests”: “My requests”,
-  “help.active_count”: “active”,
-  “help.bill”: “Bring the bill”,
-  “help.napkins”: “Napkins”,
-  “help.menu”: “Paper menu”,
-  “help.other”: “Other”,
-  “help.other_label”: “Other”,
-  “help.send_more”: “Send more”,
-  “help.all_requests_cta”: “All requests ({count})”,
-  “help.back_to_help”: “Back to help”,
-  “help.show_more”: “More”,
-  “help.show_less”: “Less”,
-  “help.requests”: “requests”,
-  “help.already_sent_short”: “Already sent”,
-  “help.comment_placeholder_other”: “E.g.: high chair, cutlery, clear the table”,
-  “help.submit_arrow”: “Send”,
-  “help.closed_by_guest”: “✅ No longer needed”,
-  “help.sending_now”: “Sending…”,
-  “help.retry”: “Retry”,
-  “help.remind”: “Remind”,
-  “help.retry_in”: “In”,
-  “help.just_sent”: “Just sent”,
-  “help.waiting_prefix”: “Waiting”,
-  “help.minutes_short”: “min”,
-  “help.reminded_just_now”: “Just reminded”,
-  “help.reminded_prefix”: “Reminded”,
-  “help.last_reminder_prefix”: “Last”,
-  “help.reminder_sent”: “Reminder sent”,
-  “help.resolved_call_waiter”: “✅ Waiter came · Thank you!”,
-  “help.resolved_bill”: “✅ Bill brought · Thank you!”,
-  “help.resolved_napkins”: “✅ Napkins brought · Thank you!”,
-  “help.resolved_menu”: “✅ Menu brought · Thank you!”,
-  “help.resolved_other”: “✅ Done · Thank you!”,
-  “help.no_connection”: “No connection”,
-  “help.try_again”: “Try again”,
-  “help.remind_failed”: “Failed to send reminder”,
-  “help.send_failed”: “Failed to send”,
-  “help.restoring_status”: “Restoring status…”,
-  “help.offline_status”: “No connection · will retry automatically”,
-  “help.stale_status”: “Data may be outdated · no update”,
-  “help.seconds_short”: “sec”,
-  “help.updated_label”: “Updated”,
-  “help.ago”: “ago”,
-  “help.reminder”: “reminder”,
-  “help.reminders”: “reminders”,
+  "help.call_waiter": "Call a waiter",
+  "help.active_requests": "Active requests",
+  "help.sent_suffix": "sent",
+  "help.undo": "Undo",
+  "help.cancel_request": "Not needed",
+  "help.modal_title": "Need help?",
+  "help.modal_desc": "Choose how we can help",
+  "help.my_requests": "My requests",
+  "help.active_count": "active",
+  "help.bill": "Bring the bill",
+  "help.napkins": "Napkins",
+  "help.menu": "Paper menu",
+  "help.other": "Other",
+  "help.other_label": "Other",
+  "help.send_more": "Send more",
+  "help.all_requests_cta": "All requests ({count})",
+  "help.back_to_help": "Back to help",
+  "help.show_more": "More",
+  "help.show_less": "Less",
+  "help.requests": "requests",
+  "help.already_sent_short": "Already sent",
+  "help.comment_placeholder_other": "E.g.: high chair, cutlery, clear the table",
+  "help.submit_arrow": "Send",
+  "help.closed_by_guest": "✅ No longer needed",
+  "help.sending_now": "Sending…",
+  "help.retry": "Retry",
+  "help.remind": "Remind",
+  "help.retry_in": "In",
+  "help.just_sent": "Just sent",
+  "help.waiting_prefix": "Waiting",
+  "help.minutes_short": "min",
+  "help.reminded_just_now": "Just reminded",
+  "help.reminded_prefix": "Reminded",
+  "help.last_reminder_prefix": "Last",
+  "help.reminder_sent": "Reminder sent",
+  "help.resolved_call_waiter": "✅ Waiter came · Thank you!",
+  "help.resolved_bill": "✅ Bill brought · Thank you!",
+  "help.resolved_napkins": "✅ Napkins brought · Thank you!",
+  "help.resolved_menu": "✅ Menu brought · Thank you!",
+  "help.resolved_other": "✅ Done · Thank you!",
+  "help.no_connection": "No connection",
+  "help.try_again": "Try again",
+  "help.remind_failed": "Failed to send reminder",
+  "help.send_failed": "Failed to send",
+  "help.restoring_status": "Restoring status…",
+  "help.offline_status": "No connection · will retry automatically",
+  "help.stale_status": "Data may be outdated · no update",
+  "help.seconds_short": "sec",
+  "help.updated_label": "Updated",
+  "help.ago": "ago",
+  "help.reminder": "reminder",
+  "help.reminders": "reminders",
   // Help Chips (quick suggestions in help drawer)
-  “help.chip.high_chair”: “High chair”,
-  “help.chip.cutlery”: “Cutlery”,
-  “help.chip.sauce”: “Sauce”,
-  “help.chip.clear_table”: “Clear the table”,
-  “help.chip.water”: “Water”,
+  "help.chip.high_chair": "High chair",
+  "help.chip.cutlery": "Cutlery",
+  "help.chip.sauce": "Sauce",
+  "help.chip.clear_table": "Clear the table",
+  "help.chip.water": "Water",
 };
 
 /**
@@ -643,7 +643,7 @@ function OrderStatusBadge({ status, stageId, stages, t }) {
     const stage = stages.find(s => String(s.id) === String(stageIdNorm));
     if (stage) {
       const icon = stage.internal_code === 'finish' ? 'âœ…' : 
-                   stage.internal_code === 'start' ? 'ðŸ”µ' : 'ðŸŸ ';
+                   stage.internal_code === 'start' ? 'ðŸ"µ' : 'ðŸŸ ';
       const label = STAGE_LABELS[stage.internal_code] || t('status.new');
       const color = stage.color || '#64748b';
       return (
@@ -659,8 +659,8 @@ function OrderStatusBadge({ status, stageId, stages, t }) {
   
   // Fallback to status
   const STATUS_CONFIG = {
-    new: { icon: 'ðŸ”µ', label: t('status.new'), bg: 'bg-blue-100', color: 'text-blue-700' },
-    accepted: { icon: 'ðŸ”µ', label: t('status.accepted'), bg: 'bg-blue-100', color: 'text-blue-700' },
+    new: { icon: 'ðŸ"µ', label: t('status.new'), bg: 'bg-blue-100', color: 'text-blue-700' },
+    accepted: { icon: 'ðŸ"µ', label: t('status.accepted'), bg: 'bg-blue-100', color: 'text-blue-700' },
     in_progress: { icon: 'ðŸŸ ', label: t('status.cooking'), bg: 'bg-orange-100', color: 'text-orange-700' },
     ready: { icon: 'âœ…', label: t('status.ready'), bg: 'bg-green-100', color: 'text-green-700' },
     served: { icon: 'âœ…', label: t('status.served'), bg: 'bg-green-100', color: 'text-green-700' },
@@ -708,7 +708,7 @@ function OrderConfirmationScreen({
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto" style={{backgroundColor:'#faf9f7'}}>
     <div className="px-4 py-8 max-w-md mx-auto animate-[fadeInUp_0.3s_ease-out]">
-      {/* CSS-only animations â€” respects prefers-reduced-motion */}
+      {/* CSS-only animations â€" respects prefers-reduced-motion */}
       <style>{`
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(12px); }
@@ -833,7 +833,7 @@ function OrderConfirmationScreen({
           {tr("confirmation.my_orders", "My orders")}
         </Button>
 
-        {/* Track order â€” pickup/delivery only (GAP-02: navigate to embedded status view) */}
+        {/* Track order â€" pickup/delivery only (GAP-02: navigate to embedded status view) */}
         {orderMode !== "hall" && publicToken && (
           <Button
             variant="ghost"
@@ -855,7 +855,7 @@ function OrderConfirmationScreen({
 /* ============================================================
    GAP-02: ORDER STATUS SCREEN (embedded)
    Pickup/delivery guests track their order status.
-   Renders inside x.jsx as a view â€” no separate /orderstatus route.
+   Renders inside x.jsx as a view â€" no separate /orderstatus route.
    Polls every 10s for status updates.
    ============================================================ */
 
@@ -1042,7 +1042,7 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
     if (order && !lastUpdated) setLastUpdated(new Date());
   }, [order, lastUpdated]);
 
-  // "seconds ago" counter â€” stops when order is terminal (P0 fix)
+  // "seconds ago" counter â€" stops when order is terminal (P0 fix)
   useEffect(() => {
     if (!lastUpdated || isTerminal) return;
     const tick = () => setSecondsAgo(Math.floor((Date.now() - lastUpdated.getTime()) / 1000));
@@ -1100,7 +1100,7 @@ function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }
     );
   }
 
-  // Network/backend error â€” retryable (PM-074)
+  // Network/backend error â€" retryable (PM-074)
   if (orderError) {
     return (
       <div className="fixed inset-0 z-[60] overflow-y-auto" style={{backgroundColor:'#faf9f7'}}>
@@ -1393,7 +1393,7 @@ export default function X() {
     return window.matchMedia("(max-width: 767px)").matches;
   });
 
-  // Mobile layout preference (tile | list) â€” S72: default list for mobile-first UX
+  // Mobile layout preference (tile | list) â€" S72: default list for mobile-first UX
   const [mobileLayout, setMobileLayout] = useState('list');
 
   // Redirect banner state
@@ -1453,7 +1453,7 @@ export default function X() {
         primaryError = e;
       }
 
-      // Fallback lookup â€” let errors propagate to React Query (PM-070)
+      // Fallback lookup â€" let errors propagate to React Query (PM-070)
       const res2 = await base44.entities.Partner.filter(byIdFirst ? { slug: p } : { id: p });
       if (res2?.[0]) return res2[0];
       if (primaryError) throw primaryError;
@@ -1492,13 +1492,13 @@ export default function X() {
       if (saved === 'tile' || saved === 'list') {
         setMobileLayout(saved);
       } else {
-        // Default based on partner setting â€” S72: default list unless partner set 2-col grid
+        // Default based on partner setting â€" S72: default list unless partner set 2-col grid
         const mobileGrid = Number(partner.menu_grid_mobile ?? 1);
         const defaultLayout = mobileGrid === 2 ? 'tile' : 'list';
         setMobileLayout(defaultLayout);
       }
     } catch (e) {
-      // Failed to load mobile layout preference â€” silent in prod
+      // Failed to load mobile layout preference â€" silent in prod
     }
   }, [partner?.id, partner?._id, partner?.slug, partner?.code]);
 
@@ -1515,7 +1515,7 @@ export default function X() {
       const storageKey = `menuMobileLayout:${partnerKey}`;
       localStorage.setItem(storageKey, layout);
     } catch (e) {
-      // Failed to save mobile layout preference â€” silent in prod
+      // Failed to save mobile layout preference â€" silent in prod
     }
   };
 
@@ -1570,7 +1570,7 @@ export default function X() {
     setView("menu");
   }, []);
 
-  // GAP-01: Show confirmation screen (no auto-dismiss â€” user navigates via buttons)
+  // GAP-01: Show confirmation screen (no auto-dismiss â€" user navigates via buttons)
   const showConfirmation = useCallback((data) => {
     setConfirmationData(data);
     setView("confirmation");
@@ -1663,7 +1663,7 @@ export default function X() {
         JSON.stringify({ partnerId, tableId, timestamp: Date.now() })
       );
     } catch (e) {
-      /* silent â€” localStorage save is best-effort */
+      /* silent â€" localStorage save is best-effort */
     }
   };
 
@@ -1691,7 +1691,7 @@ export default function X() {
   // Removed hasTableInUrl from condition - URL param alone doesn't mean verified
   const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
 
-  // Table code config (for Bottom Sheet â€” PM-064)
+  // Table code config (for Bottom Sheet â€" PM-064)
   const tableCodeLength = useMemo(() => {
     const n = Number(partner?.table_code_length);
     return (Number.isFinite(n) && n > 0) ? Math.max(3, Math.min(8, Math.round(n))) : 4;
@@ -2196,7 +2196,7 @@ export default function X() {
   }, [findMatchingOtherLocalIndex, getHelpCooldownMs, groupOtherServerEntries, helpSyncUpdatedAt, normalizedHelpRequests, HELP_ACTIVE_SERVER_STATUSES, HELP_DONE_SERVER_STATUSES]);
 
   // PM-126/PM-125: Help drawer open/close with overlay stack integration
-  // PM-133: Guard for null currentTableId â€” redirect to table code entry
+  // PM-133: Guard for null currentTableId â€" redirect to table code entry
   const openHelpDrawer = useCallback(() => {
     if (!currentTableId) {
       setShowTableConfirmSheet(true);
@@ -2252,14 +2252,14 @@ export default function X() {
     setUndoToast({ type, rowId: type, tableId: currentTableId, expiresAt: Date.now() + 5000, timeoutId });
   }, [currentTableId, handlePresetSelect, undoToast]);
 
-  // HD-06: Undo handler â€” cancel pending send, return card to idle
+  // HD-06: Undo handler â€" cancel pending send, return card to idle
   const handleUndo = useCallback(() => {
     if (!undoToast) return;
     clearTimeout(undoToast.timeoutId);
     setUndoToast(null);
   }, [undoToast]);
 
-  // Fix 4A: handleRemind â€” send reminder without undo, update cooldown
+  // Fix 4A: handleRemind â€" send reminder without undo, update cooldown
   const handleRemind = useCallback((type, otherId) => {
     const row = type === 'other'
       ? (Array.isArray(requestStates.other) ? requestStates.other.find((entry) => entry.id === otherId) : null)
@@ -2699,7 +2699,7 @@ export default function X() {
     }
   }, [currentTableId, getNormalizedHelpState, requestStates]);
 
-  // PM-125: Cart-to-help sequencing â€” close cart first, 300ms delay, then open help
+  // PM-125: Cart-to-help sequencing â€" close cart first, 300ms delay, then open help
   const handleHelpFromCart = useCallback(() => {
     popOverlay('cart');
     setDrawerMode(null);
@@ -2738,10 +2738,10 @@ export default function X() {
   // P0-4: Warning if limit reached
   useEffect(() => {
     if (allDishes?.length === 100) {
-      // Dish limit reached (100) â€” silent in prod
+      // Dish limit reached (100) â€" silent in prod
     }
     if (allCategories?.length === 100) {
-      // Category limit reached (100) â€” silent in prod
+      // Category limit reached (100) â€" silent in prod
     }
   }, [allDishes?.length, allCategories?.length]);
 
@@ -2773,7 +2773,7 @@ export default function X() {
           lang: lang
         });
       } catch (e) {
-        // Failed to fetch category translations â€” silent in prod
+        // Failed to fetch category translations â€" silent in prod
         return [];
       }
     },
@@ -2791,7 +2791,7 @@ export default function X() {
           lang: lang
         });
       } catch (e) {
-        // Failed to fetch dish translations â€” silent in prod
+        // Failed to fetch dish translations â€" silent in prod
         return [];
       }
     },
@@ -3196,8 +3196,8 @@ export default function X() {
   };
 
   // Show cart button in hall mode: always when table verified, or when cart has items (even before verification)
-  // TASK-260201-01: StickyBar Ð²Ð¸Ð´ÐµÐ½ Ð’Ð¡Ð•Ð“Ð”Ð Ð¿Ñ€Ð¸ Ð²ÐµÑ€Ð¸Ñ„Ð¸Ñ†Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð½Ð¾Ð¼ ÑÑ‚Ð¾Ð»Ðµ
-  // Ð­Ñ‚Ð¾ Ñ€ÐµÑˆÐ°ÐµÑ‚ Ð¿Ñ€Ð¾Ð±Ð»ÐµÐ¼Ñƒ F5 â€” Ð½Ðµ Ð½ÑƒÐ¶Ð½Ð¾ Ð¶Ð´Ð°Ñ‚ÑŒ Ð²Ð¾ÑÑÑ‚Ð°Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ñ session/orders
+  // TASK-260201-01: StickyBar Ð²Ð¸Ð´ÐµÐ½ Ð’Ð¡Ð•Ð"Ð"Ð Ð¿Ñ€Ð¸ Ð²ÐµÑ€Ð¸Ñ„Ð¸Ñ†Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð½Ð¾Ð¼ ÑÑ‚Ð¾Ð»Ðµ
+  // Ð­Ñ‚Ð¾ Ñ€ÐµÑˆÐ°ÐµÑ‚ Ð¿Ñ€Ð¾Ð±Ð»ÐµÐ¼Ñƒ F5 â€" Ð½Ðµ Ð½ÑƒÐ¶Ð½Ð¾ Ð¶Ð´Ð°Ñ‚ÑŒ Ð²Ð¾ÑÑÑ‚Ð°Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ñ session/orders
   const showCartButton = isHallMode && (isTableVerified || (cart?.length || 0) > 0);
 
   // After F5, table is verified from localStorage but session data is still loading from server
@@ -3225,7 +3225,7 @@ export default function X() {
     };
   }, [isTableVerified, currentTableId]);
 
-  // PM-128: Deferred pushOverlay for table confirm drawer â€” avoids disrupting vaul animation
+  // PM-128: Deferred pushOverlay for table confirm drawer â€" avoids disrupting vaul animation
   useEffect(() => {
     if (showTableConfirmSheet) {
       const id = setTimeout(() => pushOverlay('tableConfirm'), 50);
@@ -3384,7 +3384,7 @@ export default function X() {
       localStorage.setItem("menu_preview_mode", normalized);
     } catch {}
 
-    // FIX P1: Revalidate cart on mode change â€” drop items not available in new mode
+    // FIX P1: Revalidate cart on mode change â€" drop items not available in new mode
     setCart((prev) => {
       if (!allDishes || prev.length === 0) return prev;
       const filtered = prev.filter((cartItem) => {
@@ -3445,7 +3445,7 @@ export default function X() {
     }
   }, [currentTableId]);
 
-  // PM-152: Clear guest name when table changes â€” localStorage-based (survives Chrome kill)
+  // PM-152: Clear guest name when table changes â€" localStorage-based (survives Chrome kill)
   useEffect(() => {
     if (!tableCodeParam) return;
     try {
@@ -3464,13 +3464,13 @@ export default function X() {
   // PM-S81-15 + PM-105: Android back button closes topmost overlay (stack-based)
   useEffect(() => {
     const handlePopState = () => {
-      // PM-107: If popOverlay triggered this back, skip â€” sheet already closed
+      // PM-107: If popOverlay triggered this back, skip â€" sheet already closed
       if (isProgrammaticCloseRef.current) {
         isProgrammaticCloseRef.current = false;
         return;
       }
       const stack = overlayStackRef.current;
-      if (stack.length === 0) return; // No overlay open â€” let browser handle normally
+      if (stack.length === 0) return; // No overlay open â€" let browser handle normally
 
       isPopStateClosingRef.current = true;
       const topOverlay = stack[stack.length - 1];
@@ -3669,7 +3669,7 @@ export default function X() {
       const order = await base44.entities.Order.create(orderData);
       let orderCreated = true;
 
-      // FIX P0: Create order items FIRST â€” commit point before loyalty side effects
+      // FIX P0: Create order items FIRST â€" commit point before loyalty side effects
       const newItems = cart.map((item) => ({
         order: order.id,
         dish: item.dishId,
@@ -3682,7 +3682,7 @@ export default function X() {
 
       await base44.entities.OrderItem.bulkCreate(newItems);
 
-      // Post-create side effects â€” best-effort after items exist
+      // Post-create side effects â€" best-effort after items exist
       try {
         // Process points redemption AFTER items created (BUG-PM-032, P0 fix)
         if (loyaltyAccountToUse && redeemedPoints > 0) {
@@ -3702,7 +3702,7 @@ export default function X() {
         // silent
       }
 
-      // Earn points after order creation â€” best-effort
+      // Earn points after order creation â€" best-effort
       try {
         if (loyaltyAccountToUse && loyaltyEnabled && earnedPoints > 0) {
           const expiresAt = new Date();
@@ -3733,7 +3733,7 @@ export default function X() {
         // silent
       }
 
-      // Update partner counters â€” best-effort
+      // Update partner counters â€" best-effort
       try { await base44.entities.Partner.update(partner.id, updatedCounters); } catch (e) { /* silent */ }
       
       // Update local partner cache
@@ -3834,7 +3834,7 @@ export default function X() {
         // P0-2: Validate existing session is still valid
         let session = tableSession;
         if (session && isSessionExpired(session)) {
-          // Session expired â€” close it in DB and force new one
+          // Session expired â€" close it in DB and force new one
           try {
             await base44.entities.TableSession.update(session.id, {
               status: 'expired',
@@ -3851,7 +3851,7 @@ export default function X() {
           sessionIdRef.current = session?.id;
         }
 
-        // P0-2: Hard guard â€” reject order if no valid session
+        // P0-2: Hard guard â€" reject order if no valid session
         if (!session?.id) {
           toast.error(t('error.session_expired'), { id: 'session-err' });
           submitLockRef.current = false;
@@ -3860,7 +3860,7 @@ export default function X() {
         }
 
         // ============================================================
-        // FIX-260131-07 FINAL: SAFEGUARD â€” try restore guest before creating new
+        // FIX-260131-07 FINAL: SAFEGUARD â€" try restore guest before creating new
         // This prevents "submit races restore" bug where guest is created
         // because currentGuest hasn't been set yet
         // ============================================================
@@ -3954,7 +3954,7 @@ export default function X() {
           }
         }
 
-        // If still no guest after safeguard â€” create new
+        // If still no guest after safeguard â€" create new
         if (!guest) {
           const deviceId = getDeviceId();
           guest = await addGuestToSession(session.id, null, deviceId);
@@ -4047,7 +4047,7 @@ export default function X() {
 
         const order = await base44.entities.Order.create(orderData);
 
-        // FIX P0: Create order items FIRST â€” commit point before loyalty side effects
+        // FIX P0: Create order items FIRST â€" commit point before loyalty side effects
         const orderItemsData = cart.map((item) => ({
           order: order.id,
           dish: item.dishId,
@@ -4059,7 +4059,7 @@ export default function X() {
 
         await base44.entities.OrderItem.bulkCreate(orderItemsData);
 
-        // Post-create side effects â€” best-effort after items exist
+        // Post-create side effects â€" best-effort after items exist
         try {
           // Process points redemption AFTER items created (BUG-PM-032, P0 fix)
           if (loyaltyAccountToUse && redeemedPoints > 0) {
@@ -4079,7 +4079,7 @@ export default function X() {
           // silent
         }
 
-        // Earn points after order creation â€” best-effort
+        // Earn points after order creation â€" best-effort
         try {
           if (loyaltyAccountToUse && loyaltyEnabled && earnedPoints > 0) {
             const expiresAt = new Date();
@@ -4612,7 +4612,7 @@ export default function X() {
       >
         <DrawerContent className="max-h-[85dvh] rounded-t-3xl z-[60]">
           <div className="relative">
-            {/* #143: Chevron close button â€” top-right */}
+            {/* #143: Chevron close button â€" top-right */}
             <button
               onClick={() => { popOverlay('tableConfirm'); pendingSubmitRef.current = false; setShowTableConfirmSheet(false); }}
               className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 z-10"
@@ -5033,7 +5033,7 @@ export default function X() {
               </Button>
             </div>
           )}
-          {/* cardActionModal removed â€” replaced by ticket board + smart redirect (Fix 1B) */}
+          {/* cardActionModal removed â€" replaced by ticket board + smart redirect (Fix 1B) */}
         </DrawerContent>
       </Drawer>
 
@@ -5104,7 +5104,7 @@ export default function X() {
                     {getDishDescription(detailDish)}
                   </p>
                 )}
-                {/* PM-118: Discount display â€” partner-level pattern (matches MenuView.jsx) */}
+                {/* PM-118: Discount display â€" partner-level pattern (matches MenuView.jsx) */}
                 <div className="flex items-baseline gap-2">
                   {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
                     <>
@@ -5142,7 +5142,7 @@ export default function X() {
                   style={{ backgroundColor: partner?.primary_color || '#1A1A1A', color: '#FFFFFF' }}
                   onClick={() => { addToCart(detailDish); popOverlay('detailDish'); setDetailDish(null); }}
                 >
-                  {t('menu.add_to_cart', 'Ð”Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ Ð² ÐºÐ¾Ñ€Ð·Ð¸Ð½Ñƒ')}
+                  {t('menu.add_to_cart', 'Ð"Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ Ð² ÐºÐ¾Ñ€Ð·Ð¸Ð½Ñƒ')}
                 </Button>
               </div>
             </div>
@@ -5150,7 +5150,7 @@ export default function X() {
         </DrawerContent>
       </Drawer>
 
-      {/* PM-156: Floating bell removed â€” bell accessible via CartView header + help drawer */}
+      {/* PM-156: Floating bell removed â€" bell accessible via CartView header + help drawer */}
 
       {/* Sticky cart bar - updated for TableSession */}
       {view === "menu" && (() => {
