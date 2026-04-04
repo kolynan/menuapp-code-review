@@ -587,8 +587,21 @@ const I18N_FALLBACKS = {
  * Wraps raw t() to prevent raw i18n keys from reaching the UI.
  * Falls back to I18N_FALLBACKS map, supports {param} interpolation.
  */
-function makeSafeT(rawT) {
+function makeSafeT(rawT, lang) {
   return (key, params) => {
+    // EN mode: I18N_FALLBACKS is the authoritative EN source.
+    // Check it FIRST to avoid B44 returning RU for keys with no EN translation.
+    if (lang === 'en') {
+      let fb = I18N_FALLBACKS[key];
+      if (fb != null && fb !== '') {
+        if (params && typeof params === "object") {
+          Object.entries(params).forEach(([k, v]) => {
+            fb = fb.replace(new RegExp(`\\{${k}\\}`, "g"), String(v ?? ""));
+          });
+        }
+        return fb;
+      }
+    }
     // Try the real translation first
     const val = typeof rawT === "function" ? rawT(key, params) : "";
     if (val && typeof val === "string") {
@@ -757,7 +770,7 @@ function OrderConfirmationScreen({
 
       {/* Title */}
       <h2 className="text-xl font-semibold text-center text-slate-800 mb-6">
-        {tr("confirmation.title", "Ð—Ð°ÐºÐ°Ð· Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½!")}
+        {tr("confirmation.title", "Order sent!")}
       </h2>
 
       {/* Order summary card */}
@@ -785,7 +798,7 @@ function OrderConfirmationScreen({
           <div className="border-t border-slate-200 pt-3 mt-3">
             <div className="flex justify-between items-center">
               <span className="font-medium text-slate-800">
-                {tr("confirmation.total", "Ð˜Ñ‚Ð¾Ð³Ð¾")}
+                {tr("confirmation.total", "Total")}
               </span>
               <span className="font-semibold text-slate-800 tabular-nums">
                 {formatPrice(parseFloat(Number(totalAmount).toFixed(2)))}
@@ -796,7 +809,7 @@ function OrderConfirmationScreen({
           {/* Client name (pickup/delivery) */}
           {clientName && orderMode !== "hall" && (
             <p className="text-sm text-slate-500 mt-1">
-              {tr("confirmation.client_name", "Ð˜Ð¼Ñ")}: {clientName}
+              {tr("confirmation.client_name", "Name")}: {clientName}
             </p>
           )}
         </CardContent>
@@ -809,7 +822,7 @@ function OrderConfirmationScreen({
           style={{backgroundColor: primaryColor}}
           onClick={onBackToMenu}
         >
-          {tr("confirmation.back_to_menu", "Ð’ÐµÑ€Ð½ÑƒÑ‚ÑŒÑÑ Ð² Ð¼ÐµÐ½ÑŽ")}
+          {tr("confirmation.back_to_menu", "Back to menu")}
         </Button>
 
         <Button
@@ -817,7 +830,7 @@ function OrderConfirmationScreen({
           className="w-full h-12"
           onClick={onOpenOrders}
         >
-          {tr("confirmation.my_orders", "ÐœÐ¾Ð¸ Ð·Ð°ÐºÐ°Ð·Ñ‹")}
+          {tr("confirmation.my_orders", "My orders")}
         </Button>
 
         {/* Track order â€” pickup/delivery only (GAP-02: navigate to embedded status view) */}
@@ -830,7 +843,7 @@ function OrderConfirmationScreen({
               onTrackOrder(publicToken);
             }}
           >
-            {tr("confirmation.track_order", "ÐžÑ‚ÑÐ»ÐµÐ´Ð¸Ñ‚ÑŒ Ð·Ð°ÐºÐ°Ð·")}
+            {tr("confirmation.track_order", "Track order")}
           </Button>
         )}
       </div>
@@ -1303,7 +1316,7 @@ function formatOrderTime(order) {
 
 export default function X() {
   const { lang, setLang, t: rawT } = useI18n();
-  const t = makeSafeT(rawT);
+  const t = makeSafeT(rawT, lang);
 
   // Safe translation with explicit fallback (kept for backward compat)
   const tr = (key, fallback) => {
@@ -3233,22 +3246,22 @@ export default function X() {
   // Hall StickyBar label: Ñ‚ÐµÐºÑÑ‚ ÐºÐ½Ð¾Ð¿ÐºÐ¸
   const hallStickyButtonLabel =
     hallStickyMode === "cart"
-      ? tr("cart.checkout", "ÐžÑ„Ð¾Ñ€Ð¼Ð¸Ñ‚ÑŒ Ð·Ð°ÐºÐ°Ð·")
+      ? tr("cart.checkout", "Checkout")
       : hallStickyMode === "myBill"
-        ? tr("cart.my_bill", "ÐœÐ¾Ð¹ ÑÑ‡Ñ‘Ñ‚")
+        ? tr("cart.my_bill", "My bill")
         : hallStickyMode === "tableOrders"
-          ? tr("cart.table_orders", "Ð—Ð°ÐºÐ°Ð·Ñ‹ ÑÑ‚Ð¾Ð»Ð°")
+          ? tr("cart.table_orders", "Table orders")
           : isSessionLoading
-            ? tr("common.loading", "Ð—Ð°Ð³Ñ€ÑƒÐ·ÐºÐ°...")
-            : tr("cart.view", "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ");
+            ? tr("common.loading", "Loading...")
+            : tr("cart.view", "Open");
 
   // Hall StickyBar: Ð·Ð°Ð³Ð¾Ð»Ð¾Ð²Ð¾Ðº (Ð´Ð»Ñ Ñ€ÐµÐ¶Ð¸Ð¼Ð¾Ð² Ð±ÐµÐ· ÐºÐ¾Ñ€Ð·Ð¸Ð½Ñ‹)
   const hallStickyModeLabel =
     hallStickyMode === "myBill"
-      ? tr("cart.my_bill", "ÐœÐ¾Ð¹ ÑÑ‡Ñ‘Ñ‚")
+      ? tr("cart.my_bill", "My bill")
       : hallStickyMode === "tableOrders"
-        ? tr("cart.table_orders", "Ð—Ð°ÐºÐ°Ð·Ñ‹ ÑÑ‚Ð¾Ð»Ð°")
-        : tr("cart.your_orders", "Ð’Ð°ÑˆÐ¸ Ð·Ð°ÐºÐ°Ð·Ñ‹");
+        ? tr("cart.table_orders", "Table orders")
+        : tr("cart.your_orders", "Your orders");
 
   // Hall StickyBar: ÑÑƒÐ¼Ð¼Ð° Ð´Ð»Ñ Ð¿Ð¾ÐºÐ°Ð·Ð°
   const hallStickyBillTotal =
@@ -3807,7 +3820,7 @@ export default function X() {
 
     // Empty cart guard
     if (cart.length === 0) {
-      toast.error(tr('cart.empty', 'ÐšÐ¾Ñ€Ð·Ð¸Ð½Ð° Ð¿ÑƒÑÑ‚Ð°'), { id: 'mm1' });
+      toast.error(tr('cart.empty', 'Cart is empty'), { id: 'mm1' });
       return;
     }
 
@@ -4168,7 +4181,7 @@ export default function X() {
 
   const handleRequestBill = async () => {
     if (billCooldown || billRequested) {
-      toast.info(tr('cart.bill_already_requested', 'Ð¡Ñ‡Ñ‘Ñ‚ ÑƒÐ¶Ðµ Ð·Ð°Ð¿Ñ€Ð¾ÑˆÐµÐ½'), { id: 'mm1' });
+      toast.info(tr('cart.bill_already_requested', 'Bill already requested'), { id: 'mm1' });
       return;
     }
     
@@ -4185,7 +4198,7 @@ export default function X() {
       
       setBillCooldownStorage(currentTableId);
       setBillCooldown(true);
-      toast.success(tr('cart.bill_requested', 'ÐžÑ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚ ÑÐºÐ¾Ñ€Ð¾ Ð¿Ñ€Ð¸Ð½ÐµÑÑ‘Ñ‚ ÑÑ‡Ñ‘Ñ‚'), { id: 'mm1' });
+      toast.success(tr('cart.bill_requested', 'Waiter will bring the bill'), { id: 'mm1' });
     } catch (err) {
       // silent
       toast.error(t('toast.error'), { id: 'mm1' });
@@ -4592,7 +4605,7 @@ export default function X() {
             popOverlay('tableConfirm');
             setShowTableConfirmSheet(false);
             if (!isTableVerified) {
-              toast(tr('cart.confirm_table.dismissed', 'Ð”Ð»Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð·Ð°ÐºÐ°Ð·Ð° Ð½ÑƒÐ¶Ð½Ð¾ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ ÑÑ‚Ð¾Ð»'), { id: 'table-dismiss' });
+              toast(tr('cart.confirm_table.dismissed', 'Got it'), { id: 'table-dismiss' });
             }
           }
         }}
@@ -4610,10 +4623,10 @@ export default function X() {
             <DrawerHeader className="text-center pb-2">
 
               <DrawerTitle className="text-lg font-semibold text-slate-900">
-                {tr('cart.verify.enter_table_code', 'Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÐºÐ¾Ð´ ÑÑ‚Ð¾Ð»Ð°')}
+                {tr('cart.verify.enter_table_code', 'Enter table code')}
               </DrawerTitle>
               <p className="text-xs text-gray-400 mt-2 px-4">
-                {tr('cart.verify.helper_text', 'ÐšÐ¾Ð´ ÑƒÐºÐ°Ð·Ð°Ð½ Ð½Ð° Ñ‚Ð°Ð±Ð»Ð¸Ñ‡ÐºÐµ Ð²Ð°ÑˆÐµÐ³Ð¾ ÑÑ‚Ð¾Ð»Ð°. ÐžÐ½ Ð½ÑƒÐ¶ÐµÐ½, Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚ Ð·Ð½Ð°Ð» ÐºÑƒÐ´Ð° Ð½ÐµÑÑ‚Ð¸ Ð·Ð°ÐºÐ°Ð·.')}
+                {tr('cart.verify.helper_text', 'Enter code from your table')}
               </p>
             </DrawerHeader>
           </div>
@@ -4650,7 +4663,7 @@ export default function X() {
                 }}
                 className="sr-only"
                 placeholder=""
-                aria-label={tr('cart.verify.enter_table_code', 'Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÐºÐ¾Ð´ ÑÑ‚Ð¾Ð»Ð°')}
+                aria-label={tr('cart.verify.enter_table_code', 'Enter table code')}
               />
               {isVerifyingCode && (
                 <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -4687,7 +4700,7 @@ export default function X() {
             >
               {isVerifyingCode
                 ? t('common.loading')
-                : tr('cart.confirm_table.submit', 'ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ')}
+                : tr('cart.confirm_table.submit', 'Send')}
             </Button>
           </div>
         </DrawerContent>
@@ -4968,7 +4981,7 @@ export default function X() {
                 className="flex-1 min-h-[44px]"
                 onClick={() => { setShowOtherForm(false); setHelpComment(''); }}
               >
-                {tr('common.cancel', 'Отмена')}
+                {tr('common.cancel', 'Cancel')}
               </Button>
               <Button
                 className="flex-1 min-h-[44px] text-white"
@@ -5187,7 +5200,7 @@ export default function X() {
               isLoadingBill={false}
               formattedBillTotal=""
               onButtonClick={handleCheckoutClick}
-              buttonLabel={tr('cart.checkout', 'ÐžÑ„Ð¾Ñ€Ð¼Ð¸Ñ‚ÑŒ Ð·Ð°ÐºÐ°Ð·')}
+              buttonLabel={tr('cart.checkout', 'Checkout')}
               primaryColor={primaryColor}
             />
           );
