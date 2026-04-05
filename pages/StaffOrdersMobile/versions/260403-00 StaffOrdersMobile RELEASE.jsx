@@ -1,7 +1,7 @@
-﻿/* ═══════════════════════════════════════════════════════════════════════════
-   STAFFORDERSMOBILE — v4.0.0 (2026-03-05) UX Redesign — Expand/Collapse Cards
+﻿/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   STAFFORDERSMOBILE â€” v4.0.0 (2026-03-05) UX Redesign â€” Expand/Collapse Cards
 
-   CHANGES in v4.0.0 (UX Redesign — Expand/Collapse Cards — S77):
+   CHANGES in v4.0.0 (UX Redesign â€” Expand/Collapse Cards â€” S77):
    - Replaced detail view navigation with inline expand/collapse cards
    - Collapsed card: identifier + elapsed time + channel + status + items preview + request badges
    - Expanded card (Hall): Block A (active orders) + Block B (action) + Block C (requests)
@@ -16,50 +16,50 @@
    - Bill summary with per-guest breakdown
    - Close table with disable reasons
 
-   CHANGES in v3.7.0 (Bug Fixes — S76):
-   - BUG-S76-01: Fixed i18n — status badge now translates OrderStage names via t()
-   - BUG-S76-02: Fixed i18n — action button text now translates OrderStage names via t()
+   CHANGES in v3.7.0 (Bug Fixes â€” S76):
+   - BUG-S76-01: Fixed i18n â€” status badge now translates OrderStage names via t()
+   - BUG-S76-02: Fixed i18n â€” action button text now translates OrderStage names via t()
    - BUG-S76-03: Fixed client_name display in detail view for Pickup/Delivery orders
 
-   CHANGES in v3.6.0 (P0 Stale Data + Close Table Confirm — S74):
+   CHANGES in v3.6.0 (P0 Stale Data + Close Table Confirm â€” S74):
    - P0: Detail view forces refetch on open (prevents stale order list)
    - P0: Notification effect invalidates orders query when new orders detected
-   - P0: computeTableStatus reordered — NEW before STALE (new orders clear ПРОСРОЧЕН)
+   - P0: computeTableStatus reordered â€” NEW before STALE (new orders clear ПРОСРОЧЕН)
    - P0: "Закрыть стол" replaced browser confirm() with React confirmation dialog
    - Dialog: table name in title, destructive red button, 44px touch targets, mobile 320px safe
 
-   CHANGES in v3.5.0 (SESS-016 — Session Cleanup Integration):
+   CHANGES in v3.5.0 (SESS-016 â€” Session Cleanup Integration):
    - Added runSessionCleanup() import from @/components/sessionCleanupJob
    - Added useEffect + setInterval(5min) to auto-expire stale sessions
    - Silent background job: logs only when actions taken or errors occur
    - Idempotent: safe to run on each mount + every 5 minutes
 
-   CHANGES in v3.4.0 (UI Bug Fixes — 4 bugs from Deep Test S66):
+   CHANGES in v3.4.0 (UI Bug Fixes â€” 4 bugs from Deep Test S66):
    - BUG-S66-01: Detail view now opens reliably (removed translate-x animation, z-40)
    - BUG-S66-02: PREPARING cards show CTA for advanceable orders (was hidden)
    - BUG-S65-04: First-stage CTA opens detail view (prevents blind accept)
    - BUG-S65-05: Fixed double "Стол" prefix (displayName + banner)
 
-   CHANGES in v3.2.0 (Sprint D — Waiter Screen V2):
-   - V2-09: BannerNotification — in-app banner overlay for new order events
+   CHANGES in v3.2.0 (Sprint D â€” Waiter Screen V2):
+   - V2-09: BannerNotification â€” in-app banner overlay for new order events
    - Fixed position at top of viewport, z-60 (above everything)
    - Content: "Стол N: Новый заказ" with table name + event type
    - Auto-hide after 5 seconds, swipe-up to dismiss early
-   - Tap banner → scroll to relevant table card with brief highlight
-   - De-duplication: multiple events in same cycle → "3 новых заказа"
+   - Tap banner â†’ scroll to relevant table card with brief highlight
+   - De-duplication: multiple events in same cycle â†’ "3 новых заказа"
    - Works on all screens (Mine, Free, Others, Detail view)
    - Non-blocking: content below remains interactive
 
-   CHANGES in v3.1.0 (Sprint B — Waiter Screen V2):
-   - V2-02: TableDetailScreen — full-screen detail view, slide-in from right
-   - V2-03: Split-tap — CTA button executes action, card body opens detail view
+   CHANGES in v3.1.0 (Sprint B â€” Waiter Screen V2):
+   - V2-02: TableDetailScreen â€” full-screen detail view, slide-in from right
+   - V2-03: Split-tap â€” CTA button executes action, card body opens detail view
    - Scroll position preserved when returning from detail view
-   - DetailOrderRow — auto-fetches items in detail view (no lazy loading needed)
-   - GuestOrderSection — per-guest action buttons (48px min, full-width)
+   - DetailOrderRow â€” auto-fetches items in detail view (no lazy loading needed)
+   - GuestOrderSection â€” per-guest action buttons (48px min, full-width)
    - Swipe-right back navigation on TableDetailScreen
    - liveDetailGroup: detail view auto-updates via polling
 
-   CHANGES in v3.0.0 (Sprint A — Waiter Screen V2):
+   CHANGES in v3.0.0 (Sprint A â€” Waiter Screen V2):
    - V2-01: Compact card layout (table name + zone, status badge, guest/order count, elapsed time, 1 CTA)
    - V2-05: Color-coded left borders (purple/blue/amber/green/gray/red per status)
    - V2-06: Muted Preparing cards (gray bg, 2px border, no CTA)
@@ -69,7 +69,7 @@
    - Added computeTableStatus() and computeGroupCTA() helpers
    - Added TABLE_STATUS_STYLES and TABLE_STATUS_SORT_PRIORITY mappings
 
-   STAFFORDERSMOBILE — v2.7.3 (2026-02-02)
+   STAFFORDERSMOBILE â€” v2.7.3 (2026-02-02)
    
    CHANGES in v2.7.3 (shift filtering):
    - Added shift-based filtering: orders/requests only from current shift
@@ -83,13 +83,13 @@
    CHANGES in v2.7.1 (tabs + overdue + favorites filter):
    - Added Active/Completed tabs (non-kitchen only)
    - Added overdue badge (red clock) on orders waiting too long
-   - Added "★ Мои" favorites filter toggle
-   - Added ★ button on ServiceRequests
+   - Added "â˜… Мои" favorites filter toggle
+   - Added â˜… button on ServiceRequests
    - Added "Закрыть стол" button when all orders ready
    
    CHANGES in v2.7.0 (grouping):
    - OrderGroupCard: hall grouped by table, pickup/delivery individual
-   - Favorites format: plain IDs → prefixed keys (table:id)
+   - Favorites format: plain IDs â†’ prefixed keys (table:id)
    - Sorted by oldest unaccepted order
    - Auto-expand first 5 + favorites
    - Kitchen unchanged (flat list)
@@ -146,15 +146,15 @@
    
    Previous changes (v2.2):
    - Added ProfileSheet with staff name, role, restaurant name
-   - Moved "My Tables" (⭐) into ProfileSheet
+   - Moved "My Tables" (â­) into ProfileSheet
    - Added role-based help instructions (waiter vs kitchen)
    - Added kitchen filter: kitchen only sees accepted/in_progress/ready orders
-   - Simplified header: [👤] [🔔] [⚙️]
+   - Simplified header: [ðŸ‘¤] [ðŸ””] [âš™ï¸]
    - Added logout functionality
    
    Previous fixes (v2.1):
    - Rate limit fix (infinite loop prevention)
-═══════════════════════════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
@@ -205,9 +205,9 @@ import { runSessionCleanup } from "@/components/sessionCleanupJob";
 // BUG-S76-01/02: i18n for OrderStage names
 import { useI18n } from "@/components/i18n";
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    CONSTANTS
-═══════════════════════════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 // FALLBACK: Used when order has no stage_id or stages not loaded
 const STATUS_FLOW = {
@@ -276,7 +276,7 @@ const STAGE_NAME_FALLBACKS = {
 };
 
 function getStageName(stage, t) {
-  if (!stage?.name) return "—";
+  if (!stage?.name) return "â€”";
   const name = stage.name;
   // 1. Try t() if available (proper B44 i18n)
   if (t) {
@@ -285,7 +285,7 @@ function getStageName(stage, t) {
   }
   // 2. Direct lookup in fallback map (exact key or short name)
   if (STAGE_NAME_FALLBACKS[name]) return STAGE_NAME_FALLBACKS[name];
-  // 3. Extract last segment from dotted key (e.g. "orderprocess.foo.new" → "new")
+  // 3. Extract last segment from dotted key (e.g. "orderprocess.foo.new" â†’ "new")
   if (name.includes('.')) {
     const lastSegment = name.split('.').pop();
     if (STAGE_NAME_FALLBACKS[lastSegment]) return STAGE_NAME_FALLBACKS[lastSegment];
@@ -464,9 +464,9 @@ const DEFAULT_POLLING_INTERVAL = 5000;
 const DEFAULT_SORT_MODE = "priority";
 const DEFAULT_SORT_ORDER = "newest";
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    HELPERS
-═══════════════════════════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 function isRateLimitError(error) {
   if (!error) return false;
@@ -772,7 +772,7 @@ function getShiftStartTime(workingHours) {
   const FALLBACK_HOURS = 12;
   const now = new Date();
   
-  // No working hours → fallback to start of today
+  // No working hours â†’ fallback to start of today
   if (!workingHours || typeof workingHours !== 'object') {
     const startOfToday = new Date(now);
     startOfToday.setHours(0, 0, 0, 0);
@@ -1040,7 +1040,7 @@ function getStagesForOrder(order, stages) {
   // P0-1: Normalize stage_id before comparison
   const orderStageId = getLinkId(order.stage_id);
   
-  // Edge case: если текущий этап не попал в список — добавить его
+  // Edge case: если текущий этап не попал в список â€” добавить его
   if (orderStageId) {
     const currentStage = stages.find(s => getLinkId(s.id) === orderStageId);
     if (currentStage && !filtered.find(s => getLinkId(s.id) === getLinkId(currentStage.id))) {
@@ -1068,7 +1068,7 @@ function computeTableStatus(group, activeRequests, getStatusConfig) {
 
   if (orders.length === 0) return 'ALL_SERVED';
 
-  // 2. Any order needs accepting (first stage)? — takes priority over STALE
+  // 2. Any order needs accepting (first stage)? â€” takes priority over STALE
   // v3.6.0: Moved before STALE so new orders clear ПРОСРОЧЕН label
   if (orders.some(o => getStatusConfig(o).isFirstStage)) return 'NEW';
 
@@ -1079,7 +1079,7 @@ function computeTableStatus(group, activeRequests, getStatusConfig) {
     if (Date.now() - oldest > 3 * 60 * 1000) return 'STALE';
   }
 
-  // 4. All orders at finish stage → waiter should close the table
+  // 4. All orders at finish stage â†’ waiter should close the table
   if (orders.every(o => getStatusConfig(o).isFinishStage)) return 'ALL_SERVED';
 
   // 5. Some orders at finish stage (food ready, needs serving)
@@ -1090,9 +1090,9 @@ function computeTableStatus(group, activeRequests, getStatusConfig) {
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    SUB-COMPONENTS
-═══════════════════════════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 /* function RateLimitScreen({ onRetry }) {
   return (
@@ -2200,7 +2200,7 @@ function MyTablesModal({ open, onClose, tables, favorites, onToggleFavorite, onC
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Поиск по номеру или зоне…"
+              placeholder="Поиск по номеру или зонеâ€¦"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-200"
@@ -2276,18 +2276,18 @@ function ProfileSheet({
   const roleLabel = ROLE_LABELS[staffRole] || staffRole || "Сотрудник";
 
   const waiterHelpItems = [
-    "«Мои» — заказы, которые вы взяли в работу",
-    "«Свободные» — новые заказы, возьмите любой",
-    "«Принять» — взять заказ себе",
-    "«Выдать» — когда отдали заказ гостю",
-    "⭐ — отметьте свои столы для быстрого доступа",
+    "Â«МоиÂ» â€” заказы, которые вы взяли в работу",
+    "Â«СвободныеÂ» â€” новые заказы, возьмите любой",
+    "Â«ПринятьÂ» â€” взять заказ себе",
+    "Â«ВыдатьÂ» â€” когда отдали заказ гостю",
+    "â­ â€” отметьте свои столы для быстрого доступа",
   ];
 
   const kitchenHelpItems = [
     "Здесь только заказы, переданные на кухню",
-    "«Готово» — блюдо готово, официант заберёт",
+    "Â«ГотовоÂ» â€” блюдо готово, официант заберёт",
     "Запросы гостей (счёт, салфетки) вам не показываются",
-    "Заказы со статусом «Новый» вам не видны",
+    "Заказы со статусом Â«НовыйÂ» вам не видны",
   ];
 
   const helpItems = isKitchen ? kitchenHelpItems : waiterHelpItems;
@@ -2306,7 +2306,7 @@ function ProfileSheet({
               <div>
                 <div className="font-bold text-lg text-slate-900">{staffName || "Сотрудник"}</div>
                 <div className="text-sm text-slate-500">
-                  {roleLabel} · {partnerName || "Ресторан"}
+                  {roleLabel} Â· {partnerName || "Ресторан"}
                 </div>
               </div>
             </div>
@@ -2360,7 +2360,7 @@ function ProfileSheet({
                 <div className="bg-slate-50 rounded-lg p-3 space-y-2">
                   {helpItems.map((item, idx) => (
                     <div key={idx} className="flex items-start gap-2 text-sm text-slate-600">
-                      <span className="text-slate-400 mt-0.5">•</span>
+                      <span className="text-slate-400 mt-0.5">â€¢</span>
                       <span>{item}</span>
                     </div>
                   ))}
@@ -2485,7 +2485,7 @@ function SettingsPanel({
                 <div>
                   <div className="text-sm font-medium text-slate-900">По приоритету</div>
                   <div className="text-[11px] text-slate-500 mt-0.5">
-                    Готов → Новый → Готовится → Принят
+                    Готов â†’ Новый â†’ Готовится â†’ Принят
                   </div>
                 </div>
               </label>
@@ -2508,7 +2508,7 @@ function SettingsPanel({
                 <div>
                   <div className="text-sm font-medium text-slate-900">По времени</div>
                   <div className="text-[11px] text-slate-500 mt-0.5">
-                    Используйте ↑↓ для переключения направления
+                    Используйте â†‘â†“ для переключения направления
                   </div>
                 </div>
               </label>
@@ -2520,14 +2520,14 @@ function SettingsPanel({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    SPRINT D: V2-09 Banner Notification Component
-═══════════════════════════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 /**
- * BannerNotification — in-app overlay banner for new order events.
+ * BannerNotification â€” in-app overlay banner for new order events.
  * Fixed at top of viewport, z-60 (above sticky header z-20, detail view z-30, modals z-40).
- * Auto-hides after 5s. Swipe-up or tap X to dismiss. Tap body → navigate to relevant group.
+ * Auto-hides after 5s. Swipe-up or tap X to dismiss. Tap body â†’ navigate to relevant group.
  * Non-blocking: pointer-events only on the banner itself, not full-screen overlay.
  *
  * Props:
@@ -2631,9 +2631,9 @@ function BannerNotification({ banner, onDismiss, onNavigate }) {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    MAIN COMPONENT
-═══════════════════════════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 export default function StaffOrdersMobile() {
   const queryClient = useQueryClient();
@@ -2705,13 +2705,13 @@ export default function StaffOrdersMobile() {
   
   const [notifiedOrderIds, setNotifiedOrderIds] = useState(() => new Set());
 
-  // V2-09: Sprint D — Banner notification state
+  // V2-09: Sprint D â€” Banner notification state
   const [bannerData, setBannerData] = useState(null);
   const bannerIdCounter = useRef(0);
 
   // v3.6.0: Close table confirmation dialog state
   const [closeTableConfirm, setCloseTableConfirm] = useState(null); // { sessionId, tableName } | null
-  const [undoToast, setUndoToast] = useState(null); // lifted from OrderGroupCard — survives card unmount
+  const [undoToast, setUndoToast] = useState(null); // lifted from OrderGroupCard â€” survives card unmount
 
   const updateNotifPrefs = (patch) => {
     setNotifPrefs((prev) => {
@@ -2820,7 +2820,7 @@ export default function StaffOrdersMobile() {
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'completed'
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
 
-  // v4.0.0: Expand/collapse — max 1 expanded card at a time
+  // v4.0.0: Expand/collapse â€” max 1 expanded card at a time
   const [expandedGroupId, setExpandedGroupId] = useState(null);
 
   useEffect(() => {
@@ -2969,7 +2969,7 @@ export default function StaffOrdersMobile() {
     return () => clearInterval(t);
   }, [isTokenMode, tokenState, rateLimitHit, queryClient]);
 
-  // Global undo handler — works after OrderGroupCard unmounts
+  // Global undo handler â€” works after OrderGroupCard unmounts
   const handleUndoGlobal = () => {
     if (!undoToast) return;
     clearTimeout(undoToast.timerId);
@@ -3142,9 +3142,9 @@ export default function StaffOrdersMobile() {
     [tables]
   );
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // P0-2: FIXED - removed .list() to be consistent with other .filter() calls
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   const { data: orderStages = [], error: stagesError } = useQuery({
     queryKey: ["orderStages", partnerId],
     queryFn: () => base44.entities.OrderStage.filter({ 
@@ -3152,7 +3152,7 @@ export default function StaffOrdersMobile() {
       is_active: true 
     }), // P0-2: removed .list()
     enabled: canFetch && !!partnerId && !rateLimitHit,
-    staleTime: 60000, // 1 minute — stages rarely change
+    staleTime: 60000, // 1 minute â€” stages rarely change
     retry: shouldRetry,
   });
 
@@ -3182,7 +3182,7 @@ export default function StaffOrdersMobile() {
 
   /**
    * Gets status configuration for an order (ORD-005, ORD-009)
-   * Priority: stage_id → fallback to STATUS_FLOW
+   * Priority: stage_id â†’ fallback to STATUS_FLOW
    * P0-1: Uses normalized stageId
    */
   const getStatusConfig = useCallback((order) => {
@@ -3214,7 +3214,7 @@ export default function StaffOrdersMobile() {
       return {
         label: getStageName(stage, t),
         color: stage.color,
-        actionLabel: nextStage ? (nextIsFinish ? 'Выдать' : `→ ${getStageName(nextStage, t)}`) : null,
+        actionLabel: nextStage ? (nextIsFinish ? 'Выдать' : `â†’ ${getStageName(nextStage, t)}`) : null,
         nextStageId: nextStage?.id || null,
         derivedNextStatus: (() => {
           if (!nextStage) return null;
@@ -3376,7 +3376,7 @@ export default function StaffOrdersMobile() {
 
   // P0-4: Batch load guests with loadedGuestIdsRef to prevent re-fetching
   useEffect(() => {
-    // Kitchen doesn't see guest badges — don't load guests
+    // Kitchen doesn't see guest badges â€” don't load guests
     if (isKitchen) return;
     
     async function loadGuestsBatch() {
@@ -3844,16 +3844,16 @@ export default function StaffOrdersMobile() {
     setAssignFilters((p) => (p.includes(key) ? p.filter((x) => x !== key) : [...p, key]));
   };
 
-  // v4.0.0: Toggle expand/collapse — max 1 card expanded
+  // v4.0.0: Toggle expand/collapse â€” max 1 card expanded
   const handleToggleExpand = useCallback((groupId) => {
     setExpandedGroupId(prev => prev === groupId ? null : groupId);
   }, []);
 
-  // V2-09: Sprint D — Highlight state for banner-navigate
+  // V2-09: Sprint D â€” Highlight state for banner-navigate
   const [highlightGroupId, setHighlightGroupId] = useState(null);
   const highlightTimerRef = useRef(null);
 
-  // v4.0.0: Banner tap → expand card + scroll to it + highlight briefly
+  // v4.0.0: Banner tap â†’ expand card + scroll to it + highlight briefly
   const handleBannerNavigate = useCallback((groupId) => {
     if (!groupId) return;
     setExpandedGroupId(groupId);
@@ -3894,7 +3894,7 @@ export default function StaffOrdersMobile() {
     setCloseTableConfirm({ sessionId, tableName: tableName || 'стол' });
   };
 
-  // v3.6.0: Confirmation dialog — executes close after user confirms
+  // v3.6.0: Confirmation dialog â€” executes close after user confirms
   const confirmCloseTable = async () => {
     if (!closeTableConfirm) return;
     const { sessionId } = closeTableConfirm;
@@ -3902,7 +3902,7 @@ export default function StaffOrdersMobile() {
     try {
       await closeSession(sessionId);
       showToast("Стол закрыт");
-      setExpandedGroupId(null); // Collapse expanded card — table no longer active
+      setExpandedGroupId(null); // Collapse expanded card â€” table no longer active
       refetchOrders();
     } catch (err) {
       showToast("Ошибка при закрытии");
@@ -3953,7 +3953,7 @@ export default function StaffOrdersMobile() {
 
   const manualAge = manualRefreshTs ? Math.floor((Date.now() - manualRefreshTs) / 1000) : 9999;
   const refreshLabelText = manualAge <= 2 
-    ? "Готово ✓" 
+    ? "Готово âœ“" 
     : pollingInterval === 0 
       ? "Вручную" 
       : `Авто ${pollingInterval / 1000}с`;
@@ -4132,7 +4132,7 @@ export default function StaffOrdersMobile() {
                     ? "Нет активных заказов" 
                     : "Нет завершённых заказов"}
             </div>
-            {isKitchen && <div className="text-xs mb-4">Фильтры: {channelLabels} · {assignLabels}</div>}
+            {isKitchen && <div className="text-xs mb-4">Фильтры: {channelLabels} Â· {assignLabels}</div>}
             <Button variant="outline" size="sm" onClick={handleRefresh}>Обновить</Button>
           </div>
         ) : (
@@ -4319,7 +4319,7 @@ export default function StaffOrdersMobile() {
         </div>
       )}
 
-      {/* V2-09: Sprint D — Banner notification overlay */}
+      {/* V2-09: Sprint D â€” Banner notification overlay */}
       <BannerNotification
         banner={bannerData}
         onDismiss={handleBannerDismiss}
