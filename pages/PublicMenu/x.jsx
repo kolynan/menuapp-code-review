@@ -583,6 +583,58 @@ const I18N_FALLBACKS = {
   "help.chip.water": "Water",
 };
 
+// i18n RU FALLBACK MAP — RU fallbacks for keys B44 stores with English values
+// Checked first in RU mode, same pattern as I18N_FALLBACKS for EN mode.
+const I18N_FALLBACKS_RU = {
+  "help.title": "Нужна помощь?",
+  "help.sent": "Отправлено",
+  "help.cancel": "Отмена",
+  "help.all_requests_cta": "Все запросы ({count})",
+  "help.back_to_help": "Назад",
+  "help.show_more": "Ещё",
+  "help.call_waiter": "Вызвать официанта",
+  "help.get_bill": "Принести счёт",
+  "help.request_napkins": "Салфетки",
+  "help.request_menu": "Меню",
+  "help.other": "Другое",
+  "help.other_label": "Другое",
+  "help.send_more": "Ещё запрос",
+  "help.sending_now": "Отправляем…",
+  "help.retry": "Повторить",
+  "help.remind": "Напомнить",
+  "help.retry_in": "Через",
+  "help.just_sent": "Только что",
+  "help.waiting_prefix": "Ожидание",
+  "help.minutes_short": "мин",
+  "help.reminded_just_now": "Только что напомнили",
+  "help.reminded_prefix": "Напомнили",
+  "help.last_reminder_prefix": "Последнее",
+  "help.reminder_sent": "Напоминание отправлено",
+  "help.resolved_call_waiter": "✅ Официант пришёл · Спасибо!",
+  "help.resolved_bill": "✅ Счёт принесли · Спасибо!",
+  "help.resolved_napkins": "✅ Салфетки принесли · спасибо!",
+  "help.resolved_menu": "✅ Меню принесли · Спасибо!",
+  "help.resolved_other": "✅ Готово · Спасибо!",
+  "help.no_connection": "Нет соединения",
+  "help.try_again": "Попробуйте снова",
+  "help.remind_failed": "Не удалось напомнить",
+  "help.send_failed": "Не удалось отправить",
+  "help.restoring_status": "Восстанавливаем…",
+  "help.offline_status": "Нет соединения · повторим автоматически",
+  "help.stale_status": "Данные могли устареть",
+  "help.seconds_short": "сек",
+  "help.updated_label": "Обновлено",
+  "help.ago": "назад",
+  "help.reminder": "напоминание",
+  "help.reminders": "напоминания",
+  "help.chip.high_chair": "Детское кресло",
+  "help.chip.cutlery": "Приборы",
+  "help.chip.sauce": "Соус",
+  "help.chip.clear_table": "Убрать стол",
+  "help.chip.water": "Вода",
+  "cart.my_bill": "Мой счёт",
+};
+
 /**
  * Wraps raw t() to prevent raw i18n keys from reaching the UI.
  * Falls back to I18N_FALLBACKS map, supports {param} interpolation.
@@ -593,6 +645,18 @@ function makeSafeT(rawT, lang) {
     // Check it FIRST to avoid B44 returning RU for keys with no EN translation.
     if (lang === 'en') {
       let fb = I18N_FALLBACKS[key];
+      if (fb != null && fb !== '') {
+        if (params && typeof params === "object") {
+          Object.entries(params).forEach(([k, v]) => {
+            fb = fb.replace(new RegExp(`\\{${k}\\}`, "g"), String(v ?? ""));
+          });
+        }
+        return fb;
+      }
+    }
+    // RU mode: check RU fallbacks first (B44 may have stored EN values for these keys)
+    if (lang === 'ru') {
+      let fb = I18N_FALLBACKS_RU[key];
       if (fb != null && fb !== '') {
         if (params && typeof params === "object") {
           Object.entries(params).forEach(([k, v]) => {
