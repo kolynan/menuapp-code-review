@@ -332,6 +332,14 @@ const HALL_UI_TEXT = {
   newBlocker: "\u0415\u0441\u0442\u044C \u043D\u043E\u0432\u044B\u0435 \u0431\u043B\u044E\u0434\u0430",
   inProgressBlocker: "\u0415\u0441\u0442\u044C \u0431\u043B\u044E\u0434\u0430 \u0432 \u0440\u0430\u0431\u043E\u0442\u0435",
   readyBlocker: "\u0415\u0441\u0442\u044C \u0431\u043B\u044E\u0434\u0430 \u0432 \u0441\u0435\u043A\u0446\u0438\u0438 \u00AB\u0413\u043E\u0442\u043E\u0432\u043E\u00BB",
+  acceptRequest: "\u041F\u0440\u0438\u043D\u044F\u0442\u044C",
+  serveRequest: "\u0412\u044B\u0434\u0430\u0442\u044C",
+  acceptAllRequests: "\u041F\u0440\u0438\u043D\u044F\u0442\u044C \u0432\u0441\u0435",
+  serveAllRequests: "\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0435",
+  undoLabel: "\u0412\u044B\u0434\u0430\u043D \u0433\u043E\u0441\u0442\u044E",
+  undo: "\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C",
+  guests: "\u0433\u043E\u0441\u0442",
+  dishes: "\u0431\u043B\u044E\u0434",
 };
 
 function formatCompactMinutes(totalMinutes) {
@@ -589,11 +597,16 @@ function getLinkId(field) {
 
               {tableRequests.length > 0 && (
                 <div>
-                  <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-violet-600">{`${HALL_UI_TEXT.requests} (${tableRequests.length})`}</div>
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-violet-600"><span className="bg-violet-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.requests} (${tableRequests.length})`}</span></div>
+                    {tableRequests.length > 1 && (() => { const allNew = tableRequests.every(r => !r.status || r.status === 'new' || r.status === 'open'); const allAccepted = tableRequests.every(r => r.status === 'accepted'); if (allNew) return <button type="button" onClick={() => tableRequests.forEach(r => onCloseRequest(r.id, 'accepted', { assignee: effectiveUserId, assigned_at: new Date().toISOString() }))} disabled={isRequestPending} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{`${HALL_UI_TEXT.acceptAllRequests} (${tableRequests.length})`}</button>; if (allAccepted) return <button type="button" onClick={() => tableRequests.forEach(r => onCloseRequest(r.id, 'done'))} disabled={isRequestPending} className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{`${HALL_UI_TEXT.serveAllRequests} (${tableRequests.length})`}</button>; return null; })()}
+                  </div>
                   <div className="space-y-1.5">
                     {tableRequests.map((request) => {
                       const ageMin = getAgeMinutes(request.created_date);
                       const label = REQUEST_TYPE_LABELS[request.request_type] || request.request_type;
+                      const isAccepted = request.status === 'accepted';
+                      const isAssignedToMe = request.assignee === effectiveUserId;
                       return (
                         <div key={request.id} className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2">
                           <div className="flex items-center gap-3">
@@ -601,10 +614,11 @@ function getLinkId(field) {
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="truncate text-sm font-medium text-slate-900">{label}</span>
                                 <span className="text-xs text-violet-500 shrink-0">{formatCompactMinutes(ageMin)}</span>
+                                {isAccepted && isAssignedToMe && staffName && <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">{staffName}</span>}
                               </div>
                               {request.comment && <div className="mt-0.5 text-xs text-slate-500 truncate">{request.comment}</div>}
                             </div>
-                            {onCloseRequest && <button type="button" onClick={() => onCloseRequest(request.id, "done")} className="shrink-0 rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs font-semibold text-violet-700 min-h-[36px] active:scale-[0.98]">{HALL_UI_TEXT.done}</button>}
+                            {onCloseRequest && (isAccepted ? <button type="button" onClick={() => onCloseRequest(request.id, "done")} disabled={isRequestPending} className="shrink-0 rounded-lg border border-green-200 bg-white px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.serveRequest}</button> : <button type="button" onClick={() => onCloseRequest(request.id, "accepted", { assignee: effectiveUserId, assigned_at: new Date().toISOString() })} disabled={isRequestPending} className="shrink-0 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.acceptRequest}</button>)}
                           </div>
                         </div>
                       );
@@ -616,31 +630,21 @@ function getLinkId(field) {
               {newOrders.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between gap-3 mb-2">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600">{`${HALL_UI_TEXT.new} (${countRows(newRows, newOrders.length)})`}</div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600"><span className="bg-blue-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.new} (${newOrders.length} ${pluralRu(newOrders.length, HALL_UI_TEXT.guests + '\u044C', HALL_UI_TEXT.guests + '\u044F', HALL_UI_TEXT.guests + '\u0435\u0439')} \u00B7 ${countRows(newRows, newOrders.length)} ${pluralRu(countRows(newRows, newOrders.length), HALL_UI_TEXT.dishes + '\u043E', HALL_UI_TEXT.dishes + '\u0430', HALL_UI_TEXT.dishes)})`}</span></div>
                     <button type="button" onClick={() => handleOrdersAction(newOrders)} disabled={advanceMutation.isPending} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{getOrderActionMeta(newOrders[0]).willServe ? HALL_UI_TEXT.serveAll : HALL_UI_TEXT.acceptAll}</button>
                   </div>
                   {renderHallRows(newRows, "blue")}
                 </div>
               )}
 
-              {readyOrders.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-green-600">{`${HALL_UI_TEXT.ready} (${countRows(readyRows, readyOrders.length)})`}</div>
-                    <button type="button" onClick={() => handleOrdersAction(readyOrders)} disabled={advanceMutation.isPending} className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.serveAll}</button>
-                  </div>
-                  {renderHallRows(readyRows, "green")}
-                </div>
-              )}
-
               {inProgressSections.length > 0 && (
                 <div>
                   <button type="button" onClick={() => setInProgressExpanded((prev) => !prev)} className="mb-2 flex w-full items-center justify-between text-left">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600">{`${HALL_UI_TEXT.inProgress} (${inProgressSections.reduce((sum, section) => sum + section.rowCount, 0)})`}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 opacity-60">{`${HALL_UI_TEXT.inProgress} (${inProgressOrders.length} ${pluralRu(inProgressOrders.length, HALL_UI_TEXT.guests + '\u044C', HALL_UI_TEXT.guests + '\u044F', HALL_UI_TEXT.guests + '\u0435\u0439')} \u00B7 ${inProgressSections.reduce((sum, section) => sum + section.rowCount, 0)} ${pluralRu(inProgressSections.reduce((sum, section) => sum + section.rowCount, 0), HALL_UI_TEXT.dishes + '\u043E', HALL_UI_TEXT.dishes + '\u0430', HALL_UI_TEXT.dishes)})`}</span>
                     <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${inProgressExpanded ? "rotate-180" : ""}`} />
                   </button>
                   {inProgressExpanded && (
-                    <div className="space-y-3">
+                    <div className="space-y-3 opacity-60">
                       {inProgressSections.map((section) => {
                         const isSubExpanded = !!expandedSubGroups[section.sid];
                         return (
@@ -648,7 +652,7 @@ function getLinkId(field) {
                             <div className="mb-1.5 flex items-center justify-between gap-3 cursor-pointer" onClick={() => setExpandedSubGroups((prev) => ({ ...prev, [section.sid]: !prev[section.sid] }))}>
                               <div className="flex items-center gap-2 min-w-0">
                                 <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isSubExpanded ? "rotate-180" : ""}`} />
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600">{`${section.label} (${section.rowCount})`}</span>
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 opacity-60">{`${section.label} (${section.rowCount})`}</span>
                               </div>
                               <button type="button" onClick={(event) => { event.stopPropagation(); handleOrdersAction(section.orders); }} disabled={advanceMutation.isPending} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{section.bulkLabel}</button>
                             </div>
@@ -661,13 +665,23 @@ function getLinkId(field) {
                 </div>
               )}
 
+              {readyOrders.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-green-600"><span className="bg-green-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.ready} (${readyOrders.length} ${pluralRu(readyOrders.length, HALL_UI_TEXT.guests + '\u044C', HALL_UI_TEXT.guests + '\u044F', HALL_UI_TEXT.guests + '\u0435\u0439')} \u00B7 ${countRows(readyRows, readyOrders.length)} ${pluralRu(countRows(readyRows, readyOrders.length), HALL_UI_TEXT.dishes + '\u043E', HALL_UI_TEXT.dishes + '\u0430', HALL_UI_TEXT.dishes)})`}</span></div>
+                    <button type="button" onClick={() => handleOrdersAction(readyOrders)} disabled={advanceMutation.isPending} className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.serveAll}</button>
+                  </div>
+                  {renderHallRows(readyRows, "green")}
+                </div>
+              )}
+
               {servedOrders.length > 0 && (
                 <div>
                   <button type="button" onClick={() => setServedExpanded((prev) => !prev)} className="mb-2 flex w-full items-center justify-between text-left">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{`${HALL_UI_TEXT.served} (${countRows(servedRows, servedOrders.length)})`}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 opacity-60">{`${HALL_UI_TEXT.served} (${countRows(servedRows, servedOrders.length)})`}</span>
                     <span className="text-xs font-medium text-slate-400">{servedExpanded ? HALL_UI_TEXT.hide : HALL_UI_TEXT.show}</span>
                   </button>
-                  {servedExpanded && renderHallRows(servedRows, "slate", true)}
+                  {servedExpanded && <div className="opacity-60">{renderHallRows(servedRows, "slate", true)}</div>}
                 </div>
               )}
 
@@ -699,7 +713,7 @@ function getLinkId(field) {
                     <X className="w-4 h-4" />
                     {HALL_UI_TEXT.closeTable}
                   </button>
-                  {closeDisabledReason && <p className="text-[10px] text-slate-400 text-center mt-1">{closeDisabledReason}</p>}
+                  {closeDisabledReasons.length > 0 && <div className="mt-1 space-y-0.5">{closeDisabledReasons.map((reason, i) => <p key={i} className="text-[10px] text-slate-400 text-center">{reason}</p>)}</div>}
                 </div>
               )}
             </React.Fragment>
@@ -1194,11 +1208,16 @@ function computeTableStatus(group, activeRequests, getStatusConfig) {
 
               {tableRequests.length > 0 && (
                 <div>
-                  <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-violet-600">{`${HALL_UI_TEXT.requests} (${tableRequests.length})`}</div>
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-violet-600"><span className="bg-violet-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.requests} (${tableRequests.length})`}</span></div>
+                    {tableRequests.length > 1 && (() => { const allNew = tableRequests.every(r => !r.status || r.status === 'new' || r.status === 'open'); const allAccepted = tableRequests.every(r => r.status === 'accepted'); if (allNew) return <button type="button" onClick={() => tableRequests.forEach(r => onCloseRequest(r.id, 'accepted', { assignee: effectiveUserId, assigned_at: new Date().toISOString() }))} disabled={isRequestPending} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{`${HALL_UI_TEXT.acceptAllRequests} (${tableRequests.length})`}</button>; if (allAccepted) return <button type="button" onClick={() => tableRequests.forEach(r => onCloseRequest(r.id, 'done'))} disabled={isRequestPending} className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{`${HALL_UI_TEXT.serveAllRequests} (${tableRequests.length})`}</button>; return null; })()}
+                  </div>
                   <div className="space-y-1.5">
                     {tableRequests.map(request => {
                       const ageMin = getAgeMinutes(request.created_date);
                       const label = REQUEST_TYPE_LABELS[request.request_type] || request.request_type;
+                      const isAccepted = request.status === 'accepted';
+                      const isAssignedToMe = request.assignee === effectiveUserId;
                       return (
                         <div key={request.id} className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2">
                           <div className="flex items-center gap-3">
@@ -1206,10 +1225,11 @@ function computeTableStatus(group, activeRequests, getStatusConfig) {
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="truncate text-sm font-medium text-slate-900">{label}</span>
                                 <span className="text-xs text-violet-500 shrink-0">{formatCompactMinutes(ageMin)}</span>
+                                {isAccepted && isAssignedToMe && staffName && <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">{staffName}</span>}
                               </div>
                               {request.comment && <div className="mt-0.5 text-xs text-slate-500 truncate">{request.comment}</div>}
                             </div>
-                            {onCloseRequest && <button type="button" onClick={() => onCloseRequest(request.id, 'done')} className="shrink-0 rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs font-semibold text-violet-700 min-h-[36px] active:scale-[0.98]">{HALL_UI_TEXT.done}</button>}
+                            {onCloseRequest && (isAccepted ? <button type="button" onClick={() => onCloseRequest(request.id, 'done')} disabled={isRequestPending} className="shrink-0 rounded-lg border border-green-200 bg-white px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.serveRequest}</button> : <button type="button" onClick={() => onCloseRequest(request.id, 'accepted', { assignee: effectiveUserId, assigned_at: new Date().toISOString() })} disabled={isRequestPending} className="shrink-0 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.acceptRequest}</button>)}
                           </div>
                         </div>
                       );
@@ -1221,31 +1241,21 @@ function computeTableStatus(group, activeRequests, getStatusConfig) {
               {newOrders.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between gap-3 mb-2">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600">{`${HALL_UI_TEXT.new} (${newRows.length || newOrders.length})`}</div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600"><span className="bg-blue-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.new} (${newOrders.length} ${pluralRu(newOrders.length, HALL_UI_TEXT.guests + '\u044C', HALL_UI_TEXT.guests + '\u044F', HALL_UI_TEXT.guests + '\u0435\u0439')} \u00B7 ${newRows.length || newOrders.length} ${pluralRu(newRows.length || newOrders.length, HALL_UI_TEXT.dishes + '\u043E', HALL_UI_TEXT.dishes + '\u0430', HALL_UI_TEXT.dishes)})`}</span></div>
                     <button type="button" onClick={() => handleOrdersAction(newOrders)} disabled={advanceMutation.isPending} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{newOrders.length > 0 && getOrderActionMeta(newOrders[0]).willServe ? HALL_UI_TEXT.serveAll : HALL_UI_TEXT.acceptAll}</button>
                   </div>
                   {renderHallRows(newRows, 'blue')}
                 </div>
               )}
 
-              {readyOrders.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-green-600">{`${HALL_UI_TEXT.ready} (${readyRows.length || readyOrders.length})`}</div>
-                    <button type="button" onClick={() => handleOrdersAction(readyOrders)} disabled={advanceMutation.isPending} className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.serveAll}</button>
-                  </div>
-                  {renderHallRows(readyRows, 'green')}
-                </div>
-              )}
-
               {inProgressSections.length > 0 && (
                 <div>
                   <button type="button" onClick={() => setInProgressExpanded(prev => !prev)} className="mb-2 flex w-full items-center justify-between text-left">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600">{`${HALL_UI_TEXT.inProgress} (${inProgressSections.reduce((sum, section) => sum + section.rowCount, 0)})`}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 opacity-60">{`${HALL_UI_TEXT.inProgress} (${inProgressOrders.length} ${pluralRu(inProgressOrders.length, HALL_UI_TEXT.guests + '\u044C', HALL_UI_TEXT.guests + '\u044F', HALL_UI_TEXT.guests + '\u0435\u0439')} \u00B7 ${inProgressSections.reduce((sum, section) => sum + section.rowCount, 0)} ${pluralRu(inProgressSections.reduce((sum, section) => sum + section.rowCount, 0), HALL_UI_TEXT.dishes + '\u043E', HALL_UI_TEXT.dishes + '\u0430', HALL_UI_TEXT.dishes)})`}</span>
                     <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${inProgressExpanded ? 'rotate-180' : ''}`} />
                   </button>
                   {inProgressExpanded && (
-                    <div className="space-y-3">
+                    <div className="space-y-3 opacity-60">
                       {inProgressSections.map(section => {
                         const isSubExpanded = !!expandedSubGroups[section.sid];
                         return (
@@ -1253,7 +1263,7 @@ function computeTableStatus(group, activeRequests, getStatusConfig) {
                             <div className="mb-1.5 flex items-center justify-between gap-3 cursor-pointer" onClick={() => setExpandedSubGroups(prev => ({ ...prev, [section.sid]: !prev[section.sid] }))}>
                               <div className="flex items-center gap-2 min-w-0">
                                 <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isSubExpanded ? 'rotate-180' : ''}`} />
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600">{`${section.label} (${section.rowCount})`}</span>
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 opacity-60">{`${section.label} (${section.rowCount})`}</span>
                               </div>
                               <button type="button" onClick={(e) => { e.stopPropagation(); handleOrdersAction(section.orders); }} disabled={advanceMutation.isPending} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{section.bulkLabel}</button>
                             </div>
@@ -1266,13 +1276,23 @@ function computeTableStatus(group, activeRequests, getStatusConfig) {
                 </div>
               )}
 
+              {readyOrders.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-green-600"><span className="bg-green-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.ready} (${readyOrders.length} ${pluralRu(readyOrders.length, HALL_UI_TEXT.guests + '\u044C', HALL_UI_TEXT.guests + '\u044F', HALL_UI_TEXT.guests + '\u0435\u0439')} \u00B7 ${readyRows.length || readyOrders.length} ${pluralRu(readyRows.length || readyOrders.length, HALL_UI_TEXT.dishes + '\u043E', HALL_UI_TEXT.dishes + '\u0430', HALL_UI_TEXT.dishes)})`}</span></div>
+                    <button type="button" onClick={() => handleOrdersAction(readyOrders)} disabled={advanceMutation.isPending} className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.serveAll}</button>
+                  </div>
+                  {renderHallRows(readyRows, 'green')}
+                </div>
+              )}
+
               {servedOrders.length > 0 && (
                 <div>
                   <button type="button" onClick={() => setServedExpanded(prev => !prev)} className="mb-2 flex w-full items-center justify-between text-left">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{`${HALL_UI_TEXT.served} (${servedRows.length || servedOrders.length})`}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 opacity-60">{`${HALL_UI_TEXT.served} (${servedRows.length || servedOrders.length})`}</span>
                     <span className="text-xs font-medium text-slate-400">{servedExpanded ? HALL_UI_TEXT.hide : HALL_UI_TEXT.show}</span>
                   </button>
-                  {servedExpanded && renderHallRows(servedRows)}
+                  {servedExpanded && <div className="opacity-60">{renderHallRows(servedRows)}</div>}
                 </div>
               )}
 
@@ -1304,7 +1324,7 @@ function computeTableStatus(group, activeRequests, getStatusConfig) {
                     <X className="w-4 h-4" />
                     {HALL_UI_TEXT.closeTable}
                   </button>
-                  {closeDisabledReason && <p className="text-[10px] text-slate-400 text-center mt-1">{closeDisabledReason}</p>}
+                  {closeDisabledReasons.length > 0 && <div className="mt-1 space-y-0.5">{closeDisabledReasons.map((reason, i) => <p key={i} className="text-[10px] text-slate-400 text-center">{reason}</p>)}</div>}
                 </div>
               )}
             </React.Fragment>
@@ -1629,6 +1649,15 @@ function OrderCard({
   );
 }
 
+function pluralRu(n, one, few, many) {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return many;
+  if (last > 1 && last < 5) return few;
+  if (last === 1) return one;
+  return many;
+}
+
 function OrderGroupCard({
   group,
   isExpanded,
@@ -1650,6 +1679,9 @@ function OrderGroupCard({
   onCloseRequest,
   orderStages = [],
   setUndoToast,
+  undoToast,
+  staffName,
+  isRequestPending,
 }) {
   const queryClient = useQueryClient();
   const tableId = group.type === "table" ? group.id : null;
@@ -1832,10 +1864,12 @@ function OrderGroupCard({
     const snapshots = orders.map((order) => ({ orderId: order.id, prevStatus: order.status, prevStageId: getLinkId(order.stage_id) }));
     setUndoToast((prev) => {
       if (prev?.timerId) clearTimeout(prev.timerId);
-      const timerId = setTimeout(() => setUndoToast(null), 5000);
+      const timerId = setTimeout(() => setUndoToast(null), 3000);
       return {
         snapshots,
         timerId,
+        orderId: orders[orders.length - 1].id,
+        label: HALL_UI_TEXT.undoLabel,
         onUndo: () => {
           snapshots.forEach(({ orderId, prevStatus, prevStageId }) => {
             const payload = { status: prevStatus };
@@ -1964,7 +1998,16 @@ function OrderGroupCard({
     return "free";
   }, [effectiveUserId, group.orders, group.type]);
 
-  const closeDisabledReason = group.type !== "table" ? null : tableRequests.length > 0 ? HALL_UI_TEXT.requestsBlocker : newOrders.length > 0 ? HALL_UI_TEXT.newBlocker : inProgressOrders.length > 0 ? HALL_UI_TEXT.inProgressBlocker : readyOrders.length > 0 ? HALL_UI_TEXT.readyBlocker : null;
+  const closeDisabledReasons = useMemo(() => {
+    if (group.type !== "table") return [];
+    const reasons = [];
+    if (tableRequests.length > 0) reasons.push(HALL_UI_TEXT.requestsBlocker);
+    if (newOrders.length > 0) reasons.push(HALL_UI_TEXT.newBlocker);
+    if (inProgressOrders.length > 0) reasons.push(HALL_UI_TEXT.inProgressBlocker);
+    if (readyOrders.length > 0) reasons.push(HALL_UI_TEXT.readyBlocker);
+    return reasons;
+  }, [group.type, tableRequests.length, newOrders.length, inProgressOrders.length, readyOrders.length]);
+  const closeDisabledReason = closeDisabledReasons[0] || null;
   const handleCloseTableClick = useCallback(() => {
     const sessionId = group.orders.map((order) => getLinkId(order.table_session)).find(Boolean);
     if (onCloseTable && sessionId) {
@@ -2008,30 +2051,47 @@ function OrderGroupCard({
       slate: { bg: "bg-slate-50", border: "border-slate-200", button: "border-slate-200 bg-white text-slate-700" },
     }[tone] || { bg: "bg-slate-50", border: "border-slate-200", button: "border-slate-200 bg-white text-slate-700" };
 
+    const toastOrderId = undoToast?.orderId;
+    const renderedToast = new Set();
+
     return (
       <div className="space-y-1.5">
-        {rows.map((row) => (
-          <div key={row.id} className={`rounded-lg border ${palette.border} ${palette.bg} px-3 py-2`}>
-            <div className="flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`truncate text-sm ${row.loading ? "text-slate-400" : "font-medium text-slate-900"}`}>{row.primary}</span>
-                  {row.secondary && <span className="shrink-0 text-xs text-slate-500">{row.secondary}</span>}
+        {rows.map((row, idx) => {
+          const isLastOfOrder = !rows[idx + 1] || rows[idx + 1].order?.id !== row.order?.id;
+          const showToast = toastOrderId && row.order?.id === toastOrderId && isLastOfOrder && !renderedToast.has(toastOrderId);
+          if (showToast) renderedToast.add(toastOrderId);
+
+          return (
+            <React.Fragment key={row.id}>
+              <div className={`rounded-lg border ${palette.border} ${palette.bg} px-3 py-2`}>
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`truncate text-sm ${row.loading ? "text-slate-400" : "font-medium text-slate-900"}`}>{row.primary}</span>
+                      {row.secondary && <span className="shrink-0 text-xs text-slate-500">{row.secondary}</span>}
+                    </div>
+                  </div>
+                  {readOnly ? (
+                    <span className="shrink-0 text-xs text-slate-400">{row.timeLabel}</span>
+                  ) : row.actionLabel ? (
+                    <button type="button" onClick={() => handleSingleAction(row.order)} disabled={advanceMutation.isPending || row.loading} className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold min-h-[36px] active:scale-[0.98] disabled:opacity-60 ${row.willServe ? "border-green-200 bg-white text-green-700" : row.actionLabel === HALL_UI_TEXT.accept ? "border-blue-200 bg-white text-blue-700" : palette.button}`}>
+                      {advanceMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : row.actionLabel}
+                    </button>
+                  ) : null}
                 </div>
               </div>
-              {readOnly ? (
-                <span className="shrink-0 text-xs text-slate-400">{row.timeLabel}</span>
-              ) : row.actionLabel ? (
-                <button type="button" onClick={() => handleSingleAction(row.order)} disabled={advanceMutation.isPending || row.loading} className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold min-h-[36px] active:scale-[0.98] disabled:opacity-60 ${row.willServe ? "border-green-200 bg-white text-green-700" : row.actionLabel === HALL_UI_TEXT.accept ? "border-blue-200 bg-white text-blue-700" : palette.button}`}>
-                  {advanceMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : row.actionLabel}
-                </button>
-              ) : null}
-            </div>
-          </div>
-        ))}
+              {showToast && (
+                <div className="flex items-center justify-between bg-slate-800 text-white text-xs rounded-lg px-3 py-2">
+                  <span>{undoToast.label || HALL_UI_TEXT.undoLabel}</span>
+                  <button type="button" onClick={() => { if (undoToast.timerId) clearTimeout(undoToast.timerId); undoToast.onUndo(); setUndoToast(null); }} className="ml-3 font-semibold text-amber-300 underline min-h-[36px] flex items-center">{HALL_UI_TEXT.undo}</button>
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
       </div>
     );
-  }, [advanceMutation.isPending, handleSingleAction]);
+  }, [advanceMutation.isPending, handleSingleAction, undoToast, setUndoToast]);
 
   const renderLegacyOrderCard = useCallback((order) => {
     const config = getStatusConfig(order);
@@ -2131,25 +2191,25 @@ function OrderGroupCard({
                 {billData && billData.total > 0 && <div className="text-xs font-semibold text-slate-700">{`${HALL_UI_TEXT.bill} \u00B7 ${HALL_UI_TEXT.total} ${formatHallMoney(billData.total)}`}</div>}
               </div>
 
-              {tableRequests.length > 0 && <div><div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-violet-600">{`${HALL_UI_TEXT.requests} (${tableRequests.length})`}</div><div className="space-y-1.5">{tableRequests.map((request) => { const ageMin = getAgeMinutes(request.created_date); const label = REQUEST_TYPE_LABELS[request.request_type] || request.request_type; return <div key={request.id} className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2"><div className="flex items-center gap-3"><div className="min-w-0 flex-1"><div className="flex items-center gap-2 min-w-0"><span className="truncate text-sm font-medium text-slate-900">{label}</span><span className="text-xs text-violet-500 shrink-0">{formatCompactMinutes(ageMin)}</span></div>{request.comment && <div className="mt-0.5 text-xs text-slate-500 truncate">{request.comment}</div>}</div>{onCloseRequest && <button type="button" onClick={() => onCloseRequest(request.id, "done")} className="shrink-0 rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs font-semibold text-violet-700 min-h-[36px] active:scale-[0.98]">{HALL_UI_TEXT.done}</button>}</div></div>; })}</div></div>}
+              {tableRequests.length > 0 && <div><div className="mb-2 flex items-center justify-between gap-3"><div className="text-[11px] font-bold uppercase tracking-wider text-violet-600"><span className="bg-violet-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.requests} (${tableRequests.length})`}</span></div>{tableRequests.length > 1 && (() => { const allNew = tableRequests.every(r => !r.status || r.status === 'new' || r.status === 'open'); const allAccepted = tableRequests.every(r => r.status === 'accepted'); if (allNew) return <button type="button" onClick={() => tableRequests.forEach(r => onCloseRequest(r.id, 'accepted', { assignee: effectiveUserId, assigned_at: new Date().toISOString() }))} disabled={isRequestPending} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{`${HALL_UI_TEXT.acceptAllRequests} (${tableRequests.length})`}</button>; if (allAccepted) return <button type="button" onClick={() => tableRequests.forEach(r => onCloseRequest(r.id, 'done'))} disabled={isRequestPending} className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{`${HALL_UI_TEXT.serveAllRequests} (${tableRequests.length})`}</button>; return null; })()}</div><div className="space-y-1.5">{tableRequests.map((request) => { const ageMin = getAgeMinutes(request.created_date); const label = REQUEST_TYPE_LABELS[request.request_type] || request.request_type; const isAccepted = request.status === 'accepted'; const isAssignedToMe = request.assignee === effectiveUserId; return <div key={request.id} className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2"><div className="flex items-center gap-3"><div className="min-w-0 flex-1"><div className="flex items-center gap-2 min-w-0"><span className="truncate text-sm font-medium text-slate-900">{label}</span><span className="text-xs text-violet-500 shrink-0">{formatCompactMinutes(ageMin)}</span>{isAccepted && isAssignedToMe && staffName && <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">{staffName}</span>}</div>{request.comment && <div className="mt-0.5 text-xs text-slate-500 truncate">{request.comment}</div>}</div>{onCloseRequest && (isAccepted ? <button type="button" onClick={() => onCloseRequest(request.id, "done")} disabled={isRequestPending} className="shrink-0 rounded-lg border border-green-200 bg-white px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.serveRequest}</button> : <button type="button" onClick={() => onCloseRequest(request.id, "accepted", { assignee: effectiveUserId, assigned_at: new Date().toISOString() })} disabled={isRequestPending} className="shrink-0 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.acceptRequest}</button>)}</div></div>; })}</div></div>}
 
-              {newOrders.length > 0 && <div><div className="flex items-center justify-between gap-3 mb-2"><div className="text-[11px] font-bold uppercase tracking-wider text-blue-600">{`${HALL_UI_TEXT.new} (${countRows(newRows, newOrders.length)})`}</div><button type="button" onClick={() => handleOrdersAction(newOrders)} disabled={advanceMutation.isPending} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{getOrderActionMeta(newOrders[0]).willServe ? HALL_UI_TEXT.serveAll : HALL_UI_TEXT.acceptAll}</button></div>{renderHallRows(newRows, "blue")}</div>}
+              {newOrders.length > 0 && <div><div className="flex items-center justify-between gap-3 mb-2"><div className="text-[11px] font-bold uppercase tracking-wider text-blue-600"><span className="bg-blue-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.new} (${newOrders.length} ${pluralRu(newOrders.length, HALL_UI_TEXT.guests + '\u044C', HALL_UI_TEXT.guests + '\u044F', HALL_UI_TEXT.guests + '\u0435\u0439')} \u00B7 ${countRows(newRows, newOrders.length)} ${pluralRu(countRows(newRows, newOrders.length), HALL_UI_TEXT.dishes + '\u043E', HALL_UI_TEXT.dishes + '\u0430', HALL_UI_TEXT.dishes)})`}</span></div><button type="button" onClick={() => handleOrdersAction(newOrders)} disabled={advanceMutation.isPending} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{getOrderActionMeta(newOrders[0]).willServe ? HALL_UI_TEXT.serveAll : HALL_UI_TEXT.acceptAll}</button></div>{renderHallRows(newRows, "blue")}</div>}
 
-              {readyOrders.length > 0 && <div><div className="flex items-center justify-between gap-3 mb-2"><div className="text-[11px] font-bold uppercase tracking-wider text-green-600">{`${HALL_UI_TEXT.ready} (${countRows(readyRows, readyOrders.length)})`}</div><button type="button" onClick={() => handleOrdersAction(readyOrders)} disabled={advanceMutation.isPending} className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.serveAll}</button></div>{renderHallRows(readyRows, "green")}</div>}
+              {inProgressSections.length > 0 && <div><button type="button" onClick={() => setInProgressExpanded((prev) => !prev)} className="mb-2 flex w-full items-center justify-between text-left"><span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 opacity-60">{`${HALL_UI_TEXT.inProgress} (${inProgressOrders.length} ${pluralRu(inProgressOrders.length, HALL_UI_TEXT.guests + '\u044C', HALL_UI_TEXT.guests + '\u044F', HALL_UI_TEXT.guests + '\u0435\u0439')} \u00B7 ${inProgressSections.reduce((sum, section) => sum + section.rowCount, 0)} ${pluralRu(inProgressSections.reduce((sum, section) => sum + section.rowCount, 0), HALL_UI_TEXT.dishes + '\u043E', HALL_UI_TEXT.dishes + '\u0430', HALL_UI_TEXT.dishes)})`}</span><ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${inProgressExpanded ? "rotate-180" : ""}`} /></button>{inProgressExpanded && <div className="space-y-3 opacity-60">{inProgressSections.map((section) => { const isSubExpanded = !!expandedSubGroups[section.sid]; return <div key={section.sid}><div className="mb-1.5 flex items-center justify-between gap-3 cursor-pointer" onClick={() => setExpandedSubGroups((prev) => ({ ...prev, [section.sid]: !prev[section.sid] }))}><div className="flex items-center gap-2 min-w-0"><ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isSubExpanded ? "rotate-180" : ""}`} /><span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 opacity-60">{`${section.label} (${section.rowCount})`}</span></div><button type="button" onClick={(event) => { event.stopPropagation(); handleOrdersAction(section.orders); }} disabled={advanceMutation.isPending} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{section.bulkLabel}</button></div>{isSubExpanded && renderHallRows(section.rows, "amber")}</div>; })}</div>}</div>}
 
-              {inProgressSections.length > 0 && <div><button type="button" onClick={() => setInProgressExpanded((prev) => !prev)} className="mb-2 flex w-full items-center justify-between text-left"><span className="text-[11px] font-bold uppercase tracking-wider text-amber-600">{`${HALL_UI_TEXT.inProgress} (${inProgressSections.reduce((sum, section) => sum + section.rowCount, 0)})`}</span><ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${inProgressExpanded ? "rotate-180" : ""}`} /></button>{inProgressExpanded && <div className="space-y-3">{inProgressSections.map((section) => { const isSubExpanded = !!expandedSubGroups[section.sid]; return <div key={section.sid}><div className="mb-1.5 flex items-center justify-between gap-3 cursor-pointer" onClick={() => setExpandedSubGroups((prev) => ({ ...prev, [section.sid]: !prev[section.sid] }))}><div className="flex items-center gap-2 min-w-0"><ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isSubExpanded ? "rotate-180" : ""}`} /><span className="text-[11px] font-bold uppercase tracking-wider text-amber-600">{`${section.label} (${section.rowCount})`}</span></div><button type="button" onClick={(event) => { event.stopPropagation(); handleOrdersAction(section.orders); }} disabled={advanceMutation.isPending} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{section.bulkLabel}</button></div>{isSubExpanded && renderHallRows(section.rows, "amber")}</div>; })}</div>}</div>}
+              {readyOrders.length > 0 && <div><div className="flex items-center justify-between gap-3 mb-2"><div className="text-[11px] font-bold uppercase tracking-wider text-green-600"><span className="bg-green-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.ready} (${readyOrders.length} ${pluralRu(readyOrders.length, HALL_UI_TEXT.guests + '\u044C', HALL_UI_TEXT.guests + '\u044F', HALL_UI_TEXT.guests + '\u0435\u0439')} \u00B7 ${countRows(readyRows, readyOrders.length)} ${pluralRu(countRows(readyRows, readyOrders.length), HALL_UI_TEXT.dishes + '\u043E', HALL_UI_TEXT.dishes + '\u0430', HALL_UI_TEXT.dishes)})`}</span></div><button type="button" onClick={() => handleOrdersAction(readyOrders)} disabled={advanceMutation.isPending} className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.serveAll}</button></div>{renderHallRows(readyRows, "green")}</div>}
 
-              {servedOrders.length > 0 && <div><button type="button" onClick={() => setServedExpanded((prev) => !prev)} className="mb-2 flex w-full items-center justify-between text-left"><span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{`${HALL_UI_TEXT.served} (${countRows(servedRows, servedOrders.length)})`}</span><span className="text-xs font-medium text-slate-400">{servedExpanded ? HALL_UI_TEXT.hide : HALL_UI_TEXT.show}</span></button>{servedExpanded && renderHallRows(servedRows, "slate", true)}</div>}
+              {servedOrders.length > 0 && <div><button type="button" onClick={() => setServedExpanded((prev) => !prev)} className="mb-2 flex w-full items-center justify-between text-left"><span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 opacity-60">{`${HALL_UI_TEXT.served} (${countRows(servedRows, servedOrders.length)})`}</span><span className="text-xs font-medium text-slate-400">{servedExpanded ? HALL_UI_TEXT.hide : HALL_UI_TEXT.show}</span></button>{servedExpanded && <div className="opacity-60">{renderHallRows(servedRows, "slate", true)}</div>}</div>}
 
               {billData && billData.total > 0 && <div className={`rounded-xl border p-3 ${hasBillRequest ? "border-violet-300 bg-violet-50/80" : "border-slate-200 bg-slate-50"}`}><button type="button" onClick={() => setBillExpanded((prev) => !prev)} className="flex w-full items-start justify-between gap-3 text-left"><div className="min-w-0 flex-1"><div className="text-[11px] font-bold uppercase tracking-wider text-slate-600">{HALL_UI_TEXT.bill}</div><div className="mt-1 text-sm font-semibold text-slate-900">{`${HALL_UI_TEXT.total} ${formatHallMoney(billData.total)}`}</div>{!billExpanded && billData.remaining < billData.total && <div className="mt-1 text-xs text-slate-500">{`${HALL_UI_TEXT.remaining} ${formatHallMoney(billData.remaining)}`}</div>}</div>{billExpanded ? <ChevronUp className="w-4 h-4 text-slate-400 mt-1" /> : <ChevronDown className="w-4 h-4 text-slate-400 mt-1" />}</button>{billExpanded && <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">{billData.guests.map((guest, index) => <div key={`${guest.id}:${index}`} className="flex items-center justify-between gap-3 text-sm"><span className="text-slate-600">{guest.name}</span><span className="font-medium text-slate-900">{formatHallMoney(guest.total)}</span></div>)}<div className="border-t border-slate-200 pt-2 space-y-1 text-sm"><div className="flex items-center justify-between gap-3"><span className="text-slate-500">{HALL_UI_TEXT.paid}</span><span className="font-medium text-slate-700">{formatHallMoney(billData.paid)}</span></div><div className="flex items-center justify-between gap-3 font-semibold text-slate-900"><span>{HALL_UI_TEXT.remaining}</span><span>{formatHallMoney(billData.remaining)}</span></div></div></div>}</div>}
 
-              {onCloseTable && group.orders.length > 0 && <div className="pt-2 border-t border-slate-200"><button type="button" onClick={handleCloseTableClick} disabled={!!closeDisabledReason} className={`w-full min-h-[44px] flex items-center justify-center gap-2 font-medium text-sm rounded-lg border transition-all active:scale-[0.99] ${closeDisabledReason ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}><X className="w-4 h-4" />{HALL_UI_TEXT.closeTable}</button>{closeDisabledReason && <p className="text-[10px] text-slate-400 text-center mt-1">{closeDisabledReason}</p>}</div>}
+              {onCloseTable && group.orders.length > 0 && <div className="pt-2 border-t border-slate-200"><button type="button" onClick={handleCloseTableClick} disabled={!!closeDisabledReason} className={`w-full min-h-[44px] flex items-center justify-center gap-2 font-medium text-sm rounded-lg border transition-all active:scale-[0.99] ${closeDisabledReason ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}><X className="w-4 h-4" />{HALL_UI_TEXT.closeTable}</button>{closeDisabledReasons.length > 0 && <div className="mt-1 space-y-0.5">{closeDisabledReasons.map((reason, i) => <p key={i} className="text-[10px] text-slate-400 text-center">{reason}</p>)}</div>}</div>}
             </React.Fragment>
           ) : (
             <React.Fragment>
-              {newOrders.length > 0 && <div><div className="flex items-center justify-between mb-2"><p className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">{`\u041D\u043E\u0432\u044B\u0435 (${newOrders.length})`}</p><button type="button" onClick={() => handleOrdersAction(newOrders)} disabled={advanceMutation.isPending} className="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1 rounded min-h-[44px] active:scale-95 disabled:opacity-60">{'\u041F\u0440\u0438\u043D\u044F\u0442\u044C \u0432\u0441\u0435'}</button></div><div className="space-y-2">{newOrders.map(renderLegacyOrderCard)}</div></div>}
-              {readyOrders.length > 0 && <div><div className="flex items-center justify-between mb-2"><p className="text-[11px] font-bold text-green-600 uppercase tracking-wider">{`\u0413\u043E\u0442\u043E\u0432\u043E \u043A \u0432\u044B\u0434\u0430\u0447\u0435 (${readyOrders.length})`}</p><button type="button" onClick={() => handleOrdersAction(readyOrders)} disabled={advanceMutation.isPending} className="text-xs font-semibold text-green-600 bg-green-50 border border-green-200 px-3 py-1 rounded min-h-[44px] active:scale-95 disabled:opacity-60">{'\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0435'}</button></div><div className="space-y-2">{readyOrders.map(renderLegacyOrderCard)}</div></div>}
-              {inProgressOrders.length > 0 && <div><div className="flex items-center justify-between mb-2 cursor-pointer min-h-[44px]" onClick={() => setInProgressExpanded((prev) => !prev)}><p className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">{`\u0412 \u0440\u0430\u0431\u043E\u0442\u0435 (${inProgressOrders.length})`}</p><ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${inProgressExpanded ? "rotate-180" : ""}`} /></div>{inProgressExpanded && <div className="space-y-3">{subGroups.map(({ sid, orders, cfg }) => { const isSubExpanded = !!expandedSubGroups[sid]; const actionMeta = getOrderActionMeta(orders[0]); const subGroupLabel = sid === "__null__" ? '\u0412 \u0420\u0410\u0411\u041E\u0422\u0415' : cfg.label; if (subGroups.length === 1) return <div key={sid} className="space-y-2">{orders.map(renderLegacyOrderCard)}</div>; return <div key={sid}><div className="flex items-center justify-between mb-1.5 cursor-pointer min-h-[44px]" onClick={() => setExpandedSubGroups((prev) => ({ ...prev, [sid]: !prev[sid] }))}><div className="flex items-center gap-2"><ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isSubExpanded ? "rotate-180" : ""}`} /><span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">{`${subGroupLabel} (${orders.length})`}</span></div><button type="button" onClick={(event) => { event.stopPropagation(); handleOrdersAction(orders); }} disabled={advanceMutation.isPending} className="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded min-h-[36px] active:scale-95 disabled:opacity-60">{actionMeta.bulkLabel}</button></div>{isSubExpanded && <div className="space-y-2">{orders.map(renderLegacyOrderCard)}</div>}</div>; })}</div>}</div>}
+              {newOrders.length > 0 && <div><div className="flex items-center justify-between mb-2"><p className="text-[11px] font-bold text-blue-600 uppercase tracking-wider"><span className="bg-blue-50 rounded-md px-2 py-0.5">{`\u041D\u043E\u0432\u044B\u0435 (${newOrders.length})`}</span></p><button type="button" onClick={() => handleOrdersAction(newOrders)} disabled={advanceMutation.isPending} className="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1 rounded min-h-[44px] active:scale-95 disabled:opacity-60">{'\u041F\u0440\u0438\u043D\u044F\u0442\u044C \u0432\u0441\u0435'}</button></div><div className="space-y-2">{newOrders.map(renderLegacyOrderCard)}</div></div>}
+              {inProgressOrders.length > 0 && <div><div className="flex items-center justify-between mb-2 cursor-pointer min-h-[44px]" onClick={() => setInProgressExpanded((prev) => !prev)}><p className="text-[11px] font-bold text-amber-400 uppercase tracking-wider opacity-60">{`\u0412 \u0440\u0430\u0431\u043E\u0442\u0435 (${inProgressOrders.length})`}</p><ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${inProgressExpanded ? "rotate-180" : ""}`} /></div>{inProgressExpanded && <div className="space-y-3">{subGroups.map(({ sid, orders, cfg }) => { const isSubExpanded = !!expandedSubGroups[sid]; const actionMeta = getOrderActionMeta(orders[0]); const subGroupLabel = sid === "__null__" ? '\u0412 \u0420\u0410\u0411\u041E\u0422\u0415' : cfg.label; if (subGroups.length === 1) return <div key={sid} className="space-y-2">{orders.map(renderLegacyOrderCard)}</div>; return <div key={sid}><div className="flex items-center justify-between mb-1.5 cursor-pointer min-h-[44px]" onClick={() => setExpandedSubGroups((prev) => ({ ...prev, [sid]: !prev[sid] }))}><div className="flex items-center gap-2"><ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isSubExpanded ? "rotate-180" : ""}`} /><span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">{`${subGroupLabel} (${orders.length})`}</span></div><button type="button" onClick={(event) => { event.stopPropagation(); handleOrdersAction(orders); }} disabled={advanceMutation.isPending} className="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded min-h-[36px] active:scale-95 disabled:opacity-60">{actionMeta.bulkLabel}</button></div>{isSubExpanded && <div className="space-y-2">{orders.map(renderLegacyOrderCard)}</div>}</div>; })}</div>}</div>}
+              {readyOrders.length > 0 && <div><div className="flex items-center justify-between mb-2"><p className="text-[11px] font-bold text-green-600 uppercase tracking-wider"><span className="bg-green-50 rounded-md px-2 py-0.5">{`\u0413\u043E\u0442\u043E\u0432\u043E \u043A \u0432\u044B\u0434\u0430\u0447\u0435 (${readyOrders.length})`}</span></p><button type="button" onClick={() => handleOrdersAction(readyOrders)} disabled={advanceMutation.isPending} className="text-xs font-semibold text-green-600 bg-green-50 border border-green-200 px-3 py-1 rounded min-h-[44px] active:scale-95 disabled:opacity-60">{'\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0435'}</button></div><div className="space-y-2">{readyOrders.map(renderLegacyOrderCard)}</div></div>}
               {contactInfo && <div className="space-y-2 pt-2 border-t border-slate-200">{contactInfo.name && <div className="flex items-center gap-2 text-sm"><User className="w-4 h-4 text-slate-400" /><span className="text-slate-700">{contactInfo.name}</span></div>}{contactInfo.phone && <div className="flex items-center gap-2 text-sm"><Phone className="w-4 h-4 text-slate-400" /><a href={`tel:${contactInfo.phone}`} className="text-blue-600 underline">{contactInfo.phone}</a></div>}{contactInfo.address && <div className="flex items-center gap-2 text-sm"><MapPin className="w-4 h-4 text-slate-400" /><span className="text-slate-600">{contactInfo.address}</span></div>}</div>}
             </React.Fragment>
           )}
@@ -3307,12 +3367,12 @@ export default function StaffOrdersMobile() {
       if (createdAt < shiftCutoff) return false;
       
       // Existing status filter
-      return ["new", "in_progress"].includes(r.status);
+      return !["done", "cancelled"].includes(r.status);
     });
   }, [allRequests, isKitchen, shiftStartTime]);
 
   const updateRequestMutation = useMutation({
-    mutationFn: ({ id, status }) => base44.entities.ServiceRequest.update(id, { status }),
+    mutationFn: (payload) => { const { id, ...fields } = payload; return base44.entities.ServiceRequest.update(id, fields); },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["serviceRequests"] }),
     onError: (err) => {
       if (isRateLimitError(err)) {
@@ -4187,9 +4247,12 @@ export default function StaffOrdersMobile() {
                   tableMap={tableMap}
                   onCloseAllOrders={handleCloseAllOrders}
                   activeRequests={activeRequests}
-                  onCloseRequest={(reqId, status) => updateRequestMutation.mutate({ id: reqId, status: 'done' })}
+                  onCloseRequest={(reqId, newStatus, extraFields) => updateRequestMutation.mutate({ id: reqId, status: newStatus, ...extraFields })}
                   orderStages={sortedStages}
                   setUndoToast={setUndoToast}
+                  undoToast={undoToast}
+                  staffName={staffName}
+                  isRequestPending={updateRequestMutation.isPending}
                 />
               ))
             )}
@@ -4197,13 +4260,6 @@ export default function StaffOrdersMobile() {
           </React.Fragment>
         )}
       </div>
-
-      {undoToast && (
-        <div className="fixed bottom-4 left-4 right-4 z-50 flex items-center justify-between bg-slate-800 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
-          <span>{'\u0412\u044B\u0434\u0430\u043D \u0433\u043E\u0441\u0442\u044E'}</span>
-          <button onClick={handleUndoGlobal} className="ml-3 font-semibold text-amber-300 underline min-h-[44px] flex items-center">{'\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C'}</button>
-        </div>
-      )}
 
       {/* Modals */}
       <MyTablesModal

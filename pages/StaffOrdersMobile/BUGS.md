@@ -1,11 +1,68 @@
 # StaffOrdersMobile Bug Tracker
 
-**Page:** `pages/StaffOrdersMobile/260331-04 StaffOrdersMobile RELEASE.jsx`
-**Last updated:** 2026-04-01 (Chain 9ed3 — #219 batch undo toast + #220 ВЫДАНО section)
+**Page:** `pages/StaffOrdersMobile/staffordersmobile.jsx`
+**Last updated:** 2026-04-06 (Chain c05c — SOM Section Rework: lifecycle order, active/passive, dual metric, 2-step requests, staff pill, inline toast, close-blocker, bulk requests)
 
 ---
 
 ## Fixed Bugs
+
+### SOM-KS1-P0-01 (P0) -- activeRequests filter excludes 'accepted' status
+- **Function:** activeRequests useMemo filter (line ~3310)
+- **Root cause:** Filter only included `["new", "in_progress"]` — accepted requests vanished from UI, making two-step flow impossible.
+- **Fix:** Changed to `!["done", "cancelled"].includes(r.status)` — now includes accepted requests.
+- **Chain:** staffordersmobile-260406-195641-c05c
+- **Status:** 🟡 Fixed (pending test)
+
+### SOM-KS1-P0-02 (P0) -- updateRequestMutation only passes status, loses assignee
+- **Function:** updateRequestMutation mutationFn (line ~3315)
+- **Root cause:** Destructured only `{id, status}` — Accept step needed `assignee` + `assigned_at` fields.
+- **Fix:** Changed to spread all payload fields to update call.
+- **Chain:** staffordersmobile-260406-195641-c05c
+- **Status:** 🟡 Fixed (pending test)
+
+### SOM-KS1-P0-03 (P0) -- onCloseRequest hardcodes 'done', ignores status parameter
+- **Function:** onCloseRequest prop (line ~4190)
+- **Root cause:** Status param from child was ignored — always sent 'done'. Accept button would incorrectly close request instead of accepting.
+- **Fix:** Changed to pass `newStatus` and `extraFields` from child component.
+- **Chain:** staffordersmobile-260406-195641-c05c
+- **Status:** 🟡 Fixed (pending test)
+
+### SOM-KS1-01 (P1) -- Sections in wrong lifecycle order (Ready before InProgress)
+- **Root cause:** Ready rendered before InProgress in all 3+1 blocks. Lifecycle should be: New → InProgress → Ready → Served.
+- **Fix:** Swapped InProgress before Ready in compact, expanded, compact-table, and legacy blocks.
+- **Chain:** staffordersmobile-260406-195641-c05c
+- **Status:** 🟡 Fixed (pending test)
+
+### SOM-KS1-02 (P1) -- No visual distinction between active/passive sections
+- **Fix:** Active headers (Requests, New, Ready) get bg pill; passive (InProgress, Served) get opacity-60.
+- **Chain:** staffordersmobile-260406-195641-c05c
+- **Status:** 🟡 Fixed (pending test)
+
+### SOM-KS1-03 (P1) -- Section headers show single count, need dual metric
+- **Fix:** Added `pluralRu` helper. Headers now show "N гость · M блюд" format in all blocks.
+- **Chain:** staffordersmobile-260406-195641-c05c
+- **Status:** 🟡 Fixed (pending test)
+
+### SOM-KS1-04 (P1) -- Request buttons: single "Выполнено" instead of two-step flow
+- **Fix:** Conditional render: new requests → blue "Принять" (sets accepted + assignee), accepted → green "Выдать" (sets done) + staff pill. All 3 render blocks updated.
+- **Chain:** staffordersmobile-260406-195641-c05c
+- **Status:** 🟡 Fixed (pending test)
+
+### SOM-KS1-05 (P1) -- Close-table shows only first blocker, not all
+- **Fix:** Replaced single ternary with array-based closeDisabledReasons. All blockers shown as list.
+- **Chain:** staffordersmobile-260406-195641-c05c
+- **Status:** 🟡 Fixed (pending test)
+
+### SOM-KS1-06 (P1) -- No bulk request buttons
+- **Fix:** Added "Принять все (N)" / "Выдать все (N)" buttons based on request status homogeneity.
+- **Chain:** staffordersmobile-260406-195641-c05c
+- **Status:** 🟡 Fixed (pending test)
+
+### SOM-KS1-07 (P1) -- Undo toast: global fixed position instead of inline
+- **Fix:** Toast now renders inline under acted order row in renderHallRows. Timeout changed 5s→3s. Added orderId + label to toast object. Global toast removed.
+- **Chain:** staffordersmobile-260406-195641-c05c
+- **Status:** 🟡 Fixed (pending test)
 
 ### SOM-S213-01 (P1) -- Batch "Выдать всё" button does not trigger undo toast
 - **Function:** OrderGroupCard, Section 2 batch button onClick handler
