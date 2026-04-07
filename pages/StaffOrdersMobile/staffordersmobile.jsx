@@ -1745,6 +1745,23 @@ function OrderGroupCard({
   const [servedExpanded, setServedExpanded] = useState(false);
   const [ownerHintVisible, setOwnerHintVisible] = useState(false);
   const ownerHintTimerRef = useRef(null);
+  const requestsSectionRef = useRef(null);
+  const newSectionRef = useRef(null);
+  const inProgressSectionRef = useRef(null);
+  const readySectionRef = useRef(null);
+
+  const scrollToSection = useCallback((kind) => {
+    const refMap = {
+      requests: requestsSectionRef,
+      new: newSectionRef,
+      inProgress: inProgressSectionRef,
+      ready: readySectionRef,
+    };
+    const ref = refMap[kind];
+    if (ref?.current) {
+      ref.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, []);
 
   const servedItemResults = useQueries({
     queries: servedOrders.map((order) => ({
@@ -1859,7 +1876,7 @@ function OrderGroupCard({
     return payload;
   }, [effectiveUserId, getStatusConfig]);
 
-  const startUndoWindow = useCallback((orders) => {
+  const startUndoWindow = useCallback((orders, rowId) => {
     if (!setUndoToast || orders.length === 0) return;
     const snapshots = orders.map((order) => ({ orderId: order.id, prevStatus: order.status, prevStageId: getLinkId(order.stage_id) }));
     setUndoToast((prev) => {
@@ -1869,6 +1886,7 @@ function OrderGroupCard({
         snapshots,
         timerId,
         orderId: orders[orders.length - 1].id,
+        rowId,
         label: HALL_UI_TEXT.undoLabel,
         onUndo: () => {
           snapshots.forEach(({ orderId, prevStatus, prevStageId }) => {
@@ -1894,7 +1912,7 @@ function OrderGroupCard({
     };
   }, [getStatusConfig]);
 
-  const handleOrdersAction = useCallback((orders) => {
+  const handleOrdersAction = useCallback((orders, rowId) => {
     if (advanceMutation.isPending) return;
     const actionable = orders.map((order) => ({ order, payload: buildAdvancePayload(order), meta: getOrderActionMeta(order) })).filter((entry) => entry.payload);
     if (actionable.length === 0) return;
@@ -1902,9 +1920,9 @@ function OrderGroupCard({
       if (onClearNotified) onClearNotified(order.id);
       advanceMutation.mutate({ id: order.id, payload });
     });
-    if (actionable.every(({ meta }) => meta.willServe)) startUndoWindow(actionable.map(({ order }) => order));
+    if (actionable.every(({ meta }) => meta.willServe)) startUndoWindow(actionable.map(({ order }) => order), rowId);
   }, [advanceMutation, buildAdvancePayload, getOrderActionMeta, onClearNotified, startUndoWindow]);
-  const handleSingleAction = useCallback((order) => handleOrdersAction([order]), [handleOrdersAction]);
+  const handleSingleAction = useCallback((order, rowId) => handleOrdersAction([order], rowId), [handleOrdersAction]);
 
   const guestName = useCallback((order) => {
     const guestId = getLinkId(order.guest);
@@ -2008,6 +2026,12 @@ function OrderGroupCard({
     return reasons;
   }, [group.type, tableRequests.length, newOrders.length, inProgressOrders.length, readyOrders.length]);
   const closeDisabledReason = closeDisabledReasons[0] || null;
+  const reasonToKind = useMemo(() => ({
+    [HALL_UI_TEXT.requestsBlocker]: "requests",
+    [HALL_UI_TEXT.newBlocker]: "new",
+    [HALL_UI_TEXT.inProgressBlocker]: "inProgress",
+    [HALL_UI_TEXT.readyBlocker]: "ready",
+  }), []);
   const handleCloseTableClick = useCallback(() => {
     const sessionId = group.orders.map((order) => getLinkId(order.table_session)).find(Boolean);
     if (onCloseTable && sessionId) {
@@ -2033,15 +2057,20 @@ function OrderGroupCard({
   const renderHallSummaryItem = useCallback((item) => {
     const Icon = item.icon;
     return (
-      <span key={item.key} className={`inline-flex items-center gap-1.5 text-xs font-medium ${getSummaryTone(item.kind, item.ageMin)}`}>
+      <button
+        type="button"
+        key={item.key}
+        onClick={(e) => { e.stopPropagation(); scrollToSection(item.kind); }}
+        className={`inline-flex items-center gap-1.5 text-xs font-medium cursor-pointer active:opacity-70 ${getSummaryTone(item.kind, item.ageMin)}`}
+      >
         {Icon && <Icon className="w-3.5 h-3.5 shrink-0" />}
         {item.label && <span>{item.label}</span>}
         <span className="font-semibold text-slate-900">{item.count}</span>
         <span className="text-slate-300">{'\u00B7'}</span>
         <span>{formatCompactMinutes(item.ageMin)}</span>
-      </span>
+      </button>
     );
-  }, [getSummaryTone]);
+  }, [getSummaryTone, scrollToSection]);
 
   const renderHallRows = useCallback((rows, tone = "slate", readOnly = false) => {
     const palette = {
@@ -2058,12 +2087,15 @@ function OrderGroupCard({
       <div className="space-y-1.5">
         {rows.map((row, idx) => {
           const isLastOfOrder = !rows[idx + 1] || rows[idx + 1].order?.id !== row.order?.id;
-          const showToast = toastOrderId && row.order?.id === toastOrderId && isLastOfOrder && !renderedToast.has(toastOrderId);
+          const showToast = toastOrderId && row.order?.id === toastOrderId && (undoToast.rowId ? row.id === undoToast.rowId : isLastOfOrder) && !renderedToast.has(toastOrderId);
           if (showToast) renderedToast.add(toastOrderId);
+          const ageMin = getAgeMinutes(row.order?.created_date);
+          const overdueThreshold = overdueMinutes || 10;
+          const urgencyClass = ageMin >= overdueThreshold + 5 ? "border-l-4 border-l-red-500" : ageMin >= overdueThreshold ? "border-l-4 border-l-amber-400" : "";
 
           return (
             <React.Fragment key={row.id}>
-              <div className={`rounded-lg border ${palette.border} ${palette.bg} px-3 py-2`}>
+              <div className={`rounded-lg border ${palette.border} ${palette.bg} px-3 py-2 ${urgencyClass}`}>
                 <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 min-w-0">
@@ -2074,7 +2106,7 @@ function OrderGroupCard({
                   {readOnly ? (
                     <span className="shrink-0 text-xs text-slate-400">{row.timeLabel}</span>
                   ) : row.actionLabel ? (
-                    <button type="button" onClick={() => handleSingleAction(row.order)} disabled={advanceMutation.isPending || row.loading} className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold min-h-[36px] active:scale-[0.98] disabled:opacity-60 ${row.willServe ? "border-green-200 bg-white text-green-700" : row.actionLabel === HALL_UI_TEXT.accept ? "border-blue-200 bg-white text-blue-700" : palette.button}`}>
+                    <button type="button" onClick={() => handleSingleAction(row.order, row.id)} disabled={advanceMutation.isPending || row.loading} className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold min-h-[36px] active:scale-[0.98] disabled:opacity-60 ${row.willServe ? "border-green-200 bg-white text-green-700" : row.actionLabel === HALL_UI_TEXT.accept ? "border-blue-200 bg-white text-blue-700" : palette.button}`}>
                       {advanceMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : row.actionLabel}
                     </button>
                   ) : null}
@@ -2177,33 +2209,19 @@ function OrderGroupCard({
         <div className="border-t border-slate-200 px-4 py-3 space-y-4">
           {group.type === "table" ? (
             <React.Fragment>
-              <div className="rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {ownershipState === "mine" ? <Star className="w-4 h-4 fill-yellow-400 text-yellow-400 shrink-0" /> : ownershipState === "other" ? <button type="button" onClick={showOtherTableHint} className="shrink-0 rounded-full p-0.5 -m-0.5" aria-label={HALL_UI_TEXT.otherTableTitle}><Lock className="w-4 h-4 text-slate-400 shrink-0" /></button> : <Star className="w-4 h-4 text-slate-300 shrink-0" />}
-                    <span className="inline-flex min-w-[2rem] items-center justify-center rounded-lg bg-slate-900 px-2.5 py-1 text-sm font-bold text-white">{compactTableLabel}</span>
-                    {tableData?.zone_name && <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 border border-slate-200">{tableData.zone_name}</span>}
-                  </div>
-                  <button type="button" onClick={onToggleExpand} className="text-xs font-semibold text-slate-500 min-h-[36px]">{HALL_UI_TEXT.collapse}</button>
-                </div>
-                {ownerHintVisible && <div className="rounded-lg bg-slate-900 px-3 py-2 text-white"><div className="text-xs font-semibold">{HALL_UI_TEXT.otherTableTitle}</div><div className="text-[11px] text-slate-200">{HALL_UI_TEXT.otherTableHint}</div></div>}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">{hallSummaryItems.length > 0 ? hallSummaryItems.map(renderHallSummaryItem) : <span className="text-xs text-slate-400">{HALL_UI_TEXT.noActions}</span>}</div>
-                {billData && billData.total > 0 && <div className="text-xs font-semibold text-slate-700">{`${HALL_UI_TEXT.bill} \u00B7 ${HALL_UI_TEXT.total} ${formatHallMoney(billData.total)}`}</div>}
-              </div>
+              {tableRequests.length > 0 && <div ref={requestsSectionRef}><div className="mb-2 flex items-center justify-between gap-3"><div className="text-[11px] font-bold uppercase tracking-wider text-violet-600"><span className="bg-violet-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.requests} (${tableRequests.length})`}</span></div>{tableRequests.length > 1 && (() => { const allNew = tableRequests.every(r => !r.status || r.status === 'new' || r.status === 'open'); const allAccepted = tableRequests.every(r => r.status === 'accepted'); if (allNew) return <button type="button" onClick={() => tableRequests.forEach(r => onCloseRequest(r.id, 'accepted', { assignee: effectiveUserId, assigned_at: new Date().toISOString() }))} disabled={isRequestPending} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{`${HALL_UI_TEXT.acceptAllRequests} (${tableRequests.length})`}</button>; if (allAccepted) return <button type="button" onClick={() => tableRequests.forEach(r => onCloseRequest(r.id, 'done'))} disabled={isRequestPending} className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{`${HALL_UI_TEXT.serveAllRequests} (${tableRequests.length})`}</button>; return null; })()}</div><div className="space-y-1.5">{tableRequests.map((request) => { const ageMin = getAgeMinutes(request.created_date); const label = REQUEST_TYPE_LABELS[request.request_type] || request.request_type; const isAccepted = request.status === 'accepted'; const isAssignedToMe = request.assignee === effectiveUserId; return <div key={request.id} className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2"><div className="flex items-center gap-3"><div className="min-w-0 flex-1"><div className="flex items-center gap-2 min-w-0"><span className="truncate text-sm font-medium text-slate-900">{label}</span><span className="text-xs text-violet-500 shrink-0">{formatCompactMinutes(ageMin)}</span>{isAccepted && isAssignedToMe && staffName && <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">{staffName}</span>}</div>{request.comment && <div className="mt-0.5 text-xs text-slate-500 truncate">{request.comment}</div>}</div>{onCloseRequest && (isAccepted ? <button type="button" onClick={() => onCloseRequest(request.id, "done")} disabled={isRequestPending} className="shrink-0 rounded-lg border border-green-200 bg-white px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.serveRequest}</button> : <button type="button" onClick={() => onCloseRequest(request.id, "accepted", { assignee: effectiveUserId, assigned_at: new Date().toISOString() })} disabled={isRequestPending} className="shrink-0 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.acceptRequest}</button>)}</div></div>; })}</div></div>}
 
-              {tableRequests.length > 0 && <div><div className="mb-2 flex items-center justify-between gap-3"><div className="text-[11px] font-bold uppercase tracking-wider text-violet-600"><span className="bg-violet-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.requests} (${tableRequests.length})`}</span></div>{tableRequests.length > 1 && (() => { const allNew = tableRequests.every(r => !r.status || r.status === 'new' || r.status === 'open'); const allAccepted = tableRequests.every(r => r.status === 'accepted'); if (allNew) return <button type="button" onClick={() => tableRequests.forEach(r => onCloseRequest(r.id, 'accepted', { assignee: effectiveUserId, assigned_at: new Date().toISOString() }))} disabled={isRequestPending} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{`${HALL_UI_TEXT.acceptAllRequests} (${tableRequests.length})`}</button>; if (allAccepted) return <button type="button" onClick={() => tableRequests.forEach(r => onCloseRequest(r.id, 'done'))} disabled={isRequestPending} className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{`${HALL_UI_TEXT.serveAllRequests} (${tableRequests.length})`}</button>; return null; })()}</div><div className="space-y-1.5">{tableRequests.map((request) => { const ageMin = getAgeMinutes(request.created_date); const label = REQUEST_TYPE_LABELS[request.request_type] || request.request_type; const isAccepted = request.status === 'accepted'; const isAssignedToMe = request.assignee === effectiveUserId; return <div key={request.id} className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2"><div className="flex items-center gap-3"><div className="min-w-0 flex-1"><div className="flex items-center gap-2 min-w-0"><span className="truncate text-sm font-medium text-slate-900">{label}</span><span className="text-xs text-violet-500 shrink-0">{formatCompactMinutes(ageMin)}</span>{isAccepted && isAssignedToMe && staffName && <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">{staffName}</span>}</div>{request.comment && <div className="mt-0.5 text-xs text-slate-500 truncate">{request.comment}</div>}</div>{onCloseRequest && (isAccepted ? <button type="button" onClick={() => onCloseRequest(request.id, "done")} disabled={isRequestPending} className="shrink-0 rounded-lg border border-green-200 bg-white px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.serveRequest}</button> : <button type="button" onClick={() => onCloseRequest(request.id, "accepted", { assignee: effectiveUserId, assigned_at: new Date().toISOString() })} disabled={isRequestPending} className="shrink-0 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.acceptRequest}</button>)}</div></div>; })}</div></div>}
+              {newOrders.length > 0 && <div ref={newSectionRef}><div className="flex items-center justify-between gap-3 mb-2"><div className="text-[11px] font-bold uppercase tracking-wider text-blue-600"><span className="bg-blue-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.new} (${newOrders.length} ${pluralRu(newOrders.length, HALL_UI_TEXT.guests + '\u044C', HALL_UI_TEXT.guests + '\u044F', HALL_UI_TEXT.guests + '\u0435\u0439')} \u00B7 ${countRows(newRows, newOrders.length)} ${pluralRu(countRows(newRows, newOrders.length), HALL_UI_TEXT.dishes + '\u043E', HALL_UI_TEXT.dishes + '\u0430', HALL_UI_TEXT.dishes)})`}</span></div><button type="button" onClick={() => handleOrdersAction(newOrders)} disabled={advanceMutation.isPending} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{getOrderActionMeta(newOrders[0]).willServe ? HALL_UI_TEXT.serveAll : HALL_UI_TEXT.acceptAll}</button></div>{renderHallRows(newRows, "blue")}</div>}
 
-              {newOrders.length > 0 && <div><div className="flex items-center justify-between gap-3 mb-2"><div className="text-[11px] font-bold uppercase tracking-wider text-blue-600"><span className="bg-blue-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.new} (${newOrders.length} ${pluralRu(newOrders.length, HALL_UI_TEXT.guests + '\u044C', HALL_UI_TEXT.guests + '\u044F', HALL_UI_TEXT.guests + '\u0435\u0439')} \u00B7 ${countRows(newRows, newOrders.length)} ${pluralRu(countRows(newRows, newOrders.length), HALL_UI_TEXT.dishes + '\u043E', HALL_UI_TEXT.dishes + '\u0430', HALL_UI_TEXT.dishes)})`}</span></div><button type="button" onClick={() => handleOrdersAction(newOrders)} disabled={advanceMutation.isPending} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{getOrderActionMeta(newOrders[0]).willServe ? HALL_UI_TEXT.serveAll : HALL_UI_TEXT.acceptAll}</button></div>{renderHallRows(newRows, "blue")}</div>}
+              {inProgressSections.length > 0 && <div ref={inProgressSectionRef}><button type="button" onClick={() => setInProgressExpanded((prev) => !prev)} className="mb-2 flex w-full items-center justify-between text-left"><span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 opacity-60">{`${HALL_UI_TEXT.inProgress} (${inProgressOrders.length} ${pluralRu(inProgressOrders.length, HALL_UI_TEXT.guests + '\u044C', HALL_UI_TEXT.guests + '\u044F', HALL_UI_TEXT.guests + '\u0435\u0439')} \u00B7 ${inProgressSections.reduce((sum, section) => sum + section.rowCount, 0)} ${pluralRu(inProgressSections.reduce((sum, section) => sum + section.rowCount, 0), HALL_UI_TEXT.dishes + '\u043E', HALL_UI_TEXT.dishes + '\u0430', HALL_UI_TEXT.dishes)})`}</span><ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${inProgressExpanded ? "rotate-180" : ""}`} /></button>{inProgressExpanded && <div className="space-y-3 opacity-60">{inProgressSections.map((section) => { const isSubExpanded = !!expandedSubGroups[section.sid]; return <div key={section.sid}><div className="mb-1.5 flex items-center justify-between gap-3 cursor-pointer" onClick={() => setExpandedSubGroups((prev) => ({ ...prev, [section.sid]: !prev[section.sid] }))}><div className="flex items-center gap-2 min-w-0"><ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isSubExpanded ? "rotate-180" : ""}`} /><span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 opacity-60">{`${section.label} (${section.rowCount})`}</span></div><button type="button" onClick={(event) => { event.stopPropagation(); handleOrdersAction(section.orders); }} disabled={advanceMutation.isPending} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{section.bulkLabel}</button></div>{isSubExpanded && renderHallRows(section.rows, "amber")}</div>; })}</div>}</div>}
 
-              {inProgressSections.length > 0 && <div><button type="button" onClick={() => setInProgressExpanded((prev) => !prev)} className="mb-2 flex w-full items-center justify-between text-left"><span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 opacity-60">{`${HALL_UI_TEXT.inProgress} (${inProgressOrders.length} ${pluralRu(inProgressOrders.length, HALL_UI_TEXT.guests + '\u044C', HALL_UI_TEXT.guests + '\u044F', HALL_UI_TEXT.guests + '\u0435\u0439')} \u00B7 ${inProgressSections.reduce((sum, section) => sum + section.rowCount, 0)} ${pluralRu(inProgressSections.reduce((sum, section) => sum + section.rowCount, 0), HALL_UI_TEXT.dishes + '\u043E', HALL_UI_TEXT.dishes + '\u0430', HALL_UI_TEXT.dishes)})`}</span><ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${inProgressExpanded ? "rotate-180" : ""}`} /></button>{inProgressExpanded && <div className="space-y-3 opacity-60">{inProgressSections.map((section) => { const isSubExpanded = !!expandedSubGroups[section.sid]; return <div key={section.sid}><div className="mb-1.5 flex items-center justify-between gap-3 cursor-pointer" onClick={() => setExpandedSubGroups((prev) => ({ ...prev, [section.sid]: !prev[section.sid] }))}><div className="flex items-center gap-2 min-w-0"><ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isSubExpanded ? "rotate-180" : ""}`} /><span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 opacity-60">{`${section.label} (${section.rowCount})`}</span></div><button type="button" onClick={(event) => { event.stopPropagation(); handleOrdersAction(section.orders); }} disabled={advanceMutation.isPending} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{section.bulkLabel}</button></div>{isSubExpanded && renderHallRows(section.rows, "amber")}</div>; })}</div>}</div>}
-
-              {readyOrders.length > 0 && <div><div className="flex items-center justify-between gap-3 mb-2"><div className="text-[11px] font-bold uppercase tracking-wider text-green-600"><span className="bg-green-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.ready} (${readyOrders.length} ${pluralRu(readyOrders.length, HALL_UI_TEXT.guests + '\u044C', HALL_UI_TEXT.guests + '\u044F', HALL_UI_TEXT.guests + '\u0435\u0439')} \u00B7 ${countRows(readyRows, readyOrders.length)} ${pluralRu(countRows(readyRows, readyOrders.length), HALL_UI_TEXT.dishes + '\u043E', HALL_UI_TEXT.dishes + '\u0430', HALL_UI_TEXT.dishes)})`}</span></div><button type="button" onClick={() => handleOrdersAction(readyOrders)} disabled={advanceMutation.isPending} className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.serveAll}</button></div>{renderHallRows(readyRows, "green")}</div>}
+              {readyOrders.length > 0 && <div ref={readySectionRef}><div className="flex items-center justify-between gap-3 mb-2"><div className="text-[11px] font-bold uppercase tracking-wider text-green-600"><span className="bg-green-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.ready} (${readyOrders.length} ${pluralRu(readyOrders.length, HALL_UI_TEXT.guests + '\u044C', HALL_UI_TEXT.guests + '\u044F', HALL_UI_TEXT.guests + '\u0435\u0439')} \u00B7 ${countRows(readyRows, readyOrders.length)} ${pluralRu(countRows(readyRows, readyOrders.length), HALL_UI_TEXT.dishes + '\u043E', HALL_UI_TEXT.dishes + '\u0430', HALL_UI_TEXT.dishes)})`}</span></div><button type="button" onClick={() => handleOrdersAction(readyOrders)} disabled={advanceMutation.isPending} className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.serveAll}</button></div>{renderHallRows(readyRows, "green")}</div>}
 
               {servedOrders.length > 0 && <div><button type="button" onClick={() => setServedExpanded((prev) => !prev)} className="mb-2 flex w-full items-center justify-between text-left"><span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 opacity-60">{`${HALL_UI_TEXT.served} (${countRows(servedRows, servedOrders.length)})`}</span><span className="text-xs font-medium text-slate-400">{servedExpanded ? HALL_UI_TEXT.hide : HALL_UI_TEXT.show}</span></button>{servedExpanded && <div className="opacity-60">{renderHallRows(servedRows, "slate", true)}</div>}</div>}
 
               {billData && billData.total > 0 && <div className={`rounded-xl border p-3 ${hasBillRequest ? "border-violet-300 bg-violet-50/80" : "border-slate-200 bg-slate-50"}`}><button type="button" onClick={() => setBillExpanded((prev) => !prev)} className="flex w-full items-start justify-between gap-3 text-left"><div className="min-w-0 flex-1"><div className="text-[11px] font-bold uppercase tracking-wider text-slate-600">{HALL_UI_TEXT.bill}</div><div className="mt-1 text-sm font-semibold text-slate-900">{`${HALL_UI_TEXT.total} ${formatHallMoney(billData.total)}`}</div>{!billExpanded && billData.remaining < billData.total && <div className="mt-1 text-xs text-slate-500">{`${HALL_UI_TEXT.remaining} ${formatHallMoney(billData.remaining)}`}</div>}</div>{billExpanded ? <ChevronUp className="w-4 h-4 text-slate-400 mt-1" /> : <ChevronDown className="w-4 h-4 text-slate-400 mt-1" />}</button>{billExpanded && <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">{billData.guests.map((guest, index) => <div key={`${guest.id}:${index}`} className="flex items-center justify-between gap-3 text-sm"><span className="text-slate-600">{guest.name}</span><span className="font-medium text-slate-900">{formatHallMoney(guest.total)}</span></div>)}<div className="border-t border-slate-200 pt-2 space-y-1 text-sm"><div className="flex items-center justify-between gap-3"><span className="text-slate-500">{HALL_UI_TEXT.paid}</span><span className="font-medium text-slate-700">{formatHallMoney(billData.paid)}</span></div><div className="flex items-center justify-between gap-3 font-semibold text-slate-900"><span>{HALL_UI_TEXT.remaining}</span><span>{formatHallMoney(billData.remaining)}</span></div></div></div>}</div>}
 
-              {onCloseTable && group.orders.length > 0 && <div className="pt-2 border-t border-slate-200"><button type="button" onClick={handleCloseTableClick} disabled={!!closeDisabledReason} className={`w-full min-h-[44px] flex items-center justify-center gap-2 font-medium text-sm rounded-lg border transition-all active:scale-[0.99] ${closeDisabledReason ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}><X className="w-4 h-4" />{HALL_UI_TEXT.closeTable}</button>{closeDisabledReasons.length > 0 && <div className="mt-1 space-y-0.5">{closeDisabledReasons.map((reason, i) => <p key={i} className="text-[10px] text-slate-400 text-center">{reason}</p>)}</div>}</div>}
+              {onCloseTable && group.orders.length > 0 && <div className="pt-2 border-t border-slate-200"><button type="button" onClick={handleCloseTableClick} disabled={!!closeDisabledReason} className={`w-full min-h-[44px] flex items-center justify-center gap-2 font-medium text-sm rounded-lg border transition-all active:scale-[0.99] ${closeDisabledReason ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}><X className="w-4 h-4" />{HALL_UI_TEXT.closeTable}</button>{closeDisabledReasons.length > 0 && <div className="mt-1 space-y-0.5">{closeDisabledReasons.map((reason, i) => { const kind = reasonToKind[reason]; if (!kind) return <p key={i} className="text-[10px] text-slate-400 text-center">{reason}</p>; return <button key={i} type="button" onClick={() => scrollToSection(kind)} className="w-full text-[10px] text-slate-400 text-center min-h-[28px] active:text-slate-600">{reason} ›</button>; })}</div>}</div>}
             </React.Fragment>
           ) : (
             <React.Fragment>
