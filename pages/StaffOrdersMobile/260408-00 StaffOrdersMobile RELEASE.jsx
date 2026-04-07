@@ -2009,6 +2009,12 @@ function OrderGroupCard({
   const readySummary = readyOrders.length > 0 ? { key: "ready", kind: "ready", icon: null, label: HALL_UI_TEXT.readyShort, count: countRows(readyRows, readyOrders.length), ageMin: getOldestAgeMinutes(readyOrders, (order) => order.stage_entered_at || order.created_date) || 0 } : null;
   const hallSummaryItems = [requestSummary, newSummary, readySummary].filter(Boolean);
 
+  const inProgressSections = useMemo(() => subGroups.map(({ sid, orders, cfg }) => {
+    const rows = buildHallRows(orders);
+    const actionMeta = getOrderActionMeta(orders[0]);
+    return { sid, orders, rows, rowCount: countRows(rows, orders.length), label: sid === "__null__" ? HALL_UI_TEXT.inProgress : cfg.label, bulkLabel: actionMeta.bulkLabel };
+  }).filter((section) => section.orders.length > 0), [buildHallRows, countRows, getOrderActionMeta, subGroups]);
+
   const jumpChips = [
     tableRequests.length > 0 && { label: HALL_UI_TEXT.requestsShort, count: tableRequests.length, kind: "requests", tone: "red" },
     newOrders.length > 0 && { label: HALL_UI_TEXT.newShort, count: countRows(newRows, newOrders.length), kind: "new", tone: "blue" },
@@ -2016,12 +2022,6 @@ function OrderGroupCard({
     readyOrders.length > 0 && { label: HALL_UI_TEXT.readyShort, count: countRows(readyRows, readyOrders.length), kind: "ready", tone: "green" },
     billData && billData.total > 0 && { label: HALL_UI_TEXT.bill, count: formatHallMoney(billData.total), kind: "bill", tone: "gray" },
   ].filter(Boolean);
-
-  const inProgressSections = useMemo(() => subGroups.map(({ sid, orders, cfg }) => {
-    const rows = buildHallRows(orders);
-    const actionMeta = getOrderActionMeta(orders[0]);
-    return { sid, orders, rows, rowCount: countRows(rows, orders.length), label: sid === "__null__" ? HALL_UI_TEXT.inProgress : cfg.label, bulkLabel: actionMeta.bulkLabel };
-  }).filter((section) => section.orders.length > 0), [buildHallRows, countRows, getOrderActionMeta, subGroups]);
 
   const legacySummaryLines = useMemo(() => {
     const lines = [];
