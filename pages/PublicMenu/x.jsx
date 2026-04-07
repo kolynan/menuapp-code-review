@@ -3705,48 +3705,89 @@ export default function X() {
       // Get start stage for this order type
       const startStage = getStartStage(orderStages, orderMode);
 
-      // Generate order number (for staff, not shown to guest)
-      const { orderNumber, updatedCounters } = getNextOrderNumber(partner, 'hall');
+      // Save table selection BEFORE order creation loop
+      if (partner?.id && currentTableId) saveTableSelection(partner.id, currentTableId);
 
-      const orderData = {
+      // Split-order: create N Orders (1 per cart line) instead of 1 Order + N OrderItems
+      const cartSubtotal = cartTotalAmount; // use same rounded value as discount computation
+      const totalDiscount = discountAmount + pointsDiscountAmount;
+
+      // Base orderData — shared fields (per-item fields added in loop)
+      const baseOrderData = {
         partner: partner.id,
         order_type: 'hall',
         status: "new",
         stage_id: startStage?.id || null,
         payment_status: "unpaid",
-        total_amount: finalTotal,
         comment: comment || undefined,
         client_phone: clientPhone || undefined,
         client_email: customerEmail && customerEmail.trim() ? customerEmail.trim().toLowerCase() : undefined,
-        public_token: Math.random().toString(36).substring(2, 10),
         table: currentTableId,
         table_session: validatedSession?.id ?? null,
         guest: guestToUse?.id || null,
-        order_number: orderNumber,
         loyalty_account: loyaltyAccountToUse?.id || null,
         points_redeemed: redeemedPoints || 0,
-        discount_amount: discountAmount + pointsDiscountAmount,
       };
 
-      if (partner?.id && orderData.table) saveTableSelection(partner.id, orderData.table);
+      // Loop: create N Orders, accumulate order numbers
+      const createdOrders = [];
+      let currentPartnerState = { ...partner };
+      let accumulatedDiscount = 0;
 
-      const order = await base44.entities.Order.create(orderData);
-      let orderCreated = true;
+      for (let idx = 0; idx < cart.length; idx++) {
+        const item = cart[idx];
+        const itemGross = Math.round(item.price * item.quantity * 100) / 100;
 
-      // FIX P0: Create order items FIRST â€" commit point before loyalty side effects
-      const newItems = cart.map((item) => ({
-        order: order.id,
-        dish: item.dishId,
-        dish_name: item.name,
-        dish_price: item.price,
-        quantity: item.quantity,
-        line_total: Math.round(item.price * item.quantity * 100) / 100,
-        split_type: splitType,
-      }));
+        // Proportional discount; last item absorbs rounding remainder
+        let itemDiscount;
+        if (cartSubtotal <= 0) {
+          itemDiscount = 0;
+        } else if (idx < cart.length - 1) {
+          itemDiscount = parseFloat((totalDiscount * (itemGross / cartSubtotal)).toFixed(2));
+        } else {
+          itemDiscount = parseFloat((totalDiscount - accumulatedDiscount).toFixed(2));
+        }
+        // Clamp: itemTotal must not go below 0
+        const itemTotal = Math.max(0, parseFloat((itemGross - itemDiscount).toFixed(2)));
+        accumulatedDiscount += itemDiscount;
 
-      await base44.entities.OrderItem.bulkCreate(newItems);
+        // Sequential order number (accumulate state across loop)
+        const { orderNumber: itemOrderNumber, updatedCounters: itemCounters } =
+          getNextOrderNumber(currentPartnerState, 'hall');
+        currentPartnerState = { ...currentPartnerState, ...itemCounters };
 
-      // Post-create side effects â€" best-effort after items exist
+        const itemOrderData = {
+          ...baseOrderData,
+          total_amount: itemTotal,
+          discount_amount: itemDiscount,
+          order_number: itemOrderNumber,
+          public_token: Math.random().toString(36).substring(2, 10),
+        };
+
+        const createdOrder = await base44.entities.Order.create(itemOrderData);
+        createdOrders.push(createdOrder);
+
+        await base44.entities.OrderItem.create({
+          order: createdOrder.id,
+          dish: item.dishId,
+          dish_name: item.name,
+          dish_price: item.price,
+          quantity: item.quantity,
+          line_total: itemGross,
+          split_type: splitType,
+        });
+      }
+
+      // Final accumulated counters for Partner.update (once, not N times)
+      const finalUpdatedCounters = {
+        order_counter_hall: currentPartnerState.order_counter_hall,
+        order_counter_pickup: currentPartnerState.order_counter_pickup,
+        order_counter_delivery: currentPartnerState.order_counter_delivery,
+        order_counter_date: currentPartnerState.order_counter_date,
+      };
+
+      // Post-create side effects — best-effort after items exist
+      // Loyalty attaches to createdOrders[0] only (architecture decision)
       try {
         // Process points redemption AFTER items created (BUG-PM-032, P0 fix)
         if (loyaltyAccountToUse && redeemedPoints > 0) {
@@ -3766,7 +3807,7 @@ export default function X() {
         // silent
       }
 
-      // Earn points after order creation â€" best-effort
+      // Earn points after order creation — best-effort
       try {
         if (loyaltyAccountToUse && loyaltyEnabled && earnedPoints > 0) {
           const expiresAt = new Date();
@@ -3776,8 +3817,8 @@ export default function X() {
             account: loyaltyAccountToUse.id,
             type: 'earn_order',
             amount: earnedPoints,
-            order: order.id,
-            description: t('loyalty.transaction.earn_order', { orderNumber: order.order_number }),
+            order: createdOrders[0].id,
+            description: t('loyalty.transaction.earn_order', { orderNumber: createdOrders[0].order_number }),
             expires_at: expiresAt.toISOString()
           });
 
@@ -3789,7 +3830,7 @@ export default function X() {
             last_visit_at: new Date().toISOString()
           });
 
-          await base44.entities.Order.update(order.id, {
+          await base44.entities.Order.update(createdOrders[0].id, {
             points_earned: earnedPoints
           });
         }
@@ -3797,41 +3838,43 @@ export default function X() {
         // silent
       }
 
-      // Update partner counters â€" best-effort
-      try { await base44.entities.Partner.update(partner.id, updatedCounters); } catch (e) { /* silent */ }
-      
+      // Update partner counters — best-effort (once, with final accumulated counters)
+      try { await base44.entities.Partner.update(partner.id, finalUpdatedCounters); } catch (e) { /* silent */ }
+
       // Update local partner cache
       queryClient.setQueryData(["publicPartner", partnerParamRaw], (prev) =>
-        prev ? { ...prev, ...updatedCounters } : prev
+        prev ? { ...prev, ...finalUpdatedCounters } : prev
       );
 
-      // Optimistic update session data with proper guest link
+      // Optimistic update session data — add ALL N created orders
       // BUG-PM-004: add _optimisticAt so polling merge preserves this until server confirms
       const optimisticAt = Date.now();
-      const orderWithGuest = {
-        ...order,
-        guest: guestToUse?.id,
-        _optimisticAt: optimisticAt,
-      };
-      // Dedup: skip if a poll already delivered this order
       setSessionOrders(prev => {
-        if (prev.some(o => String(o.id) === String(order.id))) return prev;
-        return [orderWithGuest, ...prev];
+        const existingIds = new Set(prev.map(o => String(o.id)));
+        const newOpts = createdOrders
+          .filter(o => !existingIds.has(String(o.id)))
+          .map(o => ({ ...o, guest: guestToUse?.id, _optimisticAt: optimisticAt }));
+        return [...newOpts, ...prev];
       });
-      
-      const tempIdBase = typeof crypto !== 'undefined' && crypto.randomUUID 
-        ? crypto.randomUUID() 
+
+      const tempIdBase = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
         : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-      
+
       // BUG-PM-004: add _optimisticAt so polling merge preserves temp items
-      const itemsWithLinks = newItems.map((item, i) => ({
-        ...item,
+      const allOptimisticItems = cart.map((item, i) => ({
         id: `temp_${tempIdBase}_${i}`,
-        order: order.id,
+        order: createdOrders[i].id,
+        dish: item.dishId,
+        dish_name: item.name,
+        dish_price: item.price,
+        quantity: item.quantity,
+        line_total: Math.round(item.price * item.quantity * 100) / 100,
+        split_type: splitType,
         _optimisticAt: optimisticAt,
       }));
-      
-      setSessionItems(prev => [...prev, ...itemsWithLinks]);
+
+      setSessionItems(prev => [...prev, ...allOptimisticItems]);
 
       // GAP-01: Save cart snapshot for confirmation screen BEFORE clearing
       // FIX P1: Use finalTotal (post-discount) instead of raw cart.reduce
@@ -3856,7 +3899,7 @@ export default function X() {
         totalAmount: confirmedTotal,
         guestLabel,
         orderMode: "hall",
-        publicToken: order.public_token,
+        publicToken: createdOrders[0].public_token,
         clientName: null,
       });
 
@@ -4091,41 +4134,67 @@ export default function X() {
         // Get start stage for this order type
         const startStage = getStartStage(orderStages, orderMode);
 
-        const orderData = {
+        // Split-order: create N Orders (1 per cart line) for delivery/takeaway
+        const cartSubtotal = cartTotalAmount; // use same rounded value as discount computation
+        const totalDiscount = discountAmount + pointsDiscountAmount;
+
+        // Base orderData — shared fields (per-item fields added in loop)
+        const baseDeliveryOrderData = {
           partner: partner.id,
           order_type: orderMode,
           status: "new",
           stage_id: startStage?.id || null,
           payment_status: "unpaid",
-          total_amount: finalTotal,
           comment: comment || undefined,
           client_name: clientName || undefined,
           client_phone: clientPhone || undefined,
           client_email: customerEmail && customerEmail.trim() ? customerEmail.trim().toLowerCase() : undefined,
           delivery_address: orderMode === "delivery" ? deliveryAddress || undefined : undefined,
-          public_token: Math.random().toString(36).substring(2, 10),
           loyalty_account: loyaltyAccountToUse?.id || null,
           points_redeemed: redeemedPoints || 0,
-          discount_amount: discountAmount + pointsDiscountAmount,
         };
 
-        const order = await base44.entities.Order.create(orderData);
+        const createdOrders = [];
+        let accumulatedDiscount = 0;
 
-        // FIX P0: Create order items FIRST â€" commit point before loyalty side effects
-        const orderItemsData = cart.map((item) => ({
-          order: order.id,
-          dish: item.dishId,
-          dish_name: item.name,
-          dish_price: item.price,
-          quantity: item.quantity,
-          line_total: Math.round(item.price * item.quantity * 100) / 100,
-        }));
+        for (let idx = 0; idx < cart.length; idx++) {
+          const item = cart[idx];
+          const itemGross = Math.round(item.price * item.quantity * 100) / 100;
 
-        await base44.entities.OrderItem.bulkCreate(orderItemsData);
+          let itemDiscount;
+          if (cartSubtotal <= 0) {
+            itemDiscount = 0;
+          } else if (idx < cart.length - 1) {
+            itemDiscount = parseFloat((totalDiscount * (itemGross / cartSubtotal)).toFixed(2));
+          } else {
+            itemDiscount = parseFloat((totalDiscount - accumulatedDiscount).toFixed(2));
+          }
+          const itemTotal = Math.max(0, parseFloat((itemGross - itemDiscount).toFixed(2)));
+          accumulatedDiscount += itemDiscount;
 
-        // Post-create side effects â€" best-effort after items exist
+          const itemOrderData = {
+            ...baseDeliveryOrderData,
+            total_amount: itemTotal,
+            discount_amount: itemDiscount,
+            public_token: Math.random().toString(36).substring(2, 10),
+          };
+
+          const createdOrder = await base44.entities.Order.create(itemOrderData);
+          createdOrders.push(createdOrder);
+
+          await base44.entities.OrderItem.create({
+            order: createdOrder.id,
+            dish: item.dishId,
+            dish_name: item.name,
+            dish_price: item.price,
+            quantity: item.quantity,
+            line_total: itemGross,
+          });
+        }
+
+        // Post-create side effects — best-effort after items exist
+        // Loyalty attaches to createdOrders[0] only (architecture decision)
         try {
-          // Process points redemption AFTER items created (BUG-PM-032, P0 fix)
           if (loyaltyAccountToUse && redeemedPoints > 0) {
             await base44.entities.LoyaltyTransaction.create({
               account: loyaltyAccountToUse.id,
@@ -4143,7 +4212,7 @@ export default function X() {
           // silent
         }
 
-        // Earn points after order creation â€" best-effort
+        // Earn points after order creation — best-effort
         try {
           if (loyaltyAccountToUse && loyaltyEnabled && earnedPoints > 0) {
             const expiresAt = new Date();
@@ -4153,8 +4222,8 @@ export default function X() {
               account: loyaltyAccountToUse.id,
               type: 'earn_order',
               amount: earnedPoints,
-              order: order.id,
-              description: t('loyalty.transaction.earn_order', { orderNumber: order.order_number || order.id }),
+              order: createdOrders[0].id,
+              description: t('loyalty.transaction.earn_order', { orderNumber: createdOrders[0].order_number || createdOrders[0].id }),
               expires_at: expiresAt.toISOString()
             });
 
@@ -4166,13 +4235,40 @@ export default function X() {
               last_visit_at: new Date().toISOString()
             });
 
-            await base44.entities.Order.update(order.id, {
+            await base44.entities.Order.update(createdOrders[0].id, {
               points_earned: earnedPoints
             });
           }
         } catch (earnErr) {
           // silent
         }
+
+        // Optimistic update session data — add ALL N created orders
+        const optimisticAt = Date.now();
+        setSessionOrders(prev => {
+          const existingIds = new Set(prev.map(o => String(o.id)));
+          const newOpts = createdOrders
+            .filter(o => !existingIds.has(String(o.id)))
+            .map(o => ({ ...o, _optimisticAt: optimisticAt }));
+          return [...newOpts, ...prev];
+        });
+
+        const tempIdBase = typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
+        const allOptimisticItems = cart.map((item, i) => ({
+          id: `temp_${tempIdBase}_${i}`,
+          order: createdOrders[i].id,
+          dish: item.dishId,
+          dish_name: item.name,
+          dish_price: item.price,
+          quantity: item.quantity,
+          line_total: Math.round(item.price * item.quantity * 100) / 100,
+          _optimisticAt: optimisticAt,
+        }));
+
+        setSessionItems(prev => [...prev, ...allOptimisticItems]);
 
         // GAP-01: Save cart snapshot for confirmation screen BEFORE clearing
         const confirmedItems = [...cart];
@@ -4195,7 +4291,7 @@ export default function X() {
           totalAmount: confirmedTotal,
           guestLabel: null,
           orderMode,
-          publicToken: order.public_token,
+          publicToken: createdOrders[0].public_token,
           clientName: savedClientName,
         });
 
