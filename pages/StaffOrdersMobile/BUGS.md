@@ -321,6 +321,41 @@
 - **Chain:** staffordersmobile-260331-204431-401b
 - **Status:** FIXED
 
+### SOM-S231-01 (P1) -- Duplicate inner card in hall-mode expanded area
+- **Function:** OrderGroupCard hall-mode expanded content (~line 2180)
+- **Root cause:** Third instance of `rounded-xl border border-slate-200 bg-white/80` block duplicated the header (star/lock icon, table badge, zone, collapse button, summary chips, bill total) inside the expanded area.
+- **Fix:** Removed the duplicate block entirely. Legacy instances (lines 584, 1196) preserved.
+- **Chain:** staffordersmobile-260407-132533-b0c8
+- **Status:** 🟡 Fixed (pending test)
+
+### SOM-S233-02 (P1) -- Jump chips not tappable (#251, UX #26)
+- **Function:** renderHallSummaryItem, OrderGroupCard
+- **Root cause:** Summary chips (Новые 3, Готово 2) were `<span>` elements — no click handler, no scroll behavior.
+- **Fix:** Changed to `<button>` with `e.stopPropagation()` + `scrollToSection(kind)`. Added 4 section refs + `scrollToSection` useCallback.
+- **Chain:** staffordersmobile-260407-132533-b0c8
+- **Status:** 🟡 Fixed (pending test)
+
+### SOM-S233-03 (P1) -- Undo toast appears under last row, not clicked row (#254, UX #23)
+- **Function:** renderHallRows, handleSingleAction, handleOrdersAction, startUndoWindow
+- **Root cause:** Toast placement used `isLastOfOrder` — always under last row of order regardless of which row was clicked.
+- **Fix:** Threaded `rowId` through full call chain. Toast now appears under the clicked row. Bulk actions (no rowId) fall back to `isLastOfOrder`.
+- **Chain:** staffordersmobile-260407-132533-b0c8
+- **Status:** 🟡 Fixed (pending test)
+
+### SOM-S233-04 (P2) -- Close table blocker reasons not tappable (#256, UX #29)
+- **Function:** closeDisabledReasons.map in hall-mode
+- **Root cause:** Blocker reasons were `<p>` elements — user had to manually scroll to find the blocking section.
+- **Fix:** Added `reasonToKind` mapping. Known reasons render as `<button>` with `scrollToSection(kind)` + ` ›` suffix. Unknown reasons stay as `<p>`.
+- **Chain:** staffordersmobile-260407-132533-b0c8
+- **Status:** 🟡 Fixed (pending test)
+
+### SOM-S233-05 (P2) -- No age urgency indicator on dish rows (#255, UX #13)
+- **Function:** renderHallRows
+- **Root cause:** Dish rows had no visual urgency cue — waiter couldn't see which orders were waiting longest.
+- **Fix:** Added `urgencyClass` calculation: amber `border-l-4` at overdueMinutes threshold, red at threshold+5. Applied to all rows including served.
+- **Chain:** staffordersmobile-260407-132533-b0c8
+- **Status:** 🟡 Fixed (pending test)
+
 ## Active Bugs
 
 ### BUG-SM-001 (P1 -- deferred) -- Complete absence of i18n
