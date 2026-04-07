@@ -1,0 +1,15 @@
+# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-153540-d45d
+
+## Findings
+1. [P2] Fix 1 blocked by modal detail surface - `x.jsx:3665-3666` still opens `detailDish` with `<Dialog>` and `<DialogContent className="max-w-md p-0 overflow-hidden">` instead of the page's existing bottom-drawer pattern used at `x.jsx:3417-3422`. That means the dish detail cannot meet the required 85-90% bottom sheet presentation, preserve visible background at the top, or expose the expected drawer drag handle. FIX: replace the inline detail `Dialog` with a `Drawer`/`DrawerContent` bottom sheet using the same cart-style pattern and an explicit `max-h-[85vh]` to `88vh` capped height.
+2. [P2] Fix 2 still renders price before description - inside the current detail card, the order is Title (`x.jsx:3679-3683`) -> Price (`x.jsx:3684-3705`) -> Rating (`x.jsx:3706-3710`) -> Description (`x.jsx:3712-3715`). This is the inverse of the requested Wolt-style flow, so users see pricing before the dish explanation. FIX: move the description block to immediately follow the title, then render the price/discount section below description, with reviews/options after price and the action area kept at the bottom.
+3. [P2] Fix 3 regressed from the page's required discount guard pattern - `BUGS.md:142-146` records that this page standardized dish discount rendering to `discount_enabled === true && (discount_percent ?? 0) > 0`, but the current detail card uses `detailDish.discount_enabled === true && detailDish.original_price` at `x.jsx:3685` and computes the badge from `price / original_price` at `x.jsx:3697`. This custom branch can drift from the menu-card display and bypasses the page's explicit `discount_percent` guard. FIX: rebuild the detail price block from the same fields and guard pattern used by this page's dish cards: `discount_enabled === true && (discount_percent ?? 0) > 0`, plus `original_price` for strikethrough and `discount_percent` for the badge text.
+
+## Summary
+Total: 3 findings (0 P0, 0 P1, 3 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY - do NOT skip this section)
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 2 references keeping the existing bottom action bar with stepper + Add button, but the target `x.jsx` detail card currently renders only a single inline Add button, so it was unclear whether the missing sticky stepper area should be reviewed as part of Fix 2 or treated as out of scope.
+- Missing context (what info would have helped): The prompt simultaneously forbids reading files outside the page folder and cites external references (`BUGS_MASTER.md`, `outputs/wolt-reference/WOLT_DESIGN_REFERENCE.md`). A single authoritative source list would remove that conflict.
+- Scope questions (anything you weren't sure if it's in scope): Whether `pages/PublicMenu/MenuView.jsx` was allowed for discount-field verification, since the task context names it as read-only context but the speed rules say to read only the target file plus same-folder `README.md`/`BUGS.md`.
