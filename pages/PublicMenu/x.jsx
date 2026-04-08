@@ -575,6 +575,25 @@ const I18N_FALLBACKS = {
   "help.ago": "ago",
   "help.reminder": "reminder",
   "help.reminders": "reminders",
+  // SOS v6.0 new keys
+  "help.get_bill": "Bill",
+  "help.plate": "Extra plate",
+  "help.utensils": "Utensils",
+  "help.clear_table": "Clear the table",
+  "help.call_waiter_short": "Call",
+  "help.get_bill_short": "Bill",
+  "help.plate_short": "Plate",
+  "help.napkins_short": "Napkins",
+  "help.utensils_short": "Utensils",
+  "help.clear_table_short": "Clear",
+  "help.subtitle_choose": "Choose what you need",
+  "help.table_default": "Table",
+  "help.cancel_confirm_q": "Cancel request?",
+  "help.cancel_keep": "Keep",
+  "help.cancel_do": "Cancel",
+  "help.other_request_link": "Something else?",
+  "help.other_placeholder": "Describe what you need…",
+  "help.send_btn": "Send",
   // Help Chips (quick suggestions in help drawer)
   "help.chip.high_chair": "High chair",
   "help.chip.cutlery": "Cutlery",
@@ -593,7 +612,7 @@ const I18N_FALLBACKS_RU = {
   "help.back_to_help": "Назад",
   "help.show_more": "Ещё",
   "help.call_waiter": "Вызвать официанта",
-  "help.get_bill": "Принести счёт",
+  "help.get_bill": "Счёт",
   "help.request_napkins": "Салфетки",
   "help.request_menu": "Меню",
   "help.other": "Другое",
@@ -632,6 +651,26 @@ const I18N_FALLBACKS_RU = {
   "help.chip.sauce": "Соус",
   "help.chip.clear_table": "Убрать стол",
   "help.chip.water": "Вода",
+  // SOS v6.0 new keys
+  "help.plate": "Тарелку",
+  "help.utensils": "Приборы",
+  "help.clear_table": "Убрать со стола",
+  "help.call_waiter_short": "Позвать",
+  "help.get_bill_short": "Счёт",
+  "help.plate_short": "Тарелку",
+  "help.napkins_short": "Салфетки",
+  "help.utensils_short": "Приборы",
+  "help.clear_table_short": "Убрать",
+  "help.subtitle_choose": "Выберите, что нужно",
+  "help.table_default": "Стол",
+  "help.cancel_confirm_q": "Отменить запрос?",
+  "help.cancel_keep": "Оставить",
+  "help.cancel_do": "Отменить",
+  "help.other_request_link": "Другой запрос?",
+  "help.other_placeholder": "Напишите, что нужно…",
+  "help.send_btn": "Отправить",
+  "help.sent_suffix": "отправлено",
+  "help.undo": "Отменить",
   "cart.my_bill": "Мой счёт",
 };
 
@@ -1792,25 +1831,71 @@ export default function X() {
   const HELP_MATCH_GRACE_MS = 2 * 60 * 1000;
   const HELP_RESOLVED_HIDE_MS = 4000;
   const HELP_CLOSED_HIDE_MS = 2000;
-  const HELP_PREVIEW_LIMIT = 2;
-  const HELP_REQUEST_TYPES = useMemo(() => new Set(['call_waiter', 'bill', 'napkins', 'menu', 'other']), []);
+  const HELP_PREVIEW_LIMIT = 2; // TODO: remove in v6.0 Part B
+  const HELP_REQUEST_TYPES = useMemo(() => new Set([
+    'call_waiter', 'bill', 'plate', 'napkins', 'utensils', 'clear_table', 'other',
+    'menu', // legacy — keep readable for backward compat; NOT shown in SOS grid
+  ]), []);
   const HELP_ACTIVE_SERVER_STATUSES = useMemo(() => new Set(['new', 'in_progress']), []);
   const HELP_DONE_SERVER_STATUSES = useMemo(() => new Set(['done']), []);
-  const HELP_COOLDOWN_SECONDS = useMemo(() => ({ call_waiter: 90, bill: 150, napkins: 240, menu: 240, other: 120 }), []);
+  const HELP_COOLDOWN_SECONDS = useMemo(() => ({
+    call_waiter: 90, bill: 150, plate: 120, napkins: 120,
+    utensils: 120, clear_table: 120, other: 120,
+    menu: 240, // legacy
+  }), []);
   const HELP_CARD_LABELS = useMemo(() => ({
     call_waiter: tr('help.call_waiter', 'Call a waiter'),
-    bill: tr('help.bill', 'Bring the bill'),
+    bill: tr('help.get_bill', 'Bill'),
+    plate: tr('help.plate', 'Extra plate'),
     napkins: tr('help.napkins', 'Napkins'),
-    menu: tr('help.menu', 'Paper menu'),
+    utensils: tr('help.utensils', 'Utensils'),
+    clear_table: tr('help.clear_table', 'Clear the table'),
+    other: tr('help.other_label', 'Other'),
+    menu: tr('help.menu', 'Paper menu'), // legacy
+  }), [tr]);
+  const HELP_CARD_SHORT_LABELS = useMemo(() => ({
+    call_waiter: tr('help.call_waiter_short', 'Call'),
+    bill: tr('help.get_bill_short', 'Bill'),
+    plate: tr('help.plate_short', 'Plate'),
+    napkins: tr('help.napkins_short', 'Napkins'),
+    utensils: tr('help.utensils_short', 'Utensils'),
+    clear_table: tr('help.clear_table_short', 'Clear'),
     other: tr('help.other_label', 'Other'),
   }), [tr]);
-  const HELP_CHIPS = useMemo(() => [
+  // SOS v6.0: Urgency thresholds (seconds)
+  const HELP_URGENCY_THRESHOLDS = useMemo(() => ({
+    std:  { amber: 480, red: 900  },   // 8m / 15m
+    bill: { amber: 300, red: 600  },   // 5m / 10m
+  }), []);
+  const HELP_URGENCY_GROUP = useMemo(() => ({
+    call_waiter: 'std', bill: 'bill', plate: 'std', napkins: 'std',
+    utensils: 'std', clear_table: 'std', other: 'std',
+  }), []);
+  const HELP_CHIPS = useMemo(() => [ // TODO: remove in v6.0 Part B
     tr('help.chip.high_chair', 'High chair'),
     tr('help.chip.cutlery', 'Cutlery'),
     tr('help.chip.sauce', 'Sauce'),
     tr('help.chip.clear_table', 'Clear the table'),
     tr('help.chip.water', 'Water'),
   ], [tr]);
+
+  const getHelpUrgency = useCallback((type, sentAt) => {
+    if (!sentAt) return 'neutral';
+    const elapsedSec = Math.floor((Date.now() - sentAt) / 1000);
+    const group = HELP_URGENCY_GROUP[type] || 'std';
+    const thr = HELP_URGENCY_THRESHOLDS[group];
+    if (elapsedSec >= thr.red) return 'red';
+    if (elapsedSec >= thr.amber) return 'amber';
+    return 'neutral';
+  }, [HELP_URGENCY_GROUP, HELP_URGENCY_THRESHOLDS]);
+
+  const getHelpTimerStr = useCallback((sentAt) => {
+    if (!sentAt) return '';
+    const elapsedSec = Math.floor((Date.now() - sentAt) / 1000);
+    if (elapsedSec < 60) return '<1м';
+    const min = Math.floor(elapsedSec / 60);
+    return `${min}м`;
+  }, []);
 
   const [requestStates, setRequestStates] = useState({});
   const hasLoadedHelpStatesRef = useRef(false);
@@ -2127,7 +2212,7 @@ export default function X() {
     setRequestStates((prev) => {
       const now = Date.now();
       const next = {};
-      const nonOtherTypes = ['call_waiter', 'bill', 'napkins', 'menu'];
+      const nonOtherTypes = ['call_waiter', 'bill', 'plate', 'napkins', 'utensils', 'clear_table', 'menu'];
 
       nonOtherTypes.forEach((type) => {
         const current = prev[type];
