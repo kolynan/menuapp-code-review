@@ -1831,7 +1831,6 @@ export default function X() {
   const HELP_MATCH_GRACE_MS = 2 * 60 * 1000;
   const HELP_RESOLVED_HIDE_MS = 4000;
   const HELP_CLOSED_HIDE_MS = 2000;
-  const HELP_PREVIEW_LIMIT = 2; // TODO: remove in v6.0 Part B
   const HELP_REQUEST_TYPES = useMemo(() => new Set([
     'call_waiter', 'bill', 'plate', 'napkins', 'utensils', 'clear_table', 'other',
     'menu', // legacy — keep readable for backward compat; NOT shown in SOS grid
@@ -1871,13 +1870,20 @@ export default function X() {
     call_waiter: 'std', bill: 'bill', plate: 'std', napkins: 'std',
     utensils: 'std', clear_table: 'std', other: 'std',
   }), []);
-  const HELP_CHIPS = useMemo(() => [ // TODO: remove in v6.0 Part B
-    tr('help.chip.high_chair', 'High chair'),
-    tr('help.chip.cutlery', 'Cutlery'),
-    tr('help.chip.sauce', 'Sauce'),
-    tr('help.chip.clear_table', 'Clear the table'),
-    tr('help.chip.water', 'Water'),
-  ], [tr]);
+  const SOS_BUTTONS = useMemo(() => [
+    { id: 'call_waiter', emoji: '🙋', label: HELP_CARD_LABELS.call_waiter, shortLabel: HELP_CARD_SHORT_LABELS.call_waiter },
+    { id: 'bill', emoji: '🧾', label: HELP_CARD_LABELS.bill, shortLabel: HELP_CARD_SHORT_LABELS.bill },
+    { id: 'plate', emoji: '🍽️', label: HELP_CARD_LABELS.plate, shortLabel: HELP_CARD_SHORT_LABELS.plate },
+    { id: 'napkins', icon: 'layers', label: HELP_CARD_LABELS.napkins, shortLabel: HELP_CARD_SHORT_LABELS.napkins },
+    { id: 'utensils', emoji: '🍴', label: HELP_CARD_LABELS.utensils, shortLabel: HELP_CARD_SHORT_LABELS.utensils },
+    { id: 'clear_table', emoji: '🗑️', label: HELP_CARD_LABELS.clear_table, shortLabel: HELP_CARD_SHORT_LABELS.clear_table },
+  ], [HELP_CARD_LABELS, HELP_CARD_SHORT_LABELS]);
+
+  const URGENCY_STYLES = {
+    neutral: { bg: 'bg-orange-50', border: 'border-orange-500', label: 'text-orange-800', timer: 'text-orange-500', xBg: 'bg-orange-500/15', xColor: 'text-orange-800' },
+    amber: { bg: 'bg-amber-50', border: 'border-amber-500', label: 'text-amber-900', timer: 'text-amber-600', xBg: 'bg-amber-500/20', xColor: 'text-amber-800' },
+    red: { bg: 'bg-red-50', border: 'border-red-500', label: 'text-red-900', timer: 'text-red-600', xBg: 'bg-red-500/20', xColor: 'text-red-800' },
+  };
 
   const getHelpUrgency = useCallback((type, sentAt) => {
     if (!sentAt) return 'neutral';
@@ -1907,9 +1913,9 @@ export default function X() {
   const currentTableIdRef = useRef(currentTableId);
   const [isHelpRestoring, setIsHelpRestoring] = useState(false);
   const [isHelpOnline, setIsHelpOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
-  const ticketBoardRef = useRef(null);
-  const [highlightedTicket, setHighlightedTicket] = useState(null);
-  const [isTicketExpanded, setIsTicketExpanded] = useState(false);
+  const [highlightedTicket, setHighlightedTicket] = useState(null); // SOS v6.0 — kept for hook order, no longer used in JSX
+  const [isTicketExpanded, setIsTicketExpanded] = useState(false); // SOS v6.0 — kept for hook order, no longer used in JSX
+  const [cancelConfirmType, setCancelConfirmType] = useState(null); // SOS v6.0 cancel confirm
 
   useEffect(() => {
     currentTableIdRef.current = currentTableId;
@@ -2028,7 +2034,9 @@ export default function X() {
   }, [getNormalizedHelpState, requestStates, timerTick]);
 
   const activeRequests = useMemo(() => ticketRows.filter((row) => row.isActive), [ticketRows]);
-  const activeRequestCount = useMemo(() => activeRequests.length, [activeRequests]);
+  const activeRequestCount = useMemo(() =>
+    activeRequests.filter(r => r.type !== 'menu').length,
+  [activeRequests]);
 
   // HD-05: Load requestStates from localStorage on mount / table change
   useEffect(() => {
@@ -2354,6 +2362,7 @@ export default function X() {
     setShowOtherForm(false);
     setHelpComment('');
     setIsTicketExpanded(false);
+    setCancelConfirmType(null);
     setIsHelpModalOpen(true);
     pushOverlay('help');
   }, [currentTableId, pushOverlay, setHelpComment, setShowTableConfirmSheet]);
@@ -2364,6 +2373,7 @@ export default function X() {
     setIsTicketExpanded(false);
     setShowOtherForm(false);
     setHelpComment('');
+    setCancelConfirmType(null);
   }, [popOverlay, setHelpComment]);
 
   // HD-01 + HD-06: Card tap with 5s undo delay before actual server send
@@ -2492,6 +2502,23 @@ export default function X() {
     });
   }, []);
 
+  const handleSosCancel = useCallback((type) => {
+    const activeRow = activeRequests.find(r => r.type === type);
+    if (!activeRow) return;
+    const urgency = getHelpUrgency(type, activeRow.sentAt);
+    if (urgency === 'red') {
+      setCancelConfirmType(type);
+    } else {
+      handleResolve(type, type === 'other' ? activeRow.id : undefined);
+    }
+  }, [activeRequests, getHelpUrgency, handleResolve]);
+
+  useEffect(() => {
+    if (!cancelConfirmType) return;
+    const exists = activeRequests.some(r => r.type === cancelConfirmType);
+    if (!exists) setCancelConfirmType(null);
+  }, [activeRequests, cancelConfirmType]);
+
   // HD-01: Auto-submit when selectedHelpType matches pending quick send
   useEffect(() => {
     const action = pendingQuickSendRef.current;
@@ -2565,9 +2592,6 @@ export default function X() {
       if (action.action === 'send') {
         setIsTicketExpanded(false);
         setShowOtherForm(false);
-        ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        setHighlightedTicket(action.rowId || action.type);
-        setTimeout(() => setHighlightedTicket((prev) => (prev === (action.rowId || action.type) ? null : prev)), 1500);
       }
 
       if (action.action === 'remind') {
@@ -2627,72 +2651,6 @@ export default function X() {
       onError(err);
     }
   }, [selectedHelpType, submitHelpRequest, pendingHelpActionTick, helpComment, normalizeHelpMessage, getHelpCooldownMs, partner?.id, queryClient, tr, isHelpOnline]);
-
-  const getHelpReminderWord = useCallback((count) => {
-    return count === 1 ? tr('help.reminder', 'reminder') : tr('help.reminders', 'reminders');
-  }, [tr]);
-
-  const getMinutesAgo = useCallback((timestamp) => {
-    return Math.max(1, Math.floor((Date.now() - timestamp) / 60000));
-  }, [timerTick]);
-
-  const getHelpWaitLabel = useCallback((row) => {
-    if (!row?.sentAt) return '';
-    const seconds = Math.max(0, Math.floor((Date.now() - row.sentAt) / 1000));
-    if (seconds < 60) return tr('help.just_sent', 'Just sent');
-    return `${tr('help.waiting_prefix', 'Waiting')} ${getMinutesAgo(row.sentAt)} ${tr('help.minutes_short', 'min')}`;
-  }, [getMinutesAgo, tr]);
-
-  const getHelpReminderLabel = useCallback((row) => {
-    if (!row?.lastReminderAt || !row?.reminderCount) return '';
-    const minutesAgo = getMinutesAgo(row.lastReminderAt);
-    const latestLabel = minutesAgo <= 1
-      ? tr('help.reminded_just_now', 'Just reminded')
-      : `${tr('help.reminded_prefix', 'Reminded')} ${minutesAgo} ${tr('help.minutes_short', 'min')} ${tr('help.ago', 'ago')}`;
-
-    if (row.reminderCount === 1) return latestLabel;
-    return `${row.reminderCount} ${getHelpReminderWord(row.reminderCount)} · ${tr('help.last_reminder_prefix', 'Last')} ${minutesAgo} ${tr('help.minutes_short', 'min')} ${tr('help.ago', 'ago')}`;
-  }, [getHelpReminderWord, getMinutesAgo, tr]);
-
-  const getHelpResolvedLabel = useCallback((type) => {
-    const byType = {
-      call_waiter: tr('help.resolved_call_waiter', '✅ Waiter came · Thank you!'),
-      bill: tr('help.resolved_bill', '✅ Bill brought · Thank you!'),
-      napkins: tr('help.resolved_napkins', '✅ Napkins brought · Thank you!'),
-      menu: tr('help.resolved_menu', '✅ Menu brought · Thank you!'),
-      other: tr('help.resolved_other', '✅ Done · Thank you!'),
-    };
-    return byType[type] || byType.other;
-  }, [tr]);
-
-  const getHelpErrorCopy = useCallback((row) => {
-    if (!row?.errorKind) return null;
-    if (row.errorMessage === 'offline') {
-      return {
-        title: tr('help.no_connection', 'No connection'),
-        detail: tr('help.try_again', 'Try again'),
-      };
-    }
-    return {
-      title: row.errorKind === 'remind'
-        ? tr('help.remind_failed', 'Failed to send reminder')
-        : tr('help.send_failed', 'Failed to send'),
-      detail: tr('help.try_again', 'Try again'),
-    };
-  }, [tr]);
-
-  const getHelpFreshnessLabel = useCallback(() => {
-    if (!activeRequests.length) return '';
-    if (isHelpRestoring) return tr('help.restoring_status', 'Restoring status…');
-    if (!isHelpOnline || isHelpSyncError) return tr('help.offline_status', 'No connection · will retry automatically');
-    if (!helpSyncUpdatedAt) return '';
-
-    const seconds = Math.max(0, Math.floor((Date.now() - helpSyncUpdatedAt) / 1000));
-    if (seconds >= Math.floor(HELP_STALE_AFTER_MS / 1000)) {
-      return `${tr('help.stale_status', 'Data may be outdated · no update')} ${seconds} ${tr('help.seconds_short', 'sec')}`;
-    }
-    return `${tr('help.updated_label', 'Updated')} ${seconds} ${tr('help.seconds_short', 'sec')} ${tr('help.ago', 'ago')}`;
-  }, [activeRequests.length, helpSyncUpdatedAt, isHelpOnline, isHelpRestoring, isHelpSyncError, timerTick, tr]);
 
   const handleRetry = useCallback((row) => {
     if (!row) return;
@@ -2780,15 +2738,6 @@ export default function X() {
     handlePresetSelect(row.type);
     setPendingHelpActionTick((value) => value + 1);
   }, [handlePresetSelect, setHelpComment]);
-
-  const focusHelpRow = useCallback((rowId) => {
-    const rowIndex = activeRequests.findIndex((row) => row.id === rowId);
-    setIsTicketExpanded(rowIndex >= HELP_PREVIEW_LIMIT);
-    setShowOtherForm(false);
-    ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setHighlightedTicket(rowId);
-    setTimeout(() => setHighlightedTicket((prev) => (prev === rowId ? null : prev)), 1500);
-  }, [activeRequests, setShowOtherForm]);
 
   useEffect(() => {
     const shouldTick = isHelpModalOpen || !!undoToast || ticketRows.length > 0 || isHelpRestoring;
@@ -4973,312 +4922,230 @@ export default function X() {
       {/* PM-125: Help as Bottom Drawer (replaces HelpModal Dialog) */}
       <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
         <DrawerContent className="max-h-[85vh] rounded-t-2xl flex flex-col">
-          <div className="relative">
-            {isTicketExpanded && (
-              <button
-                onClick={() => { setIsTicketExpanded(false); }}
-                className="absolute top-3 left-3 min-h-[44px] px-3 flex items-center gap-1 rounded-full bg-slate-100 text-slate-700 z-10 text-sm font-medium"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>{t('help.back_to_help')}</span>
-              </button>
-            )}
-            <button
-              onClick={closeHelpDrawer}
-              className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 z-10"
-              aria-label={t('common.close', 'Закрыть')}
-            >
-              <ChevronDown className="w-6 h-6" />
-            </button>
-            <DrawerHeader className="text-center pb-2">
-              <DrawerTitle className="text-lg font-semibold text-slate-900">{isTicketExpanded ? t('help.my_requests') : t('help.modal_title')}</DrawerTitle>
-              {!isTicketExpanded && (
-                <p className="text-sm text-slate-500 mt-1">{t('help.modal_desc')}</p>
-              )}
-            </DrawerHeader>
+          {/* SOS v6.0 Drag handle pill */}
+          <div className="flex justify-center pt-2 pb-1">
+            <div className="w-10 h-1 rounded-full bg-gray-300" />
           </div>
-          <div className="px-4 pb-6 space-y-4 overflow-y-auto flex-1">
-            {currentTable && (
-              <div className="flex items-center justify-center gap-2 text-sm text-slate-600">
-                <MapPin className="w-4 h-4" />
-                <span>{currentTable?.name || currentTable?.code}</span>
-              </div>
+
+          {/* SOS v6.0 Header */}
+          <div className="px-4 pt-2 pb-2 border-b border-slate-100">
+            <div className="flex items-center justify-between">
+              <span className="text-[17px] font-extrabold text-gray-900">
+                {tr('help.modal_title', 'Нужна помощь?')}
+              </span>
+              <span className="bg-orange-500 text-white rounded-xl px-3 py-0.5 text-[13px] font-bold">
+                {currentTable?.name || currentTable?.code || tr('help.table_default', 'Стол')}
+              </span>
+            </div>
+            {activeRequestCount === 0 && (
+              <p className="text-[13px] text-gray-400 mt-0.5">
+                {tr('help.subtitle_choose', 'Выберите, что нужно')}
+              </p>
             )}
-            {ticketRows.length > 0 && (
-              <div ref={ticketBoardRef} className="mb-4">
-                {!isTicketExpanded && (
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-gray-700">{t('help.my_requests')}</span>
-                    {activeRequestCount > 0 && (
-                      <span className="text-xs text-gray-400">{activeRequestCount} {t('help.active_count')}</span>
-                    )}
-                  </div>
-                )}
-                {(() => {
-                  const visibleRequests = isTicketExpanded
-                    ? (activeRequests.length > 0 ? activeRequests : ticketRows)
-                    : (activeRequests.length > 0 ? activeRequests.slice(0, HELP_PREVIEW_LIMIT) : ticketRows.slice(0, HELP_PREVIEW_LIMIT));
-                  const freshnessLabel = getHelpFreshnessLabel();
-                  return (
-                    <>
-                      {visibleRequests.map(req => {
-                        const isHighlighted = highlightedTicket === req.id;
-                        const cooldownActive = req.remindCooldownUntil && req.remindCooldownUntil > Date.now();
-                        const cooldownSec = cooldownActive ? Math.ceil((req.remindCooldownUntil - Date.now()) / 1000) : 0;
-                        const cooldownMin = Math.floor(cooldownSec / 60);
-                        const cooldownSecRem = cooldownSec % 60;
-                        const reminderLabel = getHelpReminderLabel(req);
-                        const errorCopy = getHelpErrorCopy(req);
-                        const isSending = req.status === 'sending' || req.pendingAction === 'send' || req.pendingAction === 'remind';
-                        const isResolved = req.status === 'resolved';
-                        const isClosed = req.status === 'closed_by_guest';
-                        return (
-                          <div
-                            key={req.id}
-                            className={`rounded-lg border p-3 mb-2 transition-colors duration-300 ${
-                              isHighlighted
-                                ? 'bg-amber-50 border-amber-300'
-                                : errorCopy
-                                  ? 'bg-red-50 border-red-200'
-                                  : isResolved || isClosed
-                                    ? 'bg-emerald-50 border-emerald-200'
-                                    : 'bg-white border-slate-200'
-                            }`}
-                          >
-                            <div className="text-sm font-medium text-slate-800">
-                              {HELP_CARD_LABELS[req.type] || req.type}
-                            </div>
-                            {req.message && (
-                              <div className="text-xs text-slate-500 mt-1 break-words">{req.message}</div>
-                            )}
-                            <div className="mt-2">
-                              {isClosed ? (
-                                <div className="text-sm font-medium text-emerald-700">{tr('help.closed_by_guest', '✅ No longer needed')}</div>
-                              ) : isResolved ? (
-                                <div className="text-sm font-medium text-emerald-700">{getHelpResolvedLabel(req.type)}</div>
-                              ) : errorCopy ? (
-                                <>
-                                  <div className="text-sm font-medium text-red-700">{errorCopy.title}</div>
-                                  <div className="text-xs text-red-600 mt-1">{errorCopy.detail}</div>
-                                </>
-                              ) : (
-                                <>
-                                  <div className="text-sm text-slate-700">
-                                    {isSending ? tr('help.sending_now', 'Sending…') : getHelpWaitLabel(req)}
-                                  </div>
-                                  {reminderLabel && (
-                                    <div className="text-xs text-slate-500 mt-1">{reminderLabel}</div>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                            {!isClosed && !isResolved && (
-                              <div className="flex gap-2 mt-3">
-                                {errorCopy ? (
-                                  <button
-                                    onClick={() => handleRetry(req)}
-                                    className="flex-1 text-xs font-medium py-2 min-h-[36px] rounded-lg text-red-700 bg-red-100 active:bg-red-200"
-                                  >
-                                    {tr('help.retry', 'Retry')}
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => handleRemind(req.type, req.type === 'other' ? req.id : undefined)}
-                                    disabled={isSending || cooldownActive}
-                                    className={`flex-1 text-xs font-medium py-2 min-h-[36px] rounded-lg ${
-                                      isSending || cooldownActive
-                                        ? 'text-slate-400 bg-slate-100'
-                                        : 'text-orange-800 bg-orange-50 active:bg-orange-100'
-                                    }`}
-                                  >
-                                    {isSending
-                                      ? tr('help.sending_now', 'Sending…')
-                                      : cooldownActive
-                                        ? `${tr('help.retry_in', 'In')} ${String(cooldownMin).padStart(2, '0')}:${String(cooldownSecRem).padStart(2, '0')}`
-                                        : tr('help.remind', 'Remind')}
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => handleResolve(req.type, req.type === 'other' ? req.id : undefined)}
-                                  className="flex-1 text-xs font-medium py-2 min-h-[36px] rounded-lg text-slate-600 bg-slate-100 active:bg-slate-200"
-                                >
-                                  {t('help.cancel_request')}
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                      {!isTicketExpanded && activeRequestCount > HELP_PREVIEW_LIMIT && (
-                        <button
-                          onClick={() => { setIsTicketExpanded(true); setShowOtherForm(false); }}
-                          className="w-full text-center text-sm font-medium text-blue-600 py-2 min-h-[40px]"
-                        >
-                          {t('help.all_requests_cta', { count: activeRequestCount })}
-                        </button>
-                      )}
-                      {freshnessLabel && (
-                        <p className="text-xs text-gray-400 mt-1 text-center break-words">{freshnessLabel}</p>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            )}
-            {!isTicketExpanded && activeRequests.length > 0 && (
-              <span className="text-sm font-semibold text-gray-700">{t('help.send_more')}</span>
-            )}
-            {!isTicketExpanded && (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { id: 'call_waiter', emoji: '\uD83D\uDE4B', label: t('help.call_waiter') },
-                    { id: 'bill', emoji: '\uD83E\uDDFE', label: t('help.bill') },
-                    { id: 'napkins', emoji: null, label: t('help.napkins') },
-                    { id: 'menu', emoji: '\uD83D\uDCC4', label: t('help.menu') },
-                  ].map(card => {
-                    const activeRow = activeRequests.find((row) => row.type === card.id);
-                    const isSubdued = Boolean(activeRow);
+          </div>
+
+          {/* SOS v6.0 Scroll wrapper */}
+          <div className="overflow-y-auto flex-1 pb-6">
+            {/* SOS v6.0 Button Grid — 3x2, in-place state */}
+            <div className="grid grid-cols-2 gap-[9px] px-3.5 pt-2.5 pb-2">
+              {SOS_BUTTONS.map(btn => {
+                const activeRow = activeRequests.find(r => r.type === btn.id);
+                const isActive = Boolean(activeRow);
+                const sentAt = activeRow?.sentAt;
+                const urgency = isActive ? getHelpUrgency(btn.id, sentAt) : 'neutral';
+                const timerText = isActive ? getHelpTimerStr(sentAt) : '';
+                if (isActive) {
+                  const hasError = Boolean(activeRow.errorKind);
+                  if (hasError) {
                     return (
-                      <button
-                        key={card.id}
-                        onClick={() => {
-                          if (activeRow) {
-                            focusHelpRow(activeRow.id);
-                            return;
-                          }
-                          handleCardTap(card.id);
-                        }}
-                        className={`relative rounded-xl border min-h-[80px] flex flex-col items-center justify-center gap-1 px-2 ${
-                          isSubdued
-                            ? 'bg-slate-50 border-slate-200 text-slate-500'
-                            : 'bg-white border-slate-200 active:border-blue-400 active:bg-blue-50'
-                        }`}
-                      >
-                        {card.id === 'napkins' ? (
-                          <Layers className={`w-6 h-6 ${isSubdued ? 'text-slate-400' : 'text-slate-500'}`} />
-                        ) : (
-                          <span className={`text-2xl ${isSubdued ? 'opacity-60' : ''}`}>{card.emoji}</span>
-                        )}
-                        <span className={`text-sm font-medium text-center ${isSubdued ? 'text-slate-500' : 'text-slate-700'}`}>
-                          {card.label}
-                        </span>
-                        {isSubdued && (
-                          <span className="text-[11px] font-medium text-slate-400">
-                            {t('help.already_sent_short')}
-                          </span>
-                        )}
+                      <button key={btn.id} onClick={() => handleRetry(activeRow)}
+                        className="rounded-xl border-2 border-red-400 bg-red-50 p-[11px] min-h-[70px] flex flex-col justify-between select-none active:bg-red-100">
+                        <span className="text-[13px] font-extrabold text-red-800">{btn.shortLabel}</span>
+                        <div className="text-[12px] font-bold text-red-600 flex items-center gap-[3px] mt-1">
+                          <span className="text-[11px]">⚠</span>{tr('help.retry', 'Повторить')}
+                        </div>
                       </button>
                     );
-                  })}
-                  <button
-                    onClick={() => setShowOtherForm(prev => !prev)}
-                    className="relative col-span-2 rounded-xl border min-h-[48px] flex flex-row items-center justify-center gap-2 bg-white border-slate-200 active:border-blue-400 active:bg-blue-50"
-                  >
-                    <span className="text-xl">{'\u270F\uFE0F'}</span>
-                    <span className="text-sm font-medium text-slate-700">
-                      {t('help.other')}
-                    </span>
+                  }
+                  const s = URGENCY_STYLES[urgency] || URGENCY_STYLES.neutral;
+                  return (
+                    <div key={btn.id} className={`rounded-xl border-2 ${s.border} ${s.bg} p-[11px] min-h-[70px] flex flex-col justify-between select-none`}>
+                      <div className="flex items-start justify-between">
+                        <span className={`text-[13px] font-extrabold ${s.label}`}>{btn.shortLabel}</span>
+                        <button onClick={(e) => { e.stopPropagation(); handleSosCancel(btn.id); }}
+                          className={`w-[22px] h-[22px] rounded-full ${s.xBg} ${s.xColor} flex items-center justify-center text-[11px] font-extrabold -mt-0.5 flex-shrink-0`}>✕</button>
+                      </div>
+                      <div className={`text-[12px] font-bold ${s.timer} flex items-center gap-[3px] mt-1`}>
+                        <span className="text-[11px]">⏱</span>{timerText}
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <button key={btn.id} onClick={() => handleCardTap(btn.id)}
+                    className="rounded-xl border-2 border-gray-200 bg-gray-50 p-[11px] min-h-[70px] flex flex-row items-center gap-[9px] select-none active:bg-gray-100 active:scale-[0.97] transition-transform">
+                    {btn.icon === 'layers' ? (
+                      <Layers className="w-[22px] h-[22px] text-gray-500 flex-shrink-0" />
+                    ) : (
+                      <span className="text-xl leading-none flex-shrink-0">{btn.emoji}</span>
+                    )}
+                    <span className="text-[13px] font-bold text-gray-900 text-left leading-tight">{btn.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Cancel confirm panel */}
+            {cancelConfirmType && (
+              <div className="mx-3.5 mb-1.5 p-3 bg-red-50 border-[1.5px] border-red-200 rounded-xl">
+                <div className="text-sm font-extrabold text-red-900 mb-2.5">
+                  {tr('help.cancel_confirm_q', 'Отменить запрос?')}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setCancelConfirmType(null)}
+                    className="flex-1 py-2 rounded-lg border-2 border-gray-200 bg-white text-sm font-bold text-gray-700">
+                    {tr('help.cancel_keep', 'Оставить')}
+                  </button>
+                  <button onClick={() => {
+                      const targetRow = activeRequests.find(r => r.type === cancelConfirmType);
+                      if (targetRow) {
+                        handleResolve(cancelConfirmType);
+                      }
+                      setCancelConfirmType(null);
+                    }}
+                    className="flex-1 py-2 rounded-lg bg-red-500 text-white text-sm font-bold">
+                    {tr('help.cancel_do', 'Отменить')}
                   </button>
                 </div>
-                {showOtherForm && (
-                  <div className="space-y-3 pt-1">
-                    <div className="flex flex-wrap gap-2">
-                      {HELP_CHIPS.map(chip => (
-                        <button
-                          key={chip}
-                          onClick={() => setHelpComment(prev => prev ? `${prev}, ${chip.toLowerCase()}` : chip)}
-                          className="px-3 py-1.5 rounded-full border border-slate-200 bg-white text-sm text-slate-700 active:bg-slate-100 min-h-[36px]"
-                        >
-                          {chip}
-                        </button>
-                      ))}
-                    </div>
-                    <textarea
-                      autoFocus
-                      value={helpComment}
-                      onChange={(e) => setHelpComment(e.target.value.slice(0, 100))}
-                      maxLength={100}
-                      placeholder={t('help.comment_placeholder_other')}
-                      className="w-full rounded-lg border border-slate-200 p-3 text-sm min-h-[80px] resize-none focus:outline-none focus:ring-2 focus:ring-blue-200"
-                    />
-                    <div className="text-right text-xs text-slate-400">{helpComment.length} / 100</div>
-                  </div>
-                )}
-              </>
+              </div>
             )}
-            {undoToast && (
-              <div className="rounded-lg bg-slate-800 text-white px-4 py-3 flex items-center justify-between text-sm">
-                <span>{HELP_CARD_LABELS[undoToast.type] || undoToast.type} {t('help.sent_suffix')}</span>
-                <button onClick={handleUndo} className="text-amber-300 font-medium ml-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
-                  {t('help.undo')} ({Math.max(0, Math.ceil((undoToast.expiresAt - Date.now()) / 1000))})
+
+            {/* Active custom "other" requests — same urgency model as 6 SOS buttons */}
+            {activeRequests.filter(r => r.type === 'other').map(row => {
+              const hasError = Boolean(row.errorKind);
+              if (hasError) {
+                return (
+                  <div key={row.id} className="mx-3.5 mb-2 px-3 py-2 bg-red-50 border-[1.5px] border-red-400 rounded-[10px] flex items-center justify-between gap-2">
+                    <span className="text-[13px] text-red-800 font-semibold flex-1 truncate">
+                      «{row.message || tr('help.other_label', 'Другое')}»
+                    </span>
+                    <button onClick={() => handleRetry(row)}
+                      className="text-[12px] font-bold text-red-600 whitespace-nowrap">
+                      {tr('help.retry', 'Повторить')}
+                    </button>
+                  </div>
+                );
+              }
+              const urgency = getHelpUrgency('other', row.sentAt);
+              const s = URGENCY_STYLES[urgency] || URGENCY_STYLES.neutral;
+              return (
+                <div key={row.id} className={`mx-3.5 mb-2 px-3 py-2 ${s.bg} border-[1.5px] ${s.border} rounded-[10px] flex items-center justify-between gap-2`}>
+                  <span className={`text-[13px] ${s.label} font-semibold flex-1 truncate`}>
+                    «{row.message || tr('help.other_label', 'Другое')}»
+                  </span>
+                  <span className={`text-[12px] font-bold ${s.timer} whitespace-nowrap`}>⏱ {getHelpTimerStr(row.sentAt)}</span>
+                  <button onClick={(e) => { e.stopPropagation(); handleResolve('other', row.id); }}
+                    className={`w-[22px] h-[22px] rounded-full ${s.xBg} ${s.xColor} flex items-center justify-center text-[11px] font-extrabold flex-shrink-0`}>✕</button>
+                </div>
+              );
+            })}
+
+            {/* "Другой запрос?" link — hidden while any 'other' request is active */}
+            {!activeRequests.some(r => r.type === 'other') && !showOtherForm && (
+              <div className="px-3.5 pb-3">
+                <button onClick={() => setShowOtherForm(true)}
+                  className="text-sm text-gray-400 underline underline-offset-2 bg-transparent border-none cursor-pointer">
+                  {tr('help.other_request_link', 'Другой запрос?')}
                 </button>
               </div>
             )}
-            {helpSubmitError && !ticketRows.some((row) => row.errorKind) && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{helpSubmitError}</div>
+
+            {/* Textarea form for "other" request */}
+            {showOtherForm && (
+              <div className="mx-3.5 mb-3.5 p-2.5 bg-gray-50 border-[1.5px] border-gray-200 rounded-xl flex flex-col gap-2">
+                <textarea
+                  autoFocus
+                  value={helpComment}
+                  onChange={(e) => setHelpComment(e.target.value.slice(0, 120))}
+                  placeholder={tr('help.other_placeholder', 'Напишите, что нужно…')}
+                  maxLength={120}
+                  className="w-full rounded-lg border border-gray-200 p-2 text-sm resize-none h-[70px] focus:border-orange-400 focus:ring-1 focus:ring-orange-400 outline-none"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">{helpComment.length}/120</span>
+                  <div className="flex gap-2">
+                    <button onClick={() => { setShowOtherForm(false); setHelpComment(''); }}
+                      className="px-3 py-[7px] rounded-lg border border-gray-200 bg-white text-[13px] font-bold text-gray-700">
+                      {tr('common.cancel', 'Отмена')}
+                    </button>
+                    <button
+                      disabled={!helpComment.trim()}
+                      onClick={() => {
+                        if (!helpComment.trim()) return;
+                        const msg = helpComment.trim();
+                        if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId);
+                        const entryId = `other-${Date.now()}`;
+                        const timeoutId = setTimeout(() => {
+                          if (currentTableIdRef.current !== currentTableId) return;
+                          const now = Date.now();
+                          setRequestStates(prev => {
+                            const otherArr = Array.isArray(prev.other) ? prev.other : (prev.other ? [prev.other] : []);
+                            return {
+                              ...prev,
+                              other: [
+                                ...otherArr,
+                                {
+                                  id: entryId,
+                                  status: 'sending',
+                                  sentAt: now,
+                                  lastReminderAt: null,
+                                  reminderCount: 0,
+                                  remindCooldownUntil: null,
+                                  message: msg,
+                                  pendingAction: 'send',
+                                  errorKind: null,
+                                  errorMessage: '',
+                                  terminalHideAt: null,
+                                  syncSource: 'local',
+                                },
+                              ],
+                            };
+                          });
+                          setHelpComment(msg);
+                          pendingQuickSendRef.current = { type: 'other', action: 'send', rowId: entryId, message: msg };
+                          handlePresetSelect('other');
+                          setPendingHelpActionTick((value) => value + 1);
+                          setUndoToast(prev => (prev?.timeoutId === timeoutId ? null : prev));
+                        }, 5000);
+                        setUndoToast({ type: 'other', rowId: entryId, tableId: currentTableId, message: msg, expiresAt: Date.now() + 5000, timeoutId });
+                        setShowOtherForm(false);
+                        setHelpComment('');
+                      }}
+                      className="flex-1 py-[7px] rounded-lg bg-orange-500 text-white text-[13px] font-bold disabled:opacity-50">
+                      {tr('help.send_btn', 'Отправить')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Undo toast */}
+            {undoToast && (
+              <div className="mx-3.5 mb-3 rounded-lg bg-slate-800 text-white px-4 py-3 flex items-center justify-between text-sm">
+                <span>{HELP_CARD_LABELS[undoToast.type] || undoToast.type} {tr('help.sent_suffix', 'отправлено')}</span>
+                <button onClick={handleUndo} className="text-amber-300 font-medium ml-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                  {tr('help.undo', 'Отмена')} ({Math.max(0, Math.ceil((undoToast.expiresAt - Date.now()) / 1000))})
+                </button>
+              </div>
+            )}
+
+            {/* Generic error fallback */}
+            {helpSubmitError && !activeRequests.some(r => r.errorKind) && (
+              <div className="mx-3.5 mb-3 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                {helpSubmitError}
+              </div>
             )}
           </div>
-          {!isTicketExpanded && showOtherForm && (
-            <div className="px-4 pb-4 pt-2 border-t border-slate-100 flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1 min-h-[44px]"
-                onClick={() => { setShowOtherForm(false); setHelpComment(''); }}
-              >
-                {tr('common.cancel', 'Cancel')}
-              </Button>
-              <Button
-                className="flex-1 min-h-[44px] text-white"
-                style={{ backgroundColor: primaryColor }}
-                onClick={() => {
-                  if (!helpComment.trim()) return;
-                  const msg = helpComment.trim();
-                  if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId);
-                  const entryId = `other-${Date.now()}`;
-                  const timeoutId = setTimeout(() => {
-                    if (currentTableIdRef.current !== currentTableId) return;
-                    const now = Date.now();
-                    setRequestStates(prev => {
-                      const otherArr = Array.isArray(prev.other) ? prev.other : (prev.other ? [prev.other] : []);
-                      return {
-                        ...prev,
-                        other: [
-                          ...otherArr,
-                          {
-                            id: entryId,
-                            status: 'sending',
-                            sentAt: now,
-                            lastReminderAt: null,
-                            reminderCount: 0,
-                            remindCooldownUntil: null,
-                            message: msg,
-                            pendingAction: 'send',
-                            errorKind: null,
-                            errorMessage: '',
-                            terminalHideAt: null,
-                            syncSource: 'local',
-                          },
-                        ],
-                      };
-                    });
-                    setHelpComment(msg);
-                    pendingQuickSendRef.current = { type: 'other', action: 'send', rowId: entryId, message: msg };
-                    handlePresetSelect('other');
-                    setPendingHelpActionTick((value) => value + 1);
-                    setUndoToast(prev => (prev?.timeoutId === timeoutId ? null : prev));
-                  }, 5000);
-                  setUndoToast({ type: 'other', rowId: entryId, tableId: currentTableId, message: msg, expiresAt: Date.now() + 5000, timeoutId });
-                  setShowOtherForm(false);
-                  setHelpComment('');
-                }}
-                disabled={!helpComment.trim()}
-              >
-                {t('help.submit_arrow')}
-              </Button>
-            </div>
-          )}
-          {/* cardActionModal removed â€" replaced by ticket board + smart redirect (Fix 1B) */}
         </DrawerContent>
       </Drawer>
 
@@ -5456,5 +5323,3 @@ export default function X() {
     </div>
   );
 }
-
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
