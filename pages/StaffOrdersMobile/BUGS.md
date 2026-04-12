@@ -356,6 +356,13 @@
 - **Chain:** staffordersmobile-260407-132533-b0c8
 - **Status:** 🟡 Fixed (pending test)
 
+### SOM-S254-01 (P1) -- Collapsed table card: identity block + status chips (#288)
+- **Function:** OrderGroupCard collapsed card header (~line 2248)
+- **Root cause:** Old collapsed card used flat row with ownership icon + small table badge + jump chips inline. Didn't match v13 UX spec (identity block + status chips + urgency colors).
+- **Fix:** (1) Added `getUrgencyLevel`, `URGENCY_IDENTITY_STYLE`, `SCS_CHIP_STYLES`, `SCS_SOLID_CHIP` helpers near line 383. (2) Added `scsChips`, `scsOldestActionable`, `scsUrgency`, `scsHighlightKey` computed values inside OrderGroupCard. (3) Replaced collapsed header with: 84px identity wrapper (ownership badge outside, 78×54px identity block with pastel urgency bg, 26px dark table number) + flex-wrap chips zone (Готово/Запросы/Новые with age + longest-chip solid highlight). (4) Moved jump chips from collapsed header to expanded content (top of sections). (5) Ownership badge as overlay circle (★ mine, 🔒 other as button with stopPropagation, ☆ free). (6) 3 urgency levels: calm/warning/danger (no "normal"). (7) Free table green outline affordance.
+- **Chain:** staffordersmobile-260412-123531-7231
+- **Status:** 🟡 Fixed (pending test)
+
 ## Active Bugs
 
 ### BUG-SM-001 (P1 -- deferred) -- Complete absence of i18n

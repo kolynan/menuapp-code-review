@@ -381,6 +381,29 @@ function getAgeMinutes(dateStr) {
   return Math.max(0, Math.floor((Date.now() - safeParseDate(dateStr).getTime()) / 60000));
 }
 
+function getUrgencyLevel(ageMin) {
+  if (!Number.isFinite(ageMin) || ageMin <= 0) return 'calm';
+  if (ageMin >= 6) return 'danger';
+  if (ageMin >= 3) return 'warning';
+  return 'calm';
+}
+const URGENCY_IDENTITY_STYLE = {
+  calm:    { background: '#F2F2F7', border: '1.5px solid #D9D9E0' },
+  warning: { background: '#FFF1DD' },
+  danger:  { background: '#FFE8E5' },
+};
+const SCS_CHIP_STYLES = {
+  green: { background: '#34c75920', color: '#30a14e' },
+  red:   { background: '#ff3b3020', color: '#ff3b30' },
+  blue:  { background: '#007aff20', color: '#007aff' },
+  gray:  { background: '#f2f2f7',   color: '#8e8e93' },
+};
+const SCS_SOLID_CHIP = {
+  green: { background: '#34c759', color: '#fff' },
+  red:   { background: '#ff3b30', color: '#fff' },
+  blue:  { background: '#007aff', color: '#fff' },
+};
+
 function stripTablePrefix(label) {
   if (!label) return "";
   return String(label).replace(/^\s*\u0421\u0442\u043E\u043B\s*/i, "").trim();
@@ -2023,6 +2046,47 @@ function OrderGroupCard({
     billData && billData.total > 0 && { label: HALL_UI_TEXT.bill, count: formatHallMoney(billData.total), kind: "bill", tone: "gray" },
   ].filter(Boolean);
 
+  const scsChips = useMemo(() => {
+    const chips = [];
+    if (readyOrders.length > 0) {
+      const ageMin = getOldestAgeMinutes(readyOrders, o => o.stage_entered_at || o.created_date) || 0;
+      chips.push({ key: 'ready', label: '\u0413\u043E\u0442\u043E\u0432\u043E', count: readyOrders.length, ageMin, isActionable: true, tone: 'green' });
+    }
+    if (tableRequests.length > 0) {
+      const ageMin = getOldestAgeMinutes(tableRequests, r => r.created_date) || 0;
+      chips.push({ key: 'requests', label: '\u0417\u0430\u043F\u0440\u043E\u0441\u044B', count: tableRequests.length, ageMin, isActionable: true, tone: 'red' });
+    }
+    if (newOrders.length > 0) {
+      const ageMin = getOldestAgeMinutes(newOrders, o => o.created_date) || 0;
+      chips.push({ key: 'new', label: '\u041D\u043E\u0432\u044B\u0435', count: newOrders.length, ageMin, isActionable: true, tone: 'blue' });
+    }
+    inProgressSections.forEach(section => {
+      if (section.rowCount > 0) {
+        const label = section.sid === '__null__' ? HALL_UI_TEXT.inProgressShort : section.label;
+        chips.push({ key: section.sid, label, count: section.rowCount, ageMin: 0, isActionable: false, tone: 'gray' });
+      }
+    });
+    return chips;
+  }, [readyOrders, tableRequests, newOrders, inProgressSections, getOldestAgeMinutes]);
+
+  const scsOldestActionable = useMemo(() => {
+    const ages = scsChips.filter(c => c.isActionable && c.ageMin > 0).map(c => c.ageMin);
+    return ages.length > 0 ? Math.max(...ages) : 0;
+  }, [scsChips]);
+
+  const scsUrgency = getUrgencyLevel(scsOldestActionable);
+
+  const scsHighlightKey = useMemo(() => {
+    const actionable = scsChips.filter(c => c.isActionable && c.ageMin > 0);
+    if (actionable.length === 0) return null;
+    const maxAge = Math.max(...actionable.map(c => c.ageMin));
+    for (const key of ['ready', 'requests', 'new']) {
+      const chip = actionable.find(c => c.key === key && c.ageMin === maxAge);
+      if (chip) return chip.key;
+    }
+    return actionable.find(c => c.ageMin === maxAge)?.key || null;
+  }, [scsChips]);
+
   const legacySummaryLines = useMemo(() => {
     const lines = [];
     if (newOrders.length > 0) lines.push({ key: "new", label: '\u041D\u043E\u0432\u044B\u0435', count: newOrders.length, ageMin: getOldestAgeMinutes(newOrders, (order) => order.created_date) || 0 });
@@ -2179,30 +2243,50 @@ function OrderGroupCard({
     <div data-group-id={group.id} className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-all duration-300 ${style.bgClass} ${style.borderClass} ${highlightRing}`}>
       <div className="px-4 pt-3 pb-3 cursor-pointer active:opacity-80" onClick={onToggleExpand} role="button" aria-expanded={isExpanded} aria-label={group.type === "table" ? identifier : `${identifier}: ${statusLabel}`}>
         {group.type === "table" ? (
-          <div className="space-y-2">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                {ownershipState === "mine" ? (
-                  <span className="shrink-0"><Star className="w-4 h-4 fill-yellow-400 text-yellow-400" /></span>
-                ) : ownershipState === "other" ? (
-                  <button type="button" onClick={showOtherTableHint} className="shrink-0 rounded-full p-0.5 -m-0.5" aria-label={HALL_UI_TEXT.otherTableTitle}>
-                    <Lock className="w-4 h-4 text-slate-400" />
-                  </button>
-                ) : (
-                  <span className="shrink-0"><Star className="w-4 h-4 text-slate-300" /></span>
+          <div>
+            <div style={{display:'flex', alignItems:'center', gap:'10px', minHeight:'72px'}}>
+              <div style={{position:'relative', flexShrink:0, width:'84px', display:'flex', alignItems:'center', justifyContent:'flex-end'}}>
+                {ownershipState === "mine" && (
+                  <div style={{position:'absolute', top:'-7px', left:'-7px', width:'26px', height:'26px', borderRadius:'50%', background:'#FFF8E7', border:'1.5px solid #FFD60A50', boxShadow:'0 1px 4px rgba(0,0,0,0.13)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'13px', zIndex:2}} aria-label={"\u041C\u043E\u0439 \u0441\u0442\u043E\u043B"}>
+                    {'\u2605'}
+                  </div>
                 )}
-                <span className="inline-flex min-w-[2rem] items-center justify-center rounded-lg bg-slate-900 px-2.5 py-1 text-sm font-bold text-white">{compactTableLabel}</span>
-                {tableData?.zone_name && <span className="rounded-full bg-white/80 px-2 py-1 text-[11px] font-medium text-slate-600 border border-slate-200 truncate">{tableData.zone_name}</span>}
+                {ownershipState === "other" && (
+                  <button type="button" onClick={(e) => { e.stopPropagation(); showOtherTableHint(e); }} aria-label={HALL_UI_TEXT.otherTableTitle} style={{position:'absolute', top:'-7px', left:'-7px', width:'26px', height:'26px', borderRadius:'50%', background:'#f2f2f7', border:'1.5px solid #d1d1d6', boxShadow:'0 1px 4px rgba(0,0,0,0.13)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'13px', zIndex:2, cursor:'pointer', padding:0}}>
+                    {'\uD83D\uDD12'}
+                  </button>
+                )}
+                {ownershipState === "free" && (
+                  <div style={{position:'absolute', top:'-7px', left:'-7px', width:'26px', height:'26px', borderRadius:'50%', background:'#EAF7EE', border:'1.5px solid #34c75940', boxShadow:'0 1px 4px rgba(0,0,0,0.13)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'13px', zIndex:2}} aria-label={"\u0421\u0432\u043E\u0431\u043E\u0434\u043D\u044B\u0439 \u0441\u0442\u043E\u043B"}>
+                    {'\u2606'}
+                  </div>
+                )}
+                <div style={{width:'78px', height:'54px', borderRadius:'12px', display:'flex', alignItems:'center', justifyContent:'center', ...URGENCY_IDENTITY_STYLE[scsUrgency], ...(ownershipState === 'free' ? {outline:'2.5px solid #34c75980', outlineOffset:'3px'} : {})}}>
+                  <span style={{fontSize:'26px', fontWeight:700, color:'#1c1c1e', fontVariantNumeric:'tabular-nums'}}>{compactTableLabel}</span>
+                </div>
               </div>
-              {isExpanded && <span className="text-xs font-semibold text-slate-500 shrink-0">{HALL_UI_TEXT.collapse}</span>}
+              <div style={{flex:1, display:'flex', flexWrap:'wrap', gap:'6px', minWidth:0, alignContent:'center'}}>
+                {scsChips.length > 0 ? scsChips.map(chip => {
+                  const isHighlight = chip.key === scsHighlightKey;
+                  const chipStyle = isHighlight ? SCS_SOLID_CHIP[chip.tone] : SCS_CHIP_STYLES[chip.tone];
+                  const text = chip.isActionable
+                    ? `${chip.label} ${chip.count} \u00B7 ${formatCompactMinutes(chip.ageMin)}`
+                    : `${chip.label} ${chip.count}`;
+                  return (
+                    <span key={chip.key} style={{height:'26px', padding:'0 9px', borderRadius:'13px', fontSize:'13px', fontWeight:600, whiteSpace:'nowrap', display:'inline-flex', alignItems:'center', ...chipStyle}}>{text}</span>
+                  );
+                }) : (
+                  <span className="text-xs text-slate-400">{HALL_UI_TEXT.noActions}</span>
+                )}
+              </div>
+              {isExpanded && <span className="text-xs font-semibold text-slate-500 shrink-0 self-start">{HALL_UI_TEXT.collapse}</span>}
             </div>
             {ownerHintVisible && (
-              <div className="rounded-lg bg-slate-900 px-3 py-2 text-white">
+              <div className="rounded-lg bg-slate-900 px-3 py-2 text-white mt-2">
                 <div className="text-xs font-semibold">{HALL_UI_TEXT.otherTableTitle}</div>
                 <div className="text-[11px] text-slate-200">{HALL_UI_TEXT.otherTableHint}</div>
               </div>
             )}
-            {jumpChips.length > 0 ? <div className="flex flex-wrap items-center gap-1.5 mt-1">{jumpChips.map(chip => <button key={chip.kind} type="button" onClick={(e) => { e.stopPropagation(); setIsExpanded(true); scrollToSection(chip.kind); }} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold border min-h-[32px] ${HALL_CHIP_STYLES[chip.tone]}`}>{`${chip.label} ${chip.count}`}</button>)}</div> : <div className="text-xs text-slate-400">{HALL_UI_TEXT.noActions}</div>}
           </div>
         ) : (
           <React.Fragment>
@@ -2231,6 +2315,17 @@ function OrderGroupCard({
         <div className="border-t border-slate-200 px-4 py-3 space-y-4">
           {group.type === "table" ? (
             <React.Fragment>
+              {jumpChips.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 pb-3">
+                  {jumpChips.map(chip => (
+                    <button key={chip.kind} type="button"
+                      onClick={(e) => { e.stopPropagation(); scrollToSection(chip.kind); }}
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold border min-h-[32px] ${HALL_CHIP_STYLES[chip.tone]}`}>
+                      {`${chip.label} ${chip.count}`}
+                    </button>
+                  ))}
+                </div>
+              )}
               {tableRequests.length > 0 && <div ref={requestsSectionRef}><div className="mb-2 flex items-center justify-between gap-3"><div className="text-[11px] font-bold uppercase tracking-wider text-violet-600"><span className="bg-violet-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.requests} (${tableRequests.length})`}</span></div><ChevronDown className="w-4 h-4 text-slate-400" /></div><div className="space-y-1.5">{tableRequests.map((request) => { const ageMin = getAgeMinutes(request.created_date); const label = REQUEST_TYPE_LABELS[request.request_type] || request.request_type; const isAccepted = request.status === 'accepted'; const isAssignedToMe = request.assignee === effectiveUserId; return <div key={request.id} className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2"><div className="flex items-center gap-3"><div className="min-w-0 flex-1"><div className="flex items-center gap-2 min-w-0"><span className="truncate text-sm font-medium text-slate-900">{label}</span><span className="text-xs text-violet-500 shrink-0">{formatCompactMinutes(ageMin)}</span>{isAccepted && isAssignedToMe && staffName && <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">{staffName}</span>}</div>{request.comment && <div className="mt-0.5 text-xs text-slate-500 truncate">{request.comment}</div>}</div>{onCloseRequest && (isAccepted ? <button type="button" onClick={() => onCloseRequest(request.id, "done")} disabled={isRequestPending} className="shrink-0 rounded-lg border border-green-200 bg-white px-3 py-2 text-xs font-semibold text-green-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.serveRequest}</button> : <button type="button" onClick={() => onCloseRequest(request.id, "accepted", { assignee: effectiveUserId, assigned_at: new Date().toISOString() })} disabled={isRequestPending} className="shrink-0 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{HALL_UI_TEXT.acceptRequest}</button>)}</div></div>; })}</div>{tableRequests.length > 0 && (() => { const allNew = tableRequests.every(r => !r.status || r.status === 'new' || r.status === 'open'); const allAccepted = tableRequests.every(r => r.status === 'accepted'); if (!allNew && !allAccepted) return null; return <div className="border-t border-red-100 pt-2 mt-2"><button type="button" onClick={allNew ? () => tableRequests.forEach(r => onCloseRequest(r.id, 'accepted', { assignee: effectiveUserId, assigned_at: new Date().toISOString() })) : () => tableRequests.forEach(r => onCloseRequest(r.id, 'done'))} disabled={isRequestPending} className="w-full rounded-lg bg-red-500 text-white px-4 py-2.5 text-sm font-semibold min-h-[44px] active:scale-[0.99] disabled:opacity-60">{allNew ? `${HALL_UI_TEXT.acceptAllRequests} (${tableRequests.length})` : `${HALL_UI_TEXT.serveAllRequests} (${tableRequests.length})`}</button></div>; })()}</div>}
 
               {newOrders.length > 0 && <div ref={newSectionRef}><div className="flex items-center justify-between gap-3 mb-2"><div className="text-[11px] font-bold uppercase tracking-wider text-blue-600"><span className="bg-blue-50 rounded-md px-2 py-0.5">{`${HALL_UI_TEXT.new} (${newOrders.length} ${pluralRu(newOrders.length, "\u0433\u043E\u0441\u0442\u044C", "\u0433\u043E\u0441\u0442\u044F", "\u0433\u043E\u0441\u0442\u0435\u0439")} \u00B7 ${countRows(newRows, newOrders.length)} ${pluralRu(countRows(newRows, newOrders.length), "\u0431\u043B\u044E\u0434\u043E", "\u0431\u043B\u044E\u0434\u0430", "\u0431\u043B\u044E\u0434")})`}</span></div><ChevronDown className="w-4 h-4 text-slate-400" /></div>{renderHallRows(newRows, "blue")}<div className="border-t border-blue-100 pt-2 mt-2"><button type="button" onClick={() => handleOrdersAction(newOrders)} disabled={advanceMutation.isPending} className="w-full rounded-lg bg-blue-600 text-white px-4 py-2.5 text-sm font-semibold min-h-[44px] active:scale-[0.99] disabled:opacity-60">{getOrderActionMeta(newOrders[0]).willServe ? `${HALL_UI_TEXT.serveAll} (${countRows(newRows, newOrders.length)})` : `${HALL_UI_TEXT.acceptAll} (${countRows(newRows, newOrders.length)})`}</button></div></div>}
