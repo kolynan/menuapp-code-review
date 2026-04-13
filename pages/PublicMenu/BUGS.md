@@ -139,6 +139,30 @@ session: 214
 
 ## Fixed Bugs (исправлены)
 
+### FIX-#285: "Другой запрос?" link — show disabled instead of hidden — FIXED S262
+- **Приоритет:** P2
+- **Когда:** S262 (chain publicmenu-260413-173504-b1a1)
+- **Файл:** x.jsx, lines ~5095–5111
+- **Фикс:** Link always visible when form is closed; disabled visual (grey, no underline) when active 'other' request exists. Helper text below. New i18n key `help.other_only_one`.
+
+### FIX-#284: Auto-resolve 24h+ requests + stale timer display — FIXED S262
+- **Приоритет:** P2
+- **Когда:** S262 (chain publicmenu-260413-173504-b1a1)
+- **Файл:** x.jsx, `getHelpTimerStr` + new useEffect
+- **Фикс:** (a) `getHelpTimerStr` returns stale status text for ≥24h requests. (b) New useEffect auto-resolves requests older than 24h on each timerTick.
+
+### FIX-#286: Save textarea draft when drawer closes — FIXED S262
+- **Приоритет:** P3
+- **Когда:** S262 (chain publicmenu-260413-173504-b1a1)
+- **Файл:** x.jsx, `closeHelpDrawer` / `openHelpDrawer` / Cancel / Send
+- **Фикс:** Draft saved to localStorage on drawer close, restored on open. Cleared on Cancel and Send. All localStorage access in try/catch (KB-033).
+
+### FIX-#232: HelpFab — move from right to left side — FIXED S262
+- **Приоритет:** P2
+- **Когда:** S262 (chain publicmenu-260413-173504-b1a1)
+- **Файл:** HelpFab.jsx, line 7
+- **Фикс:** `right-4` → `left-4`, `md:right-8` → `md:left-8`.
+
 ### FIX-#235: EN i18n — Russian fallbacks replaced with English — FIXED S219
 - **Приоритет:** P1
 - **Когда:** S219 (chain publicmenu-260404-054037-ad20)

@@ -592,6 +592,7 @@ const I18N_FALLBACKS = {
   "help.cancel_keep": "Keep",
   "help.cancel_do": "Cancel",
   "help.other_request_link": "Something else?",
+  "help.other_only_one": "Only 1 custom request at a time",
   "help.other_placeholder": "Describe what you need…",
   "help.send_btn": "Send",
   // Help Chips (quick suggestions in help drawer)
@@ -667,6 +668,7 @@ const I18N_FALLBACKS_RU = {
   "help.cancel_keep": "Оставить",
   "help.cancel_do": "Отменить",
   "help.other_request_link": "Другой запрос?",
+  "help.other_only_one": "Можно только 1 такой запрос одновременно",
   "help.other_placeholder": "Напишите, что нужно…",
   "help.send_btn": "Отправить",
   "help.sent_suffix": "отправлено",
@@ -1898,6 +1900,7 @@ export default function X() {
   const getHelpTimerStr = useCallback((sentAt) => {
     if (!sentAt) return '';
     const elapsedSec = Math.floor((Date.now() - sentAt) / 1000);
+    if (elapsedSec >= 24 * 60 * 60) return tr('help.stale_status', 'Данные могли устареть');
     if (elapsedSec < 60) return '<1м';
     const min = Math.floor(elapsedSec / 60);
     return `${min}м`;
@@ -2134,6 +2137,26 @@ export default function X() {
     });
   }, [getNormalizedHelpState, requestStates, timerTick]);
 
+  // #284: Auto-resolve requests older than 24h
+  useEffect(() => {
+    const STALE_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    Object.entries(requestStates).forEach(([type, state]) => {
+      if (type === 'other') {
+        const rows = Array.isArray(state) ? state : [];
+        rows.forEach((row) => {
+          if (row.sentAt && (now - row.sentAt > STALE_MS) && row.status !== 'closed_by_guest' && !row.terminalHideAt) {
+            handleResolve('other', row.id);
+          }
+        });
+      } else {
+        if (state?.sentAt && (now - state.sentAt > STALE_MS) && state.status !== 'closed_by_guest' && !state.terminalHideAt) {
+          handleResolve(type);
+        }
+      }
+    });
+  }, [timerTick, requestStates, handleResolve]);
+
   const helpSyncEnabled = Boolean(partner?.id && currentTableId && (isHelpModalOpen || hasAnyHelpState || isHelpRestoring));
   const { data: helpRequestFeed = [], isError: isHelpSyncError, dataUpdatedAt: helpSyncUpdatedAt } = useQuery({
     queryKey: ['helpDrawerRequests', partner?.id, currentTableId],
@@ -2363,18 +2386,33 @@ export default function X() {
     setHelpComment('');
     setIsTicketExpanded(false);
     setCancelConfirmType(null);
+    // #286: Restore draft if exists and no active 'other' request
+    const hasActiveOther = activeRequests?.some(r => r.type === 'other');
+    if (!hasActiveOther) {
+      try {
+        const draft = localStorage.getItem('sos_draft_' + currentTableId);
+        if (draft && draft.trim()) {
+          setHelpComment(draft);
+          setShowOtherForm(true);
+        }
+      } catch (e) { /* KB-033: localStorage unavailable in private browsers */ }
+    }
     setIsHelpModalOpen(true);
     pushOverlay('help');
-  }, [currentTableId, pushOverlay, setHelpComment, setShowTableConfirmSheet]);
+  }, [currentTableId, pushOverlay, setHelpComment, setShowTableConfirmSheet, activeRequests]);
 
   const closeHelpDrawer = useCallback(() => {
+    // #286: Save draft before clearing state
+    if (showOtherForm && helpComment.trim() && currentTableId) {
+      try { localStorage.setItem('sos_draft_' + currentTableId, helpComment); } catch (e) { /* KB-033 */ }
+    }
     popOverlay('help');
     setIsHelpModalOpen(false);
     setIsTicketExpanded(false);
     setShowOtherForm(false);
     setHelpComment('');
     setCancelConfirmType(null);
-  }, [popOverlay, setHelpComment]);
+  }, [popOverlay, setHelpComment, showOtherForm, helpComment, currentTableId]);
 
   // HD-01 + HD-06: Card tap with 5s undo delay before actual server send
   const handleCardTap = useCallback((type) => {
@@ -5050,15 +5088,27 @@ export default function X() {
               );
             })}
 
-            {/* "Другой запрос?" link — hidden while any 'other' request is active */}
-            {!activeRequests.some(r => r.type === 'other') && !showOtherForm && (
-              <div className="px-3.5 pb-3">
-                <button onClick={() => setShowOtherForm(true)}
-                  className="text-sm text-gray-400 underline underline-offset-2 bg-transparent border-none cursor-pointer">
-                  {tr('help.other_request_link', 'Другой запрос?')}
-                </button>
-              </div>
-            )}
+            {/* "Другой запрос?" link — disabled (not hidden) while any 'other' request is active */}
+            {!showOtherForm && (() => {
+              const hasActiveOther = activeRequests.some(r => r.type === 'other');
+              return (
+                <div className="px-3.5 pb-3">
+                  <button
+                    onClick={() => { if (!hasActiveOther) setShowOtherForm(true); }}
+                    className={hasActiveOther
+                      ? "text-sm text-gray-300 bg-transparent border-none cursor-default"
+                      : "text-sm text-gray-400 underline underline-offset-2 bg-transparent border-none cursor-pointer"}
+                  >
+                    {tr('help.other_request_link', 'Другой запрос?')}
+                  </button>
+                  {hasActiveOther && (
+                    <p className="text-[11px] text-gray-300 mt-0.5">
+                      {tr('help.other_only_one', 'Можно только 1 такой запрос одновременно')}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Textarea form for "other" request */}
             {showOtherForm && (
@@ -5074,7 +5124,7 @@ export default function X() {
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-400">{helpComment.length}/120</span>
                   <div className="flex gap-2">
-                    <button onClick={() => { setShowOtherForm(false); setHelpComment(''); }}
+                    <button onClick={() => { setShowOtherForm(false); setHelpComment(''); if (currentTableId) { try { localStorage.removeItem('sos_draft_' + currentTableId); } catch (e) { /* KB-033 */ } } }}
                       className="px-3 py-[7px] rounded-lg border border-gray-200 bg-white text-[13px] font-bold text-gray-700">
                       {tr('common.cancel', 'Отмена')}
                     </button>
@@ -5120,6 +5170,7 @@ export default function X() {
                         setUndoToast({ type: 'other', rowId: entryId, tableId: currentTableId, message: msg, expiresAt: Date.now() + 5000, timeoutId });
                         setShowOtherForm(false);
                         setHelpComment('');
+                        if (currentTableId) { try { localStorage.removeItem('sos_draft_' + currentTableId); } catch (e) { /* KB-033 */ } }
                       }}
                       className="flex-1 py-[7px] rounded-lg bg-orange-500 text-white text-[13px] font-bold disabled:opacity-50">
                       {tr('help.send_btn', 'Отправить')}
