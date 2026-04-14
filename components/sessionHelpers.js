@@ -160,6 +160,14 @@ export async function closeSession(sessionId) {
     status: "closed",
     closed_at: new Date().toISOString()
   });
+
+  // S267: Bulk-close all non-cancelled orders in this session.
+  const sessionOrders = await base44.entities.Order.filter({ table_session: sessionId });
+  await Promise.all(
+    sessionOrders
+      .filter(o => o.status !== 'cancelled')
+      .map(o => base44.entities.Order.update(o.id, { status: 'closed' }))
+  );
 }
 
 // ============================================================
