@@ -89,28 +89,17 @@ export default function CartView({
   // ===== P1 Expandable States =====
   // CV-33: splitExpanded removed — split-order section removed
   // loyaltyExpanded removed — loyalty section simplified to motivation text (#87 KS-1)
-  // CV-01/CV-09: Status-based bucket expand states (replaces old binary split)
+  // CV-01/CV-48/CV-52: 2-group expand states (Выдано / В работе)
   const [expandedStatuses, setExpandedStatuses] = React.useState({
-    served: false, // Подано — collapsed by default (CV-10)
-    ready: true,
-    in_progress: true,
-    accepted: true,
-    new_order: true, // Отправлено
+    served: false, // Выдано — collapsed by default (CV-10)
+    in_progress: true, // В работе — expanded by default
   });
   // CV-28: expandedOrders removed — flat dish list replaces per-order collapse
 
-  // CV-32: Auto-collapse "Подано" when cart is non-empty (D1 state)
-  React.useEffect(() => {
-    if (cart.length > 0) {
-      setExpandedStatuses(prev => ({
-        ...prev,
-        served: false,
-        ready: false,
-        in_progress: false,
-        accepted: false,
-      }));
-    }
-  }, [cart.length > 0]);
+  // CV-46: Track manual overrides so polling doesn't reset user's toggle
+  const manualOverrideRef = React.useRef({});
+  // CV-46: Track previous group keys for structural change detection
+  const prevGroupKeysRef = React.useRef('');
   const [showRewardEmailForm, setShowRewardEmailForm] = React.useState(false);
   const [rewardEmail, setRewardEmail] = React.useState('');
   const [rewardEmailSubmitting, setRewardEmailSubmitting] = React.useState(false);
@@ -122,6 +111,8 @@ export default function CartView({
 
   // ===== P0: Table-code verification UX (mask + auto-verify + cooldown) =====
   const [infoModal, setInfoModal] = React.useState(null); // 'online' | 'tableCode' | null
+  // CV-48/Fix 3: Submit feedback phase (idle → submitting → success → idle, or error)
+  const [submitPhase, setSubmitPhase] = React.useState('idle'); // 'idle' | 'submitting' | 'success' | 'error'
   const [codeAttempts, setCodeAttempts] = React.useState(0);
   const [codeLockedUntil, setCodeLockedUntil] = React.useState(null); // timestamp ms
   const [nowTs, setNowTs] = React.useState(() => Date.now());
@@ -134,6 +125,36 @@ export default function CartView({
 
   // Cleanup reward-email timer on unmount (PM-S140-03)
   React.useEffect(() => () => clearTimeout(rewardTimerRef.current), []);
+
+  // CV-48/Fix 3: Track isSubmitting → submitPhase transitions
+  React.useEffect(() => {
+    if (isSubmitting) {
+      setSubmitPhase('submitting');
+    } else if (submitPhase === 'submitting') {
+      // isSubmitting went false — check for error
+      if (submitError) {
+        setSubmitPhase('error');
+      } else {
+        setSubmitPhase('success');
+      }
+    }
+  }, [isSubmitting, submitError]);
+
+  // CV-48/Fix 3: Auto-transition success → idle after 1.5s
+  React.useEffect(() => {
+    if (submitPhase === 'success') {
+      const timer = setTimeout(() => setSubmitPhase('idle'), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [submitPhase]);
+
+  // CV-48/Fix 3: Reset submitPhase on drawer close
+  React.useEffect(() => {
+    // When cart becomes empty after successful submit, reset phase
+    if (cart.length === 0 && submitPhase === 'success') {
+      // Will auto-transition via the success timer above
+    }
+  }, [cart.length, submitPhase]);
 
   // Partner-configurable settings (fallbacks until Base44 adds real fields)
   const tableCodeLength = React.useMemo(() => {
@@ -271,10 +292,10 @@ export default function CartView({
     return norm;
   };
 
-  // Safe status label - guest-facing (CV-08: 5 statuses)
+  // Safe status label - guest-facing (CV-52: only 2 statuses)
   const getSafeStatus = (status) => {
     if (!status) {
-      return { icon: '🔵', label: tr('status.sent', 'Отправлено'), color: '#6B7280' };
+      return { icon: '🔵', label: tr('cart.group.in_progress', 'В работе'), color: '#6B7280' };
     }
 
     let label = status.label || '';
@@ -284,27 +305,31 @@ export default function CartView({
       const parts = label.split('.');
       const code = parts[parts.length - 1];
 
-      const fallbacks = {
-        'new': tr('status.sent', 'Отправлено'),
-        'start': tr('status.cooking', 'Готовится'),
-        'cook': tr('status.cooking', 'Готовится'),
-        'cooking': tr('status.cooking', 'Готовится'),
-        'finish': tr('status.ready', 'Готов'),
-        'ready': tr('status.ready', 'Готов'),
-        'done': tr('status.served', 'Подано'),
-        'accepted': tr('status.accepted', 'Принят'),
-        'served': tr('status.served', 'Подано'),
-        'completed': tr('status.served', 'Подано'),
-        'cancel': tr('status.cancelled', 'Отменён'),
-        'cancelled': tr('status.cancelled', 'Отменён'),
-      };
+      // CV-52: Map all statuses to 2 guest-facing labels
+      const servedCodes = ['done', 'served', 'completed'];
+      const cancelledCodes = ['cancel', 'cancelled'];
 
-      label = fallbacks[code] || tr('status.sent', 'Отправлено');
+      if (servedCodes.includes(code)) {
+        label = tr('cart.group.served', 'Выдано');
+      } else if (cancelledCodes.includes(code)) {
+        label = tr('status.cancelled', 'Отменён');
+      } else {
+        label = tr('cart.group.in_progress', 'В работе');
+      }
+    } else if (label) {
+      // CV-52: Map old Russian status labels to 2 guest-facing groups
+      const oldServedLabels = ['\u041f\u043e\u0434\u0430\u043d\u043e']; // Подано
+      const oldInProgressLabels = ['\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043e', '\u041f\u0440\u0438\u043d\u044f\u0442', '\u0413\u043e\u0442\u043e\u0432\u0438\u0442\u0441\u044f', '\u0413\u043e\u0442\u043e\u0432']; // old non-served labels
+      if (oldServedLabels.includes(label)) {
+        label = tr('cart.group.served', 'Выдано');
+      } else if (oldInProgressLabels.includes(label)) {
+        label = tr('cart.group.in_progress', 'В работе');
+      }
     }
 
     return {
       icon: status.icon || '🔵',
-      label: label,
+      label: label || tr('cart.group.in_progress', 'В работе'),
       color: status.color || '#6B7280'
     };
   };
@@ -398,20 +423,36 @@ export default function CartView({
       });
   }, [myOrders]);
 
-  // ===== CV-01/CV-09: Status-based buckets (replaces binary Выдано/Заказано split) =====
+  // ===== CV-01/CV-48/CV-52: 2-group model (В работе / Выдано) =====
   const statusBuckets = React.useMemo(() => {
-    const buckets = { served: [], ready: [], in_progress: [], accepted: [], new_order: [] };
+    const groups = { served: [], in_progress: [] };
     todayMyOrders.forEach(o => {
-      const s = o.status;
-      if (s === 'served' || s === 'completed') buckets.served.push(o);
-      else if (s === 'ready') buckets.ready.push(o);
-      else if (s === 'in_progress') buckets.in_progress.push(o);
-      else if (s === 'accepted') buckets.accepted.push(o);
-      else if (s === 'new') buckets.new_order.push(o);
-      // cancelled: already filtered out
+      const s = (o.status || 'new').toLowerCase();
+      if (s === 'served' || s === 'completed') groups.served.push(o);
+      else if (s !== 'cancelled') groups.in_progress.push(o);
     });
-    return buckets;
+    return groups;
   }, [todayMyOrders]);
+
+  // CV-46/Fix 4: Auto-collapse Выдано based on structural changes
+  const currentGroupKeys = [
+    statusBuckets.served.length > 0 ? 'S' : '',
+    statusBuckets.in_progress.length > 0 ? 'I' : '',
+    cart.length > 0 ? 'C' : ''
+  ].join('');
+
+  React.useEffect(() => {
+    const structuralChange = currentGroupKeys !== prevGroupKeysRef.current;
+    prevGroupKeysRef.current = currentGroupKeys;
+
+    if (structuralChange && !manualOverrideRef.current.served) {
+      const otherGroupsExist = statusBuckets.in_progress.length > 0 || cart.length > 0;
+      setExpandedStatuses(prev => ({
+        ...prev,
+        served: !otherGroupsExist
+      }));
+    }
+  }, [currentGroupKeys]);
 
   // ===== CV-02: Orders sum for drawer header (replaces ИТОГО ЗА ВИЗИТ) =====
   const ordersSum = React.useMemo(() => {
@@ -488,13 +529,10 @@ export default function CartView({
 
   // loyaltySummary + reviewRewardLabel removed — loyalty section simplified (#87 KS-1)
 
-  // ===== CV-01: Bucket display names =====
+  // ===== CV-01/CV-52: 2-group display names =====
   const bucketDisplayNames = {
-    served: 'Подано',
-    ready: 'Готов',
-    in_progress: 'Готовится',
-    accepted: 'Принят',
-    new_order: 'Отправлено',
+    served: tr('cart.group.served', 'Выдано'),
+    in_progress: tr('cart.group.in_progress', 'В работе'),
   };
 
 
@@ -652,11 +690,7 @@ export default function CartView({
             })}
           </div>
         ))}
-        {groups.length === 0 && orders.length > 0 && (
-          <div className="text-sm text-slate-500 py-1">
-            {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(parseFloat(orders.reduce((s, o) => s + (Number(o.total_amount) || 0), 0).toFixed(2)))}
-          </div>
-        )}
+        {/* CV-50: Inline subtotal removed — money only in drawer header */}
       </div>
     );
   };
@@ -709,17 +743,20 @@ export default function CartView({
                 </button>
               )}
             </div>
-            {/* CV-30: Order count + sum in drawer header */}
-            {ordersSum > 0 && (() => {
-              const cnt = todayMyOrders.length;
-              const plural = cnt === 1 ? tr('cart.order_one', 'заказ')
-                : (cnt >= 2 && cnt <= 4) ? tr('cart.order_few', 'заказа')
-                : tr('cart.order_many', 'заказов');
-              return (
+            {/* CV-50: Dish count + total sum in drawer header (orders + cart) */}
+            {(ordersSum > 0 || cart.length > 0) && (() => {
+              const ordersItemCount = todayMyOrders.reduce((sum, o) => {
+                const items = itemsByOrder.get(o.id) || [];
+                return sum + items.reduce((s, it) => s + (it.quantity || 1), 0);
+              }, 0);
+              const cartItemCount = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
+              const totalDishCount = ordersItemCount + cartItemCount;
+              const headerTotal = ordersSum + (Number(cartTotalAmount) || 0);
+              return totalDishCount > 0 ? (
                 <div className="text-xs text-slate-500 mt-0.5">
-                  {cnt} {plural} · {formatPrice(ordersSum)}
+                  {totalDishCount} {tr('cart.header.dishes', 'блюда')} · {formatPrice(parseFloat(headerTotal.toFixed(2)))}
                 </div>
-              );
+              ) : null;
             })()}
           </div>
 
@@ -845,17 +882,20 @@ export default function CartView({
         </Card>
       )}
 
+      {/* CV-01: Empty state — no orders and no cart */}
+      {statusBuckets.served.length === 0 && statusBuckets.in_progress.length === 0 && cart.length === 0 && todayMyOrders.length === 0 && (
+        <div className="text-center py-8">
+          <p className="text-sm text-slate-500">{tr('cart.empty', 'Корзина пуста')}</p>
+        </div>
+      )}
+
       {/* Fix 9 — D3: All served + cart empty → «Ничего не ждёте» screen */}
       {(() => {
-        const isV8 = statusBuckets.accepted.length === 0
-          && statusBuckets.in_progress.length === 0
-          && statusBuckets.ready.length === 0
-          && statusBuckets.new_order.length === 0
+        const isV8 = statusBuckets.in_progress.length === 0
           && statusBuckets.served.length > 0
           && cart.length === 0;
 
         if (isV8) {
-          const servedSubtotal = parseFloat(statusBuckets.served.reduce((s, o) => s + (Number(o.total_amount) || 0), 0).toFixed(2));
           return (
             <>
               <div className="text-center py-6 mb-4">
@@ -869,7 +909,7 @@ export default function CartView({
                   <button
                     type="button"
                     className="w-full flex items-center justify-between text-left min-h-[44px]"
-                    onClick={() => setExpandedStatuses(prev => ({ ...prev, served: !prev.served }))}
+                    onClick={() => { manualOverrideRef.current.served = true; setExpandedStatuses(prev => ({ ...prev, served: !prev.served })); }}
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-base font-semibold text-slate-800">
@@ -901,11 +941,8 @@ export default function CartView({
                               >{tr('review.rate', 'Оценить')} ({unratedServedCount})</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-slate-600">{formatPrice(servedSubtotal)}</span>
-                      <div className="min-w-[44px] min-h-[44px] flex items-center justify-end">
-                        {expandedStatuses.served ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                      </div>
+                    <div className="min-w-[44px] min-h-[44px] flex items-center justify-end">
+                      {expandedStatuses.served ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                     </div>
                   </button>
                   {/* CV-05 v2: Rating mode micro-label */}
@@ -929,13 +966,12 @@ export default function CartView({
           );
         }
 
-        // Normal rendering: status buckets in order
-        const bucketOrder = ['served', 'ready', 'in_progress', 'accepted', 'new_order'];
+        // Normal rendering: 2-group model (CV-52)
+        const bucketOrder = ['served', 'in_progress'];
         return bucketOrder.map(key => {
           const orders = statusBuckets[key];
           if (orders.length === 0) return null;
           const isExpanded = !!expandedStatuses[key];
-          const subtotal = parseFloat(orders.reduce((s, o) => s + (Number(o.total_amount) || 0), 0).toFixed(2));
           const isServed = key === 'served';
           const showRating = isServed;
 
@@ -945,7 +981,7 @@ export default function CartView({
                 <button
                   type="button"
                   className="w-full flex items-center justify-between text-left min-h-[44px]"
-                  onClick={() => setExpandedStatuses(prev => ({ ...prev, [key]: !prev[key] }))}
+                  onClick={() => { if (key === 'served') manualOverrideRef.current.served = true; setExpandedStatuses(prev => ({ ...prev, [key]: !prev[key] })); }}
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-base font-semibold text-slate-800">
@@ -978,11 +1014,8 @@ export default function CartView({
                             >{tr('review.rate', 'Оценить')} ({unratedServedCount})</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-slate-600">{formatPrice(subtotal)}</span>
-                    <div className="min-w-[44px] min-h-[44px] flex items-center justify-end">
-                      {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                    </div>
+                  <div className="min-w-[44px] min-h-[44px] flex items-center justify-end">
+                    {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                   </div>
                 </button>
                 {/* CV-05 v2: Rating mode micro-label */}
@@ -1008,9 +1041,8 @@ export default function CartView({
           <CardContent className="px-3 py-2">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                {tr('cart.new_order', 'Новый заказ')}
+                {tr('cart.group.in_cart', 'В корзине')} ({cart.reduce((sum, item) => sum + (item.quantity || 1), 0)})
               </h2>
-              <span className="text-sm font-medium text-slate-600">{formatPrice(parseFloat((Number(cartTotalAmount) || 0).toFixed(2)))}</span>
             </div>
 
             <div className="space-y-2">
@@ -1046,6 +1078,11 @@ export default function CartView({
             </div>
 
             {/* CV-33: Split-order section removed — each guest orders for themselves */}
+
+            {/* CV-33/Fix 5: Bonus line in cart group */}
+            {partner?.loyalty_enabled && earnedPoints > 0 && (
+              <div className="text-xs text-green-600 mt-1">+{earnedPoints} {tr('loyalty.points_short', 'баллов')}</div>
+            )}
 
             {/* PM-086: Pre-checkout loyalty email removed — motivation text near submit button is sufficient */}
 
@@ -1109,43 +1146,35 @@ export default function CartView({
         </div>
       )}
 
-      {/* CV-02: Sticky footer — always visible when cart or orders exist */}
+      {/* CV-51: Sticky footer — CTA only (no summary/totals) */}
       {(cart.length > 0 || todayMyOrders.length > 0) && (
         <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 -mx-4">
           {cart.length > 0 ? (
-            <>
-              {/* Motivation text — only if loyalty enabled (#87 KS-1 Fix 1) */}
-              {partner?.loyalty_enabled && (() => {
-                const motivationPoints = Math.round((Number(cartTotalAmount) || 0) * (Number(partner?.loyalty_points_per_currency) || 1));
-                return motivationPoints > 0 ? (
-                  <p className="text-sm text-gray-500 text-center mt-1 mb-1">
-                    {trFormat('cart.motivation_bonus', { points: motivationPoints }, `Отправьте заказ официанту и получите +${motivationPoints} бонусов`)}
-                  </p>
-                ) : null;
-              })()}
-              <Button
-                size="lg"
-                className={`w-full text-white ${
-                  isSubmitting || emailError
-                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
-                    : submitError
-                      ? 'bg-red-600 hover:bg-red-700'
-                      : ''
-                }`}
-                style={!isSubmitting && !submitError && !emailError ? {backgroundColor: primaryColor} : undefined}
-                onClick={() => {
-                  if (submitError && setSubmitError) setSubmitError(null);
-                  handleSubmitOrder();
-                }}
-                disabled={isSubmitting || !!emailError}
-              >
-                {isSubmitting
-                  ? tr('cta.sending', 'Отправляем...')
-                  : submitError
-                    ? tr('cta.retry', 'Повторить отправку')
-                    : tr('cart.send_to_waiter', 'Отправить заказ официанту')}
-              </Button>
-            </>
+            <Button
+              size="lg"
+              className={`w-full min-h-[44px] text-white ${
+                submitPhase === 'submitting' || submitPhase === 'success'
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
+                  : submitPhase === 'error'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : ''
+              }`}
+              style={submitPhase === 'idle' ? {backgroundColor: primaryColor} : submitPhase === 'success' ? {backgroundColor: '#16a34a'} : undefined}
+              onClick={() => {
+                if (submitPhase !== 'idle') return;
+                if (submitError && setSubmitError) setSubmitError(null);
+                handleSubmitOrder();
+              }}
+              disabled={submitPhase !== 'idle' || cart.length === 0}
+            >
+              {submitPhase === 'submitting'
+                ? tr('cart.submit.sending', 'Отправляем...')
+                : submitPhase === 'success'
+                  ? tr('cart.submit.success', 'Заказ отправлен')
+                  : submitPhase === 'error'
+                    ? tr('cart.submit.retry', 'Повторить отправку')
+                    : tr('cart.send_to_waiter', 'Отправить официанту')}
+            </Button>
           ) : (
             <Button
               variant="outline"
@@ -1154,7 +1183,7 @@ export default function CartView({
               style={{borderColor: primaryColor, color: primaryColor}}
               onClick={() => { onClose ? onClose() : setView("menu"); }}
             >
-              {tr('cart.order_more', 'Заказать ещё')}
+              {tr('cart.cta.order_more', 'Заказать ещё')}
             </Button>
           )}
         </div>
