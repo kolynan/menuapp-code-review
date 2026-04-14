@@ -933,7 +933,8 @@ export default function CartView({
                                 role="button"
                                 tabIndex={0}
                                 className="ml-1 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full cursor-pointer"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setExpandedStatuses(prev => ({ ...prev, served: true }));
                                   setIsRatingMode(true);
                                   setTimeout(() => { document.querySelector('[data-first-unrated]')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 100);
@@ -1006,7 +1007,8 @@ export default function CartView({
                               role="button"
                               tabIndex={0}
                               className="ml-1 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full cursor-pointer"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setExpandedStatuses(prev => ({ ...prev, served: true }));
                                 setIsRatingMode(true);
                                 setTimeout(() => { document.querySelector('[data-first-unrated]')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 100);
