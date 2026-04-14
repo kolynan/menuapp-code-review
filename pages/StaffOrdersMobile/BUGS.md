@@ -365,6 +365,14 @@
 
 ## Active Bugs
 
+### SOM-BUG-S270-01 (P0 CRITICAL) -- Batch mutations fire N concurrent HTTP requests causing B44 429 rate limit
+- **Function:** handleOrdersAction (line ~1956), startUndoWindow.onUndo (line ~1933), bulk request bar (line ~2333), handleCloseAllOrders (line ~4132)
+- **Root cause:** All batch operations used `forEach(mutate)` or `Promise.all(map(update))`, firing N concurrent HTTP requests in one React tick. B44 returns 429 for >3-5 concurrent requests.
+- **Fix:** Added `runBatchSequential` helper (120ms delay between items, early break on 429). Converted all 4 fan-out sites to sequential execution. Added `__batch` flag to suppress per-item `onSettled`/`onSuccess` invalidations; single invalidation after batch. Added `batchInFlight` state for button disabled feedback. Added `onBatchCloseRequestAsync` prop for bulk request operations (keeps sync `onCloseRequest` for single-item path).
+- **Session:** S271
+- **RELEASE:** `260414-02 StaffOrdersMobile RELEASE.jsx`
+- **Status:** Fixed (2026-04-14)
+
 ### BUG-SM-001 (P1 -- deferred) -- Complete absence of i18n
 - **Scope:** Entire file (~3040 lines)
 - **Impact:** 100+ hardcoded Russian strings: buttons, toasts, status text, help text, errors
