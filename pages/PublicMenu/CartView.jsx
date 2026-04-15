@@ -296,10 +296,30 @@ export default function CartView({
     return norm;
   };
 
+  const pluralizeRu = (n, one, few, many) => {
+    const abs = Math.abs(n);
+    const m10 = abs % 10;
+    const m100 = abs % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  };
+
   // Safe status label - guest-facing (CV-52: only 2 statuses)
   const getSafeStatus = (status) => {
     if (!status) {
-      return { icon: '🔵', label: tr('cart.group.in_progress', 'В работе'), color: '#6B7280' };
+      return { icon: '⏳', label: tr('cart.group.in_progress', 'В работе'), color: '#64748b' };
+    }
+
+    const code = status.internal_code;
+    if (code === 'ready' || code === 'prepared' || code === 'in_progress' || code === 'accepted' || code === 'new') {
+      return { label: tr('cart.group.in_progress', 'В работе'), icon: '⏳', color: '#64748b' };
+    }
+    if (code === 'served' || code === 'delivered' || code === 'finish') {
+      return { label: tr('cart.group.served', 'Выдано'), icon: '✓', color: '#059669' };
+    }
+    if (code === 'cancel' || code === 'cancelled') {
+      return { label: tr('status.cancelled', 'Отменён'), icon: '✕', color: '#dc2626' };
     }
 
     let label = status.label || '';
@@ -323,7 +343,7 @@ export default function CartView({
     } else if (label) {
       // CV-52: Map old Russian status labels to 2 guest-facing groups
       const oldServedLabels = ['\u041f\u043e\u0434\u0430\u043d\u043e']; // Подано
-      const oldInProgressLabels = ['\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043e', '\u041f\u0440\u0438\u043d\u044f\u0442', '\u0413\u043e\u0442\u043e\u0432\u0438\u0442\u0441\u044f', '\u0413\u043e\u0442\u043e\u0432']; // old non-served labels
+      const oldInProgressLabels = ['\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043e', '\u041f\u0440\u0438\u043d\u044f\u0442', '\u0413\u043e\u0442\u043e\u0432\u0438\u0442\u0441\u044f', '\u0413\u043e\u0442\u043e\u0432', '\u0413\u043e\u0442\u043e\u0432\u043e']; // old non-served labels
       if (oldServedLabels.includes(label)) {
         label = tr('cart.group.served', 'Выдано');
       } else if (oldInProgressLabels.includes(label)) {
@@ -419,13 +439,18 @@ export default function CartView({
         const orderDay = new Date(orderDate.getFullYear(), orderDate.getMonth(), orderDate.getDate());
         return orderDay >= cutoffDay;
       })
-      .filter(o => o.status !== 'cancelled')
+      .filter(o => {
+        const stageInfo = getOrderStatus(o);
+        const isCancelled = stageInfo?.internal_code === 'cancel'
+          || (!stageInfo?.internal_code && (o.status || '').toLowerCase() === 'cancelled');
+        return !isCancelled;
+      })
       .sort((a, b) => {
         const da = new Date(a.created_at || a.created_date || a.createdAt || 0);
         const db = new Date(b.created_at || b.created_date || b.createdAt || 0);
         return db - da;
       });
-  }, [myOrders]);
+  }, [myOrders, getOrderStatus]);
 
   // ===== CV-01/CV-48/CV-52: 2-group model (В работе / Выдано) =====
   const statusBuckets = React.useMemo(() => {
@@ -494,15 +519,24 @@ export default function CartView({
         sum += Number(o.total_amount) || 0;
       });
     });
-    return sum;
+    return parseFloat(sum.toFixed(2));
   }, [ordersByGuestId, otherGuestIdsFromOrders]);
+
+  const submittedTableTotal = React.useMemo(() => {
+    const orders = sessionOrders || [];
+    const sum = orders
+      .filter(o => o.status !== 'cancelled' && (o.status === 'submitted' || o.status === 'accepted' || o.status === 'in_progress' || o.status === 'ready' || o.status === 'served' || o.status === 'closed'))
+      .reduce((acc, o) => acc + (Number(o.total_amount) || 0), 0);
+    return parseFloat(sum.toFixed(2));
+  }, [sessionOrders]);
 
   const getGuestLabelById = (guestId) => {
     const gid = String(guestId);
     const found = (sessionGuests || []).find((g) => String(g.id) === gid);
     if (found) return getGuestDisplayName(found);
-    const suffix = gid.length >= 4 ? gid.slice(-4) : gid;
-    return `${tr("cart.guest", "Гость")} ${suffix}`;
+    const idx = (otherGuestIdsFromOrders || []).indexOf(gid);
+    const guestNum = idx >= 0 ? idx + 2 : '?';
+    return `${tr("cart.guest", "Гость")} ${guestNum}`;
   };
 
   const showTableOrdersSection = otherGuestIdsFromOrders.length > 0;
@@ -751,7 +785,7 @@ export default function CartView({
               )}
             </div>
             {/* CV-50: Dish count + total sum in drawer header (orders + cart) */}
-            {(ordersSum > 0 || cart.length > 0) && (() => {
+            {(ordersSum > 0 || cart.length > 0 || (cartTab === 'table' && submittedTableTotal > 0)) && (() => {
               const ordersItemCount = todayMyOrders.reduce((sum, o) => {
                 const items = itemsByOrder.get(o.id) || [];
                 return sum + items.reduce((s, it) => s + (it.quantity || 1), 0);
@@ -759,11 +793,17 @@ export default function CartView({
               const cartItemCount = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
               const totalDishCount = ordersItemCount + cartItemCount;
               const headerTotal = ordersSum + (Number(cartTotalAmount) || 0);
-              return totalDishCount > 0 ? (
-                <div className="text-xs text-slate-500 mt-0.5">
-                  {totalDishCount} {tr('cart.header.dishes', 'блюда')} · {formatPrice(parseFloat(headerTotal.toFixed(2)))}
-                </div>
-              ) : null;
+              return cartTab === 'table'
+                ? (
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    {tr('cart.header.table_ordered', 'Заказано на стол')}: {formatPrice(parseFloat(Number(submittedTableTotal).toFixed(2)))}
+                  </div>
+                )
+                : totalDishCount > 0 ? (
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    {totalDishCount} {pluralizeRu(totalDishCount, tr('cart.header.dish_one', 'блюдо'), tr('cart.header.dish_few', 'блюда'), tr('cart.header.dish_many', 'блюд'))} · {formatPrice(parseFloat(headerTotal.toFixed(2)))}
+                  </div>
+                ) : null;
             })()}
           </div>
 
@@ -808,7 +848,7 @@ export default function CartView({
                 {sessionItems.length === 0 && sessionOrders.length > 0 ? (
                   <span className="text-sm text-slate-400">{tr('common.loading', 'Загрузка')}</span>
                 ) : (
-                  <span className="font-bold text-slate-700">{formatPrice(tableOrdersTotal)}</span>
+                  <span className="font-bold text-slate-700">{formatPrice(parseFloat(Number(tableOrdersTotal).toFixed(2)))}</span>
                 )}
                 {otherGuestsExpanded ? (
                   <ChevronUp className="w-4 h-4 text-slate-400" />
@@ -831,7 +871,7 @@ export default function CartView({
                         {sessionItems.length === 0 && sessionOrders.length > 0 ? (
                           <span className="text-slate-400">{tr('common.loading', 'Загрузка')}</span>
                         ) : (
-                          <span className="font-bold text-slate-600">{formatPrice(guestTotal)}</span>
+                          <span className="font-bold text-slate-600">{formatPrice(parseFloat(Number(guestTotal).toFixed(2)))}</span>
                         )}
                       </div>
 
@@ -845,7 +885,7 @@ export default function CartView({
                               return (
                                 <div key={order.id} className="flex justify-between items-center text-xs">
                                   <span className="text-slate-600">
-                                    {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(order.total_amount)}
+                                    {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(parseFloat(Number(order.total_amount).toFixed(2)))}
                                   </span>
                                   <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
                                 </div>
@@ -869,47 +909,12 @@ export default function CartView({
                   );
                 })}
 
-                {/* Review button for other guests' dishes */}
-                {otherGuestsReviewableItems.length > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full mt-2"
-                    onClick={() => openReviewDialog(otherGuestsReviewableItems)}
-                  >
-                    ⭐ {tr('review.rate_others', 'Оценить блюда гостей')}
-                    {loyaltyAccount && (partner?.loyalty_review_points ?? 0) > 0 && ` (+${otherGuestsReviewableItems.length * (partner?.loyalty_review_points ?? 0)} ${tr('review.points', 'баллов')})`}
-                  </Button>
-                )}
               </div>
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* SECTION 6: TABLE TOTAL — full version in Стол tab */}
-      {showTableOrdersSection && cartTab === 'table' && (
-        <Card className="mb-4 bg-slate-50">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="font-medium text-slate-700">{tr('cart.table_total', 'Счёт стола')}:</span>
-              <span className="text-xl font-bold text-slate-900">{formatPrice(parseFloat(Number(tableTotal).toFixed(2)))}</span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Mini table total in Мои tab */}
-      {showTableOrdersSection && cartTab === 'my' && (
-        <Card className="mb-4 bg-slate-50">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-600">{tr('cart.table_total', 'Счёт стола')}:</span>
-              <span className="font-bold text-slate-800">{formatPrice(parseFloat(Number(tableTotal).toFixed(2)))}</span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* CV-01: Empty state — no orders and no cart */}
       {(!showTableOrdersSection || cartTab === 'my') && statusBuckets.served.length === 0 && statusBuckets.in_progress.length === 0 && cart.length === 0 && todayMyOrders.length === 0 && (
@@ -1208,13 +1213,12 @@ export default function CartView({
             </Button>
           ) : (
             <Button
-              variant="outline"
               size="lg"
-              className="w-full min-h-[44px]"
-              style={{borderColor: primaryColor, color: primaryColor}}
+              className="w-full min-h-[44px] text-white"
+              style={{backgroundColor: primaryColor}}
               onClick={() => { onClose ? onClose() : setView("menu"); }}
             >
-              {tr('cart.cta.order_more', 'Заказать ещё')}
+              {tr('cart.cta.back_to_menu', 'Вернуться в меню')}
             </Button>
           )}
         </div>

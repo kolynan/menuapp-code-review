@@ -13,14 +13,7 @@ session: 214
 
 ## Active Bugs (не исправлены)
 
-*10 active bugs remaining (0x P0, 4x P1, 5x P2, 0x P3, 1x suggestion).*
-
-### CV-BUG-06: cancelled filter uses o.status instead of stage_id (P2 — BACKLOG)
-- **Приоритет:** P2
-- **Когда:** S279 (spillover from CV-BUG-05)
-- **Файл:** CartView.jsx, line ~418
-- **Симптом:** `o.status === 'cancelled'` used for filtering todayMyOrders. Should also check stage_id for consistency with statusBuckets fix.
-- **Фикс:** Same pattern as CV-BUG-05 — check internal_code. Deferred to next batch.
+*3 active bugs remaining (0x P0, 3x P1, 0x P2, 0x P3, 0x suggestion). 7 bugs fixed in CV-B1-Polish chain.*
 
 ### BUG-PM-132: List mode stepper buttons use w-9 h-9 (36px) instead of w-11 h-11 (44px) (P2)
 - **Приоритет:** P2
@@ -145,6 +138,54 @@ session: 214
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-CV-BUG-06: cancelled filter → stage-based — FIXED S290 (CV-B1-Polish)
+- **Приоритет:** P1
+- **Файл:** CartView.jsx, todayMyOrders useMemo
+- **Фикс:** Replaced `o.status !== 'cancelled'` with stage-based check via `getOrderStatus` (internal_code='cancel' + fallback).
+- **Chain:** cartview-260415-225026-8ace
+
+### FIX-CV-BUG-07: Floating-point in Стол-tab sums — FIXED S290 (CV-B1-Polish)
+- **Приоритет:** P0
+- **Файл:** CartView.jsx, tableOrdersTotal useMemo + 3 call-sites
+- **Фикс:** Added `parseFloat(sum.toFixed(2))` in useMemo return + wrapped 3 formatPrice call-sites with `parseFloat(Number(x).toFixed(2))`.
+- **Chain:** cartview-260415-225026-8ace
+
+### FIX-CV-BUG-08: Empty-cart CTA regression (CV-70) — FIXED S290 (CV-B1-Polish)
+- **Приоритет:** P0
+- **Файл:** CartView.jsx, footer CTA
+- **Фикс:** Changed outline "Заказать ещё" → primary filled "Вернуться в меню" per CV-70 rule b.
+- **Chain:** cartview-260415-225026-8ace
+
+### FIX-CV-BUG-09: Badge "Готово" leaks in Стол-tab (CV-52) — FIXED S290 (CV-B1-Polish)
+- **Приоритет:** P1
+- **Файл:** CartView.jsx, getSafeStatus function
+- **Фикс:** Added internal_code early-check (ready/prepared/in_progress/accepted/new → В работе; served/delivered/finish → Выдано; cancel/cancelled → Отменён). Extended oldInProgressLabels with 'Готово'.
+- **Chain:** cartview-260415-225026-8ace
+
+### FIX-CV-BUG-10: Header total semantics (CV-50) — FIXED S290 (CV-B1-Polish)
+- **Приоритет:** P1
+- **Файл:** CartView.jsx, header + Card blocks
+- **Фикс:** Added submittedTableTotal useMemo (submitted-only). Conditional header: Стол-tab = "Заказано на стол: X ₸", My-tab = "N блюд · X ₸". Deleted both "Счёт стола" Card blocks. Extended header guard for table tab.
+- **Chain:** cartview-260415-225026-8ace
+
+### FIX-CV-BUG-11: Remove "Оценить блюда гостей" (CV-20) — FIXED S290 (CV-B1-Polish)
+- **Приоритет:** P2
+- **Файл:** CartView.jsx, Стол-tab other guests section
+- **Фикс:** Deleted cross-guest review button entirely. Self-rating preserved.
+- **Chain:** cartview-260415-225026-8ace
+
+### FIX-CV-BUG-12: "Гость 5331" → "Гость N" (CV-13) — FIXED S290 (CV-B1-Polish)
+- **Приоритет:** P1
+- **Файл:** CartView.jsx, getGuestLabelById function
+- **Фикс:** Replaced gid.slice(-4) with index-based ordinal from otherGuestIdsFromOrders (self=1, others=2+).
+- **Chain:** cartview-260415-225026-8ace
+
+### FIX-CV-BUG-13: Russian pluralization in header — FIXED S290 (CV-B1-Polish)
+- **Приоритет:** P2
+- **Файл:** CartView.jsx, header dish count
+- **Фикс:** Added pluralizeRu helper. Header now shows correct form: 1 блюдо, 3 блюда, 17 блюд.
+- **Chain:** cartview-260415-225026-8ace
 
 ### FIX-CV-BUG-05: statusBuckets reads o.status instead of stage_id.internal_code — FIXED S279
 - **Приоритет:** P0
