@@ -2162,13 +2162,19 @@ function OrderGroupCard({
     [HALL_UI_TEXT.readyBlocker]: "ready",
   }), []);
   const handleCloseTableClick = useCallback(() => {
-    const sessionId = group.orders.map((order) => getLinkId(order.table_session)).find(Boolean);
+    let sessionId = group.openSessionId || null;
+    if (!sessionId) {
+      const openOrder = group.orders.find(
+        (o) => o.status !== 'closed' && o.status !== 'cancelled' && getLinkId(o.table_session)
+      );
+      sessionId = openOrder ? getLinkId(openOrder.table_session) : null;
+    }
     if (onCloseTable && sessionId) {
       onCloseTable(sessionId, identifier, group.id);
       return;
     }
     if (onCloseAllOrders) onCloseAllOrders(group.orders);
-  }, [group.orders, identifier, onCloseAllOrders, onCloseTable]);
+  }, [group.openSessionId, group.orders, identifier, onCloseAllOrders, onCloseTable]);
   const showOtherTableHint = useCallback((event) => {
     event?.stopPropagation();
     if (ownershipState !== "other") return;
@@ -3532,6 +3538,28 @@ export default function StaffOrdersMobile() {
     }
   }, [requestsErrorObj]);
 
+  const { data: openSessions = [] } = useQuery({
+    queryKey: ["openSessions", partnerId],
+    queryFn: () =>
+      partnerId
+        ? base44.entities.TableSession.filter({ partner: partnerId, status: 'open' })
+        : base44.entities.TableSession.list(),
+    enabled: canFetch && !!partnerId && !rateLimitHit,
+    staleTime: 30_000,
+    refetchInterval: effectivePollingInterval,
+    refetchIntervalInBackground: false,
+    retry: shouldRetry,
+  });
+
+  const openSessionByTableId = useMemo(() => {
+    const map = {};
+    (openSessions || []).forEach((s) => {
+      const tid = getLinkId(s.table);
+      if (tid) map[tid] = s;
+    });
+    return map;
+  }, [openSessions]);
+
   const lastUpdatedAt = Math.max(ordersUpdatedAt || 0, requestsUpdatedAt || 0) || null;
 
   const activeRequests = useMemo(() => {
@@ -3580,7 +3608,7 @@ export default function StaffOrdersMobile() {
       if (stageId && stagesMap[stageId]) {
         const stage = stagesMap[stageId];
         if (stage.internal_code === 'finish') {
-          return o.status !== 'cancelled';
+          return o.status !== 'closed' && o.status !== 'cancelled';
         }
         return true;
       }
@@ -3754,6 +3782,7 @@ export default function StaffOrdersMobile() {
             id: tableId,
             displayName: tableName,
             orders: [],
+            openSessionId: openSessionByTableId[tableId]?.id || null,
           };
           groups.push(tableGroups[tableId]);
         }
@@ -3780,13 +3809,14 @@ export default function StaffOrdersMobile() {
           id: tableId,
           displayName: tableName,
           orders: [],
+          openSessionId: openSessionByTableId[tableId]?.id || null,
         };
         groups.push(tableGroups[tableId]);
       }
     });
-    
+
     return groups;
-  }, [visibleOrders, tableMap, isKitchen, activeRequests]);
+  }, [visibleOrders, tableMap, isKitchen, activeRequests, openSessionByTableId]);
 
   // v2.7.0: Sorted groups by oldest unaccepted order
   const sortedGroups = useMemo(() => {
@@ -3831,14 +3861,17 @@ export default function StaffOrdersMobile() {
   // v2.7.1: Tab filtering (active vs completed)
   const filteredGroups = useMemo(() => {
     if (!orderGroups) return [];
-    
+
     return orderGroups.filter(group => {
+      if (group.type === 'table') {
+        const hasOpenSession = !!openSessionByTableId[group.id];
+        if (!hasOpenSession) return activeTab === 'completed';
+      }
       const hasActiveOrder = group.orders.some(o => {
         const config = getStatusConfig(o);
         return !config.isFinishStage && o.status !== 'cancelled';
       });
       const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
-      // S267: served-but-not-closed → stay in Active until closeSession
       const hasServedButNotClosed = group.orders.some(o => {
         const config = getStatusConfig(o);
         return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
@@ -3847,14 +3880,18 @@ export default function StaffOrdersMobile() {
         ? (hasActiveOrder || hasActiveRequest || hasServedButNotClosed)
         : (!hasActiveOrder && !hasActiveRequest && !hasServedButNotClosed);
     });
-  }, [orderGroups, activeTab, getStatusConfig, activeRequests]);
+  }, [orderGroups, activeTab, getStatusConfig, activeRequests, openSessionByTableId]);
 
   // v2.7.1: Tab counts
   const tabCounts = useMemo(() => {
     if (!orderGroups) return { active: 0, completed: 0 };
-    
+
     let active = 0, completed = 0;
     orderGroups.forEach(group => {
+      if (group.type === 'table' && !openSessionByTableId[group.id]) {
+        completed++;
+        return;
+      }
       const hasActiveOrder = group.orders.some(o => {
         const config = getStatusConfig(o);
         return !config.isFinishStage && o.status !== 'cancelled';
@@ -3866,9 +3903,9 @@ export default function StaffOrdersMobile() {
       });
       if (hasActiveOrder || hasActiveRequest || hasServedButNotClosed) active++; else completed++;
     });
-    
+
     return { active, completed };
-  }, [orderGroups, getStatusConfig, activeRequests]);
+  }, [orderGroups, getStatusConfig, activeRequests, openSessionByTableId]);
 
   // v2.7.1: Favorites filter
   const finalGroups = useMemo(() => {
@@ -4153,6 +4190,7 @@ export default function StaffOrdersMobile() {
       setExpandedGroupId(null); // Collapse expanded card — table no longer active
       refetchOrders();
       if (!isKitchen) refetchRequests();
+      queryClient.invalidateQueries({ queryKey: ["openSessions"] });
     } catch (err) {
       showToast("Ошибка при закрытии");
     }

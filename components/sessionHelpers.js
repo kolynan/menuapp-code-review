@@ -174,7 +174,10 @@ export async function closeSession(sessionId, tableId) {
 
   // S283: Close open ServiceRequests for this table (so closed table leaves Active tab)
   if (tableId) {
-    const requests = await base44.entities.ServiceRequest.filter({ table: tableId });
+    let requests = await base44.entities.ServiceRequest.filter({ table_session: sessionId });
+    if (requests.length === 0 && tableId) {
+      requests = await base44.entities.ServiceRequest.filter({ table: tableId });
+    }
     const openRequests = requests.filter(r => !['done', 'cancelled'].includes(r.status));
     for (let i = 0; i < openRequests.length; i++) {
       await base44.entities.ServiceRequest.update(openRequests[i].id, { status: 'done' });
