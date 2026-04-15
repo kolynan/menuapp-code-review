@@ -386,6 +386,38 @@
 - **Chain:** staffordersmobile-260415-161942-d5a3
 - **Status:** Fixed (2026-04-15)
 
+## Fixed — Batch B2 (S290, 2026-04-15)
+
+### SOM-B2-FIX-B (P0) -- ServiceRequest filter by table field causes link-mismatch
+- **Function:** `closeSession()` in `sessionHelpers.js` (line 177)
+- **Root cause:** `ServiceRequest.filter({ table: tableId })` used link-field that could mismatch (ref vs id), leaving requests unclosed after close-table → table stays in Active tab.
+- **Fix:** Primary filter by `table_session: sessionId` (scoped to exact session), fallback to `table: tableId` for legacy requests.
+- **Chain:** staffordersmobile-260415-225055-2937
+- **Status:** Fixed
+
+### SOM-B2-FIX-C1 (P1) -- activeOrders includes closed orders in finish-stage passthrough
+- **Function:** `activeOrders` useMemo (line ~3583)
+- **Root cause:** Finish-stage branch only excluded `cancelled`, letting `status='closed'` orders into active set after close-table.
+- **Fix:** Added `o.status !== 'closed'` to finish-stage filter.
+- **Chain:** staffordersmobile-260415-225055-2937
+- **Status:** Fixed
+
+### SOM-B2-FIX-C2 (P1) -- handleCloseTableClick picks wrong sessionId on mixed tables
+- **Function:** `handleCloseTableClick` (line ~2164)
+- **Root cause:** `find(Boolean)` on all orders could return old closed session's ID on reopened tables.
+- **Fix:** Prefer `group.openSessionId` (from Fix A), fallback to non-closed order's session.
+- **Chain:** staffordersmobile-260415-225055-2937
+- **Status:** Fixed
+
+### SOM-B2-FIX-A (P1) -- No TableSession ground truth in tab filtering
+- **Function:** `filteredGroups` / `tabCounts` useMemos (lines ~3832-3871)
+- **Root cause:** Tab assignment derived purely from orders/requests — if any signal inconsistent, closed table stays in Active.
+- **Fix:** Added `useQuery` for open TableSessions, session-first override in filteredGroups/tabCounts, `openSessionId` field in orderGroups, invalidation on close-table.
+- **Chain:** staffordersmobile-260415-225055-2937
+- **Status:** Fixed
+
+---
+
 ## Active Bugs
 
 ### BUG-SM-001 (P1 -- deferred) -- Complete absence of i18n
