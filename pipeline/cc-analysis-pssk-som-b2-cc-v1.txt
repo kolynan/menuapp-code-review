@@ -1,0 +1,558 @@
+# CC Analysis: SOM Batch B2 — pssk-som-b2-cc-v1
+# Analyst: Claude Code (Opus 4.6)
+# Date: 2026-04-15
+# File: pages/StaffOrdersMobile/260415-00 StaffOrdersMobile RELEASE.jsx (4579 lines)
+# Helpers: components/sessionHelpers.js (229 lines)
+
+---
+
+## Section 1 — Fix A: filteredGroups TableSession.status override
+
+### 1.1 Verbatim: filteredGroups useMemo (lines 3832-3850)
+
+```jsx
+// v2.7.1: Tab filtering (active vs completed)
+const filteredGroups = useMemo(() => {
+  if (!orderGroups) return [];
+
+  return orderGroups.filter(group => {
+    const hasActiveOrder = group.orders.some(o => {
+      const config = getStatusConfig(o);
+      return !config.isFinishStage && o.status !== 'cancelled';
+    });
+    const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+    // S267: served-but-not-closed → stay in Active until closeSession
+    const hasServedButNotClosed = group.orders.some(o => {
+      const config = getStatusConfig(o);
+      return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+    });
+    return activeTab === 'active'
+      ? (hasActiveOrder || hasActiveRequest || hasServedButNotClosed)
+      : (!hasActiveOrder && !hasActiveRequest && !hasServedButNotClosed);
+  });
+}, [orderGroups, activeTab, getStatusConfig, activeRequests]);
+```
+
+### 1.2 Verbatim: tabCounts useMemo (lines 3852-3871)
+
+```jsx
+// v2.7.1: Tab counts
+const tabCounts = useMemo(() => {
+  if (!orderGroups) return { active: 0, completed: 0 };
+
+  let active = 0, completed = 0;
+  orderGroups.forEach(group => {
+    const hasActiveOrder = group.orders.some(o => {
+      const config = getStatusConfig(o);
+      return !config.isFinishStage && o.status !== 'cancelled';
+    });
+    const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+    const hasServedButNotClosed = group.orders.some(o => {
+      const config = getStatusConfig(o);
+      return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+    });
+    if (hasActiveOrder || hasActiveRequest || hasServedButNotClosed) active++; else completed++;
+  });
+
+  return { active, completed };
+}, [orderGroups, getStatusConfig, activeRequests]);
+```
+
+### 1.3 Grep: TableSession in SOM
+
+```
+$ grep -n "TableSession" pages/StaffOrdersMobile/260415-00\ StaffOrdersMobile\ RELEASE.jsx
+(no matches)
+```
+
+**CONFIRMED: TableSession entity is NOT queried anywhere in SOM.**
+
+SOM has zero awareness of session status. It relies entirely on:
+- Order statuses (via `getStatusConfig` / `o.status`)
+- ServiceRequest statuses (via `activeRequests`)
+- The `hasServedButNotClosed` heuristic
+
+There is no `useQuery` for `TableSession` entities in the entire 4579-line file.
+
+### 1.4 Root cause analysis
+
+After `closeSession()` executes (sessionHelpers.js:158-186):
+1. `TableSession.update(sessionId, { status: 'closed' })` — SOM doesn't read this
+2. `Order.filter({ table_session: sessionId })` → bulk close all orders to `status: 'closed'`
+3. `ServiceRequest.filter({ table: tableId })` → mark all open requests as `done`
+
+After refetch (SOM line 4154-4155):
+- `refetchOrders()` — reloads all partner orders
+- `refetchRequests()` — reloads all partner service requests
+
+**Expected behavior after successful closeSession + refetch:**
+- All orders in group have `status: 'closed'`
+- `hasActiveOrder`: all orders are at finish stage with status 'closed' → `!config.isFinishStage` is false → **false**
+- `hasServedButNotClosed`: all orders at finish stage with `status === 'closed'` → `o.status !== 'closed'` is false → **false**
+- `hasActiveRequest`: all requests marked 'done' → filtered out by `activeRequests` memo (line 3548) → **false**
+- Result: group moves to "completed" tab ✓
+
+**BUT if ServiceRequest.filter fails (Fix B), `hasActiveRequest` stays true → group remains Active.**
+
+This means Fix A's root cause is actually Fix B (ServiceRequest filter not working). However, there's a secondary issue:
+
+**Race condition / invalidation gap:** Between `closeSession()` completing and `refetchOrders()`/`refetchRequests()` completing, there's a window where stale data shows. The `await closeSession()` is sequential before refetch, so this should be minimal. But polling intervals could cause other SOM instances to show stale data.
+
+### 1.5 Recommended approach
+
+**Option A: Add useQuery for TableSession.filter({ status: 'open' })** → map openSessionByTableId → override in filteredGroups.
+
+- Pro: Authoritative — session status is the source of truth after closeSession
+- Pro: Works even if Fix B fails (ServiceRequests not closed)
+- Con: Additional B44 query (1 extra request per polling interval)
+- Con: Requires adding TableSession import and wiring through components
+
+**Option B: Add session_closed flag in orderGroups from o.table_session status**
+
+- Pro: No extra query if session status is denormalized on orders
+- Con: Orders don't carry session status — would need joined data or separate query
+- Con: Effectively same as Option A but more complex
+
+**Option C: Check all orders .every(o => o.status === 'closed' || 'cancelled') → completed**
+
+- Pro: No extra query
+- Pro: Simple logic change
+- Con: Doesn't handle case where closeSession partially failed (some orders closed, some not)
+- Con: Doesn't handle the "served but waiter hasn't clicked close yet" intent (S267 explicitly wants served-but-not-closed in Active)
+
+**RECOMMENDATION: Option A is the most robust.**
+
+Cost: 1 additional `TableSession.filter({ status: 'open' })` query. This returns only open sessions (small set), runs at same polling interval as orders/requests. The override logic is straightforward:
+
+```jsx
+// Pseudo-code for filteredGroups override:
+const sessionClosed = group.type === 'table' && !openSessionByTableId[group.id];
+if (sessionClosed) {
+  // Force to completed regardless of order/request status
+  return activeTab === 'completed';
+}
+// ... existing logic
+```
+
+However, this requires knowing which session maps to which table. Since orderGroups groups by tableId, and TableSession has a `table` field, the mapping is: `openSessionByTableId = Object.fromEntries(openSessions.map(s => [getLinkId(s.table), s]))`.
+
+**IMPORTANT caveat:** This only works if there's at most one open session per table (which should be enforced by openSession/closeSession logic). If multiple open sessions exist for a table, this needs additional handling.
+
+### 1.6 Regression risks
+
+1. **Tab counts desync:** If `tabCounts` doesn't use the same override logic as `filteredGroups`, the count badge will show wrong numbers. Both memos must be updated together.
+
+2. **Sort order disruption:** `sortedGroups` (line 3792-3803) sorts by oldest unaccepted order. If a closed-session group is forcibly moved to completed, it will be sorted among completed groups. Need to verify `v2SortedGroups` (which uses `filteredGroups` output) handles this correctly.
+
+3. **Re-open table UX:** If a new session is opened for the same table while the old session's orders are still in `activeOrders` (they have `status: 'closed'` which passes `activeOrders` filter at line 3583), the table would have a mix of old closed orders and new active orders. The session override would correctly show it as Active (new open session exists), but the old closed orders would be mixed in the same group (Fix C territory).
+
+### 1.7 Test plan
+
+1. **Close table → verify tab switch:** Open table with served orders → click "Close table" → confirm → verify table disappears from Active tab and appears in Completed tab within 2 seconds.
+
+2. **Reload after close:** Close table → force reload page (F5) → verify closed table is in Completed tab, not Active.
+
+3. **Swipe tabs:** After closing table, switch between Active/Completed tabs multiple times → verify counts are correct and table appears consistently in Completed.
+
+4. **Reopen + new order:** After closing table, create new TableSession for same table → place new order → verify new group appears in Active tab with only new session's orders (also validates Fix C).
+
+---
+
+## Section 2 — Fix B: ServiceRequest.filter debug
+
+### 2.1 Verbatim: ServiceRequest close in sessionHelpers.js (lines 175-185)
+
+```jsx
+// S283: Close open ServiceRequests for this table (so closed table leaves Active tab)
+if (tableId) {
+  const requests = await base44.entities.ServiceRequest.filter({ table: tableId });
+  const openRequests = requests.filter(r => !['done', 'cancelled'].includes(r.status));
+  for (let i = 0; i < openRequests.length; i++) {
+    await base44.entities.ServiceRequest.update(openRequests[i].id, { status: 'done' });
+    if (i < openRequests.length - 1) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+    }
+  }
+}
+```
+
+### 2.2 ServiceRequest creation format
+
+From PublicMenu (260321-02 x RELEASE.jsx, line 2992-2999):
+```jsx
+await base44.entities.ServiceRequest.create({
+  partner: partner.id,
+  table: currentTableId,      // ← string ID
+  table_session: tableSession?.id,  // ← string ID (session link)
+  request_type: 'bill',
+  status: 'new',
+  source: 'public'
+});
+```
+
+**`table` field is created as a string ID** (`currentTableId`).
+
+### 2.3 activeRequests query in SOM
+
+SOM loads ALL ServiceRequests for the partner (line 3521):
+```jsx
+queryFn: () => (partnerId
+  ? base44.entities.ServiceRequest.filter({ partner: partnerId })
+  : base44.entities.ServiceRequest.list()),
+```
+
+Then filters locally in `activeRequests` memo (lines 3537-3550):
+```jsx
+const activeRequests = useMemo(() => {
+  if (!allRequests || isKitchen) return [];
+  const shiftCutoff = shiftStartTime.getTime();
+  return allRequests.filter((r) => {
+    const createdAt = safeParseDate(r.created_date).getTime();
+    if (createdAt < shiftCutoff) return false;
+    return !["done", "cancelled"].includes(r.status);
+  });
+}, [allRequests, isKitchen, shiftStartTime]);
+```
+
+**Key observation:** SOM reads requests by `partner`, then filters locally by status. The `activeRequests` array excludes `done`/`cancelled` requests. So if `closeSession` successfully marks requests as `done`, they will be excluded after refetch.
+
+### 2.4 Diagnosis: filter format mismatch
+
+**closeSession filters by:** `ServiceRequest.filter({ table: tableId })` where `tableId` is a string ID.
+
+**ServiceRequest is created with:** `table: currentTableId` (string ID).
+
+**On the surface, this looks correct** — both use string IDs. However, there's a critical B44 platform subtlety:
+
+**B44 link fields:** When B44 stores a link field (like `table` which links to a Table entity), the stored value may be:
+- A string ID (as created)
+- A link object `{ id: "...", _type: "Table" }` (B44 internal format)
+
+When using `.filter({ table: tableId })`, B44's backend should resolve the link and match. But there are known issues with B44 link field filtering:
+
+1. **If `table` is stored as a link object but filter uses a string** — B44 may not match.
+2. **If `table` field is not indexed** — filter returns empty.
+
+**However, the actual test failure report says:** "after closing table, it stayed 'active'" (S286 testing). This could mean:
+
+a. `ServiceRequest.filter({ table: tableId })` returned empty (filter doesn't work for this field)
+b. The filter works but the update didn't propagate (timing)
+c. `tableId` passed to `closeSession` was `undefined` or wrong format
+
+**Checking the call chain:**
+- SOM line 4148: `const { sessionId, tableId } = closeTableConfirm;`
+- Line 4142: `setCloseTableConfirm({ sessionId, tableId, tableName: ... })`
+- Line 4139: `handleCloseTable = (tableSessionField, tableName, tableId) => { ... }`
+- Called via `onCloseTable` prop → OrderGroupCard line 2167: `onCloseTable(sessionId, identifier, group.id)`
+  - `sessionId` = `getLinkId(order.table_session)` from line 2165
+  - `identifier` = table display name
+  - `group.id` = tableId from orderGroups (line 3754: `id: tableId` where `tableId = getLinkId(o.table)`)
+
+So `tableId` in `closeSession` = `getLinkId(o.table)` = normalized string ID. This matches the creation format.
+
+**Most likely root cause: B44 `.filter()` on link fields may require the field to be the link target ID in a specific format, or the `table` field on ServiceRequest may not be filterable server-side.**
+
+**Alternative hypothesis:** The `table` field in ServiceRequest is a **link field** (not a plain string), and B44's `.filter()` on link fields requires passing the ID as-is (string), which should work. But if B44 internally stores it as `{ id: "abc123" }` and the filter tries exact match on `"abc123"`, it may fail.
+
+**Diagnostic recommendation:** Add console.log to `closeSession` to log `requests` array length and `tableId` value. In production, the most reliable fix is to filter by `table_session` instead:
+
+### 2.5 Recommended fix
+
+**Primary fix: Filter by table_session instead of table**
+
+```jsx
+// sessionHelpers.js, line 176-177
+// BEFORE:
+if (tableId) {
+  const requests = await base44.entities.ServiceRequest.filter({ table: tableId });
+
+// AFTER:
+if (sessionId) {
+  // Filter by session — more reliable than table link field
+  const requests = await base44.entities.ServiceRequest.filter({ table_session: sessionId });
+```
+
+**Rationale:**
+- ServiceRequest is created with `table_session: tableSession?.id` (line 2995 PublicMenu)
+- `sessionId` is the first parameter of `closeSession(sessionId, tableId)` — always available
+- Filtering by `table_session` is semantically more correct: we want to close requests for THIS session, not all requests for the table (there might be requests from a previous session)
+- `table_session` is a string ID, same as what's stored → filter should work
+
+**Fallback fix: Try both filters**
+
+```jsx
+if (tableId || sessionId) {
+  let requests = [];
+  if (sessionId) {
+    requests = await base44.entities.ServiceRequest.filter({ table_session: sessionId });
+  }
+  if (requests.length === 0 && tableId) {
+    // Fallback: try by table (for requests created without session)
+    requests = await base44.entities.ServiceRequest.filter({ table: tableId });
+  }
+  const openRequests = requests.filter(r => !['done', 'cancelled'].includes(r.status));
+  // ... close loop
+}
+```
+
+### 2.6 Regression risks
+
+1. **Requests without table_session:** If older ServiceRequests were created before `table_session` field existed (or PublicMenu didn't pass it), filtering by `table_session` would miss them. The fallback fix handles this.
+
+2. **Multiple sessions for same table:** If we filter by `table` instead of `table_session`, we'd close requests from ALL sessions of that table, not just the current one. This is actually desired behavior for closeSession (close everything), but could be surprising if a new session was opened while old requests lingered.
+
+3. **Rate limiting:** The sequential update loop with 120ms delay could hit rate limits if there are many open requests. Current code handles up to ~50 requests within 6 seconds. If table has more (unlikely but possible), timeout could occur.
+
+---
+
+## Section 3 — Fix C: #347 orderGroups session-aware
+
+### 3.1 Verbatim: orderGroups useMemo (lines 3740-3789)
+
+```jsx
+// v2.7.0: Order groups model (hall by table, pickup/delivery individual)
+const orderGroups = useMemo(() => {
+  if (isKitchen) return null;
+
+  const groups = [];
+  const tableGroups = {};
+
+  visibleOrders.forEach(o => {
+    if (o.order_type === 'hall') {
+      const tableId = getLinkId(o.table);
+      if (!tableId) return;
+      if (!tableGroups[tableId]) {
+        const tableName = tableMap[tableId]?.name || '?';
+        tableGroups[tableId] = {
+          type: 'table',
+          id: tableId,
+          displayName: tableName,
+          orders: [],
+        };
+        groups.push(tableGroups[tableId]);
+      }
+      tableGroups[tableId].orders.push(o);
+    } else {
+      groups.push({
+        type: o.order_type,
+        id: o.id,
+        displayName: o.order_type === 'pickup'
+          ? `CB-${o.order_number || o.id.slice(-3)}`
+          : `DOS-${o.order_number || o.id.slice(-3)}`,
+        orders: [o],
+      });
+    }
+  });
+
+  activeRequests.forEach((req) => {
+    const tableId = getLinkId(req.table);
+    if (!tableId) return;
+    if (!tableGroups[tableId]) {
+      const tableName = tableMap[tableId]?.name || '?';
+      tableGroups[tableId] = {
+        type: 'table',
+        id: tableId,
+        displayName: tableName,
+        orders: [],
+      };
+      groups.push(tableGroups[tableId]);
+    }
+  });
+
+  return groups;
+}, [visibleOrders, tableMap, isKitchen, activeRequests]);
+```
+
+### 3.2 Grep: table_session as grouping key
+
+```
+$ grep -n "table_session" pages/StaffOrdersMobile/260415-00\ StaffOrdersMobile\ RELEASE.jsx
+1584:  const tableSessionId = getLinkId(order.table_session);
+2165:    const sessionId = group.orders.map((order) => getLinkId(order.table_session)).find(Boolean);
+3571:      // P0-3: For hall orders, require table_session (filter out legacy/orphan orders)
+3572:      if (o.order_type === 'hall' && !getLinkId(o.table_session)) return false;
+```
+
+**CONFIRMED: `table_session` is NEVER used as a grouping key.** It's only used for:
+- Getting sessionId in single-order detail view (line 1584)
+- Extracting sessionId for closeTable (line 2165)
+- Filtering out orders without sessions (line 3572 — P0-3 fix)
+
+The grouping key is `getLinkId(o.table)` = tableId only. This is the bug.
+
+### 3.3 Recommended approach
+
+**Option A: Composite key `${tableId}:${sessionId}`**
+
+```jsx
+visibleOrders.forEach(o => {
+  if (o.order_type === 'hall') {
+    const tableId = getLinkId(o.table);
+    const sessionId = getLinkId(o.table_session);
+    if (!tableId) return;
+    const groupKey = sessionId ? `${tableId}:${sessionId}` : tableId;
+    if (!tableGroups[groupKey]) {
+      const tableName = tableMap[tableId]?.name || '?';
+      tableGroups[groupKey] = {
+        type: 'table',
+        id: tableId,        // keep tableId for request matching
+        sessionId: sessionId, // new field
+        groupKey: groupKey,   // unique key
+        displayName: tableName,
+        orders: [],
+      };
+      groups.push(tableGroups[groupKey]);
+    }
+    tableGroups[groupKey].orders.push(o);
+  }
+});
+```
+
+- Pro: Clean separation of sessions
+- Pro: Each group has its own session context
+- Con: Requires updating ALL downstream code that uses `group.id` for table matching (e.g., `activeRequests.some(r => getLinkId(r.table) === group.id)` at line 3840)
+- Con: Would show "T5" twice in the list (once for closed session, once for active) — confusing UX unless labeled
+- Con: `expandedGroups` set uses `group.id` — would need to use `groupKey` instead
+
+**Option B: Filter visibleOrders by open session only**
+
+```jsx
+// Before orderGroups: filter out orders from closed sessions
+const sessionAwareOrders = visibleOrders.filter(o => {
+  if (o.order_type !== 'hall') return true;
+  const sessionId = getLinkId(o.table_session);
+  return !sessionId || openSessionByTableId[getLinkId(o.table)]; // needs TableSession query
+});
+```
+
+- Pro: No downstream changes needed — grouping stays by tableId
+- Pro: Cleanest UX: only shows current session's orders
+- Con: Requires TableSession query (same as Fix A Option A)
+- Con: Loses visibility of old session orders (waiter can't see what was served before)
+
+**Option C: Group by tableId, exclude orders from closed sessions**
+
+Same as Option B but implemented inside orderGroups:
+
+```jsx
+visibleOrders.forEach(o => {
+  if (o.order_type === 'hall') {
+    const tableId = getLinkId(o.table);
+    if (!tableId) return;
+    // Skip orders from closed sessions (if we know session status)
+    const sessionId = getLinkId(o.table_session);
+    if (sessionId && closedSessionIds.has(sessionId)) return;
+    // ... rest unchanged
+  }
+});
+```
+
+- Pro: Minimal code change
+- Pro: No downstream changes
+- Con: Needs `closedSessionIds` set (from TableSession query or local tracking)
+- Con: Same dependency on TableSession data as Options A and B
+
+**RECOMMENDATION: Option C is the cleanest and least disruptive.**
+
+It preserves the existing grouping-by-tableId pattern, keeps all downstream code working (group.id, expandedGroups, request matching, etc.), and only adds a filter inside the existing forEach loop.
+
+However, it depends on Fix A providing TableSession data. If Fix A adds `useQuery` for TableSessions, the `closedSessionIds` or `openSessionByTableId` map is available to both Fix A and Fix C.
+
+**Combined approach for Fix A + C:**
+
+```jsx
+// New query (shared by Fix A and Fix C):
+const { data: openSessions } = useQuery({
+  queryKey: ["tableSessions", partnerId],
+  queryFn: () => base44.entities.TableSession.filter({ partner: partnerId, status: 'open' }),
+  enabled: canFetch && !isKitchen && !rateLimitHit,
+  refetchInterval: effectivePollingInterval,
+});
+
+const openSessionIds = useMemo(() => {
+  if (!openSessions) return new Set();
+  return new Set(openSessions.map(s => s.id));
+}, [openSessions]);
+
+const openSessionByTableId = useMemo(() => {
+  if (!openSessions) return {};
+  const map = {};
+  openSessions.forEach(s => { map[getLinkId(s.table)] = s; });
+  return map;
+}, [openSessions]);
+```
+
+Fix C uses `openSessionIds` inside `orderGroups`:
+```jsx
+// Inside orderGroups forEach:
+const sessionId = getLinkId(o.table_session);
+if (sessionId && !openSessionIds.has(sessionId)) return; // skip closed session orders
+```
+
+Fix A uses `openSessionByTableId` inside `filteredGroups`:
+```jsx
+// Override at top of filter callback:
+if (group.type === 'table' && !openSessionByTableId[group.id]) {
+  return activeTab === 'completed';
+}
+```
+
+### 3.4 UX impact: re-opened table with unclosed orders from old session
+
+**Current behavior (buggy):** All orders from both sessions appear in one group. Waiter sees old served/closed orders mixed with new active orders. The group stays Active because new orders are active.
+
+**After Fix C:** Orders from closed session are filtered out of `visibleOrders`→`orderGroups`. Only the new session's orders appear. The old orders are gone from the waiter's view.
+
+**Edge case:** What if the old session has orders that were NOT closed (closeSession partially failed)? These orders would have `table_session` pointing to a now-closed session → `openSessionIds.has(sessionId)` = false → filtered out. This is correct behavior: even if individual orders weren't properly closed, the session is closed, so they shouldn't appear in Active.
+
+**Edge case:** What if a waiter wants to see what the previous guest at this table ordered? They lose this visibility. However, this is an intentional design choice — the Completed tab + served orders section already provides historical visibility.
+
+### 3.5 Test plan
+
+1. **Session 1 close → Session 2 open:** Create session for table T5, place 2 orders, serve them, close table. Open new session for T5, place 1 order. → Verify: only 1 order visible in T5 group, Active tab.
+
+2. **No session bleed:** After step 1, expand the T5 card → verify bill summary, guest info, etc. are from session 2 only. Session 1 data should not appear.
+
+3. **Completed tab history:** After step 1, switch to Completed tab → verify session 1's group appears there with the 2 old orders (if they're still within shift window).
+
+---
+
+## Section 4 — Prompt Clarity Rating
+
+**Rating: 4/5**
+
+**Unclear points:**
+
+1. **B44 entity schema not available in repo.** The prompt references `B44_Entity_Schemas.md v3.0` but this file doesn't exist in the worktree. Understanding exact field types (link vs string) for ServiceRequest.table requires this schema. I inferred from code patterns.
+
+2. **"invalidation not reaching SOM" (Fix B hypothesis):** The prompt mentions this as a possibility, but SOM uses polling (not push). After `refetchOrders()`/`refetchRequests()`, the data should be fresh. The invalidation concern is about **other SOM instances** on other devices, which would pick up changes on next poll cycle. This distinction wasn't clear in the prompt.
+
+3. **Acceptance criteria for "closed table leaves Active tab":** Is it OK if there's a 1-2 second delay while refetch completes? Or does it need to be instant (optimistic update)?
+
+---
+
+## Section 5 — Risks Outside Scope
+
+1. **activeOrders includes closed orders:** Line 3582-3583 — orders at finish stage with `status: 'closed'` pass the filter (`o.status !== 'cancelled'` is true). This means closed orders remain in `activeOrders` and `visibleOrders`, creating phantom groups even after session close until they age past shiftCutoff.
+
+2. **Polling interval amplifies stale data:** Other SOM instances (other waiters) won't see closed table until their next poll cycle. If polling interval is 10s+, table shows Active for up to 10s on other devices.
+
+3. **closeSession has no error handling for partial failures:** If order bulk-close succeeds but ServiceRequest close fails (or vice versa), the session is in an inconsistent state. No rollback mechanism exists.
+
+4. **ServiceRequest.filter({ table: tableId }) returns ALL requests for the table across all sessions.** If table has been through multiple sessions, closeSession would mark ALL requests as done, not just current session's. This is usually OK but could mask data for analytics.
+
+5. **expandedGroups Set uses group.id (= tableId).** If Fix C changes the grouping key to composite `tableId:sessionId`, the Set would need updating. All `expandedGroups.has(group.id)` checks and `toggleGroupExpand(groupId)` calls would break if group.id format changes.
+
+---
+
+## Summary
+
+| Fix | Root Cause | Recommended Approach | Complexity | Dependencies |
+|-----|-----------|---------------------|------------|-------------|
+| A | No TableSession awareness in filteredGroups; relies on order/request status which can be stale or incomplete | Add `useQuery` for `TableSession.filter({ status: 'open' })`, override in filteredGroups | Medium | None (standalone query) |
+| B | `ServiceRequest.filter({ table: tableId })` may not match B44 link field format; should filter by `table_session: sessionId` instead | Change filter key from `table` to `table_session` in `closeSession()` | Low | None |
+| C | `orderGroups` groups by tableId only, ignoring `table_session`; orders from closed sessions mix with new session | Filter out orders from closed sessions inside `orderGroups` using `openSessionIds` from Fix A's query | Medium | Fix A (needs TableSession data) |
+
+**Fix priority:** B → A → C (Fix B is lowest-hanging fruit and may resolve the symptom alone; Fix A adds robustness; Fix C completes session isolation).
+
+**Total new B44 queries:** 1 (TableSession.filter for Fix A + C shared).
