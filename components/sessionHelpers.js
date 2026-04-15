@@ -155,19 +155,34 @@ export async function getSessionOrders(sessionId) {
 // FUNCTION 8: closeSession
 // Closes session
 // ============================================================
-export async function closeSession(sessionId) {
+export async function closeSession(sessionId, tableId) {
   await base44.entities.TableSession.update(sessionId, {
     status: "closed",
     closed_at: new Date().toISOString()
   });
 
-  // S267: Bulk-close all non-cancelled orders in this session.
+  // S267: Bulk-close all non-cancelled orders in this session (sequential to avoid 429).
+  const BATCH_DELAY_MS = 120;
   const sessionOrders = await base44.entities.Order.filter({ table_session: sessionId });
-  await Promise.all(
-    sessionOrders
-      .filter(o => o.status !== 'cancelled')
-      .map(o => base44.entities.Order.update(o.id, { status: 'closed' }))
-  );
+  const ordersToClose = sessionOrders.filter(o => o.status !== 'cancelled');
+  for (let i = 0; i < ordersToClose.length; i++) {
+    await base44.entities.Order.update(ordersToClose[i].id, { status: 'closed' });
+    if (i < ordersToClose.length - 1) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+    }
+  }
+
+  // S283: Close open ServiceRequests for this table (so closed table leaves Active tab)
+  if (tableId) {
+    const requests = await base44.entities.ServiceRequest.filter({ table: tableId });
+    const openRequests = requests.filter(r => !['done', 'cancelled'].includes(r.status));
+    for (let i = 0; i < openRequests.length; i++) {
+      await base44.entities.ServiceRequest.update(openRequests[i].id, { status: 'done' });
+      if (i < openRequests.length - 1) {
+        await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+      }
+    }
+  }
 }
 
 // ============================================================

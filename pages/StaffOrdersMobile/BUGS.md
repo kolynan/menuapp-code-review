@@ -363,8 +363,6 @@
 - **Chain:** staffordersmobile-260412-123531-7231
 - **Status:** 🟡 Fixed (pending test)
 
-## Active Bugs
-
 ### SOM-BUG-S270-01 (P0 CRITICAL) -- Batch mutations fire N concurrent HTTP requests causing B44 429 rate limit
 - **Function:** handleOrdersAction (line ~1956), startUndoWindow.onUndo (line ~1933), bulk request bar (line ~2333), handleCloseAllOrders (line ~4132)
 - **Root cause:** All batch operations used `forEach(mutate)` or `Promise.all(map(update))`, firing N concurrent HTTP requests in one React tick. B44 returns 429 for >3-5 concurrent requests.
@@ -372,6 +370,23 @@
 - **Session:** S271
 - **RELEASE:** `260414-02 StaffOrdersMobile RELEASE.jsx`
 - **Status:** Fixed (2026-04-14)
+
+### SOM-BUG-S270-02 (P1) -- Close Table: table disappears from both tabs instead of moving to Completed
+- **Function:** activeOrders useMemo filter (line ~3580), closeSession (sessionHelpers.js), confirmCloseTable (line ~4143)
+- **Root cause:** (a) `activeOrders` filter excluded `status === 'closed'` at finish stage — closed orders never reached `filteredGroups`. (b) `closeSession` used `Promise.all` for bulk-close (rate limit risk). (c) ServiceRequests not closed on table close — `hasActiveRequest` kept table in Active tab. (d) `refetchRequests` not called after close — stale cache.
+- **Fix:** (a) Removed `o.status !== 'closed'` from finish-stage filter — shift cutoff on 3572-3574 prevents historical leakage. (b) Replaced `Promise.all` with sequential loop + 120ms delay in `closeSession`. (c) Added `tableId` param to `closeSession` — closes open ServiceRequests sequentially. (d) Added `refetchRequests()` in `confirmCloseTable` after close.
+- **Chain:** staffordersmobile-260415-161942-d5a3
+- **RELEASE:** `260414-02 StaffOrdersMobile RELEASE.jsx` + `components/sessionHelpers.js`
+- **Status:** Fixed (2026-04-15)
+
+### SOM-BUG-S270-03 (P2) -- updateStatusMutation missing __batch guard on onSettled
+- **Function:** updateStatusMutation onSettled (line ~1606)
+- **Root cause:** `onSettled` always fires `invalidateQueries(["orders"])` — no `__batch` guard (unlike `advanceMutation`). Latent issue for future batch usage.
+- **Fix:** Added `if (vars?.__batch) return;` guard to skip invalidation for batched calls.
+- **Chain:** staffordersmobile-260415-161942-d5a3
+- **Status:** Fixed (2026-04-15)
+
+## Active Bugs
 
 ### BUG-SM-001 (P1 -- deferred) -- Complete absence of i18n
 - **Scope:** Entire file (~3040 lines)
