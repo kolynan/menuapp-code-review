@@ -805,10 +805,10 @@ export function useTableSession({
     if (stage) {
       const icon = stage.internal_code === 'finish' ? '✅' 
                  : stage.internal_code === 'start' ? '🔵' : '🟠';
-      return { icon, label: stage.name, color: stage.color || '#3b82f6' };
+      return { icon, label: stage.name, color: stage.color || '#3b82f6', internal_code: stage.internal_code || null };
     }
-    
-    return { icon: '🔵', label: t('status.new'), color: '#3b82f6' };
+
+    return { icon: '🔵', label: t('status.new'), color: '#3b82f6', internal_code: null };
   };
 
   return {

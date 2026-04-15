@@ -13,7 +13,14 @@ session: 214
 
 ## Active Bugs (не исправлены)
 
-*9 active bugs remaining (0x P0, 4x P1, 4x P2, 0x P3, 1x suggestion).*
+*10 active bugs remaining (0x P0, 4x P1, 5x P2, 0x P3, 1x suggestion).*
+
+### CV-BUG-06: cancelled filter uses o.status instead of stage_id (P2 — BACKLOG)
+- **Приоритет:** P2
+- **Когда:** S279 (spillover from CV-BUG-05)
+- **Файл:** CartView.jsx, line ~418
+- **Симптом:** `o.status === 'cancelled'` used for filtering todayMyOrders. Should also check stage_id for consistency with statusBuckets fix.
+- **Фикс:** Same pattern as CV-BUG-05 — check internal_code. Deferred to next batch.
 
 ### BUG-PM-132: List mode stepper buttons use w-9 h-9 (36px) instead of w-11 h-11 (44px) (P2)
 - **Приоритет:** P2
@@ -138,6 +145,30 @@ session: 214
 ---
 
 ## Fixed Bugs (исправлены)
+
+### FIX-CV-BUG-05: statusBuckets reads o.status instead of stage_id.internal_code — FIXED S279
+- **Приоритет:** P0
+- **Когда:** S276 (HO_CV-B1-Core)
+- **Файл:** CartView.jsx (statusBuckets ~line 428), useTableSession.jsx (getOrderStatus ~line 808)
+- **Симптом:** When SOM moves order to "Выдано" via stage, CartView doesn't move it from "В работе" to "Выдано" because statusBuckets groups by o.status, not stage_id.internal_code.
+- **Фикс:** Extended getOrderStatus to return internal_code. Rewrote statusBuckets to use stage-first (internal_code==='finish'), with o.status fallback for legacy orders.
+- **Chain:** cartview-260415-105013-e600
+
+### FIX-CV-14/CV-56: Tabs (Мои / Стол) inside CartView — FIXED S279
+- **Приоритет:** P1
+- **Когда:** S276 (HO_CV-B1-Core)
+- **Файл:** CartView.jsx
+- **Симптом:** CartView shows own orders + table orders in single scroll. Standard UX is to separate with tabs.
+- **Фикс:** Added shadcn/ui Tabs (Мои/Стол). "Мои" tab shows cart + order buckets + mini table total. "Стол" tab shows other guests' orders + full table total.
+- **Chain:** cartview-260415-105013-e600
+
+### FIX-CV-15: Hide tabs when single guest — FIXED S279
+- **Приоритет:** P2
+- **Когда:** S276 (HO_CV-B1-Core)
+- **Файл:** CartView.jsx
+- **Симптом:** With 1 guest, "Стол" tab is empty and useless.
+- **Фикс:** Tabs only render when showTableOrdersSection is true (otherGuestIdsFromOrders.length > 0).
+- **Chain:** cartview-260415-105013-e600
 
 ### FIX-#285: "Другой запрос?" link — show disabled instead of hidden — FIXED S262
 - **Приоритет:** P2
