@@ -1603,7 +1603,10 @@ function OrderCard({
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) ctx.prev.forEach(([key, data]) => queryClient.setQueryData(key, data));
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["orders"] }),
+    onSettled: (_data, _err, vars) => {
+      if (vars?.__batch) return;
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+    },
   });
 
   const handleAction = (event) => {
@@ -1691,7 +1694,7 @@ function OrderCard({
           <Badge variant="outline" className={`text-xs px-2 py-0.5 ${statusConfig.badgeClass || ""}`} style={badgeStyle}>{statusConfig.label}</Badge>
           <div className="flex items-center gap-2">
             {!isKitchen && order.order_type === "hall" && tableSessionId && onCloseTable && (
-              <Button variant="outline" size="sm" onClick={(event) => { event.stopPropagation(); onCloseTable(tableSessionId, tableData?.name || '\u0441\u0442\u043E\u043B'); }} className="h-8 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50">
+              <Button variant="outline" size="sm" onClick={(event) => { event.stopPropagation(); onCloseTable(tableSessionId, tableData?.name || '\u0441\u0442\u043E\u043B', tableId); }} className="h-8 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50">
                 <X className="h-3 w-3 mr-1" />
                 {'\u0417\u0430\u043A\u0440\u044B\u0442\u044C \u0441\u0442\u043E\u043B'}
               </Button>
@@ -2159,13 +2162,19 @@ function OrderGroupCard({
     [HALL_UI_TEXT.readyBlocker]: "ready",
   }), []);
   const handleCloseTableClick = useCallback(() => {
-    const sessionId = group.orders.map((order) => getLinkId(order.table_session)).find(Boolean);
+    let sessionId = group.openSessionId || null;
+    if (!sessionId) {
+      const openOrder = group.orders.find(
+        (o) => o.status !== 'closed' && o.status !== 'cancelled' && getLinkId(o.table_session)
+      );
+      sessionId = openOrder ? getLinkId(openOrder.table_session) : null;
+    }
     if (onCloseTable && sessionId) {
-      onCloseTable(sessionId, identifier);
+      onCloseTable(sessionId, identifier, group.id);
       return;
     }
     if (onCloseAllOrders) onCloseAllOrders(group.orders);
-  }, [group.orders, identifier, onCloseAllOrders, onCloseTable]);
+  }, [group.openSessionId, group.orders, identifier, onCloseAllOrders, onCloseTable]);
   const showOtherTableHint = useCallback((event) => {
     event?.stopPropagation();
     if (ownershipState !== "other") return;
@@ -2280,7 +2289,7 @@ function OrderGroupCard({
   const highlightRing = isHighlighted ? "ring-2 ring-indigo-400 ring-offset-1" : "";
 
   return (
-    <div data-group-id={group.id} className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-all duration-300 ${style.bgClass} ${style.borderClass} ${highlightRing}`}>
+    <div data-group-id={group.compositeKey} className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-all duration-300 ${style.bgClass} ${style.borderClass} ${highlightRing}`}>
       <div className="px-4 pt-3 pb-3 cursor-pointer active:opacity-80" onClick={onToggleExpand} role="button" aria-expanded={isExpanded} aria-label={group.type === "table" ? identifier : `${identifier}: ${statusLabel}`}>
         {group.type === "table" ? (
           <div>
@@ -3529,6 +3538,28 @@ export default function StaffOrdersMobile() {
     }
   }, [requestsErrorObj]);
 
+  const { data: openSessions = [] } = useQuery({
+    queryKey: ["openSessions", partnerId],
+    queryFn: () =>
+      partnerId
+        ? base44.entities.TableSession.filter({ partner: partnerId, status: 'open' })
+        : base44.entities.TableSession.list(),
+    enabled: canFetch && !!partnerId && !rateLimitHit,
+    staleTime: 5_000,
+    refetchInterval: effectivePollingInterval,
+    refetchIntervalInBackground: false,
+    retry: shouldRetry,
+  });
+
+  const openSessionByTableId = useMemo(() => {
+    const map = {};
+    (openSessions || []).forEach((s) => {
+      const tid = getLinkId(s.table);
+      if (tid) map[tid] = s;
+    });
+    return map;
+  }, [openSessions]);
+
   const lastUpdatedAt = Math.max(ordersUpdatedAt || 0, requestsUpdatedAt || 0) || null;
 
   const activeRequests = useMemo(() => {
@@ -3733,57 +3764,80 @@ export default function StaffOrdersMobile() {
     return r;
   }, [roleFilteredOrders, selectedTypes, assignFilters, sortMode, sortOrder, effectiveUserId, stagesMap]);
 
-  // v2.7.0: Order groups model (hall by table, pickup/delivery individual)
+  // v2.7.0 + Б2.1: Order groups model (hall by table+session, pickup/delivery individual)
+  // BUG-SM-015: Split table orders by session_id so closed session stays in
+  // «Завершённые» while new session appears as a fresh card in «Активные».
   const orderGroups = useMemo(() => {
     if (isKitchen) return null;
-    
+
     const groups = [];
-    const tableGroups = {};
-    
+    const tableGroups = {}; // key: `${tableId}__${sessionKey}` where sessionKey = sessionId || 'no-session'
+
     visibleOrders.forEach(o => {
       if (o.order_type === 'hall') {
         const tableId = getLinkId(o.table);
         if (!tableId) return;
-        if (!tableGroups[tableId]) {
+
+        const orderSessionId = getLinkId(o.table_session) || 'no-session';
+        const openSessionId = openSessionByTableId[tableId]?.id || null;
+        const compositeKey = `${tableId}__${orderSessionId}`;
+
+        if (!tableGroups[compositeKey]) {
           const tableName = tableMap[tableId]?.name || '?';
-          tableGroups[tableId] = {
+          tableGroups[compositeKey] = {
             type: 'table',
-            id: tableId,
+            id: tableId,                   // tableId — used for favorites, servedOrders query, onCloseTable callback
+            sessionId: orderSessionId === 'no-session' ? null : orderSessionId, // NEW: session of this group
+            compositeKey,                  // NEW: React key + data-group-id + expand/highlight tracking
             displayName: tableName,
             orders: [],
+            openSessionId,                 // ID of open session for this table (may differ from sessionId if closed)
           };
-          groups.push(tableGroups[tableId]);
+          groups.push(tableGroups[compositeKey]);
         }
-        tableGroups[tableId].orders.push(o);
+        tableGroups[compositeKey].orders.push(o);
       } else {
+        // Pickup/Delivery — unique by orderId, logic unchanged.
         groups.push({
           type: o.order_type,
           id: o.id,
-          displayName: o.order_type === 'pickup' 
-            ? `СВ-${o.order_number || o.id.slice(-3)}` 
+          sessionId: null,
+          compositeKey: `${o.order_type}__${o.id}`,
+          displayName: o.order_type === 'pickup'
+            ? `СВ-${o.order_number || o.id.slice(-3)}`
             : `ДОС-${o.order_number || o.id.slice(-3)}`,
           orders: [o],
         });
       }
     });
 
+    // ServiceRequest → attach to current open session card (if any), else `${tableId}__no-session`.
+    // Requests from closed sessions are already 'done' (sessionHelpers.js:175-188), so not in activeRequests.
     activeRequests.forEach((req) => {
       const tableId = getLinkId(req.table);
       if (!tableId) return;
-      if (!tableGroups[tableId]) {
+
+      const openSessionId = openSessionByTableId[tableId]?.id || null;
+      const targetSessionKey = openSessionId || 'no-session';
+      const compositeKey = `${tableId}__${targetSessionKey}`;
+
+      if (!tableGroups[compositeKey]) {
         const tableName = tableMap[tableId]?.name || '?';
-        tableGroups[tableId] = {
+        tableGroups[compositeKey] = {
           type: 'table',
           id: tableId,
+          sessionId: openSessionId,
+          compositeKey,
           displayName: tableName,
           orders: [],
+          openSessionId,
         };
-        groups.push(tableGroups[tableId]);
+        groups.push(tableGroups[compositeKey]);
       }
     });
-    
+
     return groups;
-  }, [visibleOrders, tableMap, isKitchen, activeRequests]);
+  }, [visibleOrders, tableMap, isKitchen, activeRequests, openSessionByTableId]);
 
   // v2.7.0: Sorted groups by oldest unaccepted order
   const sortedGroups = useMemo(() => {
@@ -3828,14 +3882,19 @@ export default function StaffOrdersMobile() {
   // v2.7.1: Tab filtering (active vs completed)
   const filteredGroups = useMemo(() => {
     if (!orderGroups) return [];
-    
+
     return orderGroups.filter(group => {
+      if (group.type === 'table') {
+        // Б2.1: group belongs to «Активные» ONLY if its sessionId matches the current open session
+        const openId = openSessionByTableId[group.id]?.id || null;
+        const isCurrentOpenSession = !!openId && group.sessionId === openId;
+        if (!isCurrentOpenSession) return activeTab === 'completed';
+      }
       const hasActiveOrder = group.orders.some(o => {
         const config = getStatusConfig(o);
         return !config.isFinishStage && o.status !== 'cancelled';
       });
       const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
-      // S267: served-but-not-closed → stay in Active until closeSession
       const hasServedButNotClosed = group.orders.some(o => {
         const config = getStatusConfig(o);
         return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
@@ -3844,14 +3903,23 @@ export default function StaffOrdersMobile() {
         ? (hasActiveOrder || hasActiveRequest || hasServedButNotClosed)
         : (!hasActiveOrder && !hasActiveRequest && !hasServedButNotClosed);
     });
-  }, [orderGroups, activeTab, getStatusConfig, activeRequests]);
+  }, [orderGroups, activeTab, getStatusConfig, activeRequests, openSessionByTableId]);
 
   // v2.7.1: Tab counts
   const tabCounts = useMemo(() => {
     if (!orderGroups) return { active: 0, completed: 0 };
-    
+
     let active = 0, completed = 0;
     orderGroups.forEach(group => {
+      if (group.type === 'table') {
+        // Б2.1: group belongs to «Завершённые» if NOT the current open session's group
+        const openId = openSessionByTableId[group.id]?.id || null;
+        const isCurrentOpenSession = !!openId && group.sessionId === openId;
+        if (!isCurrentOpenSession) {
+          completed++;
+          return;
+        }
+      }
       const hasActiveOrder = group.orders.some(o => {
         const config = getStatusConfig(o);
         return !config.isFinishStage && o.status !== 'cancelled';
@@ -3863,9 +3931,9 @@ export default function StaffOrdersMobile() {
       });
       if (hasActiveOrder || hasActiveRequest || hasServedButNotClosed) active++; else completed++;
     });
-    
+
     return { active, completed };
-  }, [orderGroups, getStatusConfig, activeRequests]);
+  }, [orderGroups, getStatusConfig, activeRequests, openSessionByTableId]);
 
   // v2.7.1: Favorites filter
   const finalGroups = useMemo(() => {
@@ -4099,21 +4167,33 @@ export default function StaffOrdersMobile() {
   const highlightTimerRef = useRef(null);
 
   // v4.0.0: Banner tap → expand card + scroll to it + highlight briefly
-  const handleBannerNavigate = useCallback((groupId) => {
-    if (!groupId) return;
-    setExpandedGroupId(groupId);
+  const handleBannerNavigate = useCallback((maybeTableIdOrCompositeKey) => {
+    if (!maybeTableIdOrCompositeKey) return;
+
+    // Б2.1: if tableId passed (current flow: banner.groupId = tableId from buildBannerInfo) —
+    // resolve to compositeKey of current open session for that table.
+    // Defensive: also works if caller already passes compositeKey (contains '__').
+    let targetKey = String(maybeTableIdOrCompositeKey);
+    if (!targetKey.includes('__')) {
+      const openId = openSessionByTableId[targetKey]?.id || null;
+      targetKey = openId
+        ? `${targetKey}__${openId}`
+        : `${targetKey}__no-session`;
+    }
+
+    setExpandedGroupId(targetKey);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const el = document.querySelector(`[data-group-id="${CSS.escape(String(groupId))}"]`);
+        const el = document.querySelector(`[data-group-id="${CSS.escape(targetKey)}"]`);
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          setHighlightGroupId(groupId);
+          setHighlightGroupId(targetKey);
           if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
           highlightTimerRef.current = setTimeout(() => setHighlightGroupId(null), 1500);
         }
       });
     });
-  }, []);
+  }, [openSessionByTableId]);
 
   // Cleanup highlight timer
   useEffect(() => () => {
@@ -4133,22 +4213,24 @@ export default function StaffOrdersMobile() {
 
   // D1-007, D1-008, D1-009: Close table handler
   // v3.6.0: Shows confirmation dialog instead of browser confirm()
-  const handleCloseTable = (tableSessionField, tableName) => {
+  const handleCloseTable = (tableSessionField, tableName, tableId) => {
     const sessionId = getLinkId(tableSessionField);
     if (!sessionId) return;
-    setCloseTableConfirm({ sessionId, tableName: tableName || 'стол' });
+    setCloseTableConfirm({ sessionId, tableId, tableName: tableName || 'стол' });
   };
 
   // v3.6.0: Confirmation dialog — executes close after user confirms
   const confirmCloseTable = async () => {
     if (!closeTableConfirm) return;
-    const { sessionId } = closeTableConfirm;
+    const { sessionId, tableId } = closeTableConfirm;
     setCloseTableConfirm(null);
     try {
-      await closeSession(sessionId);
+      await closeSession(sessionId, tableId);
       showToast("Стол закрыт");
       setExpandedGroupId(null); // Collapse expanded card — table no longer active
       refetchOrders();
+      if (!isKitchen) refetchRequests();
+      queryClient.invalidateQueries({ queryKey: ["openSessions"] });
     } catch (err) {
       showToast("Ошибка при закрытии");
     }
@@ -4414,11 +4496,11 @@ export default function StaffOrdersMobile() {
             ) : (
               v2SortedGroups.map(group => (
                 <OrderGroupCard
-                  key={group.id}
+                  key={group.compositeKey}
                   group={group}
-                  isExpanded={expandedGroupId === group.id}
-                  onToggleExpand={() => handleToggleExpand(group.id)}
-                  isHighlighted={highlightGroupId === group.id}
+                  isExpanded={expandedGroupId === group.compositeKey}
+                  onToggleExpand={() => handleToggleExpand(group.compositeKey)}
+                  isHighlighted={highlightGroupId === group.compositeKey}
                   isFavorite={isFavorite(group.type === 'table' ? 'table' : 'order', group.id)}
                   onToggleFavorite={toggleFavorite}
                   getStatusConfig={getStatusConfig}
