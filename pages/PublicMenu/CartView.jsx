@@ -97,6 +97,7 @@ export default function CartView({
   const [expandedStatuses, setExpandedStatuses] = React.useState({
     served: false, // Выдано — collapsed by default (CV-10)
     in_progress: true, // В работе — expanded by default
+    pending_unconfirmed: true, // Ожидает — expanded by default
   });
   // CV-28: expandedOrders removed — flat dish list replaces per-order collapse
 
@@ -421,6 +422,14 @@ export default function CartView({
   );
   const canSplit = guestCount > 1;
 
+  // ===== CV-B2 Fix 1.0: Shared cancelled-order helper =====
+  const isCancelledOrder = (o) => {
+    const stageInfo = getOrderStatus(o);
+    return stageInfo?.internal_code === 'cancel'
+      || stageInfo?.internal_code === 'cancelled'
+      || (!stageInfo?.internal_code && (o.status || '').toLowerCase() === 'cancelled');
+  };
+
   // ===== PM-142/143/154: Filter myOrders to 06:00 business-day + sort by datetime =====
   const todayMyOrders = React.useMemo(() => {
     const now = new Date();
@@ -439,12 +448,7 @@ export default function CartView({
         const orderDay = new Date(orderDate.getFullYear(), orderDate.getMonth(), orderDate.getDate());
         return orderDay >= cutoffDay;
       })
-      .filter(o => {
-        const stageInfo = getOrderStatus(o);
-        const isCancelled = stageInfo?.internal_code === 'cancel'
-          || (!stageInfo?.internal_code && (o.status || '').toLowerCase() === 'cancelled');
-        return !isCancelled;
-      })
+      .filter(o => !isCancelledOrder(o))
       .sort((a, b) => {
         const da = new Date(a.created_at || a.created_date || a.createdAt || 0);
         const db = new Date(b.created_at || b.created_date || b.createdAt || 0);
@@ -452,16 +456,18 @@ export default function CartView({
       });
   }, [myOrders, getOrderStatus]);
 
-  // ===== CV-01/CV-48/CV-52: 2-group model (В работе / Выдано) =====
+  // ===== CV-01/CV-48/CV-52: 3-group model (Ожидает / В работе / Выдано) =====
   const statusBuckets = React.useMemo(() => {
-    const groups = { served: [], in_progress: [] };
+    const groups = { pending_unconfirmed: [], served: [], in_progress: [] };
     todayMyOrders.forEach(o => {
+      if (isCancelledOrder(o)) return;
       const stageInfo = getOrderStatus(o);
       const isServed = stageInfo?.internal_code === 'finish'
         || (!stageInfo?.internal_code && ['served', 'completed'].includes((o.status || '').toLowerCase()));
-      const isCancelled = !stageInfo?.internal_code && (o.status || '').toLowerCase() === 'cancelled';
+      const isPending = !stageInfo?.internal_code && (o.status || '').toLowerCase() === 'submitted';
       if (isServed) groups.served.push(o);
-      else if (!isCancelled) groups.in_progress.push(o);
+      else if (isPending) groups.pending_unconfirmed.push(o);
+      else groups.in_progress.push(o);
     });
     return groups;
   }, [todayMyOrders, getOrderStatus]);
@@ -470,6 +476,7 @@ export default function CartView({
   const currentGroupKeys = [
     statusBuckets.served.length > 0 ? 'S' : '',
     statusBuckets.in_progress.length > 0 ? 'I' : '',
+    statusBuckets.pending_unconfirmed.length > 0 ? 'P' : '',
     cart.length > 0 ? 'C' : ''
   ].join('');
 
@@ -478,7 +485,7 @@ export default function CartView({
     prevGroupKeysRef.current = currentGroupKeys;
 
     if (structuralChange && !manualOverrideRef.current.served) {
-      const otherGroupsExist = statusBuckets.in_progress.length > 0 || cart.length > 0;
+      const otherGroupsExist = statusBuckets.in_progress.length > 0 || statusBuckets.pending_unconfirmed.length > 0 || cart.length > 0;
       setExpandedStatuses(prev => ({
         ...prev,
         served: !otherGroupsExist
@@ -522,13 +529,41 @@ export default function CartView({
     return parseFloat(sum.toFixed(2));
   }, [ordersByGuestId, otherGuestIdsFromOrders]);
 
-  const submittedTableTotal = React.useMemo(() => {
-    const orders = sessionOrders || [];
-    const sum = orders
-      .filter(o => o.status !== 'cancelled' && (o.status === 'submitted' || o.status === 'accepted' || o.status === 'in_progress' || o.status === 'ready' || o.status === 'served' || o.status === 'closed'))
-      .reduce((acc, o) => acc + (Number(o.total_amount) || 0), 0);
+  // CV-B2 Fix 1.1: Rendered-data aggregates from ordersByGuestId (all guests)
+  const renderedTableTotal = React.useMemo(() => {
+    let sum = 0;
+    ordersByGuestId.forEach((orders) => {
+      orders.forEach((o) => {
+        if (!isCancelledOrder(o)) sum += Number(o.total_amount) || 0;
+      });
+    });
     return parseFloat(sum.toFixed(2));
-  }, [sessionOrders]);
+  }, [ordersByGuestId]);
+
+  const renderedTableDishCount = React.useMemo(() => {
+    let count = 0;
+    ordersByGuestId.forEach((orders) => {
+      orders.forEach((o) => {
+        if (!isCancelledOrder(o)) {
+          const items = itemsByOrder.get(o.id) || [];
+          count += items.reduce((s, it) => s + (it.quantity || 1), 0);
+        }
+      });
+    });
+    return count;
+  }, [ordersByGuestId, itemsByOrder]);
+
+  const renderedTableGuestCount = React.useMemo(() => {
+    let count = 0;
+    const hasNonCancelled = (gid) => {
+      const orders = ordersByGuestId.get(gid) || [];
+      return orders.some(o => !isCancelledOrder(o));
+    };
+    ordersByGuestId.forEach((_orders, gid) => {
+      if (hasNonCancelled(gid)) count++;
+    });
+    return count;
+  }, [ordersByGuestId]);
 
   const getGuestLabelById = (guestId) => {
     const gid = String(guestId);
@@ -572,6 +607,7 @@ export default function CartView({
 
   // ===== CV-01/CV-52: 2-group display names =====
   const bucketDisplayNames = {
+    pending_unconfirmed: tr('cart.group.pending', 'Ожидает'),
     served: tr('cart.group.served', 'Выдано'),
     in_progress: tr('cart.group.in_progress', 'В работе'),
   };
@@ -784,8 +820,12 @@ export default function CartView({
                 </button>
               )}
             </div>
-            {/* CV-50: Dish count + total sum in drawer header (orders + cart) */}
-            {(ordersSum > 0 || cart.length > 0 || (cartTab === 'table' && submittedTableTotal > 0)) && (() => {
+            {/* CV-B2 Fix 1.3: Attributed header — Стол / Вы */}
+            {cartTab === 'table' && renderedTableTotal > 0 ? (
+              <div className="text-xs text-slate-500 mt-0.5">
+                {tr('cart.header.table_label', 'Стол')}: {renderedTableGuestCount} {pluralizeRu(renderedTableGuestCount, tr('cart.header.guest_one', 'гость'), tr('cart.header.guest_few', 'гостя'), tr('cart.header.guest_many', 'гостей'))} · {renderedTableDishCount} {pluralizeRu(renderedTableDishCount, tr('cart.header.dish_one', 'блюдо'), tr('cart.header.dish_few', 'блюда'), tr('cart.header.dish_many', 'блюд'))} · {formatPrice(renderedTableTotal)}
+              </div>
+            ) : (() => {
               const ordersItemCount = todayMyOrders.reduce((sum, o) => {
                 const items = itemsByOrder.get(o.id) || [];
                 return sum + items.reduce((s, it) => s + (it.quantity || 1), 0);
@@ -793,17 +833,11 @@ export default function CartView({
               const cartItemCount = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
               const totalDishCount = ordersItemCount + cartItemCount;
               const headerTotal = ordersSum + (Number(cartTotalAmount) || 0);
-              return cartTab === 'table'
-                ? (
-                  <div className="text-xs text-slate-500 mt-0.5">
-                    {tr('cart.header.table_ordered', 'Заказано на стол')}: {formatPrice(parseFloat(Number(submittedTableTotal).toFixed(2)))}
-                  </div>
-                )
-                : totalDishCount > 0 ? (
-                  <div className="text-xs text-slate-500 mt-0.5">
-                    {totalDishCount} {pluralizeRu(totalDishCount, tr('cart.header.dish_one', 'блюдо'), tr('cart.header.dish_few', 'блюда'), tr('cart.header.dish_many', 'блюд'))} · {formatPrice(parseFloat(headerTotal.toFixed(2)))}
-                  </div>
-                ) : null;
+              return totalDishCount > 0 ? (
+                <div className="text-xs text-slate-500 mt-0.5">
+                  {tr('cart.header.you_label', 'Вы')}: {totalDishCount} {pluralizeRu(totalDishCount, tr('cart.header.dish_one', 'блюдо'), tr('cart.header.dish_few', 'блюда'), tr('cart.header.dish_many', 'блюд'))} · {formatPrice(parseFloat(headerTotal.toFixed(2)))}
+                </div>
+              ) : null;
             })()}
           </div>
 
@@ -829,6 +863,56 @@ export default function CartView({
           </TabsList>
         </Tabs>
       )}
+
+      {/* CV-B2 Fix 4.1: Self-block Card — your own orders in Стол tab */}
+      {showTableOrdersSection && cartTab === 'table' && myGuestId && (ordersByGuestId.get(myGuestId) || []).some(o => !isCancelledOrder(o)) && (() => {
+        const selfOrders = (ordersByGuestId.get(myGuestId) || []).filter(o => !isCancelledOrder(o));
+        const selfTotal = selfOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+        return (
+          <Card className="mb-4">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <ShoppingBag className="w-4 h-4 text-slate-500" />
+                  <span className="text-sm font-semibold text-slate-600">
+                    {tr('cart.self_orders', 'Вы')} ({getGuestLabelById(myGuestId)})
+                  </span>
+                </div>
+                <span className="font-bold text-slate-700">{formatPrice(parseFloat(selfTotal.toFixed(2)))}</span>
+              </div>
+              <div className="pl-2 border-l-2 border-slate-200 space-y-1">
+                {selfOrders.map((order) => {
+                  const items = itemsByOrder.get(order.id) || [];
+                  const status = getSafeStatus(getOrderStatus(order));
+                  const isOrderPending = !getOrderStatus(order)?.internal_code && (order.status || '').toLowerCase() === 'submitted';
+
+                  if (items.length === 0) {
+                    return (
+                      <div key={order.id} className="flex justify-between items-center text-xs">
+                        <span className="text-slate-600">
+                          {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(parseFloat(Number(order.total_amount).toFixed(2)))}
+                          {isOrderPending && <span className="ml-1 text-amber-600 font-medium">{tr('cart.badge.pending', '⏳ Ожидает')}</span>}
+                        </span>
+                        <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
+                      </div>
+                    );
+                  }
+
+                  return items.map((item, idx) => (
+                    <div key={`${order.id}-${idx}`} className="flex justify-between items-center text-xs">
+                      <span className="text-slate-600">
+                        {item.dish_name} × {item.quantity}
+                        {isOrderPending && <span className="ml-1 text-amber-600 font-medium">{tr('cart.badge.pending', '⏳ Ожидает')}</span>}
+                      </span>
+                      <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
+                    </div>
+                  ));
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* SECTION 5: TABLE ORDERS (other guests) — visible only in Стол tab */}
       {showTableOrdersSection && cartTab === 'table' && (
@@ -892,9 +976,13 @@ export default function CartView({
                               );
                             }
 
+                            const isOrderPending = !getOrderStatus(order)?.internal_code && (order.status || '').toLowerCase() === 'submitted';
                             return items.map((item, idx) => (
                               <div key={`${order.id}-${idx}`} className="flex justify-between items-center text-xs">
-                                <span className="text-slate-600">{item.dish_name} × {item.quantity}</span>
+                                <span className="text-slate-600">
+                                  {item.dish_name} × {item.quantity}
+                                  {isOrderPending && <span className="ml-1 text-amber-600 font-medium">{tr('cart.badge.pending', '⏳ Ожидает')}</span>}
+                                </span>
                                 <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
                               </div>
                             ));
@@ -917,7 +1005,7 @@ export default function CartView({
 
 
       {/* CV-01: Empty state — no orders and no cart */}
-      {(!showTableOrdersSection || cartTab === 'my') && statusBuckets.served.length === 0 && statusBuckets.in_progress.length === 0 && cart.length === 0 && todayMyOrders.length === 0 && (
+      {(!showTableOrdersSection || cartTab === 'my') && statusBuckets.served.length === 0 && statusBuckets.in_progress.length === 0 && statusBuckets.pending_unconfirmed.length === 0 && cart.length === 0 && todayMyOrders.length === 0 && (
         <div className="text-center py-8">
           <p className="text-sm text-slate-500">{tr('cart.empty', 'Корзина пуста')}</p>
         </div>
@@ -926,6 +1014,7 @@ export default function CartView({
       {/* Fix 9 — D3: All served + cart empty → «Ничего не ждёте» screen */}
       {(!showTableOrdersSection || cartTab === 'my') && (() => {
         const isV8 = statusBuckets.in_progress.length === 0
+          && statusBuckets.pending_unconfirmed.length === 0
           && statusBuckets.served.length > 0
           && cart.length === 0;
 
@@ -1002,7 +1091,7 @@ export default function CartView({
         }
 
         // Normal rendering: 2-group model (CV-52)
-        const bucketOrder = ['served', 'in_progress'];
+        const bucketOrder = ['pending_unconfirmed', 'served', 'in_progress'];
         return bucketOrder.map(key => {
           const orders = statusBuckets[key];
           if (orders.length === 0) return null;
@@ -1019,7 +1108,7 @@ export default function CartView({
                   onClick={() => { if (key === 'served') manualOverrideRef.current.served = true; setExpandedStatuses(prev => ({ ...prev, [key]: !prev[key] })); }}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-base font-semibold text-slate-800">
+                    <span className={`text-base font-semibold ${key === 'pending_unconfirmed' ? 'text-amber-600' : 'text-slate-800'}`}>
                       {bucketDisplayNames[key]} ({orders.length})
                     </span>
                     {/* CV-05 v2: Accent chip on Подано only */}
