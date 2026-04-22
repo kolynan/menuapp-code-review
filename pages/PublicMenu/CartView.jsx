@@ -118,6 +118,10 @@ export default function CartView({
   const [infoModal, setInfoModal] = React.useState(null); // 'online' | 'tableCode' | null
   // CV-48/Fix 3: Submit feedback phase (idle → submitting → success → idle, or error)
   const [submitPhase, setSubmitPhase] = React.useState('idle'); // 'idle' | 'submitting' | 'success' | 'error'
+  // Fix 3: R4 Terminal Screen — durable state persist (DECISIONS_INDEX §2 R4 LOCKED)
+  const [terminalStateShownForVersion, setTerminalStateShownForVersion] = React.useState(() => {
+    try { return localStorage.getItem('terminalStateShownForVersion') || ''; } catch { return ''; }
+  });
   const [codeAttempts, setCodeAttempts] = React.useState(0);
   const [codeLockedUntil, setCodeLockedUntil] = React.useState(null); // timestamp ms
   const [nowTs, setNowTs] = React.useState(() => Date.now());
@@ -464,13 +468,35 @@ export default function CartView({
       const stageInfo = getOrderStatus(o);
       const isServed = stageInfo?.internal_code === 'finish'
         || (!stageInfo?.internal_code && ['served', 'completed'].includes((o.status || '').toLowerCase()));
-      const isPending = !stageInfo?.internal_code && (o.status || '').toLowerCase() === 'submitted';
+      // CV-BUG-16: B44 pending status string is 'new'
+      const isPending = !stageInfo?.internal_code && (o.status || '').toLowerCase() === 'new';
       if (isServed) groups.served.push(o);
       else if (isPending) groups.pending_unconfirmed.push(o);
       else groups.in_progress.push(o);
     });
     return groups;
   }, [todayMyOrders, getOrderStatus]);
+
+  // Fix 3: R4 — compute terminal version key from current served orders
+  const terminalVersion = React.useMemo(() => {
+    if (
+      statusBuckets.served.length > 0 &&
+      statusBuckets.in_progress.length === 0 &&
+      statusBuckets.pending_unconfirmed.length === 0 &&
+      cart.length === 0
+    ) {
+      return statusBuckets.served.map(o => String(o.id)).sort().join('-');
+    }
+    return '';
+  }, [statusBuckets, cart]);
+
+  // Fix 3: R4 — persist terminal version to localStorage when terminal state is active
+  React.useEffect(() => {
+    if (terminalVersion && terminalVersion !== terminalStateShownForVersion) {
+      setTerminalStateShownForVersion(terminalVersion);
+      try { localStorage.setItem('terminalStateShownForVersion', terminalVersion); } catch {}
+    }
+  }, [terminalVersion]);
 
   // CV-46/Fix 4: Auto-collapse Выдано based on structural changes
   const currentGroupKeys = [
@@ -518,16 +544,18 @@ export default function CartView({
     return Array.from(ordersByGuestId.keys()).filter((gid) => !myGuestId || gid !== myGuestId);
   }, [ordersByGuestId, myGuestId]);
 
+  // CV-BUG-06: exclude cancelled orders from tableOrdersTotal (mirrors renderedTableTotal)
   const tableOrdersTotal = React.useMemo(() => {
     let sum = 0;
     otherGuestIdsFromOrders.forEach((gid) => {
       const orders = ordersByGuestId.get(gid) || [];
       orders.forEach((o) => {
+        if (isCancelledOrder(o)) return;
         sum += Number(o.total_amount) || 0;
       });
     });
     return parseFloat(sum.toFixed(2));
-  }, [ordersByGuestId, otherGuestIdsFromOrders]);
+  }, [ordersByGuestId, otherGuestIdsFromOrders, isCancelledOrder]);
 
   // CV-B2 Fix 1.1: Rendered-data aggregates from ordersByGuestId (all guests)
   const renderedTableTotal = React.useMemo(() => {
@@ -884,7 +912,8 @@ export default function CartView({
                 {selfOrders.map((order) => {
                   const items = itemsByOrder.get(order.id) || [];
                   const status = getSafeStatus(getOrderStatus(order));
-                  const isOrderPending = !getOrderStatus(order)?.internal_code && (order.status || '').toLowerCase() === 'submitted';
+                  // CV-BUG-16: B44 pending status string is 'new'
+                  const isOrderPending = !getOrderStatus(order)?.internal_code && (order.status || '').toLowerCase() === 'new';
 
                   if (items.length === 0) {
                     return (
@@ -914,94 +943,65 @@ export default function CartView({
         );
       })()}
 
-      {/* SECTION 5: TABLE ORDERS (other guests) — visible only in Стол tab */}
-      {showTableOrdersSection && cartTab === 'table' && (
-        <Card className="mb-4">
-          <CardContent className="p-4">
-            <button
-              onClick={() => setOtherGuestsExpanded(!otherGuestsExpanded)}
-              className="w-full flex items-center justify-between text-left"
-            >
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-slate-500" />
-                <span className="text-sm font-semibold text-slate-600">
-                  {tr('cart.table_orders', 'Заказы стола')} ({otherGuestIdsFromOrders.length})
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                {sessionItems.length === 0 && sessionOrders.length > 0 ? (
-                  <span className="text-sm text-slate-400">{tr('common.loading', 'Загрузка')}</span>
-                ) : (
-                  <span className="font-bold text-slate-700">{formatPrice(parseFloat(Number(tableOrdersTotal).toFixed(2)))}</span>
-                )}
-                {otherGuestsExpanded ? (
-                  <ChevronUp className="w-4 h-4 text-slate-400" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-slate-400" />
-                )}
-              </div>
-            </button>
+      {/* SECTION 5: TABLE ORDERS (other guests) — flat list, no wrapper group (CV-BUG-15) */}
+      {showTableOrdersSection && cartTab === 'table' && otherGuestIdsFromOrders.map((gid) => {
+        const guestOrders = ordersByGuestId.get(gid) || [];
+        // CV-BUG-06: exclude cancelled orders from guestTotal
+        const guestTotal = guestOrders.reduce((sum, o) => isCancelledOrder(o) ? sum : sum + (Number(o.total_amount) || 0), 0);
 
-            {otherGuestsExpanded && (
-              <div className="mt-4 pt-4 border-t space-y-4">
-                {otherGuestIdsFromOrders.map((gid) => {
-                  const guestOrders = ordersByGuestId.get(gid) || [];
-                  const guestTotal = guestOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+        return (
+          <Card key={gid} className="mb-4">
+            <CardContent className="p-4">
+              <div className="text-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-slate-700">{getGuestLabelById(gid)}</span>
+                  {sessionItems.length === 0 && sessionOrders.length > 0 ? (
+                    <span className="text-slate-400">{tr('common.loading', 'Загрузка')}</span>
+                  ) : (
+                    <span className="font-bold text-slate-600">{formatPrice(parseFloat(Number(guestTotal).toFixed(2)))}</span>
+                  )}
+                </div>
 
-                  return (
-                    <div key={gid} className="text-sm">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-slate-700">{getGuestLabelById(gid)}</span>
-                        {sessionItems.length === 0 && sessionOrders.length > 0 ? (
-                          <span className="text-slate-400">{tr('common.loading', 'Загрузка')}</span>
-                        ) : (
-                          <span className="font-bold text-slate-600">{formatPrice(parseFloat(Number(guestTotal).toFixed(2)))}</span>
-                        )}
-                      </div>
+                {guestOrders.length > 0 ? (
+                  <div className="pl-2 border-l-2 border-slate-200 space-y-1">
+                    {guestOrders.map((order) => {
+                      const items = itemsByOrder.get(order.id) || [];
+                      const status = getSafeStatus(getOrderStatus(order));
 
-                      {guestOrders.length > 0 ? (
-                        <div className="pl-2 border-l-2 border-slate-200 space-y-1">
-                          {guestOrders.map((order) => {
-                            const items = itemsByOrder.get(order.id) || [];
-                            const status = getSafeStatus(getOrderStatus(order));
+                      if (items.length === 0) {
+                        return (
+                          <div key={order.id} className="flex justify-between items-center text-xs">
+                            <span className="text-slate-600">
+                              {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(parseFloat(Number(order.total_amount).toFixed(2)))}
+                            </span>
+                            <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
+                          </div>
+                        );
+                      }
 
-                            if (items.length === 0) {
-                              return (
-                                <div key={order.id} className="flex justify-between items-center text-xs">
-                                  <span className="text-slate-600">
-                                    {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(parseFloat(Number(order.total_amount).toFixed(2)))}
-                                  </span>
-                                  <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
-                                </div>
-                              );
-                            }
-
-                            const isOrderPending = !getOrderStatus(order)?.internal_code && (order.status || '').toLowerCase() === 'submitted';
-                            return items.map((item, idx) => (
-                              <div key={`${order.id}-${idx}`} className="flex justify-between items-center text-xs">
-                                <span className="text-slate-600">
-                                  {item.dish_name} × {item.quantity}
-                                  {isOrderPending && <span className="ml-1 text-amber-600 font-medium">{tr('cart.badge.pending', '⏳ Ожидает')}</span>}
-                                </span>
-                                <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
-                              </div>
-                            ));
-                          })}
+                      // CV-BUG-16: B44 pending status string is 'new'
+                      const isOrderPending = !getOrderStatus(order)?.internal_code && (order.status || '').toLowerCase() === 'new';
+                      return items.map((item, idx) => (
+                        <div key={`${order.id}-${idx}`} className="flex justify-between items-center text-xs">
+                          <span className="text-slate-600">
+                            {item.dish_name} × {item.quantity}
+                            {isOrderPending && <span className="ml-1 text-amber-600 font-medium">{tr('cart.badge.pending', '⏳ Ожидает')}</span>}
+                          </span>
+                          <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
                         </div>
-                      ) : (
-                        <div className="pl-2 text-xs text-slate-400">
-                          {tr('cart.no_orders_yet', 'Заказов пока нет')}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
+                      ));
+                    })}
+                  </div>
+                ) : (
+                  <div className="pl-2 text-xs text-slate-400">
+                    {tr('cart.no_orders_yet', 'Заказов пока нет')}
+                  </div>
+                )}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        );
+      })}
 
 
       {/* CV-01: Empty state — no orders and no cart */}
@@ -1091,7 +1091,8 @@ export default function CartView({
         }
 
         // Normal rendering: 2-group model (CV-52)
-        const bucketOrder = ['pending_unconfirmed', 'served', 'in_progress'];
+        // R1 LOCKED: pending_unconfirmed показывается НИЖЕ in_progress (DECISIONS_INDEX §2)
+        const bucketOrder = ['served', 'in_progress', 'pending_unconfirmed'];
         return bucketOrder.map(key => {
           const orders = statusBuckets[key];
           if (orders.length === 0) return null;
@@ -1301,14 +1302,20 @@ export default function CartView({
                     : tr('cart.send_to_waiter', 'Отправить официанту')}
             </Button>
           ) : (
-            <Button
-              size="lg"
-              className="w-full min-h-[44px] text-white"
-              style={{backgroundColor: primaryColor}}
-              onClick={() => { onClose ? onClose() : setView("menu"); }}
-            >
-              {tr('cart.cta.back_to_menu', 'Вернуться в меню')}
-            </Button>
+            // V4 LOCKED: outline button + 🔔 helper (DECISIONS_INDEX §2)
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full min-h-[44px]"
+                onClick={() => { onClose ? onClose() : setView("menu"); }}
+              >
+                {tr('cart.cta.back_to_menu', 'Вернуться в меню')}
+              </Button>
+              <p className="text-center text-sm text-slate-500">
+                {tr('cart.cta.need_help_or_bill', 'Нужна помощь или счёт? Нажмите')} <Bell className="inline w-4 h-4 align-middle" />
+              </p>
+            </div>
           )}
         </div>
       )}
