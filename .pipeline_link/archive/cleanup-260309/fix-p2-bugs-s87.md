@@ -1,0 +1,92 @@
+---
+task_id: fix-p2-bugs-s87
+status: pending
+page: StaffOrdersMobile, PartnerClients, PartnerLoyalty
+work_dir: C:/Users/ASUS/OneDrive/002 Menu/Claude AI Cowork/menuapp-code-review
+budget_usd: 12
+fallback_model: sonnet
+system_rules: C:/Users/ASUS/OneDrive/002 Menu/Claude AI Cowork/references/cc-system-rules.txt
+version: "4.0"
+---
+
+# Task: fix-p2-bugs-s87
+
+## Config (v4.0)
+- Budget: $12
+- Fallback model: sonnet
+- System rules: cc-system-rules.txt
+- Progress: per-task TG message via progress-monitor.sh
+
+## Prompt
+IMPORTANT: Your VERY FIRST action must be: echo "started $(date -Iseconds)" > "C:/Users/ASUS/OneDrive/002 Menu/Claude AI Cowork/pipeline/started-fix-p2-bugs-s87.md" — this confirms to Cowork that you started working.
+
+=== TASK SETUP ===
+Progress file: C:/Users/ASUS/OneDrive/002 Menu/Claude AI Cowork/pipeline/progress-fix-p2-bugs-s87.txt
+Task ID: fix-p2-bugs-s87
+=== END TASK SETUP ===
+
+---
+task: fix-p2-bugs-s87
+type: bugfix
+budget: "$12"
+priority: P2
+codex: yes
+---
+
+# Задача: P2 фиксы — StaffOrdersMobile, PartnerClients, PartnerLoyalty (S87)
+
+Починить 3 P2 бага на 3 страницах: регрессия двойного стола, сырой i18n ключ, неправильное склонение баллов.
+
+## Баги для починки
+
+### BUG-1: SO-S61-07 — «Стол Стол 1» двойной префикс, РЕГРЕССИЯ (P2)
+- **Файл:** `pages/StaffOrdersMobile/base/staffordersmobile.jsx`
+- **Симптом:** В таблице заказов (особенно в табе "Завершённые") название стола отображается как "Стол Стол 1" вместо "Стол 1". Баг был починен в RELEASE 260302-00, но вернулся (регрессия S87).
+- **Причина:** Код добавляет prefix "Стол " к значению, которое уже содержит "Стол " — двойное добавление.
+- **Фикс:** Найти место где формируется название стола. Добавить guard: если значение уже начинается с "Стол ", не добавлять prefix повторно. Например: `const tableName = name.startsWith('Стол ') ? name : 'Стол ' + name`
+- **RELEASE:** `260306-01 StaffOrdersMobile RELEASE.jsx` в `pages/StaffOrdersMobile/`
+
+### BUG-2: PC-S87-01 — `loyalty.transaction.earn_order` сырой i18n ключ (P2)
+- **Файл:** `pages/PartnerClients/base/partnerclients.jsx`
+- **Симптом:** В модале детализации клиента, в истории транзакций, тип транзакции "начисление за заказ" отображается как raw ключ `loyalty.transaction.earn_order` вместо "Начислено за заказ" или аналогичного текста.
+- **Фикс:** Найти рендер типа транзакции в client detail modal. Добавить fallback текст на русском или добавить ключ в i18n_pending.csv.
+- **i18n_pending.csv:** Добавить `loyalty.transaction.earn_order` → ru: "Начислено за заказ", en: "Earned from order"
+- **RELEASE:** `260306-01 PartnerClients RELEASE.jsx` в `pages/PartnerClients/`
+
+### BUG-3: PL-S83-02 — «1 Баллы», «0 Баллы» неправильное склонение (P2)
+- **Файл:** `pages/PartnerLoyalty/base/partnerloyalty.jsx`
+- **Симптом:** Слово "баллы/баллов/балл" не склоняется по правилам русского языка. Показывает "1 Баллы", "0 Баллы" вместо "1 Балл", "0 Баллов".
+- **Правила склонения:**
+  - 1 → "Балл"
+  - 2, 3, 4 → "Балла"
+  - 5, 6, 7, 8, 9, 0 → "Баллов"
+  - 11, 12, 13, 14 → "Баллов" (исключения)
+- **Фикс:** Добавить функцию plural для склонения:
+  ```js
+  const pluralPoints = (n) => {
+    const abs = Math.abs(n) % 100;
+    if (abs >= 11 && abs <= 14) return 'Баллов';
+    const rem = abs % 10;
+    if (rem === 1) return 'Балл';
+    if (rem >= 2 && rem <= 4) return 'Балла';
+    return 'Баллов';
+  }
+  ```
+  Заменить все места где выводится "Баллы" или жёстко прописан суффикс.
+- **RELEASE:** `260306-01 PartnerLoyalty RELEASE.jsx` в `pages/PartnerLoyalty/`
+
+## i18n_pending.csv
+Новые ключи из BUG-2 добавить в:
+`menuapp-code-review/i18n_pending.csv`
+Формат: `"key","page","description","ru","en","kk"`
+
+## Git & RELEASE
+- git add / commit / push после КАЖДОГО фикса (по одному commit на баг)
+- Новые RELEASE файлы в соответствующих папках страниц
+- Обновить BUGS.md и README.md для каждой затронутой страницы
+- Номера RELEASE: StaffOrdersMobile — 260306-01, PartnerClients — 260306-01, PartnerLoyalty — 260306-01
+
+## Приоритет выполнения
+1. BUG-3 (PL-S83-02 — plural, простой фикс)
+2. BUG-2 (PC-S87-01 — i18n ключ, простой фикс)
+3. BUG-1 (SO-S61-07 — регрессия стола)

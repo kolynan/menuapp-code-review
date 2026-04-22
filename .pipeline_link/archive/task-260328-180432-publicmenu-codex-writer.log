@@ -1,0 +1,706 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d348b-fada-7910-bb39-9f9443995ad5
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260328-180422-501a-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260328-180422-501a ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Feature: CartView Drawer UX Redesign v4 (#174 re-run) Reference: `ux-concepts/cart-view.md` v4.0 (CV-01..CV-27, ASCII mockups v5). UX agreed S183 + GPT 2 rounds + GPT CartView Review S187c. Production page: https://menu-app-mvp-49a4f5b2.base44.app **Context:** CartView drawer currently uses flat sections: «Выдано» (collapsed) + «Заказано» (expanded) + «Новый заказ». UX v4.0 replaces this with **status-based buckets** (Принят / Готовится / Готов — expanded; Подано — collapsed). This is a UI/layout restructure — no new API calls, no new entities, no backend changes. **CRITICAL: OrderItem has NO status field.** Status lives on `Order.status` only. All items in one order share the same status. Therefore, status buckets group ORDERS (not individual items). Each order = one row in one bucket. `Order.status` enum values and mapping to guest-facing buckets: - `new` → **Отправлено** (gray/neutral) — guest just tapped "Отправить", waiter hasn't seen it yet - `accepted` → **Принят** (amber) — waiter acknowledged - `in_progress` → **Готовится** (blue) - `ready` → **Готов** (amber/pulse) - `served` / `completed` → **Подано** (green, collapsed) - `cancelled` → hidden (do not render) TARGET FILES (modify): - `pages/PublicMenu/CartView.jsx` (main: sections, footer, rating, collapsed rows, D3 screen) - `pages/PublicMenu/x.jsx` (PM-151 success screen float, PM-152/153 guest name localStorage) ⚠️ KB-095 RISK: Two files modified in one chain. After chain completes: ``` git show HEAD:pages/PublicMenu/CartView.jsx | wc -l wc -l pages/PublicMenu/CartView.jsx git show HEAD:pages/PublicMenu/x.jsx | wc -l wc -l pages/PublicMenu/x.jsx ``` Line counts must match. If diff > 0 → restore from git HEAD before deploy. CONTEXT FILES (read-only): - `ux-concepts/cart-view.md` (full UX spec with ASCII mockups) - `ux-concepts/visit-lifecycle.md` (VL-04: D3 screen spec) - `BUGS_MASTER.md` --- ## Fix 1 — CV-01+CV-09: Status-based buckets (replaces Выдано/Заказано) [MUST-FIX, H weight] ### Currently CartView splits orders into 2 flat sections: «Выдано» (served, collapsed ~line 772) and «Заказано» (active, expanded ~line 806). Uses binary filter: `o.status === 'served' || o.status === 'completed'` vs everything else (~lines 366-374). ### Required Replace with **status-based buckets**. Each bucket = one Order.status group. Only non-empty buckets render. **Bucket order (top → bottom) — chronological, oldest first, cart closest to CTA:** 1. **Подано** — `Order.status in ['served', 'completed']` — **collapsed by default** (CV-10). Oldest/done at top. 2. **Готов** — `Order.status === 'ready'` — expanded 3. **Готовится** — `Order.status === 'in_progress'` — expanded 4. **Принят** — `Order.status === 'accepted'` — expanded 5. **Отправлено** — `Order.status === 'new'` — expanded. Just sent, waiter hasn't seen yet. 6. **🛒 Новый заказ** — current cart items with steppers (unchanged logic). Directly above CTA button. **Each bucket header format — includes subtotal:** ``` ▾ Принят (2) 54.77 ₸ ← expanded: ▾, collapsed: ▸. Subtotal right-aligned. 04:17 Суши, New dish 54.77 ₸ ← collapsed summary row (CV-06) ``` Subtotal in header = sum of all `order.total_amount` in that bucket. Wrap: `parseFloat(sum.toFixed(2))`. **Rules:** - Empty buckets are NOT rendered (CV-26). If no orders have status `ready`, the «Готов» section does not exist. - Within each bucket: newest first (by `created_at || created_date || createdAt`), same sort as current (~line 360). - `cancelled` orders: do NOT render anywhere. - **Preserve `expandedStatuses` in UI state** (CV-25): `const [expandedStatuses, setExpandedStatuses] = useState({accepted: true, in_progress: true, ready: true, served: false})`. Polling must NOT change expanded/collapsed state. User toggles only. ### Implementation hints - Replace `servedOrders` / `activeOrders` split (~lines 366-374) with a grouping function: ```js const statusBuckets = React.useMemo(() => { const buckets = { served: [], ready: [], in_progress: [], accepted: [], new_order: [] }; todayMyOrders.forEach(o => { const s = o.status; if (s === 'served' || s === 'completed') buckets.served.push(o); else if (s === 'ready') buckets.ready.push(o); else if (s === 'in_progress') buckets.in_progress.push(o); else if (s === 'accepted') buckets.accepted.push(o); else if (s === 'new') buckets.new_order.push(o); // cancelled: skip }); return buckets; }, [todayMyOrders]); ``` - **Render order** matches object key order: served → ready → in_progress → accepted → new_order → cart. This puts completed orders at top (collapsed) and cart at bottom (closest to CTA). - Replace the two sections (~lines 772-828) with a loop over bucket entries. - Remove `servedExpanded` / `activeExpanded` states (~lines 92-93). Replace with `expandedStatuses` object. - Bucket display names (guest-facing): `{served: 'Подано', ready: 'Готов', in_progress: 'Готовится', accepted: 'Принят', new_order: 'Отправлено'}`. - Keep `getSafeStatus()` (~line 250) for individual order status badges within expanded view, but the BUCKET HEADER uses the display name above (not per-order badge). - **Each header shows subtotal:** `▾ Готовится (2) 86.77 ₸`. Calculate: `bucket.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0)`. Wrap with `parseFloat(sum.toFixed(2))`. ### Must NOT - Old section names «Выдано» or «Заказано (N)» anywhere - Binary served/active split - Empty bucket headers (e.g., `Готов (0)`) - Per-order status badge repeated inside a single-status bucket (status is already the bucket header) ### Verification 1. Mix of statuses (accepted + in_progress) → two separate expanded buckets visible 2. All orders served → only «Подано» bucket (collapsed) visible 3. One order ready → «Готов (1)» expanded, other buckets hidden 4. New order arrives during polling → appears in correct bucket, collapsed/expanded state preserved ### Dependencies - Fix 3 rating: uses the `served` bucket to determine where to show «Оценить» - Fix 7 (PM-154 filter): runs BEFORE bucket grouping — buckets operate on already-filtered `todayMyOrders` - Fix 10 (D3 screen): triggers when all buckets except `served` are empty AND cart is empty --- ## Fix 2 — CV-02+CV-03: Sticky footer with correct scope [MUST-FIX, M weight] ### Currently «ИТОГО за визит: X ₸» is inside scrollable content (~line 980-992), a Card with bg-slate-50. Submit button is sticky (~line 1009) but ONLY visible when cart is not empty. ### Required ИТОГО + CTA button = **one sticky footer block** (always visible at bottom of drawer when there are orders or cart). Remove the old «ИТОГО за визит» Card. **Minimal footer — only bonus text + CTA button. Totals are in section headers + drawer header.** **When cart is NOT empty (D1):** ``` ├═══════════════════════════════════════┤ │ +70 бонусов │ ← if loyalty enabled │ [ Отправить официанту ] │ └═══════════════════════════════════════┘ ``` **When cart IS empty but orders exist (D0 + orders):** ``` ├═══════════════════════════════════════┤ │ [ Заказать ещё ] │ ← secondary style (outline) └═══════════════════════════════════════┘ ``` **«Мои заказы» total → moved to drawer header area** (next to guest name): ``` │ 🔔 Стол 22 ˅ │ │ Вы: Гость 1 > Заказов: 233 ₸ │ ← sum of all submitted orders ``` Show `Заказов: X ₸` ONLY when `ordersSum > 0`. Wrap: `parseFloat(ordersSum.toFixed(2))`. - ⛔ **Remove «ИТОГО ЗА ВИЗИТ» Card (~lines 980-992) completely.** - ⛔ **Remove «ИТОГО ЗА ВИЗИТ» label everywhere.** Anti-pattern per cart-view.md. - «🛒 Новый заказ» header shows cart subtotal: `🛒 Новый заказ 70.36 ₸`. This replaces the old «К отправке» line. - Each status bucket header also shows its own subtotal (see Fix 1). - Total is never in footer — all totals are inline in section headers or drawer header. ### Implementation hints - Expand the existing sticky div (~line 1009) to ALWAYS render (not just `cart.length > 0`). Condition: `cart.length > 0 || todayMyOrders.length > 0`. - Remove the «ИТОГО за визит» Card (~lines 980-992) completely. - Remove the spacer div (~line 995). - CTA logic: cart not empty → «Отправить заказ официанту» (existing); cart empty + orders → «Заказать ещё» (outline button, calls same back-to-menu navigation as «Добавить к заказу» ~line 859). - **«Заказов: X ₸» in drawer header:** add to the header area (~line 534-591), right-aligned next to guest name. Use `ordersSum` (~line 379). Show only if > 0. - **«🛒 Новый заказ X ₸» section header** shows cart subtotal: use existing `cartTotalAmount`. - ⚠️ Do NOT use `position: relative` on any element inside DrawerContent (breaks vaul, KB-096, D7). - Pattern for sticky: flex layout `h-full` → `flex-1 overflow-y-auto` (scrollable) + footer at bottom. - Float fix: ALL price displays (section headers, drawer header) must use `parseFloat(value.toFixed(2))`. ### Must NOT - «ИТОГО ЗА ВИЗИТ» label anywhere - Totals inside sticky footer (totals are in section headers + drawer header only) - Active «Отправить» button when cart is empty - `position: relative` on DrawerContent children ### Verification 1. Scroll long order list → footer stays visible at bottom (only bonus + CTA) 2. Cart empty → footer shows only «Заказать ещё» (outline). «Заказов: X ₸» in header area. 3. Cart + history → «🛒 Новый заказ 70.36 ₸» header visible, «Заказов: 233 ₸» in drawer header 4. First order without history → «🛒 Новый заказ 70.36 ₸» header, no «Заказов» (nothing submitted yet) --- ## Fix 3 — CV-04+CV-05: Rating only on «Подано» bucket [MUST-FIX, M weight] ### Currently Star rating (`<Rating>` component, imported ~line 6) shown under EVERY item in EVERY order, regardless of status. Visible at ~line 456+ inside `renderOrderItems`. ### Required - Buckets Принят / Готовится / Готов: **NO rating UI at all** — no stars, no button, no empty state - Bucket Подано: show **accent-chip** in bucket header: `Подано (3) • Оценить` (CV-05) - Tap «Оценить» → expand bucket + show star rating per item (existing `<Rating>` component) - If ALL items already rated → chip text changes to `Подано (3) ✅` - ⚠️ Use the SAME status condition as Fix 1's `served` bucket: `o.status === 'served' || o.status === 'completed'` ### Implementation hints - In `renderOrderItems` (~line 456), add a parameter `showRating: boolean`. Pass `true` only for served bucket. - Accent-chip: small colored pill next to the count in Подано header. Example: `<span className="ml-2 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">Оценить</span>`. On tap: set `expandedStatuses.served = true` AND scroll to rating section. - Keep existing `Rating` component usage and `draftRatings` / `updateDraftRating` / `ratingSavingByItemId` props. ### Must NOT - Empty stars (☆☆☆☆☆) on non-served orders - Rating button/stars on «Принят» or «Готовится» or «Готов» ### Verification 1. Order status «Принят» → no rating UI 2. Order status «Подано» → accent-chip «Оценить» in header 3. Tap «Оценить» → section expands, stars visible per item 4. All rated → chip shows ✅ --- ## Fix 4 — CV-06+CV-23: Collapsed summary rows + qty display [MUST-FIX, M weight] ### Currently Each order shows full item list expanded by default in both sections. ### Required Orders in status buckets (Принят/Готовится/Готов/Подано) show as **collapsed summary rows**: ``` 04:17 Суши, Карбонара 70.36 ₸ ▾ ``` **Rules:** - Show order time (HH:MM from `created_at`) + first 2 item names + `+N` if more: `Суши, Карбонара +3 70.36 ₸ ▾` - **qty display (CV-23):** `qty=1` → do NOT show. `qty>1` → show muted `×2` after name: `Паста карбонара ×2`. - Tap ▾ → expand to show full item list with individual prices - «Новый заказ» section items are ALWAYS expanded (user needs steppers) - ⚠️ For the order total in collapsed rows, use the SAME `formatPrice` function already used for item prices. Wrap with `parseFloat(total.toFixed(2))`. - Chevron touch target ≥ 44×44px ### Implementation hints - Each order gets its own expanded/collapsed state: `const [expandedOrders, setExpandedOrders] = useState({})`. Toggle: `setExpandedOrders(prev => ({...prev, [orderId]: !prev[orderId]}))`. - Summary text builder: `items.slice(0, 2).map(i => i.dish_name + (i.quantity > 1 ? ` ×${i.quantity}` : '')).join(', ')` + (items.length > 2 ? ` +${items.length - 2}` : ''). - Order time: `new Date(order.created_at || order.created_date || order.createdAt).toLocaleTimeString('ru', {hour:'2-digit', minute:'2-digit'})`. ### Must NOT - Auto-expanded order list in status buckets - `×1` shown for single-quantity items - Collapsed rows in «Новый заказ» section (cart always expanded) ### Verification 1. Order with 2 items → shows both names, no «+N» 2. Order with 5 items → shows 2 names + «+3» 3. Item with qty=1 → no ×1 shown. Item with qty=3 → shows ×3 4. Tap chevron → full list expands with individual prices 5. «Новый заказ» items always show with steppers --- ## Fix 5 — CV-08+CV-27: Guest-facing status labels + tappable name [SHOULD-FIX, L weight] ### Currently Status labels use raw values: Заказано, Принято, Готовится, Готов, Выдан гостю (~lines 250-280). Guest name shows with pencil icon for editing (~line 571-577). ### Required **Status labels** — 5 guest-facing statuses: - `new` → display **«Отправлено»** (gray) — waiter hasn't seen it yet - `accepted` → display **«Принят»** (amber) — waiter acknowledged - `in_progress` → **«Готовится»** (blue) - `ready` → **«Готов»** (amber/pulse) - `served` / `completed` → **«Подано»** (green) - Update `getSafeStatus()` fallback map (~line 266-278) accordingly. Remove «Заказано» as display label. Add «Отправлено» for `new`. **Guest name (CV-27):** - Replace pencil icon with tappable text: `Вы: Гость 1 >` - Hit area ≥ 44×44px - Tap → same edit mode as current pencil icon flow - Find current implementation at ~line 571 (`<button>` with edit icon) ### Must NOT - «Заказано» or «Выдан гостю» visible to guest anywhere - Pencil/edit icon next to name ### Verification 1. No label says «Заказано» or «Выдан гостю» — only «Отправлено», «Принят», «Готовится», «Готов», «Подано» 2. Order with status `new` shows «Отправлено», not «Заказано» 3. Guest name shows as `Вы: Гость 1 >` — tappable, no pencil icon --- ## Fix 6 — PM-154: Order filter 06:00 (today's shift) [MUST-FIX, M weight] ### Currently Orders filtered to today's date but PM-154 shows stale orders from previous days. Current filter at ~lines 354-361 uses `created_at || created_date || createdAt`. ### Required Filter: show only orders where `createdAt >= today at 06:00 AM`. ```js const today6am = new Date(); today6am.setHours(6, 0, 0, 0); if (new Date() < today6am) today6am.setDate(today6am.getDate() - 1); const filtered = orders.filter(o => { const d = o.created_at || o.created_date || o.createdAt; return d && new Date(d) >= today6am; }); ``` Reason: restaurants work past midnight — 06:00 is business-day reset (VL-07). ### File and location File: `CartView.jsx`, ~lines 354-361 (existing date filter). ### Must NOT - Midnight (00:00) as cutoff - Orders from yesterday evening visible ### Verification 1. Orders before 06:00 today → NOT shown 2. Orders after 06:00 today → shown 3. At 02:00 AM → shows orders since yesterday 06:00 --- ## Fix 7 — PM-151: Float in success screen (x.jsx) [MUST-FIX, L weight] ### Currently Success screen «Заказ отправлен!» shows floating point: `31.00999999999998 ₸`. Located in x.jsx ~line 731: `{formatPrice(totalAmount)}`. ### Required Wrap with float fix: `{formatPrice(parseFloat(Number(totalAmount).toFixed(2)))}`. ### File and location File: `x.jsx`, ~line 731. Search for `formatPrice(totalAmount)` near `confirmation.total`. ### Must NOT - Raw `totalAmount` without toFixed ### Verification 1. Submit order → success screen shows `31.01 ₸` (not `31.009999...`) --- ## Fix 8 — PM-152+PM-153: Guest name localStorage (x.jsx) [MUST-FIX, M weight] ### Currently Guest name initialized from localStorage ~line 1358-1359: `localStorage.getItem('menuapp_guest_name')`. Name saved on update ~line 3162: `localStorage.setItem('menuapp_guest_name', trimmedName)`. **PM-152:** Stale name from previous session (old table) not cleared. **PM-153:** Name lost after Chrome kill (already partially implemented — init from localStorage exists, but may not cover all re-mount scenarios). ### Required 1. On `tableCode` change → clear guest name: `localStorage.removeItem('menuapp_guest_name')` and reset `guestNameInput` to `''`. 2. On component mount → already reads from localStorage (~line 1358-1359) ✅. Verify this works after Chrome kill. 3. When guest enters name and taps ✓ → save to localStorage (already at ~line 3162) ✅. 4. When `tableCode` changes — search for `tableCode` state or effect. Add cleanup: ```js // Inside useEffect that watches tableCode changes: try { localStorage.removeItem('menuapp_guest_name'); } catch(e) {} setGuestNameInput(''); ``` ### File and location File: `x.jsx`. Search for `tableCode` state changes or `useEffect` depending on `tableCode`. Also check ~lines 1358-1362 (init) and ~line 3162 (save). ### Must NOT - Name from previous visitor shown to new guest at different table - Name reset to «Гость» after Chrome kill (if name was entered this session at same table) ### Verification 1. Enter name «Артур» → kill Chrome → reopen same table → name still «Артур» ✅ 2. Change table → name cleared (shows «Гость») ✅ 3. New session on different table → no stale name ✅ --- ## Fix 9 — D3 (VL-04): «Все блюда поданы» screen [MUST-FIX, M weight] ### Currently When all orders are delivered and cart is empty, drawer shows «Подано» collapsed section and empty space. No guidance for guest. ### Required When **all status buckets except `served` are empty AND cart is empty** (= V8 state): Show D3 screen: ``` ┌─────────────────────────────────────┐ │ 🔔 Стол 22 ˅ │ │ Вы: Гость 1 > Заказов: 184 ₸ │ ├─────────────────────────────────────┤ │ │ │ ✅ Ничего не ждёте. │ │ Можно заказать ещё или оценить. │ │ │ │ ▸ Подано (8) • Оценить 184.77 ₸│ ← collapsed, accent-chip, subtotal │ │ ├═════════════════════════════════════┤ │ [ Заказать ещё ] │ ← minimal footer └─────────────────────────────────────┘ ``` **Condition:** ```js const isV8 = statusBuckets.accepted.length === 0 && statusBuckets.in_progress.length === 0 && statusBuckets.ready.length === 0 && statusBuckets.served.length > 0 && cart.length === 0; ``` **Rules:** - «Дозаказать» / «Заказать ещё» button: navigates back to menu (same as existing «Добавить к заказу» at ~line 859). - ИТОГО: use `ordersSum` (same float fix). - This condition should be checked ABOVE the normal bucket rendering. ### Must NOT - Empty blank area when all delivered - «Отправить» button when cart is empty ### Verification 1. All orders delivered + cart empty → ✅ banner + «Заказать ещё» 2. Add item to cart → switches to normal CartView with «Новый заказ» 3. One order still «Готовится» → normal view, no D3 screen --- ## ⚠️ D7 — DrawerContent: NO `relative` class CartView.jsx uses DrawerContent (vaul library). Any new wrapper elements added inside DrawerContent must NOT have the `relative` class — it breaks vaul. KB-096. ## ⛔ SCOPE LOCK - Modify ONLY: section structure, footer, rating visibility, collapsed rows, labels, date filter, success screen float, guest name localStorage, D3 screen, qty display - Do NOT change: stepper +/- behavior, order submission logic, "Отправить официанту" API call payload - Do NOT change: loyalty points calculation, table header chevron icon/position, help drawer logic - Do NOT change: table confirmation Bottom Sheet, order tracking view - In x.jsx: ONLY touch success screen float (PM-151, ~line 731) and guest name localStorage (~lines 1358, 3162, + tableCode effect) ## FROZEN UX (DO NOT CHANGE) These elements are tested and working. Do NOT modify their CSS, className, or behavior: - PM-104 ✅: chevron (˅) in right part of table card header, NOT sticky (~line 582-591) - PM-140 ✅: "Вернуться в меню" + "Мои заказы" buttons on confirmation screen (x.jsx ~lines 759, 767) - PM-141 ✅: star rating touch targets ≥ 44px (keep `<Rating>` component sizing when shown) - PM-142 ✅: orders filtered to current date (Fix 6 REFINES to 06:00 cutoff, do NOT revert to all-time) - PM-143 ✅: sort by full datetime (newest first within each bucket) - PM-145 ✅: float fix on totals (parseFloat toFixed(2)) — extend pattern, do not remove existing - PM-148 ✅: table banner removed (ModeTabs.jsx — not in scope) - PM-149 ✅: guest name without suffix `#NNN` (CartView ~line 307-309 `guestDisplay = guestBaseName`) - PM-155 ✅: discount price toFixed(2) (MenuView + x.jsx detail card — not in scope) ## FROZEN UX grep verification Before commit, verify these have NOT been removed or broken: ``` grep -n "ChevronDown" pages/PublicMenu/CartView.jsx | head -5 grep -n "toFixed\|parseFloat" pages/PublicMenu/CartView.jsx | head -5 grep -n "guestBaseName\|guestDisplay" pages/PublicMenu/CartView.jsx | head -3 grep -n "formatPrice(totalAmount)" pages/PublicMenu/x.jsx | head -3 grep -n "menuapp_guest_name" pages/PublicMenu/x.jsx | head -5 ``` ## Regression Check (MANDATORY after implementation) - [ ] "Отправить заказ официанту" button still submits order correctly - [ ] Stepper (−/+) still adjusts quantities in «Новый заказ» - [ ] Stars rating works when shown on Подано orders - [ ] Table header with chevron still collapses/expands drawer - [ ] Float fix applied on ALL totals (CartView footer + x.jsx success screen) - [ ] Guest name persists after Chrome kill (same table) - [ ] Guest name clears on table change - [ ] D3 screen appears when all orders served + cart empty - [ ] Help drawer still opens from bell icon (x.jsx unchanged outside scope) - [ ] Подано bucket collapsed by default, other buckets expanded ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Verify at 375px viewport width: - [ ] Status bucket headers visible and tappable (≥ 44px height) - [ ] Sticky footer does not overlap scrollable content - [ ] Collapsed summary rows: chevron ≥ 44×44px touch target - [ ] «Новый заказ» steppers work correctly at 375px - [ ] Long dish names truncated with ellipsis (not overflowing) - [ ] Accent-chip «Оценить» visible and tappable on Подано header - [ ] Guest name `>` tappable (≥ 44×44px hit area) ## Implementation Notes - TARGET FILES: `pages/PublicMenu/CartView.jsx`, `pages/PublicMenu/x.jsx` - CONTEXT: `ux-concepts/cart-view.md`, `BUGS_MASTER.md` - Do NOT use `git add .` — only: `git add pages/PublicMenu/CartView.jsx pages/PublicMenu/x.jsx` - git commit message: `feat: CartView v4 — status buckets, sticky footer, 06:00 filter, guest name, D3 screen` - git push === END ===
+mcp startup: no servers
+codex
+Reviewing the target page in `pages/PublicMenu` only. I’ll read `CartView.jsx`, `x.jsx`, and the page-local `README.md`/`BUGS.md`, then write a concise findings file scoped strictly to Fix 1–9.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -TotalCount 220" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -TotalCount 220" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Name 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 15.25s:
+
+ exited 124 in 14.62s:
+
+ exited 124 in 15.56s:
+
+codex
+The target files are large enough that my first reads timed out. I’m switching to narrower, line-ranged reads inside `pages/PublicMenu` so I can inspect only the relevant areas without leaving the page folder.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "(Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -TotalCount 120) -join \""'`n"' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Get-ChildItem 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu' | Select-Object Name,Length" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "(Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -TotalCount 120) -join \""'`n"' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 10.77s:
+
+Name                                  Length
+----                                  ------
+components                                  
+versions                                    
+260320-01 useTableSession RELEASE.jsx 30461 
+260323-03 CheckoutView RELEASE.jsx    7840  
+260327-01 ModeTabs RELEASE.jsx        3026  
+260327-03 MenuView RELEASE.jsx        16120 
+260328-01 CartView RELEASE.jsx        44686 
+260328-01 x RELEASE.jsx               149420
+ACCEPTANCE_CRITERIA_PHASE1.md         12831 
+BUGS.md                               66479 
+CartView.jsx                          44686 
+CheckoutView.jsx                      7840  
+COPY_SPEC.md                          10857 
+i18n_DrawerUX_S79.csv                 464   
+i18n_WorkingHours_S79.csv             1206  
+MenuView.jsx                          16120 
+ModeTabs.jsx                          2476  
+ succeeded in 11.14s:
+// ======================================================
+// pages/x.jsx â€” PUBLIC MENU with i18n + Channels Visibility + Gating
+// UPDATED: Simplified Hall logic (TASK-260123-01b)
+// FIXED: P0-1..P0-7 security and functionality fixes
+// UPDATED: TASK-260127-01 - session restore, UI cleanup
+// PATCHED: 2026-01-28 - P0-1, P0-2, P0-2b, P1-1..P1-4
+// PATCHED: 2026-02-01 - FIX-260131-07 FINAL - guest safeguard in submit
+// PATCHED: 2026-02-01 - TASK-260201-01 - Hall StickyBar always visible
+// PATCHED: 2026-03-03 - GAP-01 - Order Confirmation Screen
+// FIXED: 2026-03-03 - GAP-01 fix - Confirmation as full-screen overlay (z-60)
+// FIXED: 2026-03-03 - GAP-02 fix - Embed OrderStatusScreen inside x.jsx (no /orderstatus route)
+// FIXED: 2026-03-03 - GAP-02 fix - Remove auto-dismiss timer (race condition: ghost click on menu)
+// ======================================================
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { useI18n } from "@/components/i18n";
+import { toast } from "sonner"; // P0-6: sonner instead of custom toast
+ succeeded in 11.34s:
+import React from "react";
+import { Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, Minus, Plus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import Rating from "@/components/Rating";
+
+function lightenColor(hex, amount) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = Math.min(255, (num >> 16) + Math.round((255 - (num >> 16)) * amount));
+  const g = Math.min(255, ((num >> 8) & 0x00FF) + Math.round((255 - ((num >> 8) & 0x00FF)) * amount));
+  const b = Math.min(255, (num & 0x0000FF) + Math.round((255 - (num & 0x0000FF)) * amount));
+  return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
+}
+
+export default function CartView({
+  partner,
+  currentTable,
+  currentGuest,
+  t,
+codex
+I have the page folder contents and the file starts. Next I’m pulling only the line ranges tied to the requested fixes, plus the local `README.md` and `BUGS.md`, so the review stays inside the mandated scope.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; (Get-Content "'$p -TotalCount 220) -join "`n"' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; (Get-Content "'$p -TotalCount 180) -join "`n"' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'; "'$c=Get-Content $p; $ranges=@(@(80,120),@(240,420),@(430,620),@(740,1045)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '"'{0,5}: {1}' -f "'$i,$c[$i-1] }}' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 10.55s:
+---
+version: "38.0"
+updated: "2026-03-28"
+session: 186
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*9 active bugs remaining (0x P0, 4x P1, 4x P2, 0x P3, 1x suggestion).*
+
+### BUG-PM-132: List mode stepper buttons use w-9 h-9 (36px) instead of w-11 h-11 (44px) (P2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P2
+- **ÐšÐ¾Ð³Ð´Ð°:** S177 (found by Codex in chain 74b9, confirmed by CC)
+ succeeded in 10.67s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 10.84s:
+
+--- lines 80-120 ---
+   80:   guestCode,
+   81:   showLoyaltySection,
+   82: }) {
+   83:   const primaryColor = partner?.primary_color || '#1A1A1A';
+   84: 
+   85:   // ===== P0: Safe prop defaults (BUG-PM-023, BUG-PM-025) =====
+   86:   const safeReviewedItems = reviewedItems || new Set();
+   87:   const safeDraftRatings = draftRatings || {};
+   88: 
+   89:   // ===== P1 Expandable States =====
+   90:   const [splitExpanded, setSplitExpanded] = React.useState(false);
+   91:   // loyaltyExpanded removed â€” loyalty section simplified to motivation text (#87 KS-1)
+   92:   const [servedExpanded, setServedExpanded] = React.useState(false); // PM-144: Ð’Ñ‹Ð´Ð°Ð½Ð¾ collapsed by default
+   93:   const [activeExpanded, setActiveExpanded] = React.useState(true); // PM-144: Ð—Ð°ÐºÐ°Ð·Ð°Ð½Ð¾ expanded by default
+   94:   const [showRewardEmailForm, setShowRewardEmailForm] = React.useState(false);
+   95:   const [rewardEmail, setRewardEmail] = React.useState('');
+   96:   const [rewardEmailSubmitting, setRewardEmailSubmitting] = React.useState(false);
+   97:   const [emailError, setEmailError] = React.useState('');
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path "'$p -Pattern '"'formatPrice\\(totalAmount\\)|menuapp_guest_name|tableCode|guestNameInput' | ForEach-Object { '{0}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$c=Get-Content $p; $ranges=@(@(700,780),@(1340,1385),@(3145,3185),@(1530,1615)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '"'{0,5}: {1}' -f "'$i,$c[$i-1] }}' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 10.05s:
+731: {formatPrice(totalAmount)}
+1358: const [guestNameInput, setGuestNameInput] = useState(() => {
+1359: try { return localStorage.getItem('menuapp_guest_name') || ''; } catch (e) { return ''; }
+1561: tableCodeParam,
+1564: tableCodeInput,
+1565: setTableCodeInput,
+1571: verifyTableCode,
+1578: if (typeof setTableCodeInput === 'function') setTableCodeInput('');
+1623: const tableCodeLength = useMemo(() => {
+2312: if (tableCodeParam && orderMode !== "hall") {
+2315: }, [tableCodeParam, orderMode]);
+3147: const trimmedName = guestNameInput.trim();
+3162: try { localStorage.setItem('menuapp_guest_name', trimmedName); } catch (e) { /* quota */ }
+3165: setGuestNameInput(trimmedName);
+3324: tableCodeInput={tableCodeInput}
+3325: setTableCodeInput={setTableCodeInput}
+3381: tableCodeParam={tableCodeParam}
+3527: guestNameInput={guestNameInput}
+3528: setGuestNameInput={setGuestNameInput}
+3583: tableCodeInput={tableCodeInput}
+ succeeded in 10.08s:
+
+--- lines 700-780 ---
+  700:       <Card className="mb-6">
+  701:         <CardContent className="p-4">
+  702:           <p className="text-sm font-medium text-slate-600 mb-3">
+  703:             {tr("confirmation.your_order", "Ð’Ð°Ñˆ Ð·Ð°ÐºÐ°Ð·")}
+  704:           </p>
+  705: 
+  706:           {/* Items list */}
+  707:           <div className="space-y-2 mb-3">
+  708:             {items.map((item, idx) => (
+  709:               <div
+  710:                 key={item.dishId || idx}
+  711:                 className="flex justify-between items-center text-sm"
+  712:               >
+  713:                 <span className="text-slate-700">
+  714:                   {item.name}{" "}
+  715:                   <span className="text-slate-400">x{item.quantity}</span>
+  716:                 </span>
+  717:                 <span className="text-slate-700 font-medium tabular-nums">
+codex
+I’ve confirmed the main CartView areas and the x.jsx touchpoints. I’m checking a few more targeted lines around table-change handling so I can verify Fix 8 precisely instead of inferring it.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path "'$p -Pattern '"'removeItem\\(|menuapp_guest_name|currentTable|resolvedTable|verifiedTable|useEffect\\(\\) => \\{|useEffect\\(' | ForEach-Object { '{0}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$c=Get-Content $p; $ranges=@(@(2298,2335),@(2680,2760),@(2860,2945)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '"'{0,5}: {1}' -f "'$i,$c[$i-1] }}' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 9.40s:
+175: localStorage.removeItem(key);
+199: localStorage.removeItem(key);
+212: localStorage.removeItem(key);
+963: useEffect(() => {
+975: useEffect(() => {
+980: useEffect(() => {
+1359: try { return localStorage.getItem('menuapp_guest_name') || ''; } catch (e) { return ''; }
+1401: useEffect(() => {
+1416: useEffect(() => {
+1458: useEffect(() => {
+1466: useEffect(() => {
+1488: useEffect(() => {
+1531: useEffect(() => {
+1562: resolvedTable,
+1568: verifiedTableId,
+1569: verifiedTable,
+1575: useEffect(() => {
+1602: useEffect(() => {
+1620: const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
+1630: // P0-2: currentTableId only from resolved table or code verification
+ succeeded in 9.17s:
+
+--- lines 2298-2335 ---
+ 2298:       let code = localStorage.getItem("menu_guest_code");
+ 2299:       if (!code) {
+ 2300:         code = String(Math.floor(1000 + Math.random() * 9000));
+ 2301:         localStorage.setItem("menu_guest_code", code);
+ 2302:       }
+ 2303:       setGuestCode(code);
+ 2304:     } catch (e) {
+ 2305:       // silent
+ 2306:     }
+ 2307:   }, [isHallMode, hallGuestCodeEnabled]);
+ 2308: 
+ 2309:   // P0-2: Removed legacy table_id/table_slug handling
+ 2310:   // Only explicit table code from URL triggers hall mode verification
+ 2311:   useEffect(() => {
+ 2312:     if (tableCodeParam && orderMode !== "hall") {
+ 2313:       setOrderMode("hall");
+ 2314:     }
+ 2315:   }, [tableCodeParam, orderMode]);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$c=Get-Content $p; $ranges=@(@(1396,1500),@(1688,1765),@(2210,2255),@(2448,2470)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '"'{0,5}: {1}' -f "'$i,$c[$i-1] }}' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 5.49s:
+
+--- lines 1396-1500 ---
+ 1396:   });
+ 1397: 
+ 1398:   const primaryColor = partner?.primary_color || '#1A1A1A';
+ 1399: 
+ 1400:   // Breakpoint listener
+ 1401:   useEffect(() => {
+ 1402:     const mediaQuery = window.matchMedia("(max-width: 767px)");
+ 1403:     
+ 1404:     const handleChange = (e) => {
+ 1405:       setIsMobile(e.matches);
+ 1406:     };
+ 1407:     
+ 1408:     mediaQuery.addEventListener('change', handleChange);
+ 1409:     
+ 1410:     return () => {
+ 1411:       mediaQuery.removeEventListener('change', handleChange);
+ 1412:     };
+ 1413:   }, []);
+codex
+The main gaps are already visible in the render path. I’m doing one last targeted string check inside `CartView.jsx` so the findings can cite current labels and missing D3/footer states precisely.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path "'$p -Pattern '"'Заказов:|menuapp_guest_name|formatPrice\\(totalAmount\\)|Заказать ещё|Ничего не ждёте|Оценить' | ForEach-Object { '{0}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'; Select-String -Path "'$p -Pattern '"'Выдано|Заказано|ИТОГО за визит|Добавить к заказу|Оценить|Подано|Отправлено|Ничего не ждёте|Заказать ещё|servedExpanded|activeExpanded|visitTotal|renderOrderItems|todayMyOrders' | ForEach-Object { '{0}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.08s:
+442: "review.rate_others": "Оценить блюда гостей",
+731: {formatPrice(totalAmount)}
+1359: try { return localStorage.getItem('menuapp_guest_name') || ''; } catch (e) { return ''; }
+3162: try { localStorage.setItem('menuapp_guest_name', trimmedName); } catch (e) { /* quota */ }
+ succeeded in 11.18s:
+92: const [servedExpanded, setServedExpanded] = React.useState(false); // PM-144: Выдано collapsed by default
+93: const [activeExpanded, setActiveExpanded] = React.useState(true); // PM-144: Заказано expanded by default
+253: return { icon: '🔵', label: tr('status.new', 'Заказано'), color: '#3B82F6' };
+266: 'new': tr('status.new', 'Заказано'),
+278: label = fallbacks[code] || tr('status.new', 'Заказано');
+351: const todayMyOrders = React.useMemo(() => {
+366: // ===== PM-144: Split orders into Выдано (served) vs Заказано (active) =====
+368: todayMyOrders.filter(o => o.status === 'served' || o.status === 'completed'),
+369: [todayMyOrders]
+373: todayMyOrders.filter(o => o.status !== 'served' && o.status !== 'completed' && o.status !== 'cancelled'),
+374: [todayMyOrders]
+378: const visitTotal = React.useMemo(() => {
+379: const ordersSum = todayMyOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+382: }, [todayMyOrders, cartTotalAmount]);
+456: // ===== PM-144: Reusable order list renderer for Выдано / Заказано sections =====
+457: const renderOrderItems = (orders) => (
+750: ⭐ {tr('review.rate_others', 'Оценить блюда гостей')}
+772: {/* SECTION: Выдано (served orders) — PM-144, collapsed by default */}
+779: onClick={() => setServedExpanded(!servedExpanded)}
+784: {tr('cart.served', 'Выдано')} ({servedOrders.length})
+codex
+I’ve got the scoped findings. I’m creating the required artifacts now: the pipeline findings file the task asked for, plus the page-local review and command log required by the repo instructions.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.42s:
+True
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-28.log
+# Commands executed for PublicMenu review on 2026-03-28
+
+1. [timed out] Get-ChildItem -Name 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu'
+2. [timed out] Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -TotalCount 220
+3. [timed out] Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -TotalCount 220
+4. Get-ChildItem 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu' | Select-Object Name,Length
+5. (Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -TotalCount 120) -join "`n"
+6. (Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -TotalCount 120) -join "`n"
+7. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; (Get-Content $p -TotalCount 180) -join "`n"
+8. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; (Get-Content $p -TotalCount 220) -join "`n"
+9. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'; $c=Get-Content $p; $ranges=@(@(80,120),@(240,420),@(430,620),@(740,1045)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
+10. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'formatPrice\(totalAmount\)|menuapp_guest_name|tableCode|guestNameInput' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+11. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content $p; $ranges=@(@(700,780),@(1340,1385),@(3145,3185),@(1530,1615)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
+12. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'removeItem\(|menuapp_guest_name|currentTable|resolvedTable|verifiedTable|useEffect\(\) => \{|useEffect\(' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+13. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content $p; $ranges=@(@(2298,2335),@(2680,2760),@(2860,2945)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
+14. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content $p; $ranges=@(@(1396,1500),@(1688,1765),@(2210,2255),@(2448,2470)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
+15. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'; Select-String -Path $p -Pattern 'Выдано|Заказано|ИТОГО за визит|Добавить к заказу|Оценить|Подано|Отправлено|Ничего не ждёте|Заказать ещё|servedExpanded|activeExpanded|visitTotal|renderOrderItems|todayMyOrders' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+16. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'Заказов:|menuapp_guest_name|formatPrice\(totalAmount\)|Заказать ещё|Ничего не ждёте|Оценить' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+17. Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state'
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260328-180422-501a-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-180422-501a
+
+## Findings
+1. [P1] Fix 1 — `CartView.jsx` still uses a binary `servedOrders` / `activeOrders` split instead of status buckets. `CartView.jsx:92-93` keeps only `servedExpanded` and `activeExpanded`, `CartView.jsx:366-374` groups orders only into served vs non-served, and `CartView.jsx:772-847` still renders `Выдано` / `Заказано`. This cannot produce the required `Подано / Готов / Готовится / Принят / Отправлено` buckets, per-bucket subtotals, or preserved expand state per status. FIX: replace the split with status-keyed buckets (`served`, `ready`, `in_progress`, `accepted`, `new_order`), render only non-empty buckets in the required order, and store UI state in `expandedStatuses`.
+2. [P1] Fix 2 — Footer and totals are still wired to the old layout. `CartView.jsx:549-579` shows no `Заказов: X ₸` in the drawer header, `CartView.jsx:980-992` still renders the removed `ИТОГО за визит` card, `CartView.jsx:995` still inserts the old spacer, and `CartView.jsx:1008-1042` renders the sticky footer only when `cart.length > 0`. That misses the required always-visible sticky footer for order-history states and leaves cart/order totals in the wrong places. FIX: move submitted-orders total into the header, put the cart subtotal into the `Новый заказ` section header, remove the visit-total card and spacer, and always render one sticky footer block when `cart.length > 0 || todayMyOrders.length > 0`, switching to outline `Заказать ещё` when the cart is empty.
+3. [P1] Fix 3 — Rating is still exposed outside the served state. In `CartView.jsx:457-530`, `renderOrderItems` has no status gate, and `CartView.jsx:489-516` renders `<Rating>` for any order whenever `reviewsEnabled` is true. `CartView.jsx:833-843` also leaves a review CTA inside the active-orders section, while `CartView.jsx:772-802` has no `Подано (N) • Оценить` header chip at all. FIX: pass `showRating` only for the served bucket, remove rating UI from non-served buckets, and move the entry point to a served-bucket header chip that expands `Подано`.
+4. [P1] Fix 4 — Status buckets are not collapsed into per-order summary rows. `CartView.jsx:457-529` immediately renders full item lists for every order, `CartView.jsx:474-520` has no per-order collapsed/expanded state, and `CartView.jsx:485` always prints `× {item.quantity}`, including `×1`. This misses the required `HH:MM + first 2 dishes + +N + total + chevron` summary row behavior and the qty rule from CV-23. FIX: add `expandedOrders`, render collapsed summary rows for served/accepted/in_progress/ready buckets, omit `×1`, and keep only the `Новый заказ` section permanently expanded with steppers.
+5. [P2] Fix 5 — Guest-facing status labels and the guest-name affordance are still on the old copy. `CartView.jsx:250-278` maps `new` to `Заказано`, keeps `ready` as `Готово`, and has no served/completed fallback to `Подано`; `CartView.jsx:470-472` still shows the per-order badge using that old mapping. In the header, `CartView.jsx:571-577` keeps the editable-name trigger as a plain text button with a pencil icon instead of `Вы: Имя >`. FIX: remap statuses to `Отправлено / Принят / Готовится / Готов / Подано` and replace the pencil affordance with a 44px-tappable name row that shows `Вы: {guestDisplay} >`.
+6. [P1] Fix 6 — The order filter still resets at midnight, not at the 06:00 business-day boundary. `CartView.jsx:350-358` compares `new Date(d).toDateString()` to today's date, so orders from the previous business night can leak into the drawer or disappear too early after midnight. FIX: compute `today6am` and filter on `new Date(created_at || created_date || createdAt) >= today6am`.
+7. [P2] Fix 7 — The success screen still formats the raw floating-point total. `x.jsx:726-731` renders `{formatPrice(totalAmount)}`, which is exactly the path that can show values like `31.00999999999998 ₸`. FIX: wrap the value before formatting: `formatPrice(parseFloat(Number(totalAmount).toFixed(2)))`.
+8. [P1] Fix 8 — Guest name persistence has save/load, but no table-change reset. `x.jsx:1358-1359` restores `menuapp_guest_name`, and `x.jsx:3162` saves it back, but there is no effect tied to the derived table identity after `x.jsx:1560-1634` computes the current table and no cleanup around `x.jsx:2452-2456`, where `currentTableId` changes are already observed for other state. That allows a guest name from one table to survive into another table's session. FIX: add an effect keyed to table identity (`tableCodeParam`/`currentTableId` or equivalent) that calls `localStorage.removeItem('menuapp_guest_name')` and `setGuestNameInput('')`.
+9. [P1] Fix 9 — The D3 served-only empty state is not implemented. When the cart is empty and orders exist, `CartView.jsx:772-847` still falls through to the old served/active sections, and `CartView.jsx:850-861` shows the generic `Добавить к заказу` button instead of the dedicated `Ничего не ждёте` screen. There is no `isV8` check above the main bucket rendering, and the footer path for empty-cart history states is non-sticky because `CartView.jsx:1008-1042` only mounts the sticky block for non-empty carts. FIX: compute the served-only state from the new buckets, render the D3 banner above the collapsed `Подано` bucket, and reuse the sticky outline `Заказать ещё` footer for that state.
+
+## Summary
+Total: 9 findings (0 P0, 7 P1, 2 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none
+- Scope questions (anything you weren't sure if it's in scope): the task context listed external context files (`ux-concepts/cart-view.md`, `ux-concepts/visit-lifecycle.md`, `BUGS_MASTER.md`), but the speed rules said to read only the target files plus page-local `README.md` and `BUGS.md`. I followed the speed rules.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-28.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-180422-501a
+
+## Findings
+1. [P1] Fix 1 — `CartView.jsx` still uses a binary `servedOrders` / `activeOrders` split instead of status buckets. `CartView.jsx:92-93` keeps only `servedExpanded` and `activeExpanded`, `CartView.jsx:366-374` groups orders only into served vs non-served, and `CartView.jsx:772-847` still renders `Выдано` / `Заказано`. This cannot produce the required `Подано / Готов / Готовится / Принят / Отправлено` buckets, per-bucket subtotals, or preserved expand state per status. FIX: replace the split with status-keyed buckets (`served`, `ready`, `in_progress`, `accepted`, `new_order`), render only non-empty buckets in the required order, and store UI state in `expandedStatuses`.
+2. [P1] Fix 2 — Footer and totals are still wired to the old layout. `CartView.jsx:549-579` shows no `Заказов: X ₸` in the drawer header, `CartView.jsx:980-992` still renders the removed `ИТОГО за визит` card, `CartView.jsx:995` still inserts the old spacer, and `CartView.jsx:1008-1042` renders the sticky footer only when `cart.length > 0`. That misses the required always-visible sticky footer for order-history states and leaves cart/order totals in the wrong places. FIX: move submitted-orders total into the header, put the cart subtotal into the `Новый заказ` section header, remove the visit-total card and spacer, and always render one sticky footer block when `cart.length > 0 || todayMyOrders.length > 0`, switching to outline `Заказать ещё` when the cart is empty.
+3. [P1] Fix 3 — Rating is still exposed outside the served state. In `CartView.jsx:457-530`, `renderOrderItems` has no status gate, and `CartView.jsx:489-516` renders `<Rating>` for any order whenever `reviewsEnabled` is true. `CartView.jsx:833-843` also leaves a review CTA inside the active-orders section, while `CartView.jsx:772-802` has no `Подано (N) • Оценить` header chip at all. FIX: pass `showRating` only for the served bucket, remove rating UI from non-served buckets, and move the entry point to a served-bucket header chip that expands `Подано`.
+4. [P1] Fix 4 — Status buckets are not collapsed into per-order summary rows. `CartView.jsx:457-529` immediately renders full item lists for every order, `CartView.jsx:474-520` has no per-order collapsed/expanded state, and `CartView.jsx:485` always prints `× {item.quantity}`, including `×1`. This misses the required `HH:MM + first 2 dishes + +N + total + chevron` summary row behavior and the qty rule from CV-23. FIX: add `expandedOrders`, render collapsed summary rows for served/accepted/in_progress/ready buckets, omit `×1`, and keep only the `Новый заказ` section permanently expanded with steppers.
+5. [P2] Fix 5 — Guest-facing status labels and the guest-name affordance are still on the old copy. `CartView.jsx:250-278` maps `new` to `Заказано`, keeps `ready` as `Готово`, and has no served/completed fallback to `Подано`; `CartView.jsx:470-472` still shows the per-order badge using that old mapping. In the header, `CartView.jsx:571-577` keeps the editable-name trigger as a plain text button with a pencil icon instead of `Вы: Имя >`. FIX: remap statuses to `Отправлено / Принят / Готовится / Готов / Подано` and replace the pencil affordance with a 44px-tappable name row that shows `Вы: {guestDisplay} >`.
+6. [P1] Fix 6 — The order filter still resets at midnight, not at the 06:00 business-day boundary. `CartView.jsx:350-358` compares `new Date(d).toDateString()` to today's date, so orders from the previous business night can leak into the drawer or disappear too early after midnight. FIX: compute `today6am` and filter on `new Date(created_at || created_date || createdAt) >= today6am`.
+7. [P2] Fix 7 — The success screen still formats the raw floating-point total. `x.jsx:726-731` renders `{formatPrice(totalAmount)}`, which is exactly the path that can show values like `31.00999999999998 ₸`. FIX: wrap the value before formatting: `formatPrice(parseFloat(Number(totalAmount).toFixed(2)))`.
+8. [P1] Fix 8 — Guest name persistence has save/load, but no table-change reset. `x.jsx:1358-1359` restores `menuapp_guest_name`, and `x.jsx:3162` saves it back, but there is no effect tied to the derived table identity after `x.jsx:1560-1634` computes the current table and no cleanup around `x.jsx:2452-2456`, where `currentTableId` changes are already observed for other state. That allows a guest name from one table to survive into another table's session. FIX: add an effect keyed to table identity (`tableCodeParam`/`currentTableId` or equivalent) that calls `localStorage.removeItem('menuapp_guest_name')` and `setGuestNameInput('')`.
+9. [P1] Fix 9 — The D3 served-only empty state is not implemented. When the cart is empty and orders exist, `CartView.jsx:772-847` still falls through to the old served/active sections, and `CartView.jsx:850-861` shows the generic `Добавить к заказу` button instead of the dedicated `Ничего не ждёте` screen. There is no `isV8` check above the main bucket rendering, and the footer path for empty-cart history states is non-sticky because `CartView.jsx:1008-1042` only mounts the sticky block for non-empty carts. FIX: compute the served-only state from the new buckets, render the D3 banner above the collapsed `Подано` bucket, and reuse the sticky outline `Заказать ещё` footer for that state.
+
+## Summary
+Total: 9 findings (0 P0, 7 P1, 2 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none
+- Scope questions (anything you weren't sure if it's in scope): the task context listed external context files (`ux-concepts/cart-view.md`, `ux-concepts/visit-lifecycle.md`, `BUGS_MASTER.md`), but the speed rules said to read only the target files plus page-local `README.md` and `BUGS.md`. I followed the speed rules.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/round1_2026-03-28.md
+# Round 1 — PublicMenu Chain: publicmenu-260328-180422-501a
+
+Single-round scoped review of `pages/PublicMenu/CartView.jsx` and `pages/PublicMenu/x.jsx`, using only page-local `README.md` and `BUGS.md` for context.
+
+## Findings
+1. [P1] Fix 1 — `CartView.jsx` still uses a binary `servedOrders` / `activeOrders` split instead of status buckets. `CartView.jsx:92-93` keeps only `servedExpanded` and `activeExpanded`, `CartView.jsx:366-374` groups orders only into served vs non-served, and `CartView.jsx:772-847` still renders `Выдано` / `Заказано`. FIX: replace the split with status-keyed buckets (`served`, `ready`, `in_progress`, `accepted`, `new_order`), render only non-empty buckets in the required order, and store UI state in `expandedStatuses`.
+2. [P1] Fix 2 — Footer and totals are still wired to the old layout. `CartView.jsx:549-579` shows no `Заказов: X ₸` in the drawer header, `CartView.jsx:980-992` still renders the removed `ИТОГО за визит` card, `CartView.jsx:995` still inserts the old spacer, and `CartView.jsx:1008-1042` renders the sticky footer only when `cart.length > 0`. FIX: move submitted-orders total into the header, put the cart subtotal into the `Новый заказ` section header, remove the visit-total card and spacer, and always render one sticky footer block when `cart.length > 0 || todayMyOrders.length > 0`, switching to outline `Заказать ещё` when the cart is empty.
+3. [P1] Fix 3 — Rating is still exposed outside the served state. In `CartView.jsx:457-530`, `renderOrderItems` has no status gate, and `CartView.jsx:489-516` renders `<Rating>` for any order whenever `reviewsEnabled` is true. `CartView.jsx:833-843` also leaves a review CTA inside the active-orders section, while `CartView.jsx:772-802` has no `Подано (N) • Оценить` header chip at all. FIX: pass `showRating` only for the served bucket, remove rating UI from non-served buckets, and move the entry point to a served-bucket header chip that expands `Подано`.
+4. [P1] Fix 4 — Status buckets are not collapsed into per-order summary rows. `CartView.jsx:457-529` immediately renders full item lists for every order, `CartView.jsx:474-520` has no per-order collapsed/expanded state, and `CartView.jsx:485` always prints `× {item.quantity}`, including `×1`. FIX: add `expandedOrders`, render collapsed summary rows for served/accepted/in_progress/ready buckets, omit `×1`, and keep only the `Новый заказ` section permanently expanded with steppers.
+5. [P2] Fix 5 — Guest-facing status labels and the guest-name affordance are still on the old copy. `CartView.jsx:250-278` maps `new` to `Заказано`, keeps `ready` as `Готово`, and `CartView.jsx:571-577` keeps the editable-name trigger as a plain text button with a pencil icon instead of `Вы: Имя >`. FIX: remap statuses to `Отправлено / Принят / Готовится / Готов / Подано` and replace the pencil affordance with a 44px-tappable name row that shows `Вы: {guestDisplay} >`.
+6. [P1] Fix 6 — The order filter still resets at midnight, not at the 06:00 business-day boundary. `CartView.jsx:350-358` compares `new Date(d).toDateString()` to today's date. FIX: compute `today6am` and filter on `new Date(created_at || created_date || createdAt) >= today6am`.
+7. [P2] Fix 7 — The success screen still formats the raw floating-point total. `x.jsx:726-731` renders `{formatPrice(totalAmount)}`. FIX: wrap the value before formatting: `formatPrice(parseFloat(Number(totalAmount).toFixed(2)))`.
+8. [P1] Fix 8 — Guest name persistence has save/load, but no table-change reset. `x.jsx:1358-1359` restores `menuapp_guest_name`, and `x.jsx:3162` saves it back, but there is no effect tied to table identity changes after `x.jsx:1560-1634` derives the current table. FIX: add an effect keyed to table identity that clears `menuapp_guest_name` and resets `guestNameInput`.
+9. [P1] Fix 9 — The D3 served-only empty state is not implemented. `CartView.jsx:772-847` still falls through to the old served/active sections, and `CartView.jsx:850-861` shows the generic `Добавить к заказу` button instead of the dedicated served-only screen. FIX: compute the served-only state from the new buckets, render the D3 banner above the collapsed `Подано` bucket, and reuse the sticky outline `Заказать ещё` footer for that state.
+apply_patch(auto_approved=true) exited 0 in 855ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260328-180422-501a-codex-findings.md
+A pages/PublicMenu/review_2026-03-28.md
+A pages/PublicMenu/round1_2026-03-28.md
+A pages/PublicMenu/commands_2026-03-28.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-28.log b/pages/PublicMenu/commands_2026-03-28.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..438c2763c36af880a463abae8414890bb0ae28c3
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-28.log
+@@ -0,0 +1,19 @@
++# Commands executed for PublicMenu review on 2026-03-28
++
++1. [timed out] Get-ChildItem -Name 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu'
++2. [timed out] Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -TotalCount 220
++3. [timed out] Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -TotalCount 220
++4. Get-ChildItem 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu' | Select-Object Name,Length
++5. (Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -TotalCount 120) -join "`n"
++6. (Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -TotalCount 120) -join "`n"
++7. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; (Get-Content $p -TotalCount 180) -join "`n"
++8. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; (Get-Content $p -TotalCount 220) -join "`n"
++9. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'; $c=Get-Content $p; $ranges=@(@(80,120),@(240,420),@(430,620),@(740,1045)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
++10. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'formatPrice\(totalAmount\)|menuapp_guest_name|tableCode|guestNameInput' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++11. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content $p; $ranges=@(@(700,780),@(1340,1385),@(3145,3185),@(1530,1615)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
++12. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'removeItem\(|menuapp_guest_name|currentTable|resolvedTable|verifiedTable|useEffect\(\) => \{|useEffect\(' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++13. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content $p; $ranges=@(@(2298,2335),@(2680,2760),@(2860,2945)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
++14. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content $p; $ranges=@(@(1396,1500),@(1688,1765),@(2210,2255),@(2448,2470)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
++15. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'; Select-String -Path $p -Pattern 'Выдано|Заказано|ИТОГО за визит|Добавить к заказу|Оценить|Подано|Отправлено|Ничего не ждёте|Заказать ещё|servedExpanded|activeExpanded|visitTotal|renderOrderItems|todayMyOrders' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++16. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'Заказов:|menuapp_guest_name|formatPrice\(totalAmount\)|Заказать ещё|Ничего не ждёте|Оценить' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++17. Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state'
+diff --git a/pages/PublicMenu/review_2026-03-28.md b/pages/PublicMenu/review_2026-03-28.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..30bd0b04591a3e60c46461f21c20951a7f1403dc
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-28.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-180422-501a
++
++## Findings
++1. [P1] Fix 1 — `CartView.jsx` still uses a binary `servedOrders` / `activeOrders` split instead of status buckets. `CartView.jsx:92-93` keeps only `servedExpanded` and `activeExpanded`, `CartView.jsx:366-374` groups orders only into served vs non-served, and `CartView.jsx:772-847` still renders `Выдано` / `Заказано`. This cannot produce the required `Подано / Готов / Готовится / Принят / Отправлено` buckets, per-bucket subtotals, or preserved expand state per status. FIX: replace the split with status-keyed buckets (`served`, `ready`, `in_progress`, `accepted`, `new_order`), render only non-empty buckets in the required order, and store UI state in `expandedStatuses`.
++2. [P1] Fix 2 — Footer and totals are still wired to the old layout. `CartView.jsx:549-579` shows no `Заказов: X ₸` in the drawer header, `CartView.jsx:980-992` still renders the removed `ИТОГО за визит` card, `CartView.jsx:995` still inserts the old spacer, and `CartView.jsx:1008-1042` renders the sticky footer only when `cart.length > 0`. That misses the required always-visible sticky footer for order-history states and leaves cart/order totals in the wrong places. FIX: move submitted-orders total into the header, put the cart subtotal into the `Новый заказ` section header, remove the visit-total card and spacer, and always render one sticky footer block when `cart.length > 0 || todayMyOrders.length > 0`, switching to outline `Заказать ещё` when the cart is empty.
++3. [P1] Fix 3 — Rating is still exposed outside the served state. In `CartView.jsx:457-530`, `renderOrderItems` has no status gate, and `CartView.jsx:489-516` renders `<Rating>` for any order whenever `reviewsEnabled` is true. `CartView.jsx:833-843` also leaves a review CTA inside the active-orders section, while `CartView.jsx:772-802` has no `Подано (N) • Оценить` header chip at all. FIX: pass `showRating` only for the served bucket, remove rating UI from non-served buckets, and move the entry point to a served-bucket header chip that expands `Подано`.
++4. [P1] Fix 4 — Status buckets are not collapsed into per-order summary rows. `CartView.jsx:457-529` immediately renders full item lists for every order, `CartView.jsx:474-520` has no per-order collapsed/expanded state, and `CartView.jsx:485` always prints `× {item.quantity}`, including `×1`. This misses the required `HH:MM + first 2 dishes + +N + total + chevron` summary row behavior and the qty rule from CV-23. FIX: add `expandedOrders`, render collapsed summary rows for served/accepted/in_progress/ready buckets, omit `×1`, and keep only the `Новый заказ` section permanently expanded with steppers.
++5. [P2] Fix 5 — Guest-facing status labels and the guest-name affordance are still on the old copy. `CartView.jsx:250-278` maps `new` to `Заказано`, keeps `ready` as `Готово`, and has no served/completed fallback to `Подано`; `CartView.jsx:470-472` still shows the per-order badge using that old mapping. In the header, `CartView.jsx:571-577` keeps the editable-name trigger as a plain text button with a pencil icon instead of `Вы: Имя >`. FIX: remap statuses to `Отправлено / Принят / Готовится / Готов / Подано` and replace the pencil affordance with a 44px-tappable name row that shows `Вы: {guestDisplay} >`.
++6. [P1] Fix 6 — The order filter still resets at midnight, not at the 06:00 business-day boundary. `CartView.jsx:350-358` compares `new Date(d).toDateString()` to today's date, so orders from the previous business night can leak into the drawer or disappear too early after midnight. FIX: compute `today6am` and filter on `new Date(created_at || created_date || createdAt) >= today6am`.
++7. [P2] Fix 7 — The success screen still formats the raw floating-point total. `x.jsx:726-731` renders `{formatPrice(totalAmount)}`, which is exactly the path that can show values like `31.00999999999998 ₸`. FIX: wrap the value before formatting: `formatPrice(parseFloat(Number(totalAmount).toFixed(2)))`.
++8. [P1] Fix 8 — Guest name persistence has save/load, but no table-change reset. `x.jsx:1358-1359` restores `menuapp_guest_name`, and `x.jsx:3162` saves it back, but there is no effect tied to the derived table identity after `x.jsx:1560-1634` computes the current table and no cleanup around `x.jsx:2452-2456`, where `currentTableId` changes are already observed for other state. That allows a guest name from one table to survive into another table's session. FIX: add an effect keyed to table identity (`tableCodeParam`/`currentTableId` or equivalent) that calls `localStorage.removeItem('menuapp_guest_name')` and `setGuestNameInput('')`.
++9. [P1] Fix 9 — The D3 served-only empty state is not implemented. When the cart is empty and orders exist, `CartView.jsx:772-847` still falls through to the old served/active sections, and `CartView.jsx:850-861` shows the generic `Добавить к заказу` button instead of the dedicated `Ничего не ждёте` screen. There is no `isV8` check above the main bucket rendering, and the footer path for empty-cart history states is non-sticky because `CartView.jsx:1008-1042` only mounts the sticky block for non-empty carts. FIX: compute the served-only state from the new buckets, render the D3 banner above the collapsed `Подано` bucket, and reuse the sticky outline `Заказать ещё` footer for that state.
++
++## Summary
++Total: 9 findings (0 P0, 7 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): the task context listed external context files (`ux-concepts/cart-view.md`, `ux-concepts/visit-lifecycle.md`, `BUGS_MASTER.md`), but the speed rules said to read only the target files plus page-local `README.md` and `BUGS.md`. I followed the speed rules.
+diff --git a/pages/PublicMenu/round1_2026-03-28.md b/pages/PublicMenu/round1_2026-03-28.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..57b4913708954f4ae19cf0c530b5f3fb5239e4eb
+--- /dev/null
++++ b/pages/PublicMenu/round1_2026-03-28.md
+@@ -0,0 +1,14 @@
++# Round 1 — PublicMenu Chain: publicmenu-260328-180422-501a
++
++Single-round scoped review of `pages/PublicMenu/CartView.jsx` and `pages/PublicMenu/x.jsx`, using only page-local `README.md` and `BUGS.md` for context.
++
++## Findings
++1. [P1] Fix 1 — `CartView.jsx` still uses a binary `servedOrders` / `activeOrders` split instead of status buckets. `CartView.jsx:92-93` keeps only `servedExpanded` and `activeExpanded`, `CartView.jsx:366-374` groups orders only into served vs non-served, and `CartView.jsx:772-847` still renders `Выдано` / `Заказано`. FIX: replace the split with status-keyed buckets (`served`, `ready`, `in_progress`, `accepted`, `new_order`), render only non-empty buckets in the required order, and store UI state in `expandedStatuses`.
++2. [P1] Fix 2 — Footer and totals are still wired to the old layout. `CartView.jsx:549-579` shows no `Заказов: X ₸` in the drawer header, `CartView.jsx:980-992` still renders the removed `ИТОГО за визит` card, `CartView.jsx:995` still inserts the old spacer, and `CartView.jsx:1008-1042` renders the sticky footer only when `cart.length > 0`. FIX: move submitted-orders total into the header, put the cart subtotal into the `Новый заказ` section header, remove the visit-total card and spacer, and always render one sticky footer block when `cart.length > 0 || todayMyOrders.length > 0`, switching to outline `Заказать ещё` when the cart is empty.
++3. [P1] Fix 3 — Rating is still exposed outside the served state. In `CartView.jsx:457-530`, `renderOrderItems` has no status gate, and `CartView.jsx:489-516` renders `<Rating>` for any order whenever `reviewsEnabled` is true. `CartView.jsx:833-843` also leaves a review CTA inside the active-orders section, while `CartView.jsx:772-802` has no `Подано (N) • Оценить` header chip at all. FIX: pass `showRating` only for the served bucket, remove rating UI from non-served buckets, and move the entry point to a served-bucket header chip that expands `Подано`.
++4. [P1] Fix 4 — Status buckets are not collapsed into per-order summary rows. `CartView.jsx:457-529` immediately renders full item lists for every order, `CartView.jsx:474-520` has no per-order collapsed/expanded state, and `CartView.jsx:485` always prints `× {item.quantity}`, including `×1`. FIX: add `expandedOrders`, render collapsed summary rows for served/accepted/in_progress/ready buckets, omit `×1`, and keep only the `Новый заказ` section permanently expanded with steppers.
++5. [P2] Fix 5 — Guest-facing status labels and the guest-name affordance are still on the old copy. `CartView.jsx:250-278` maps `new` to `Заказано`, keeps `ready` as `Готово`, and `CartView.jsx:571-577` keeps the editable-name trigger as a plain text button with a pencil icon instead of `Вы: Имя >`. FIX: remap statuses to `Отправлено / Принят / Готовится / Готов / Подано` and replace the pencil affordance with a 44px-tappable name row that shows `Вы: {guestDisplay} >`.
++6. [P1] Fix 6 — The order filter still resets at midnight, not at the 06:00 business-day boundary. `CartView.jsx:350-358` compares `new Date(d).toDateString()` to today's date. FIX: compute `today6am` and filter on `new Date(created_at || created_date || createdAt) >= today6am`.
++7. [P2] Fix 7 — The success screen still formats the raw floating-point total. `x.jsx:726-731` renders `{formatPrice(totalAmount)}`. FIX: wrap the value before formatting: `formatPrice(parseFloat(Number(totalAmount).toFixed(2)))`.
++8. [P1] Fix 8 — Guest name persistence has save/load, but no table-change reset. `x.jsx:1358-1359` restores `menuapp_guest_name`, and `x.jsx:3162` saves it back, but there is no effect tied to table identity changes after `x.jsx:1560-1634` derives the current table. FIX: add an effect keyed to table identity that clears `menuapp_guest_name` and resets `guestNameInput`.
++9. [P1] Fix 9 — The D3 served-only empty state is not implemented. `CartView.jsx:772-847` still falls through to the old served/active sections, and `CartView.jsx:850-861` shows the generic `Добавить к заказу` button instead of the dedicated served-only screen. FIX: compute the served-only state from the new buckets, render the D3 banner above the collapsed `Подано` bucket, and reuse the sticky outline `Заказать ещё` footer for that state.
+diff --git a/pipeline/chain-state/publicmenu-260328-180422-501a-codex-findings.md b/pipeline/chain-state/publicmenu-260328-180422-501a-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..30bd0b04591a3e60c46461f21c20951a7f1403dc
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260328-180422-501a-codex-findings.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-180422-501a
++
++## Findings
++1. [P1] Fix 1 — `CartView.jsx` still uses a binary `servedOrders` / `activeOrders` split instead of status buckets. `CartView.jsx:92-93` keeps only `servedExpanded` and `activeExpanded`, `CartView.jsx:366-374` groups orders only into served vs non-served, and `CartView.jsx:772-847` still renders `Выдано` / `Заказано`. This cannot produce the required `Подано / Готов / Готовится / Принят / Отправлено` buckets, per-bucket subtotals, or preserved expand state per status. FIX: replace the split with status-keyed buckets (`served`, `ready`, `in_progress`, `accepted`, `new_order`), render only non-empty buckets in the required order, and store UI state in `expandedStatuses`.
++2. [P1] Fix 2 — Footer and totals are still wired to the old layout. `CartView.jsx:549-579` shows no `Заказов: X ₸` in the drawer header, `CartView.jsx:980-992` still renders the removed `ИТОГО за визит` card, `CartView.jsx:995` still inserts the old spacer, and `CartView.jsx:1008-1042` renders the sticky footer only when `cart.length > 0`. That misses the required always-visible sticky footer for order-history states and leaves cart/order totals in the wrong places. FIX: move submitted-orders total into the header, put the cart subtotal into the `Новый заказ` section header, remove the visit-total card and spacer, and always render one sticky footer block when `cart.length > 0 || todayMyOrders.length > 0`, switching to outline `Заказать ещё` when the cart is empty.
++3. [P1] Fix 3 — Rating is still exposed outside the served state. In `CartView.jsx:457-530`, `renderOrderItems` has no status gate, and `CartView.jsx:489-516` renders `<Rating>` for any order whenever `reviewsEnabled` is true. `CartView.jsx:833-843` also leaves a review CTA inside the active-orders section, while `CartView.jsx:772-802` has no `Подано (N) • Оценить` header chip at all. FIX: pass `showRating` only for the served bucket, remove rating UI from non-served buckets, and move the entry point to a served-bucket header chip that expands `Подано`.
++4. [P1] Fix 4 — Status buckets are not collapsed into per-order summary rows. `CartView.jsx:457-529` immediately renders full item lists for every order, `CartView.jsx:474-520` has no per-order collapsed/expanded state, and `CartView.jsx:485` always prints `× {item.quantity}`, including `×1`. This misses the required `HH:MM + first 2 dishes + +N + total + chevron` summary row behavior and the qty rule from CV-23. FIX: add `expandedOrders`, render collapsed summary rows for served/accepted/in_progress/ready buckets, omit `×1`, and keep only the `Новый заказ` section permanently expanded with steppers.
++5. [P2] Fix 5 — Guest-facing status labels and the guest-name affordance are still on the old copy. `CartView.jsx:250-278` maps `new` to `Заказано`, keeps `ready` as `Готово`, and has no served/completed fallback to `Подано`; `CartView.jsx:470-472` still shows the per-order badge using that old mapping. In the header, `CartView.jsx:571-577` keeps the editable-name trigger as a plain text button with a pencil icon instead of `Вы: Имя >`. FIX: remap statuses to `Отправлено / Принят / Готовится / Готов / Подано` and replace the pencil affordance with a 44px-tappable name row that shows `Вы: {guestDisplay} >`.
++6. [P1] Fix 6 — The order filter still resets at midnight, not at the 06:00 business-day boundary. `CartView.jsx:350-358` compares `new Date(d).toDateString()` to today's date, so orders from the previous business night can leak into the drawer or disappear too early after midnight. FIX: compute `today6am` and filter on `new Date(created_at || created_date || createdAt) >= today6am`.
++7. [P2] Fix 7 — The success screen still formats the raw floating-point total. `x.jsx:726-731` renders `{formatPrice(totalAmount)}`, which is exactly the path that can show values like `31.00999999999998 ₸`. FIX: wrap the value before formatting: `formatPrice(parseFloat(Number(totalAmount).toFixed(2)))`.
++8. [P1] Fix 8 — Guest name persistence has save/load, but no table-change reset. `x.jsx:1358-1359` restores `menuapp_guest_name`, and `x.jsx:3162` saves it back, but there is no effect tied to the derived table identity after `x.jsx:1560-1634` computes the current table and no cleanup around `x.jsx:2452-2456`, where `currentTableId` changes are already observed for other state. That allows a guest name from one table to survive into another table's session. FIX: add an effect keyed to table identity (`tableCodeParam`/`currentTableId` or equivalent) that calls `localStorage.removeItem('menuapp_guest_name')` and `setGuestNameInput('')`.
++9. [P1] Fix 9 — The D3 served-only empty state is not implemented. When the cart is empty and orders exist, `CartView.jsx:772-847` still falls through to the old served/active sections, and `CartView.jsx:850-861` shows the generic `Добавить к заказу` button instead of the dedicated `Ничего не ждёте` screen. There is no `isV8` check above the main bucket rendering, and the footer path for empty-cart history states is non-sticky because `CartView.jsx:1008-1042` only mounts the sticky block for non-empty carts. FIX: compute the served-only state from the new buckets, render the D3 banner above the collapsed `Подано` bucket, and reuse the sticky outline `Заказать ещё` footer for that state.
++
++## Summary
++Total: 9 findings (0 P0, 7 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): the task context listed external context files (`ux-concepts/cart-view.md`, `ux-concepts/visit-lifecycle.md`, `BUGS_MASTER.md`), but the speed rules said to read only the target files plus page-local `README.md` and `BUGS.md`. I followed the speed rules.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-28.log b/pages/PublicMenu/commands_2026-03-28.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..438c2763c36af880a463abae8414890bb0ae28c3
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-28.log
+@@ -0,0 +1,19 @@
++# Commands executed for PublicMenu review on 2026-03-28
++
++1. [timed out] Get-ChildItem -Name 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu'
++2. [timed out] Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -TotalCount 220
++3. [timed out] Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -TotalCount 220
++4. Get-ChildItem 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu' | Select-Object Name,Length
++5. (Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -TotalCount 120) -join "`n"
++6. (Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -TotalCount 120) -join "`n"
++7. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; (Get-Content $p -TotalCount 180) -join "`n"
++8. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; (Get-Content $p -TotalCount 220) -join "`n"
++9. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'; $c=Get-Content $p; $ranges=@(@(80,120),@(240,420),@(430,620),@(740,1045)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
++10. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'formatPrice\(totalAmount\)|menuapp_guest_name|tableCode|guestNameInput' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++11. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content $p; $ranges=@(@(700,780),@(1340,1385),@(3145,3185),@(1530,1615)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
++12. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'removeItem\(|menuapp_guest_name|currentTable|resolvedTable|verifiedTable|useEffect\(\) => \{|useEffect\(' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++13. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content $p; $ranges=@(@(2298,2335),@(2680,2760),@(2860,2945)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
++14. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content $p; $ranges=@(@(1396,1500),@(1688,1765),@(2210,2255),@(2448,2470)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
++15. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'; Select-String -Path $p -Pattern 'Выдано|Заказано|ИТОГО за визит|Добавить к заказу|Оценить|Подано|Отправлено|Ничего не ждёте|Заказать ещё|servedExpanded|activeExpanded|visitTotal|renderOrderItems|todayMyOrders' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++16. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'Заказов:|menuapp_guest_name|formatPrice\(totalAmount\)|Заказать ещё|Ничего не ждёте|Оценить' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++17. Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state'
+diff --git a/pages/PublicMenu/review_2026-03-28.md b/pages/PublicMenu/review_2026-03-28.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..30bd0b04591a3e60c46461f21c20951a7f1403dc
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-28.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-180422-501a
++
++## Findings
++1. [P1] Fix 1 — `CartView.jsx` still uses a binary `servedOrders` / `activeOrders` split instead of status buckets. `CartView.jsx:92-93` keeps only `servedExpanded` and `activeExpanded`, `CartView.jsx:366-374` groups orders only into served vs non-served, and `CartView.jsx:772-847` still renders `Выдано` / `Заказано`. This cannot produce the required `Подано / Готов / Готовится / Принят / Отправлено` buckets, per-bucket subtotals, or preserved expand state per status. FIX: replace the split with status-keyed buckets (`served`, `ready`, `in_progress`, `accepted`, `new_order`), render only non-empty buckets in the required order, and store UI state in `expandedStatuses`.
++2. [P1] Fix 2 — Footer and totals are still wired to the old layout. `CartView.jsx:549-579` shows no `Заказов: X ₸` in the drawer header, `CartView.jsx:980-992` still renders the removed `ИТОГО за визит` card, `CartView.jsx:995` still inserts the old spacer, and `CartView.jsx:1008-1042` renders the sticky footer only when `cart.length > 0`. That misses the required always-visible sticky footer for order-history states and leaves cart/order totals in the wrong places. FIX: move submitted-orders total into the header, put the cart subtotal into the `Новый заказ` section header, remove the visit-total card and spacer, and always render one sticky footer block when `cart.length > 0 || todayMyOrders.length > 0`, switching to outline `Заказать ещё` when the cart is empty.
++3. [P1] Fix 3 — Rating is still exposed outside the served state. In `CartView.jsx:457-530`, `renderOrderItems` has no status gate, and `CartView.jsx:489-516` renders `<Rating>` for any order whenever `reviewsEnabled` is true. `CartView.jsx:833-843` also leaves a review CTA inside the active-orders section, while `CartView.jsx:772-802` has no `Подано (N) • Оценить` header chip at all. FIX: pass `showRating` only for the served bucket, remove rating UI from non-served buckets, and move the entry point to a served-bucket header chip that expands `Подано`.
++4. [P1] Fix 4 — Status buckets are not collapsed into per-order summary rows. `CartView.jsx:457-529` immediately renders full item lists for every order, `CartView.jsx:474-520` has no per-order collapsed/expanded state, and `CartView.jsx:485` always prints `× {item.quantity}`, including `×1`. This misses the required `HH:MM + first 2 dishes + +N + total + chevron` summary row behavior and the qty rule from CV-23. FIX: add `expandedOrders`, render collapsed summary rows for served/accepted/in_progress/ready buckets, omit `×1`, and keep only the `Новый заказ` section permanently expanded with steppers.
++5. [P2] Fix 5 — Guest-facing status labels and the guest-name affordance are still on the old copy. `CartView.jsx:250-278` maps `new` to `Заказано`, keeps `ready` as `Готово`, and has no served/completed fallback to `Подано`; `CartView.jsx:470-472` still shows the per-order badge using that old mapping. In the header, `CartView.jsx:571-577` keeps the editable-name trigger as a plain text button with a pencil icon instead of `Вы: Имя >`. FIX: remap statuses to `Отправлено / Принят / Готовится / Готов / Подано` and replace the pencil affordance with a 44px-tappable name row that shows `Вы: {guestDisplay} >`.
++6. [P1] Fix 6 — The order filter still resets at midnight, not at the 06:00 business-day boundary. `CartView.jsx:350-358` compares `new Date(d).toDateString()` to today's date, so orders from the previous business night can leak into the drawer or disappear too early after midnight. FIX: compute `today6am` and filter on `new Date(created_at || created_date || createdAt) >= today6am`.
++7. [P2] Fix 7 — The success screen still formats the raw floating-point total. `x.jsx:726-731` renders `{formatPrice(totalAmount)}`, which is exactly the path that can show values like `31.00999999999998 ₸`. FIX: wrap the value before formatting: `formatPrice(parseFloat(Number(totalAmount).toFixed(2)))`.
++8. [P1] Fix 8 — Guest name persistence has save/load, but no table-change reset. `x.jsx:1358-1359` restores `menuapp_guest_name`, and `x.jsx:3162` saves it back, but there is no effect tied to the derived table identity after `x.jsx:1560-1634` computes the current table and no cleanup around `x.jsx:2452-2456`, where `currentTableId` changes are already observed for other state. That allows a guest name from one table to survive into another table's session. FIX: add an effect keyed to table identity (`tableCodeParam`/`currentTableId` or equivalent) that calls `localStorage.removeItem('menuapp_guest_name')` and `setGuestNameInput('')`.
++9. [P1] Fix 9 — The D3 served-only empty state is not implemented. When the cart is empty and orders exist, `CartView.jsx:772-847` still falls through to the old served/active sections, and `CartView.jsx:850-861` shows the generic `Добавить к заказу` button instead of the dedicated `Ничего не ждёте` screen. There is no `isV8` check above the main bucket rendering, and the footer path for empty-cart history states is non-sticky because `CartView.jsx:1008-1042` only mounts the sticky block for non-empty carts. FIX: compute the served-only state from the new buckets, render the D3 banner above the collapsed `Подано` bucket, and reuse the sticky outline `Заказать ещё` footer for that state.
++
++## Summary
++Total: 9 findings (0 P0, 7 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): the task context listed external context files (`ux-concepts/cart-view.md`, `ux-concepts/visit-lifecycle.md`, `BUGS_MASTER.md`), but the speed rules said to read only the target files plus page-local `README.md` and `BUGS.md`. I followed the speed rules.
+diff --git a/pages/PublicMenu/round1_2026-03-28.md b/pages/PublicMenu/round1_2026-03-28.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..57b4913708954f4ae19cf0c530b5f3fb5239e4eb
+--- /dev/null
++++ b/pages/PublicMenu/round1_2026-03-28.md
+@@ -0,0 +1,14 @@
++# Round 1 — PublicMenu Chain: publicmenu-260328-180422-501a
++
++Single-round scoped review of `pages/PublicMenu/CartView.jsx` and `pages/PublicMenu/x.jsx`, using only page-local `README.md` and `BUGS.md` for context.
++
++## Findings
++1. [P1] Fix 1 — `CartView.jsx` still uses a binary `servedOrders` / `activeOrders` split instead of status buckets. `CartView.jsx:92-93` keeps only `servedExpanded` and `activeExpanded`, `CartView.jsx:366-374` groups orders only into served vs non-served, and `CartView.jsx:772-847` still renders `Выдано` / `Заказано`. FIX: replace the split with status-keyed buckets (`served`, `ready`, `in_progress`, `accepted`, `new_order`), render only non-empty buckets in the required order, and store UI state in `expandedStatuses`.
++2. [P1] Fix 2 — Footer and totals are still wired to the old layout. `CartView.jsx:549-579` shows no `Заказов: X ₸` in the drawer header, `CartView.jsx:980-992` still renders the removed `ИТОГО за визит` card, `CartView.jsx:995` still inserts the old spacer, and `CartView.jsx:1008-1042` renders the sticky footer only when `cart.length > 0`. FIX: move submitted-orders total into the header, put the cart subtotal into the `Новый заказ` section header, remove the visit-total card and spacer, and always render one sticky footer block when `cart.length > 0 || todayMyOrders.length > 0`, switching to outline `Заказать ещё` when the cart is empty.
++3. [P1] Fix 3 — Rating is still exposed outside the served state. In `CartView.jsx:457-530`, `renderOrderItems` has no status gate, and `CartView.jsx:489-516` renders `<Rating>` for any order whenever `reviewsEnabled` is true. `CartView.jsx:833-843` also leaves a review CTA inside the active-orders section, while `CartView.jsx:772-802` has no `Подано (N) • Оценить` header chip at all. FIX: pass `showRating` only for the served bucket, remove rating UI from non-served buckets, and move the entry point to a served-bucket header chip that expands `Подано`.
++4. [P1] Fix 4 — Status buckets are not collapsed into per-order summary rows. `CartView.jsx:457-529` immediately renders full item lists for every order, `CartView.jsx:474-520` has no per-order collapsed/expanded state, and `CartView.jsx:485` always prints `× {item.quantity}`, including `×1`. FIX: add `expandedOrders`, render collapsed summary rows for served/accepted/in_progress/ready buckets, omit `×1`, and keep only the `Новый заказ` section permanently expanded with steppers.
++5. [P2] Fix 5 — Guest-facing status labels and the guest-name affordance are still on the old copy. `CartView.jsx:250-278` maps `new` to `Заказано`, keeps `ready` as `Готово`, and `CartView.jsx:571-577` keeps the editable-name trigger as a plain text button with a pencil icon instead of `Вы: Имя >`. FIX: remap statuses to `Отправлено / Принят / Готовится / Готов / Подано` and replace the pencil affordance with a 44px-tappable name row that shows `Вы: {guestDisplay} >`.
++6. [P1] Fix 6 — The order filter still resets at midnight, not at the 06:00 business-day boundary. `CartView.jsx:350-358` compares `new Date(d).toDateString()` to today's date. FIX: compute `today6am` and filter on `new Date(created_at || created_date || createdAt) >= today6am`.
++7. [P2] Fix 7 — The success screen still formats the raw floating-point total. `x.jsx:726-731` renders `{formatPrice(totalAmount)}`. FIX: wrap the value before formatting: `formatPrice(parseFloat(Number(totalAmount).toFixed(2)))`.
++8. [P1] Fix 8 — Guest name persistence has save/load, but no table-change reset. `x.jsx:1358-1359` restores `menuapp_guest_name`, and `x.jsx:3162` saves it back, but there is no effect tied to table identity changes after `x.jsx:1560-1634` derives the current table. FIX: add an effect keyed to table identity that clears `menuapp_guest_name` and resets `guestNameInput`.
++9. [P1] Fix 9 — The D3 served-only empty state is not implemented. `CartView.jsx:772-847` still falls through to the old served/active sections, and `CartView.jsx:850-861` shows the generic `Добавить к заказу` button instead of the dedicated served-only screen. FIX: compute the served-only state from the new buckets, render the D3 banner above the collapsed `Подано` bucket, and reuse the sticky outline `Заказать ещё` footer for that state.
+diff --git a/pipeline/chain-state/publicmenu-260328-180422-501a-codex-findings.md b/pipeline/chain-state/publicmenu-260328-180422-501a-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..30bd0b04591a3e60c46461f21c20951a7f1403dc
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260328-180422-501a-codex-findings.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-180422-501a
++
++## Findings
++1. [P1] Fix 1 — `CartView.jsx` still uses a binary `servedOrders` / `activeOrders` split instead of status buckets. `CartView.jsx:92-93` keeps only `servedExpanded` and `activeExpanded`, `CartView.jsx:366-374` groups orders only into served vs non-served, and `CartView.jsx:772-847` still renders `Выдано` / `Заказано`. This cannot produce the required `Подано / Готов / Готовится / Принят / Отправлено` buckets, per-bucket subtotals, or preserved expand state per status. FIX: replace the split with status-keyed buckets (`served`, `ready`, `in_progress`, `accepted`, `new_order`), render only non-empty buckets in the required order, and store UI state in `expandedStatuses`.
++2. [P1] Fix 2 — Footer and totals are still wired to the old layout. `CartView.jsx:549-579` shows no `Заказов: X ₸` in the drawer header, `CartView.jsx:980-992` still renders the removed `ИТОГО за визит` card, `CartView.jsx:995` still inserts the old spacer, and `CartView.jsx:1008-1042` renders the sticky footer only when `cart.length > 0`. That misses the required always-visible sticky footer for order-history states and leaves cart/order totals in the wrong places. FIX: move submitted-orders total into the header, put the cart subtotal into the `Новый заказ` section header, remove the visit-total card and spacer, and always render one sticky footer block when `cart.length > 0 || todayMyOrders.length > 0`, switching to outline `Заказать ещё` when the cart is empty.
++3. [P1] Fix 3 — Rating is still exposed outside the served state. In `CartView.jsx:457-530`, `renderOrderItems` has no status gate, and `CartView.jsx:489-516` renders `<Rating>` for any order whenever `reviewsEnabled` is true. `CartView.jsx:833-843` also leaves a review CTA inside the active-orders section, while `CartView.jsx:772-802` has no `Подано (N) • Оценить` header chip at all. FIX: pass `showRating` only for the served bucket, remove rating UI from non-served buckets, and move the entry point to a served-bucket header chip that expands `Подано`.
++4. [P1] Fix 4 — Status buckets are not collapsed into per-order summary rows. `CartView.jsx:457-529` immediately renders full item lists for every order, `CartView.jsx:474-520` has no per-order collapsed/expanded state, and `CartView.jsx:485` always prints `× {item.quantity}`, including `×1`. This misses the required `HH:MM + first 2 dishes + +N + total + chevron` summary row behavior and the qty rule from CV-23. FIX: add `expandedOrders`, render collapsed summary rows for served/accepted/in_progress/ready buckets, omit `×1`, and keep only the `Новый заказ` section permanently expanded with steppers.
++5. [P2] Fix 5 — Guest-facing status labels and the guest-name affordance are still on the old copy. `CartView.jsx:250-278` maps `new` to `Заказано`, keeps `ready` as `Готово`, and has no served/completed fallback to `Подано`; `CartView.jsx:470-472` still shows the per-order badge using that old mapping. In the header, `CartView.jsx:571-577` keeps the editable-name trigger as a plain text button with a pencil icon instead of `Вы: Имя >`. FIX: remap statuses to `Отправлено / Принят / Готовится / Готов / Подано` and replace the pencil affordance with a 44px-tappable name row that shows `Вы: {guestDisplay} >`.
++6. [P1] Fix 6 — The order filter still resets at midnight, not at the 06:00 business-day boundary. `CartView.jsx:350-358` compares `new Date(d).toDateString()` to today's date, so orders from the previous business night can leak into the drawer or disappear too early after midnight. FIX: compute `today6am` and filter on `new Date(created_at || created_date || createdAt) >= today6am`.
++7. [P2] Fix 7 — The success screen still formats the raw floating-point total. `x.jsx:726-731` renders `{formatPrice(totalAmount)}`, which is exactly the path that can show values like `31.00999999999998 ₸`. FIX: wrap the value before formatting: `formatPrice(parseFloat(Number(totalAmount).toFixed(2)))`.
++8. [P1] Fix 8 — Guest name persistence has save/load, but no table-change reset. `x.jsx:1358-1359` restores `menuapp_guest_name`, and `x.jsx:3162` saves it back, but there is no effect tied to the derived table identity after `x.jsx:1560-1634` computes the current table and no cleanup around `x.jsx:2452-2456`, where `currentTableId` changes are already observed for other state. That allows a guest name from one table to survive into another table's session. FIX: add an effect keyed to table identity (`tableCodeParam`/`currentTableId` or equivalent) that calls `localStorage.removeItem('menuapp_guest_name')` and `setGuestNameInput('')`.
++9. [P1] Fix 9 — The D3 served-only empty state is not implemented. When the cart is empty and orders exist, `CartView.jsx:772-847` still falls through to the old served/active sections, and `CartView.jsx:850-861` shows the generic `Добавить к заказу` button instead of the dedicated `Ничего не ждёте` screen. There is no `isV8` check above the main bucket rendering, and the footer path for empty-cart history states is non-sticky because `CartView.jsx:1008-1042` only mounts the sticky block for non-empty carts. FIX: compute the served-only state from the new buckets, render the D3 banner above the collapsed `Подано` bucket, and reuse the sticky outline `Заказать ещё` footer for that state.
++
++## Summary
++Total: 9 findings (0 P0, 7 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): the task context listed external context files (`ux-concepts/cart-view.md`, `ux-concepts/visit-lifecycle.md`, `BUGS_MASTER.md`), but the speed rules said to read only the target files plus page-local `README.md` and `BUGS.md`. I followed the speed rules.
+
+codex
+Findings are saved in [publicmenu-260328-180422-501a-codex-findings.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260328-180422-501a-codex-findings.md). I also saved the page-local copies required by the repo in [review_2026-03-28.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-28.md), [round1_2026-03-28.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/round1_2026-03-28.md), and [commands_2026-03-28.log](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-28.log).
+
+Scoped result: 9 findings total, all tied only to Fix 1–9. Summary: 0 P0, 7 P1, 2 P2. The main gaps are that `CartView.jsx` still uses the old served/active layout, old footer/total placement, old rating behavior, old expanded item rendering, midnight filtering, and no D3 served-only state; `x.jsx` still has the raw success-screen float path and no guest-name reset on table change.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-28.log b/pages/PublicMenu/commands_2026-03-28.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..438c2763c36af880a463abae8414890bb0ae28c3
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-28.log
+@@ -0,0 +1,19 @@
++# Commands executed for PublicMenu review on 2026-03-28
++
++1. [timed out] Get-ChildItem -Name 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu'
++2. [timed out] Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -TotalCount 220
++3. [timed out] Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -TotalCount 220
++4. Get-ChildItem 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu' | Select-Object Name,Length
++5. (Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -TotalCount 120) -join "`n"
++6. (Get-Content 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -TotalCount 120) -join "`n"
++7. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; (Get-Content $p -TotalCount 180) -join "`n"
++8. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; (Get-Content $p -TotalCount 220) -join "`n"
++9. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'; $c=Get-Content $p; $ranges=@(@(80,120),@(240,420),@(430,620),@(740,1045)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
++10. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'formatPrice\(totalAmount\)|menuapp_guest_name|tableCode|guestNameInput' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++11. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content $p; $ranges=@(@(700,780),@(1340,1385),@(3145,3185),@(1530,1615)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
++12. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'removeItem\(|menuapp_guest_name|currentTable|resolvedTable|verifiedTable|useEffect\(\) => \{|useEffect\(' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++13. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content $p; $ranges=@(@(2298,2335),@(2680,2760),@(2860,2945)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
++14. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content $p; $ranges=@(@(1396,1500),@(1688,1765),@(2210,2255),@(2448,2470)); foreach($r in $ranges){"`n--- lines $($r[0])-$($r[1]) ---"; for($i=$r[0]; $i -le $r[1] -and $i -le $c.Length; $i++){ '{0,5}: {1}' -f $i,$c[$i-1] }}
++15. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'; Select-String -Path $p -Pattern 'Выдано|Заказано|ИТОГО за визит|Добавить к заказу|Оценить|Подано|Отправлено|Ничего не ждёте|Заказать ещё|servedExpanded|activeExpanded|visitTotal|renderOrderItems|todayMyOrders' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++16. $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'Заказов:|menuapp_guest_name|formatPrice\(totalAmount\)|Заказать ещё|Ничего не ждёте|Оценить' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++17. Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state'
+diff --git a/pages/PublicMenu/review_2026-03-28.md b/pages/PublicMenu/review_2026-03-28.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..30bd0b04591a3e60c46461f21c20951a7f1403dc
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-28.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-180422-501a
++
++## Findings
++1. [P1] Fix 1 — `CartView.jsx` still uses a binary `servedOrders` / `activeOrders` split instead of status buckets. `CartView.jsx:92-93` keeps only `servedExpanded` and `activeExpanded`, `CartView.jsx:366-374` groups orders only into served vs non-served, and `CartView.jsx:772-847` still renders `Выдано` / `Заказано`. This cannot produce the required `Подано / Готов / Готовится / Принят / Отправлено` buckets, per-bucket subtotals, or preserved expand state per status. FIX: replace the split with status-keyed buckets (`served`, `ready`, `in_progress`, `accepted`, `new_order`), render only non-empty buckets in the required order, and store UI state in `expandedStatuses`.
++2. [P1] Fix 2 — Footer and totals are still wired to the old layout. `CartView.jsx:549-579` shows no `Заказов: X ₸` in the drawer header, `CartView.jsx:980-992` still renders the removed `ИТОГО за визит` card, `CartView.jsx:995` still inserts the old spacer, and `CartView.jsx:1008-1042` renders the sticky footer only when `cart.length > 0`. That misses the required always-visible sticky footer for order-history states and leaves cart/order totals in the wrong places. FIX: move submitted-orders total into the header, put the cart subtotal into the `Новый заказ` section header, remove the visit-total card and spacer, and always render one sticky footer block when `cart.length > 0 || todayMyOrders.length > 0`, switching to outline `Заказать ещё` when the cart is empty.
++3. [P1] Fix 3 — Rating is still exposed outside the served state. In `CartView.jsx:457-530`, `renderOrderItems` has no status gate, and `CartView.jsx:489-516` renders `<Rating>` for any order whenever `reviewsEnabled` is true. `CartView.jsx:833-843` also leaves a review CTA inside the active-orders section, while `CartView.jsx:772-802` has no `Подано (N) • Оценить` header chip at all. FIX: pass `showRating` only for the served bucket, remove rating UI from non-served buckets, and move the entry point to a served-bucket header chip that expands `Подано`.
++4. [P1] Fix 4 — Status buckets are not collapsed into per-order summary rows. `CartView.jsx:457-529` immediately renders full item lists for every order, `CartView.jsx:474-520` has no per-order collapsed/expanded state, and `CartView.jsx:485` always prints `× {item.quantity}`, including `×1`. This misses the required `HH:MM + first 2 dishes + +N + total + chevron` summary row behavior and the qty rule from CV-23. FIX: add `expandedOrders`, render collapsed summary rows for served/accepted/in_progress/ready buckets, omit `×1`, and keep only the `Новый заказ` section permanently expanded with steppers.
++5. [P2] Fix 5 — Guest-facing status labels and the guest-name affordance are still on the old copy. `CartView.jsx:250-278` maps `new` to `Заказано`, keeps `ready` as `Готово`, and has no served/completed fallback to `Подано`; `CartView.jsx:470-472` still shows the per-order badge using that old mapping. In the header, `CartView.jsx:571-577` keeps the editable-name trigger as a plain text button with a pencil icon instead of `Вы: Имя >`. FIX: remap statuses to `Отправлено / Принят / Готовится / Готов / Подано` and replace the pencil affordance with a 44px-tappable name row that shows `Вы: {guestDisplay} >`.
++6. [P1] Fix 6 — The order filter still resets at midnight, not at the 06:00 business-day boundary. `CartView.jsx:350-358` compares `new Date(d).toDateString()` to today's date, so orders from the previous business night can leak into the drawer or disappear too early after midnight. FIX: compute `today6am` and filter on `new Date(created_at || created_date || createdAt) >= today6am`.
++7. [P2] Fix 7 — The success screen still formats the raw floating-point total. `x.jsx:726-731` renders `{formatPrice(totalAmount)}`, which is exactly the path that can show values like `31.00999999999998 ₸`. FIX: wrap the value before formatting: `formatPrice(parseFloat(Number(totalAmount).toFixed(2)))`.
++8. [P1] Fix 8 — Guest name persistence has save/load, but no table-change reset. `x.jsx:1358-1359` restores `menuapp_guest_name`, and `x.jsx:3162` saves it back, but there is no effect tied to the derived table identity after `x.jsx:1560-1634` computes the current table and no cleanup around `x.jsx:2452-2456`, where `currentTableId` changes are already observed for other state. That allows a guest name from one table to survive into another table's session. FIX: add an effect keyed to table identity (`tableCodeParam`/`currentTableId` or equivalent) that calls `localStorage.removeItem('menuapp_guest_name')` and `setGuestNameInput('')`.
++9. [P1] Fix 9 — The D3 served-only empty state is not implemented. When the cart is empty and orders exist, `CartView.jsx:772-847` still falls through to the old served/active sections, and `CartView.jsx:850-861` shows the generic `Добавить к заказу` button instead of the dedicated `Ничего не ждёте` screen. There is no `isV8` check above the main bucket rendering, and the footer path for empty-cart history states is non-sticky because `CartView.jsx:1008-1042` only mounts the sticky block for non-empty carts. FIX: compute the served-only state from the new buckets, render the D3 banner above the collapsed `Подано` bucket, and reuse the sticky outline `Заказать ещё` footer for that state.
++
++## Summary
++Total: 9 findings (0 P0, 7 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): the task context listed external context files (`ux-concepts/cart-view.md`, `ux-concepts/visit-lifecycle.md`, `BUGS_MASTER.md`), but the speed rules said to read only the target files plus page-local `README.md` and `BUGS.md`. I followed the speed rules.
+diff --git a/pages/PublicMenu/round1_2026-03-28.md b/pages/PublicMenu/round1_2026-03-28.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..57b4913708954f4ae19cf0c530b5f3fb5239e4eb
+--- /dev/null
++++ b/pages/PublicMenu/round1_2026-03-28.md
+@@ -0,0 +1,14 @@
++# Round 1 — PublicMenu Chain: publicmenu-260328-180422-501a
++
++Single-round scoped review of `pages/PublicMenu/CartView.jsx` and `pages/PublicMenu/x.jsx`, using only page-local `README.md` and `BUGS.md` for context.
++
++## Findings
++1. [P1] Fix 1 — `CartView.jsx` still uses a binary `servedOrders` / `activeOrders` split instead of status buckets. `CartView.jsx:92-93` keeps only `servedExpanded` and `activeExpanded`, `CartView.jsx:366-374` groups orders only into served vs non-served, and `CartView.jsx:772-847` still renders `Выдано` / `Заказано`. FIX: replace the split with status-keyed buckets (`served`, `ready`, `in_progress`, `accepted`, `new_order`), render only non-empty buckets in the required order, and store UI state in `expandedStatuses`.
++2. [P1] Fix 2 — Footer and totals are still wired to the old layout. `CartView.jsx:549-579` shows no `Заказов: X ₸` in the drawer header, `CartView.jsx:980-992` still renders the removed `ИТОГО за визит` card, `CartView.jsx:995` still inserts the old spacer, and `CartView.jsx:1008-1042` renders the sticky footer only when `cart.length > 0`. FIX: move submitted-orders total into the header, put the cart subtotal into the `Новый заказ` section header, remove the visit-total card and spacer, and always render one sticky footer block when `cart.length > 0 || todayMyOrders.length > 0`, switching to outline `Заказать ещё` when the cart is empty.
++3. [P1] Fix 3 — Rating is still exposed outside the served state. In `CartView.jsx:457-530`, `renderOrderItems` has no status gate, and `CartView.jsx:489-516` renders `<Rating>` for any order whenever `reviewsEnabled` is true. `CartView.jsx:833-843` also leaves a review CTA inside the active-orders section, while `CartView.jsx:772-802` has no `Подано (N) • Оценить` header chip at all. FIX: pass `showRating` only for the served bucket, remove rating UI from non-served buckets, and move the entry point to a served-bucket header chip that expands `Подано`.
++4. [P1] Fix 4 — Status buckets are not collapsed into per-order summary rows. `CartView.jsx:457-529` immediately renders full item lists for every order, `CartView.jsx:474-520` has no per-order collapsed/expanded state, and `CartView.jsx:485` always prints `× {item.quantity}`, including `×1`. FIX: add `expandedOrders`, render collapsed summary rows for served/accepted/in_progress/ready buckets, omit `×1`, and keep only the `Новый заказ` section permanently expanded with steppers.
++5. [P2] Fix 5 — Guest-facing status labels and the guest-name affordance are still on the old copy. `CartView.jsx:250-278` maps `new` to `Заказано`, keeps `ready` as `Готово`, and `CartView.jsx:571-577` keeps the editable-name trigger as a plain text button with a pencil icon instead of `Вы: Имя >`. FIX: remap statuses to `Отправлено / Принят / Готовится / Готов / Подано` and replace the pencil affordance with a 44px-tappable name row that shows `Вы: {guestDisplay} >`.
++6. [P1] Fix 6 — The order filter still resets at midnight, not at the 06:00 business-day boundary. `CartView.jsx:350-358` compares `new Date(d).toDateString()` to today's date. FIX: compute `today6am` and filter on `new Date(created_at || created_date || createdAt) >= today6am`.
++7. [P2] Fix 7 — The success screen still formats the raw floating-point total. `x.jsx:726-731` renders `{formatPrice(totalAmount)}`. FIX: wrap the value before formatting: `formatPrice(parseFloat(Number(totalAmount).toFixed(2)))`.
++8. [P1] Fix 8 — Guest name persistence has save/load, but no table-change reset. `x.jsx:1358-1359` restores `menuapp_guest_name`, and `x.jsx:3162` saves it back, but there is no effect tied to table identity changes after `x.jsx:1560-1634` derives the current table. FIX: add an effect keyed to table identity that clears `menuapp_guest_name` and resets `guestNameInput`.
++9. [P1] Fix 9 — The D3 served-only empty state is not implemented. `CartView.jsx:772-847` still falls through to the old served/active sections, and `CartView.jsx:850-861` shows the generic `Добавить к заказу` button instead of the dedicated served-only screen. FIX: compute the served-only state from the new buckets, render the D3 banner above the collapsed `Подано` bucket, and reuse the sticky outline `Заказать ещё` footer for that state.
+diff --git a/pipeline/chain-state/publicmenu-260328-180422-501a-codex-findings.md b/pipeline/chain-state/publicmenu-260328-180422-501a-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..30bd0b04591a3e60c46461f21c20951a7f1403dc
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260328-180422-501a-codex-findings.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-180422-501a
++
++## Findings
++1. [P1] Fix 1 — `CartView.jsx` still uses a binary `servedOrders` / `activeOrders` split instead of status buckets. `CartView.jsx:92-93` keeps only `servedExpanded` and `activeExpanded`, `CartView.jsx:366-374` groups orders only into served vs non-served, and `CartView.jsx:772-847` still renders `Выдано` / `Заказано`. This cannot produce the required `Подано / Готов / Готовится / Принят / Отправлено` buckets, per-bucket subtotals, or preserved expand state per status. FIX: replace the split with status-keyed buckets (`served`, `ready`, `in_progress`, `accepted`, `new_order`), render only non-empty buckets in the required order, and store UI state in `expandedStatuses`.
++2. [P1] Fix 2 — Footer and totals are still wired to the old layout. `CartView.jsx:549-579` shows no `Заказов: X ₸` in the drawer header, `CartView.jsx:980-992` still renders the removed `ИТОГО за визит` card, `CartView.jsx:995` still inserts the old spacer, and `CartView.jsx:1008-1042` renders the sticky footer only when `cart.length > 0`. That misses the required always-visible sticky footer for order-history states and leaves cart/order totals in the wrong places. FIX: move submitted-orders total into the header, put the cart subtotal into the `Новый заказ` section header, remove the visit-total card and spacer, and always render one sticky footer block when `cart.length > 0 || todayMyOrders.length > 0`, switching to outline `Заказать ещё` when the cart is empty.
++3. [P1] Fix 3 — Rating is still exposed outside the served state. In `CartView.jsx:457-530`, `renderOrderItems` has no status gate, and `CartView.jsx:489-516` renders `<Rating>` for any order whenever `reviewsEnabled` is true. `CartView.jsx:833-843` also leaves a review CTA inside the active-orders section, while `CartView.jsx:772-802` has no `Подано (N) • Оценить` header chip at all. FIX: pass `showRating` only for the served bucket, remove rating UI from non-served buckets, and move the entry point to a served-bucket header chip that expands `Подано`.
++4. [P1] Fix 4 — Status buckets are not collapsed into per-order summary rows. `CartView.jsx:457-529` immediately renders full item lists for every order, `CartView.jsx:474-520` has no per-order collapsed/expanded state, and `CartView.jsx:485` always prints `× {item.quantity}`, including `×1`. This misses the required `HH:MM + first 2 dishes + +N + total + chevron` summary row behavior and the qty rule from CV-23. FIX: add `expandedOrders`, render collapsed summary rows for served/accepted/in_progress/ready buckets, omit `×1`, and keep only the `Новый заказ` section permanently expanded with steppers.
++5. [P2] Fix 5 — Guest-facing status labels and the guest-name affordance are still on the old copy. `CartView.jsx:250-278` maps `new` to `Заказано`, keeps `ready` as `Готово`, and has no served/completed fallback to `Подано`; `CartView.jsx:470-472` still shows the per-order badge using that old mapping. In the header, `CartView.jsx:571-577` keeps the editable-name trigger as a plain text button with a pencil icon instead of `Вы: Имя >`. FIX: remap statuses to `Отправлено / Принят / Готовится / Готов / Подано` and replace the pencil affordance with a 44px-tappable name row that shows `Вы: {guestDisplay} >`.
++6. [P1] Fix 6 — The order filter still resets at midnight, not at the 06:00 business-day boundary. `CartView.jsx:350-358` compares `new Date(d).toDateString()` to today's date, so orders from the previous business night can leak into the drawer or disappear too early after midnight. FIX: compute `today6am` and filter on `new Date(created_at || created_date || createdAt) >= today6am`.
++7. [P2] Fix 7 — The success screen still formats the raw floating-point total. `x.jsx:726-731` renders `{formatPrice(totalAmount)}`, which is exactly the path that can show values like `31.00999999999998 ₸`. FIX: wrap the value before formatting: `formatPrice(parseFloat(Number(totalAmount).toFixed(2)))`.
++8. [P1] Fix 8 — Guest name persistence has save/load, but no table-change reset. `x.jsx:1358-1359` restores `menuapp_guest_name`, and `x.jsx:3162` saves it back, but there is no effect tied to the derived table identity after `x.jsx:1560-1634` computes the current table and no cleanup around `x.jsx:2452-2456`, where `currentTableId` changes are already observed for other state. That allows a guest name from one table to survive into another table's session. FIX: add an effect keyed to table identity (`tableCodeParam`/`currentTableId` or equivalent) that calls `localStorage.removeItem('menuapp_guest_name')` and `setGuestNameInput('')`.
++9. [P1] Fix 9 — The D3 served-only empty state is not implemented. When the cart is empty and orders exist, `CartView.jsx:772-847` still falls through to the old served/active sections, and `CartView.jsx:850-861` shows the generic `Добавить к заказу` button instead of the dedicated `Ничего не ждёте` screen. There is no `isV8` check above the main bucket rendering, and the footer path for empty-cart history states is non-sticky because `CartView.jsx:1008-1042` only mounts the sticky block for non-empty carts. FIX: compute the served-only state from the new buckets, render the D3 banner above the collapsed `Подано` bucket, and reuse the sticky outline `Заказать ещё` footer for that state.
++
++## Summary
++Total: 9 findings (0 P0, 7 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): the task context listed external context files (`ux-concepts/cart-view.md`, `ux-concepts/visit-lifecycle.md`, `BUGS_MASTER.md`), but the speed rules said to read only the target files plus page-local `README.md` and `BUGS.md`. I followed the speed rules.
+
+tokens used
+69 092
+Findings are saved in [publicmenu-260328-180422-501a-codex-findings.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260328-180422-501a-codex-findings.md). I also saved the page-local copies required by the repo in [review_2026-03-28.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-28.md), [round1_2026-03-28.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/round1_2026-03-28.md), and [commands_2026-03-28.log](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-28.log).
+
+Scoped result: 9 findings total, all tied only to Fix 1–9. Summary: 0 P0, 7 P1, 2 P2. The main gaps are that `CartView.jsx` still uses the old served/active layout, old footer/total placement, old rating behavior, old expanded item rendering, midnight filtering, and no D3 served-only state; `x.jsx` still has the raw success-screen float path and no guest-name reset on table change.

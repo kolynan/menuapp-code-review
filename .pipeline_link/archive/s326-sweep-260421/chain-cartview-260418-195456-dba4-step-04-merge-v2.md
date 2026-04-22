@@ -1,0 +1,99 @@
+---
+chain: cartview-260418-195456-dba4
+chain_step: 4
+chain_total: 4
+chain_step_name: merge-v2
+page: CartView
+budget: 14.00
+runner: cc
+type: KS
+---
+=== CHAIN STEP: Merge (4/4) ===
+Chain: cartview-260418-195456-dba4
+Page: CartView
+
+You are the Merge step in a modular consensus pipeline.
+Your job: apply the fix plan to the actual code.
+
+INSTRUCTIONS:
+1. Read the comparison: pipeline/chain-state/cartview-260418-195456-dba4-comparison.md
+   - **Abort-on-empty check (KB-158):** if comparison contains `## CRITICAL: No findings found` OR has empty "Final Fix Plan" (0 items) → write merge report with status `ABORTED_NO_FINDINGS`, skip git commit, EXIT step. Do NOT proceed with 0 fixes and claim success.
+   - **Capture HEAD baseline:** run `git rev-parse HEAD` and record value as `HEAD_BEFORE` in merge report. Required for step 9 verify.
+2. Check if discussion report exists: pipeline/chain-state/cartview-260418-195456-dba4-discussion.md
+   - If it exists AND has an "Updated Fix Plan" section → use THAT for disputed items
+   - If it says "No disputes" or doesn't exist → use Comparator's "Final Fix Plan" as-is
+   - Items marked "Unresolved (for Arman)" → SKIP these, do NOT apply
+3. **File integrity check (KB-121 prevention):**
+   Run: `wc -l pages/CartView/*.jsx`
+   - If result matches expected line count from comparison/findings → proceed.
+   - If result is unexpectedly low (e.g. differs by 200+ lines from what findings mention) →
+     run `git fetch origin && git reset --hard origin/main` then verify again.
+   - If still wrong after reset → STOP and write merge report explaining the issue. Do NOT apply changes to a truncated file.
+4. Read the code file: pages/CartView/*.jsx
+5. Apply ALL fixes from the fix plan, in priority order (P0 first)
+   - Agreed items from Comparator: always apply
+   - Discussion-resolved items: apply the winning solution
+   - Unresolved disputes: SKIP (note in merge report)
+   - [MUST-FIX] items: CANNOT be skipped. If you cannot apply a MUST-FIX, explain WHY in detail in merge report — do NOT silently skip.
+6. After applying fixes:
+   a. Update BUGS.md in pages/CartView/ with fixed items
+   b. Update README.md in pages/CartView/ if needed
+7. Git commit and push:
+   - git add <specific files only> (NEVER git add . or git add -A)
+   - git commit -m "fix(CartView): N bugs fixed via consensus chain cartview-260418-195456-dba4"
+   - git push
+8. **Verify-commit check (PQ-111):** run `git rev-parse HEAD` → record as `HEAD_AFTER`.
+   - If `HEAD_BEFORE == HEAD_AFTER` → merge FAILED silently. Write merge report with status `FAILED_NO_COMMIT` explaining what blocked the commit (merge conflict? nothing to stage? hooks rejected?). Do NOT claim success.
+   - If `HEAD_AFTER != HEAD_BEFORE` → verify commit touched expected files: `git show --stat HEAD` must include at least one `pages/CartView/` file. If not → status `FAILED_WRONG_FILES`.
+9. Write merge report to: pipeline/chain-state/cartview-260418-195456-dba4-merge-report.md
+
+FORMAT for merge report:
+# Merge Report — CartView
+Chain: cartview-260418-195456-dba4
+
+## Applied Fixes
+1. [P0] Fix title — Source: agreed/discussion-resolved — DONE
+2. [P1] Fix title — Source: comparator — DONE
+...
+
+## Skipped — Unresolved Disputes (for Arman)
+- Dispute: [title] — CC says X, Codex says Y — NEEDS DECISION
+
+## Skipped — Could Not Apply
+- Reason...
+
+## Git
+- HEAD_BEFORE: <hash>
+- HEAD_AFTER: <hash>
+- Commit: <hash> (MUST equal HEAD_AFTER when status=OK)
+- Status: OK | ABORTED_NO_FINDINGS | FAILED_NO_COMMIT | FAILED_WRONG_FILES
+- Lines before: <N>
+- Lines after: <N>
+- Files changed: N
+
+## Prompt Feedback
+Collect Prompt Clarity sections from CC and Codex findings files (if present), then add your own observations:
+- CC clarity score: [N/5]
+- Codex clarity score: [N/5]
+- Fixes where writers diverged due to unclear description: ...
+- Fixes where description was perfect (both writers agreed immediately): ...
+- Recommendation for improving task descriptions: ...
+
+## Summary
+- Applied: N fixes
+- Skipped (unresolved): N disputes
+- Skipped (other): N fixes
+- MUST-FIX not applied: N (with reasons)
+- Commit: <hash>
+
+=== TASK CONTEXT ===
+КС CV-B2-A — CartView Batch 2 (Fix 1/2/4) — Split КС
+Source: pssk-cv-b2-v19.md Fix 1/2/4 (dual-GO stable v13-v17)
+Scope: Fix 1 (header attribution + isCancelledOrder helper) + Fix 2 (pending_unconfirmed bucket) + Fix 4 (self-block Card before SECTION 5).
+Fix 3 excluded from this КС (separate КС-B).
+
+Key note: cc-writer produced 14 findings. Codex was skipped ($0). 0 disputes.
+Apply ALL 14 fixes from the Comparator Final Fix Plan strictly in order: Fix 1 → Fix 2 → Fix 4.
+
+IMPORTANT: Fix 1 shifts line numbers by ~23 lines. Use grep-based anchors (function names, variable names), NOT line numbers, for all subsequent fixes.
+=== END ===

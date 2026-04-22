@@ -1,0 +1,57 @@
+# INFRA: Port chain_template support to task-watcher-multi.py
+
+## Task: ks-multi-chain-support-v2-260413.md
+## Status: DONE (4/4 fixes applied)
+
+## Changes Made
+
+### Fix 1 — INFRA-001 (P0): Chain expansion functions ported to multi.py
+- Ported 20+ functions from v3.py to multi.py v5.0:
+  parse_simple_yaml, load_chain_recipe, load_step_template,
+  load_chain_state, save_chain_state, generate_chain_id,
+  resolve_inline_source, expand_chain_to_tasks, expand_chain_task_if_needed,
+  can_run_chain_step, build_chain_step_prompt, mark_chain_step_running,
+  build_chain_live_text, _build_chain_summary, _format_step_line,
+  parse_step_metrics, update_chain_tg, cleanup_chain_artifacts
+- Main loop (main()) now calls expand_chain_task_if_needed() BEFORE submitting tasks
+- run_task() detects chain steps (meta.chain), checks can_run_chain_step(),
+  calls mark_chain_step_running(), uses build_chain_step_prompt()
+- Added: import random, CHAIN_STATE_DIR_NAME, STEPS_DIR_NAME, CHAINS_DIR_NAME, _chain_state_lock
+
+### Fix 2 — INFRA-002 (P1): TG notifications for chain steps
+- Chain expansion sends initial TG with build_chain_live_text() showing [template] page
+- Each step update edits the same TG message via update_chain_tg()
+- Step format shows: step_name (CC/Codex): status, metrics, cost, duration
+- Regular (non-chain) tasks keep existing TG format unchanged
+
+### Fix 3 — INFRA-003 (P1): WinError 206 fix for large prompts
+- build_claude_command() now returns tuple: (cmd, use_stdin)
+- For prompts >7KB: omits -p from argv, returns use_stdin=True
+- run_task() Popen section pipes prompt via stdin when use_stdin=True
+- Null bytes cleaned from prompt text (KB-137 defense)
+- Small prompts (<7KB) still use -p argv as before
+
+### Fix 4 — INFRA-004 (P2): Documentation and KB
+- KNOWLEDGE_BASE_VSC.md: KB-136 status -> RESOLVED
+- task-watcher-v3.py: added DEPRECATED header
+- CLAUDE.md: commands block updated (multi.py = primary КС)
+- task-watcher-multi.py: version 4.0 -> 5.0, updated header/banner
+
+## Files Modified
+1. scripts/task-watcher-multi.py (1530 -> 2368 lines, +838 lines)
+2. scripts/task-watcher-v3.py (3002 -> 3005 lines, +3 lines header only)
+3. KNOWLEDGE_BASE_VSC.md (KB-136 status update)
+4. CLAUDE.md (commands block update)
+
+## Verification
+- Python syntax check: PASSED
+- Line count delta: +55% (all additions, no deletions)
+- Key functions grep: all 20+ chain functions present
+- v3.py DEPRECATED header: confirmed
+
+## Not Changed (scope lock)
+- No changes to pipeline/chains/*.yaml format
+- No changes to pipeline/steps/*.md format
+- task-watcher-v3.py NOT deleted (only deprecated)
+- No new pip dependencies
+- Existing parallel simple task logic preserved

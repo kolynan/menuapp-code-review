@@ -1,0 +1,52 @@
+CC Analysis Summary — task-260414-184651
+=========================================
+Task: D3 Discussion — CartView persist strategy (CV-BUG-01)
+Session: S271
+Date: 2026-04-14
+
+## What Was Done
+
+Analyzed current localStorage persist implementation across:
+- useTableSession.jsx (session + guest persistence, 7 fallback guest restore strategies)
+- x.jsx (cart persistence with 4h TTL, guest name, table tracking)
+- CartView.jsx (read-only: menu_guest_code)
+- order-flow.md (session contract, polling architecture)
+
+Produced strategy document: ux-concepts/CartView/CV-BUG-01_Persist_Strategy_S271.md
+
+## Key Decisions
+
+### Q1: Option B — Lightweight Snapshot
+Store { tableSessionId, sessionGuestId, orderIds[], lastSeenTs, pendingSubmit, schemaVersion }.
+Not full snapshot (stale data risk, reconcile complexity) nor minimal (too many round-trips).
+
+### Q2: Parallel Fetch with 8s Global Timeout
+Phase 1: validate session (single request).
+Phase 2: parallel fetch guests + orders + items.
+Transitions: S-loading -> S-restored / S-failed-network (8s timeout) / S-lost (404/410).
+
+### Q3: Invalidation at 12h Client TTL
+Server 404/410, expired session, 12h lastSeenTs TTL, schema version mismatch, table change.
+12h chosen as balance between long dinners (4-5h) and next-day staleness.
+
+### Q4: pendingSubmit Flag for Kill-During-Submit
+Set before fetch, cleared after success/failure. On restore, compare timestamp with server orders.
+False positive handling: informational banner, auto-dismiss.
+
+### Q5: Polling After S-restored Only
+No polling during S-loading or S-failed-network. Post-restore polling failure stays in S-restored
+with stale data + toast (not regression to S-failed-network).
+
+## Files Changed
+- NEW: ux-concepts/CartView/CV-BUG-01_Persist_Strategy_S271.md (407 lines)
+- No code changes (discussion task, not implementation)
+
+## Open Items
+1. Session status mismatch ("active" vs "open") still unfixed — affects new sessions, not persisted restores.
+2. OrderItems lazy loading consideration for large sessions.
+3. Codex review still pending.
+
+## Git
+- Pre: 374e7a4
+- Post: eb6da57
+- Branch: wt-task-260414-184651

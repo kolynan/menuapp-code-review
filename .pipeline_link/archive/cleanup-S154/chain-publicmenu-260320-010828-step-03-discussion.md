@@ -1,0 +1,129 @@
+---
+chain: publicmenu-260320-010828
+chain_step: 3
+chain_total: 4
+chain_step_name: discussion
+page: PublicMenu
+budget: 4.00
+runner: cc
+type: chain-step
+---
+=== CHAIN STEP: Discussion (3/4) ===
+Chain: publicmenu-260320-010828
+Page: PublicMenu
+
+You are the Discussion moderator in a modular consensus pipeline.
+Your job: resolve disputes from the Comparator step by running a multi-round discussion between CC and Codex.
+
+INSTRUCTIONS:
+
+1. Read the comparison report: pipeline/chain-state/publicmenu-260320-010828-comparison.md
+2. Look at the "Disputes" section.
+
+IF there are 0 disputes:
+   - Write to pipeline/chain-state/publicmenu-260320-010828-discussion.md:
+     # Discussion Report — PublicMenu
+     Chain: publicmenu-260320-010828
+     ## Result
+     No disputes found. All items agreed or resolved by Comparator. Skipping discussion.
+   - DONE. Exit immediately. Do NOT run any rounds.
+
+IF there are 1+ disputes:
+   Run up to 3 rounds of discussion. Each round:
+
+   a) CC Position (you write):
+      For each dispute, write your analysis:
+      - Which solution is better and WHY (with code reasoning)
+      - What edge cases or risks does each approach have
+
+   b) Codex Position (run codex):
+      Create a prompt file with CC's position and ask Codex to respond.
+      Run: codex.cmd exec --model codex-mini --prompt "<prompt>" --quiet
+      The prompt should include CC's position and ask Codex to:
+      - Agree or disagree with CC's reasoning
+      - Provide counter-arguments if it disagrees
+      - Propose a compromise if possible
+
+   c) After each round, check:
+      - If both agree on all disputes → RESOLVED, stop early
+      - If round 3 and still disagree → mark as UNRESOLVED for Arman
+
+3. Write final discussion report to: pipeline/chain-state/publicmenu-260320-010828-discussion.md
+
+FORMAT:
+# Discussion Report — PublicMenu
+Chain: publicmenu-260320-010828
+
+## Disputes Discussed
+Total: N disputes from Comparator
+
+## Round 1
+### Dispute 1: [title]
+**CC Position:** ...
+**Codex Position:** ...
+**Status:** resolved/ongoing
+
+### Dispute 2: [title]
+...
+
+## Round 2 (if needed)
+...
+
+## Round 3 (if needed)
+...
+
+## Resolution Summary
+| # | Dispute | Rounds | Resolution | Winner |
+|---|---------|--------|------------|--------|
+| 1 | Title   | 2      | resolved   | CC/Codex/compromise |
+| 2 | Title   | 3      | unresolved | → Arman |
+
+## Updated Fix Plan
+Based on discussion results, provide the UPDATED fix plan that the Merge step should use.
+Include ONLY the disputed items — agreed items from Comparator remain unchanged.
+Format same as Comparator's "Final Fix Plan":
+1. [P0] Fix title — Source: discussion-resolved — Description
+2. ...
+
+## Unresolved (for Arman)
+Items where CC and Codex could not agree after 3 rounds.
+Arman must decide. Each item shows both positions.
+
+4. Do NOT apply any fixes — only document the discussion results
+
+=== TASK CONTEXT ===
+Fix 4 P1 bugs in CartView.jsx and x.jsx (BUG-PM-027, 028, 029, 030).
+
+## Files to review
+- pages/PublicMenu/base/CartView.jsx
+- pages/PublicMenu/base/x.jsx
+
+## Bugs to fix
+
+### BUG-PM-027 (P1): Loyalty/discount UI hidden for normal checkout
+- File: CartView.jsx:859, x.jsx:1937,3295
+- Symptom: Loyalty section gated on `showLoginPromptAfterRating` instead of `showLoyaltySection`. Email entry, balance display, and point redemption unavailable until after a dish rating exists (never for fresh cart).
+- Fix: Use `showLoyaltySection` for checkout loyalty UI; keep `showLoginPromptAfterRating` only for the review nudge prompt.
+
+### BUG-PM-028 (P1): Failed star-rating saves leave dishes permanently locked
+- File: CartView.jsx:705,720,725; x.jsx:2039
+- Symptom: Item marked read-only when draftRating > 0, but async save can fail. Nothing clears the draft on failure, so user cannot retry rating.
+- Fix: Roll back draft rating on save failure (clear draftRating in catch block), or only lock from confirmed `reviewedItems`.
+
+### BUG-PM-029 (P1): Table-code auto-verify cannot retry same code after failure
+- File: CartView.jsx:174,184
+- Symptom: `lastSentVerifyCodeRef` never cleared on error or after cooldown unlock. Transient API failure forces guest to change digits to retry the same code.
+- Fix: Clear `lastSentVerifyCodeRef` on failed verification, on cooldown unlock, and when input becomes incomplete (< full length).
+
+### BUG-PM-030 (P1): Review-reward banner shows before any dish is reviewable
+- File: CartView.jsx:386
+- Symptom: "+N за отзыв" hint shows when `myOrders.length > 0` regardless of order status. Guests see reward prompt before anything is ready/served.
+- Fix: Gate banner on ready/served statuses AND `reviewableItems.length > 0`. See also BUG-PM-021 regression risk.
+
+## Instructions
+- Fix all 4 bugs with minimal, targeted changes
+- Do NOT refactor unrelated code
+- After fixing, update BUGS.md in pages/PublicMenu/ marking all 4 as Fixed
+- Git commit with message: "fix(PublicMenu): BUG-PM-027,028,029,030 — loyalty gate, rating rollback, code retry, reward banner"
+- Git push
+=== END ===

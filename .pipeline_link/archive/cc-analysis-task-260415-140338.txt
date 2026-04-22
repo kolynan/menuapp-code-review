@@ -1,0 +1,325 @@
+# CC Analysis: SOM Batch B1 — pssk-som-b1-cc-v1
+**Analyst:** Claude Code (CC-only)
+**File:** `pages/StaffOrdersMobile/260414-02 StaffOrdersMobile RELEASE.jsx` (4575 lines)
+**Helper:** `components/sessionHelpers.js` (215 lines)
+**Date:** 2026-04-15
+**Task:** Independent review for SOM-BUG-S270-02 and SOM-BUG-S270-01 re-check
+
+---
+
+## Section 1 — SOM-BUG-S270-02: Close table does NOT move to Completed tab
+
+### 1.1 closeSession() — verbatim from sessionHelpers.js (lines 158–171)
+
+```js
+// FUNCTION 8: closeSession
+// Closes session
+export async function closeSession(sessionId) {
+  await base44.entities.TableSession.update(sessionId, {
+    status: "closed",
+    closed_at: new Date().toISOString()
+  });
+
+  // S267: Bulk-close all non-cancelled orders in this session.
+  const sessionOrders = await base44.entities.Order.filter({ table_session: sessionId });
+  await Promise.all(
+    sessionOrders
+      .filter(o => o.status !== 'cancelled')
+      .map(o => base44.entities.Order.update(o.id, { status: 'closed' }))
+  );
+}
+```
+
+**CONFIRMED:** `closeSession()` does NOT touch `Table.status`. It only:
+1. Updates `TableSession.status = "closed"` + `closed_at`
+2. Bulk-closes Orders (`status = "closed"`)
+
+There is **zero** `Table.update()` anywhere in the codebase — grep `Table.update` returned 0 hits in the RELEASE file. Grep `entities.Table.` returned only one hit:
+- Line 3371: `base44.entities.Table.filter({ partner: partnerId })` — this is the table list query, read-only.
+
+### 1.2 How the "Completed" tab filters — grep results with context
+
+The Active/Completed tabs do NOT filter by `Table.status` at all. They filter by **order state** within each group:
+
+**Tab filtering logic (lines 3828–3847):**
+```js
+// v2.7.1: Tab filtering (active vs completed)
+const filteredGroups = useMemo(() => {
+  if (!orderGroups) return [];
+  return orderGroups.filter(group => {
+    const hasActiveOrder = group.orders.some(o => {
+      const config = getStatusConfig(o);
+      return !config.isFinishStage && o.status !== 'cancelled';
+    });
+    const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+    // S267: served-but-not-closed -> stay in Active until closeSession
+    const hasServedButNotClosed = group.orders.some(o => {
+      const config = getStatusConfig(o);
+      return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+    });
+    return activeTab === 'active'
+      ? (hasActiveOrder || hasActiveRequest || hasServedButNotClosed)
+      : (!hasActiveOrder && !hasActiveRequest && !hasServedButNotClosed);
+  });
+}, [orderGroups, activeTab, getStatusConfig, activeRequests]);
+```
+
+**Tab count logic (lines 3850–3868):** identical logic, just counting instead of filtering.
+
+**Tab switcher UI (lines 4326–4333):**
+```
+onClick={() => setActiveTab('completed')}
+activeTab === 'completed'
+Завершённые ({tabCounts.completed})
+```
+
+### 1.3 Root Cause Analysis — REVISED
+
+**The original hypothesis was WRONG.** The Completed tab does NOT filter by `Table.status`. It filters by order state within each group. A table moves to Completed when ALL its orders are either:
+- `status === 'closed'` (closed by closeSession)
+- `status === 'cancelled'`
+- At `isFinishStage` AND `status === 'closed'` or `'cancelled'`
+
+**So after `closeSession()` runs:**
+1. `closeSession` bulk-closes all non-cancelled orders to `status: 'closed'` (line 169)
+2. The tab filter should then see: `hasActiveOrder = false`, `hasServedButNotClosed = false`
+3. The table SHOULD move to Completed — **unless there are active requests**
+
+**KEY FINDING:** The bug is likely caused by `hasActiveRequest`:
+```js
+const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+```
+`activeRequests` is filtered at lines 3539–3546:
+```js
+return !["done", "cancelled"].includes(r.status);
+```
+If there's an **open ServiceRequest** still linked to that table (e.g., status "new" or "accepted" or "in_progress"), the table stays in Active tab even after closeSession. `closeSession()` does NOT close ServiceRequests — only Orders.
+
+**Alternative scenario:** There could be a **query cache staleness** issue. After `closeSession`, the code calls `refetchOrders()` (line 4151), but:
+- It does NOT invalidate `serviceRequests` query
+- It does NOT invalidate `tables` query
+- React-query cache might still show old order states briefly
+
+**Possible scenario 3:** The `closeSession` uses `Promise.all` (line 166) which fires all Order updates in parallel — this could trigger 429 rate limits on B44, causing some orders to fail silently. If even one order doesn't get `status: 'closed'`, the table stays Active.
+
+### 1.4 Fix Recommendations
+
+**Option A: Add `Table.status` update in `closeSession()`**
+- NOT recommended yet. The tab filtering does NOT use `Table.status` at all. Adding it would be forward-looking (for future features) but would NOT fix the current bug.
+- Also, `closeSession` only has `sessionId`, not `tableId`. Would need: `const session = await base44.entities.TableSession.filter({ id: sessionId }); const tableId = getLinkId(session[0]?.table);` + `base44.entities.Table.update(tableId, { status: 'closed' })`.
+
+**Option B: Fix the actual bug — close ServiceRequests in `closeSession()`**
+- RECOMMENDED if root cause is open requests. Add to `closeSession()`:
+  ```js
+  const tableSession = await base44.entities.TableSession.filter({ id: sessionId });
+  const tableId = getLinkId(tableSession[0]?.table);
+  if (tableId) {
+    const requests = await base44.entities.ServiceRequest.filter({ table: tableId });
+    await Promise.all(
+      requests.filter(r => !['done', 'cancelled'].includes(r.status))
+        .map(r => base44.entities.ServiceRequest.update(r.id, { status: 'done' }))
+    );
+  }
+  ```
+
+**Option C: Fix at the call-site (line 4148) — also invalidate serviceRequests**
+- SAFE quick fix. After `closeSession()`, add `refetchRequests()`:
+  ```js
+  // At line 4151, add:
+  if (!isKitchen) refetchRequests();
+  ```
+  Wait — this already exists at line 4131 in `handleRefresh`, but NOT in `confirmCloseTable`. Adding it ensures the request cache is refreshed.
+
+**Option D: Use `runBatchSequential` instead of `Promise.all` in `closeSession()`**
+- Fixes the 429 risk in bulk close. But `runBatchSequential` is defined only in the RELEASE file, not in sessionHelpers.js.
+
+**RECOMMENDED approach:** Two-part fix:
+1. **Fix C** (quick): Add `refetchRequests()` after `closeSession()` in `confirmCloseTable` (line 4151) to clear stale request cache.
+2. **Fix B** (thorough): Add ServiceRequest closure in `closeSession()` so requests don't keep the table in Active.
+3. **Option A** (bonus): Add `Table.status = 'closed'` for forward-compat (B44_Entity_Schemas v3.0 has this field).
+
+### 1.5 Regression Risks
+
+1. **Other callers of `closeSession()`**: Only one call-site (line 4148). No regression risk from other callers.
+2. **Rate limit from bulk operations**: `closeSession` uses `Promise.all` — if a table has many orders + requests, this fires many parallel mutations and could trigger 429. Should switch to sequential pattern.
+3. **UI relying on old Table.status semantics**: Currently no code reads `Table.status` in SOM. But PartnerTables page might. Need to check before adding `Table.status = 'closed'`.
+4. **ServiceRequest closure side effects**: If we auto-close requests, the waiter won't see "close request" button animations or get notified. Probably fine since the table is closing anyway.
+5. **Query invalidation timing**: `refetchOrders()` at line 4151 triggers before React processes the close — this is correct (re-fetches fresh data showing closed orders).
+
+### 1.6 Test Plan
+
+1. **Waiter opens SOM** → sees table with 1+ orders in "Active" tab → clicks all orders through to served → clicks "Close Table" → confirms → table should disappear from Active and appear in "Completed" tab.
+2. **Same flow with ServiceRequests**: Waiter opens table with 2 orders AND a service request → advances orders → closes table → table should still move to Completed (request should auto-close or at least not block the move).
+3. **Edge case — partial close**: Table with 5 orders, 2 cancelled → Close Table → verify all 3 non-cancelled orders become `status: 'closed'` AND table moves to Completed.
+
+---
+
+## Section 2 — SOM-BUG-S270-01 Re-check: Rate Limit 429 Diagnostic
+
+### 2.1 All mutation definitions and their `__batch` support
+
+| # | Mutation Name | Line | `__batch` guard? | `invalidateQueries` on single? |
+|---|---|---|---|---|
+| 1 | `updateStatusMutation` (OrderCard) | 1594 | **NO** | YES — `onSettled` always fires `invalidateQueries(["orders"])` (line 1606) |
+| 2 | `advanceMutation` (TableOrderGroup) | 1904 | YES — `if (vars?.__batch) return` (line 1917) | YES when not batched (lines 1918-1919) |
+| 3 | `updateRequestMutation` | 3549 | YES — `if (vars?.__batch) return` (line 3551) | YES when not batched (line 3551) |
+| 4 | `updateLinkMutation` | 3087 | **NO** | Conditional — only for certain keys (lines 3090-3097) |
+
+### 2.2 Handlers that call mutations WITHOUT `__batch` flag
+
+| # | Handler/Call-site | Line | Mutation Used | Issue |
+|---|---|---|---|---|
+| A | `handleAction` in OrderCard | 1627 | `updateStatusMutation.mutate(...)` | **NO `__batch`** — every single-order click triggers `invalidateQueries(["orders"])` via `onSettled` (line 1606). This is the MAIN 429 culprit for single-order clicks. |
+| B | `onAction` in RequestCard | 4360 | `updateRequestMutation.mutate(...)` | **NO `__batch`** — single request action triggers `invalidateQueries(["serviceRequests"])`. Less severe (fewer requests than orders). |
+| C | `onCloseRequest` | 4435 | `updateRequestMutation.mutate(...)` | **NO `__batch`** — single request close/accept triggers invalidation. |
+| D | Batch "Accept All/Serve All" in collapsed card | 657, 1272 | `tableRequests.forEach(r => onCloseRequest(r.id, ...))` | **CRITICAL:** `forEach` fires multiple `onCloseRequest` calls synchronously (not `runBatchSequential`), each calling `updateRequestMutation.mutate()` without `__batch`. Each triggers its own `invalidateQueries`. 3 requests = 3 mutations + 3 invalidations fired simultaneously. |
+| E | Auto-bind device | 3176 | `updateLinkMutation.mutate(...)` | No `__batch` but single fire, low risk. |
+| F | `closeSession` helper | 166 (sessionHelpers.js) | `Promise.all(orders.map(...))` | **CRITICAL:** All Order.update calls fire in parallel. For 5 orders = 5 parallel B44 mutations. No throttling, no `runBatchSequential`, no delay. |
+| G | `handleCloseAllOrders` | 4168 | `runBatchSequential` + `base44.entities.Order.update` | Uses `runBatchSequential` with 120ms delay — SAFE. But does NOT set `__batch` on the raw update (it bypasses `advanceMutation`), so no `invalidateQueries` spam. Actually, the `queryClient.invalidateQueries` at line 4171 fires once after all. This is OK. |
+
+### 2.3 Analysis of `onSuccess` / `onSettled` invalidation patterns
+
+**updateStatusMutation (line 1594–1607):**
+```js
+onSettled: () => queryClient.invalidateQueries({ queryKey: ["orders"] }),
+```
+- ALWAYS fires — no `__batch` check.
+- Every single tap on an OrderCard action button = 1 mutation + 1 full orders refetch.
+- If a waiter taps 3 OrderCards quickly = 3 mutations + 3 refetches simultaneously.
+
+**advanceMutation (line 1904–1921):**
+```js
+onSettled: (_data, _err, vars) => {
+  if (vars?.__batch) return;
+  queryClient.invalidateQueries({ queryKey: ["orders"] });
+  queryClient.invalidateQueries({ queryKey: ["servedOrders", group.id] });
+},
+```
+- Has `__batch` guard — batch calls skip invalidation.
+- But note: `handleSingleAction` at line 2002 calls `handleOrdersAction([order], rowId)` which uses `__batch: true` (line 1990). So single actions through the TABLE CARD path DO use `__batch` and then invalidate once after the batch at line 1992-1993. This is correct.
+
+**The issue is that `updateStatusMutation` (OrderCard's own mutation at line 1594) does NOT have `__batch` support — it fires `onSettled` unconditionally.**
+
+There are TWO DIFFERENT mutation objects:
+1. `updateStatusMutation` in `OrderCard` component (line 1594) — simple, no `__batch`. Used in kitchen view for individual order cards.
+2. `advanceMutation` in `TableOrderGroup` component (line 1904) — has `__batch` guard. Used in hall view grouped cards.
+
+### 2.4 Rate Limit Vectors — Ranked by Severity
+
+**HIGH:**
+1. **[D] Batch request close via `forEach` (lines 657, 1272)** — fires N mutations synchronously without `runBatchSequential`. Each mutation triggers `invalidateQueries`. If table has 4 requests: 4 mutations + 4 invalidations in <50ms. VERY likely to hit 429.
+2. **[F] `closeSession` `Promise.all` (sessionHelpers.js line 166)** — fires all order closes in parallel. 5 orders = 5 simultaneous B44 API calls. No throttling at all.
+
+**MEDIUM:**
+3. **[A] `updateStatusMutation.onSettled` (line 1606)** — every single-order action in OrderCard fires full invalidation. Low risk for single taps, but if waiter is fast or kitchen view has many items, quick taps can stack.
+
+**LOW:**
+4. **[B,C] Single request actions (lines 4360, 4435)** — one mutation per click, manageable.
+
+### 2.5 Proposed Minimal Fix Pattern
+
+**Fix for [D] — Replace `forEach` with `runBatchSequential` + `__batch`:**
+```js
+// BEFORE (line 657):
+onClick={() => tableRequests.forEach(r => onCloseRequest(r.id, 'accepted', {...}))}
+
+// AFTER:
+onClick={async () => {
+  await runBatchSequential(tableRequests, (r) =>
+    onBatchCloseRequestAsync(r.id, 'accepted', { assignee: effectiveUserId, assigned_at: new Date().toISOString() })
+  );
+  queryClient.invalidateQueries({ queryKey: ["serviceRequests"] });
+}}
+```
+**Note:** The expanded card view at line 2369 ALREADY uses this correct pattern with `runBatchSequential` + `onBatchCloseRequestAsync`. The collapsed card views at lines 657 and 1272 use the old `forEach` pattern — these were not updated during the S272 rate limit fix.
+
+**Fix for [F] — Replace `Promise.all` in `closeSession` with sequential pattern:**
+Either:
+(a) Import/inline `runBatchSequential` in sessionHelpers.js
+(b) Use a simple for-loop with delay:
+```js
+for (const o of ordersToClose) {
+  await base44.entities.Order.update(o.id, { status: 'closed' });
+  if (ordersToClose.indexOf(o) < ordersToClose.length - 1) {
+    await new Promise(r => setTimeout(r, 120));
+  }
+}
+```
+
+**Fix for [A] — Add `__batch` guard to `updateStatusMutation`:**
+Not strictly needed since OrderCard only fires single mutations, but for safety:
+```js
+onSettled: (_data, _err, vars) => {
+  if (vars?.__batch) return;
+  queryClient.invalidateQueries({ queryKey: ["orders"] });
+},
+```
+
+### 2.6 Summary — Rate Limit Status After S272 Fix
+
+The S272 fix (SOM-BUG-S270-01) added:
+- `runBatchSequential` helper (line 529) with 120ms delay
+- `__batch` flag on `advanceMutation` and `updateRequestMutation`
+- `onBatchCloseRequestAsync` prop for batch request operations
+
+**What was MISSED in S272:**
+1. Collapsed card "Accept All / Serve All" buttons (lines 657, 1272) still use `forEach` + `onCloseRequest` (no `__batch`, no sequential)
+2. `closeSession` in sessionHelpers.js still uses `Promise.all` for parallel order closes
+3. `updateStatusMutation` in OrderCard (line 1594) has no `__batch` support (minor risk)
+
+---
+
+## Section 3 — Prompt Clarity Rating
+
+**Rating: 4/5**
+
+**Good:**
+- Clear scope: two specific bugs with IDs and descriptions
+- Reference files listed
+- Section structure with specific deliverables
+- Root hypothesis provided for each bug
+
+**Minor ambiguities:**
+- SOM-BUG-S270-02 hypothesis assumed `Table.status` is used for filtering — it's not. The actual tab filtering uses order states. This mismatch could waste time verifying the wrong theory. The prompt should say "verify the hypothesis first."
+- SOM-BUG-S270-01 re-check says "single mutations (handleAccept/handleReady/handleServe)" but those handler names don't exist in the code. The actual names are `handleAction` (OrderCard), `handleSingleAction`/`handleOrdersAction` (TableOrderGroup). Using exact names would save grep time.
+
+---
+
+## Section 4 — Risks Outside Scope (max 5)
+
+1. **[P1] `closeSession` `Promise.all` (sessionHelpers.js:166)** — bulk Order.update in parallel, no throttling, no error handling per-item. If one order fails, `Promise.all` rejects and remaining orders stay open. Should use `Promise.allSettled` or sequential.
+
+2. **[P2] Hardcoded Russian strings** — Lines 4149 ("Стол закрыт"), 4153 ("Ошибка при закрытии"), 4163 ("Нет этапа 'Завершён'"), 4378 ("Нет завершённых заказов"), etc. ~15+ user-facing strings not using `t()` / i18n.
+
+3. **[P2] `updateStatusMutation` vs `advanceMutation` duplication** — Two separate Order.update mutations with different onMutate/onSettled behaviors. If one gets patched (e.g., for rate limit), the other doesn't. Should consolidate or at least align patterns.
+
+4. **[P1] `closeSession` does NOT invalidate any query caches** — After closing session + orders + (future) requests, the SOM UI relies on `refetchOrders()` at the call-site (line 4151). But if `closeSession` is called from elsewhere in the future, the caller must remember to refetch. The function should return metadata (which orders were closed) or invalidate caches itself.
+
+5. **[P2] `confirmCloseTable` missing error details** — Line 4153 shows generic "Ошибка при закрытии" without logging `err`. If `closeSession` fails due to 429 (from `Promise.all`), the waiter has no idea what happened. Should log error and ideally retry.
+
+---
+
+## Appendix: Key Line References
+
+| What | Line(s) |
+|---|---|
+| `closeSession` import | 202 |
+| `closeSession` definition | sessionHelpers.js:158-171 |
+| `closeSession` call | 4148 |
+| `handleCloseTable` | 4136 |
+| `confirmCloseTable` | 4143 |
+| `closeTableConfirm` state | 2948 |
+| Tab filter (active/completed) | 3828-3847 |
+| Tab counts | 3850-3868 |
+| `updateStatusMutation` (OrderCard) | 1594-1607 |
+| `advanceMutation` (TableOrderGroup) | 1904-1921 |
+| `updateRequestMutation` | 3549-3558 |
+| `runBatchSequential` | 529-543 |
+| `BATCH_DELAY_MS` | 528 (120ms) |
+| `isRateLimitError` | 516-519 |
+| forEach batch (collapsed) | 657, 1272 |
+| forEach batch (expanded) — CORRECT | 2369 (uses `runBatchSequential`) |
+| `handleOrdersAction` | 1981-2001 |
+| `handleSingleAction` | 2002 |
+| `handleCloseAllOrders` | 4158-4179 |
+| Table.filter (only Table entity op) | 3371 |

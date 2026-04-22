@@ -1,0 +1,1036 @@
+OpenAI Codex v0.115.0 (research preview)
+--------
+workdir: C:/Dev/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d0eaf-65e9-7843-b69d-37cc48b2340e
+--------
+user
+Review the file pages/PublicMenu/base/*.jsx for bugs in a React restaurant QR-menu app on Base44 platform. Also check pages/PublicMenu/README.md and pages/PublicMenu/BUGS.md for context (ONLY these 3 files, nothing else). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the 3 files above. Do NOT search the repo, do NOT read old findings, do NOT read files outside pages/PublicMenu/. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. Find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260321-093745-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260321-093745 ## Findings 1. [P0] Title — Description. FIX: ... 2. [P1] Title — Description. FIX: ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) Do NOT apply fixes — only document findings. === TASK CONTEXT === # UX Batch 2+3: Drawer Restructure + StickyCartBar + Visit States Reference: `ux-concepts/public-menu.md` v4.1 (sections D, E), `STYLE_GUIDE.md` v3.2, `BUGS_MASTER.md`. ## Context This task implements Phase 2 structural improvements for PublicMenu (x.jsx). Two closely related areas: cart drawer layout and sticky bottom bar visibility logic. --- ## Part 1 — Drawer Restructure (Batch 2) ### Problem Currently the cart drawer does not distinguish between sent orders and the current draft visually or structurally. The layout is the same regardless of visit state (before first send / after send with new draft / after send no draft). ### Expected Behavior Implement 3 drawer layouts based on visit + draft state (see `public-menu.md` §E): **Layout 1 — Before first send (V1+D1 / V2+D1):** - Top: НОВЫЙ ЗАКАЗ section (draft items with stepper/remove, editable) - Bottom sticky: draft total + primary CTA "Отправить официанту" - [If table unknown — V2]: show table confirmation hint inside drawer before CTA **Layout 2 — After first send + new draft (V4+D1):** - Top: НОВЫЙ ЗАКАЗ (draft, editable, bright style, steppers visible) - Middle: МОИ ЗАКАЗЫ (collapsible, sent orders read-only, calm style, status chips) - Middle: СЧЁТ (collapsible, bill summary) - Bottom sticky: draft total (line 1) + unpaid total secondary (line 2) + CTA "Отправить новый заказ" **Layout 3 — After first send, no draft (V3+D0):** - Top: МОИ ЗАКАЗЫ (expanded, read-only) - Middle: СЧЁТ - Bottom sticky: open tab total + CTA "Заказать ещё" + secondary "Открыть счёт" ### Visual separation — sent vs draft | Zone | Style | |------|-------| | Sent orders | No stepper, no remove button, status chip, calm background, slightly less contrast text (but still readable) | | Draft | Steppers visible, remove visible, section title brighter, CTA active | **Anti-pattern:** Do NOT use opacity 50% or heavy blur on sent orders — must remain readable. ### CTA Logic per state (from `public-menu.md` §E CTA Logic table) | State | Primary CTA | Secondary CTA | |-------|-------------|---------------| | V1+D0 | — | Вернуться в меню | | V1+D1 | Отправить официанту | Продолжить выбор | | V2+D1 | Отправить официанту (→ intercept table confirmation) | Продолжить выбор | | V3+D0 | Заказать ещё | Открыть счёт | | V4+D1 | Отправить новый заказ | Мои заказы | | V5+D2 | Отправляем... (disabled) | — | | V6+D3 | Повторить отправку | Продолжить выбор | | V7+D0 | — | Вернуться в меню | ### Totals Logic 1. **Draft total** = sum(draftItems.price × qty + modifiers). Does NOT include sent. Does NOT subtract savings before submit. 2. **Sent unpaid total** = sum of Visit.orders where status != paid. Secondary line. 3. **Estimated savings** = loyalty preview, label "Ожидаемая выгода". Does NOT change draft total. 4. **Bill total** = Visit.total. "Только мои" / "Общий". Do NOT show before open tab. --- ## Part 2 — StickyCartBar + Visit States (Batch 3) ### Problem StickyCartBar does not implement the 7-state visibility matrix — it either shows or doesn't based on cart count, without considering visit state. Text modes are not implemented (visit mode vs draft mode). ### Expected Behavior Single bottom panel, 56px height, two text modes (from `public-menu.md` §D): | Mode | Panel text | |------|------------| | Has draft | `2 блюда · Новый заказ · 3400₸` | | No draft, has sent orders | `Мой заказ · 2 отправлено · Не оплачено 5600₸` | **7-state visibility matrix:** | Visit state | Draft state | StickyCartBar | Text | |-------------|-------------|---------------|------| | No visit | Empty | Hidden or ghost | — | | No visit | Has items | Active | draft mode | | Open, unpaid | Empty | Active (visit mode) | visit mode | | Open, unpaid | Has items | Active (draft mode) | draft mode | | Fully paid | Empty | Fade out 5s | — | | Tab closed by waiter | Empty | Hidden (3s) | — | | Tab closed by waiter | Has items | Hidden + confirm reset | — | **Animations:** - On `+`: subtle count bump animation in StickyCartBar + toast "Добавлено" - On first item added: bar rises/activates with soft animation - No complex "flying item" animations --- ## Part 3 — PM-S152-01: Complete Terracotta palette (open bug, P2) ### Problem After Batch 1 deploy, terracotta was applied only to primary CTA buttons (drawer "Отправить официанту", confirmation "Вернуться в меню"). The following elements still use `bg-indigo-xxx`: - Tab "В зале" (active state) - Category pills/chips ("Все", "Блюдо дня", etc.) - "+" buttons on dish cards CSS variables `--color-primary` are empty (not defined). Verified via `getComputedStyle` in S152. ### Expected Behavior All interactive elements that use primary color → terracotta `#B5543A` (consistent with STYLE_GUIDE.md v3.2 Batch 1 palette). No indigo remaining in UI. --- ## Implementation Notes - Files to modify: `x.jsx` (main), possibly `CartView.jsx` (if drawer logic is there) - Read `BUGS_MASTER.md` for current open PublicMenu bugs — do not regress any Fixed items - Read `STYLE_GUIDE.md` for exact color values and component specs - After all changes: `git add pages/PublicMenu/base/x.jsx pages/PublicMenu/base/CartView.jsx && git commit -m "feat: batch 2+3 drawer restructure + StickyCartBar visit states + terracotta complete" && git push` === END ===
+mcp startup: no servers
+codex
+Reviewing only the requested PublicMenu files and keeping scope locked to those inputs. I’ll inspect the JSX plus the local `README.md` and `BUGS.md`, then write a concise findings report without touching app code.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/BUGS.md' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/README.md' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -File pages/PublicMenu/base/*.jsx | Select-Object -ExpandProperty FullName' in C:/Dev/menuapp-code-review succeeded in 4.97s:
+---
+version: "26.0"
+updated: "2026-03-20"
+session: 150
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*7 active bugs remaining (1x P0, 2x P1, 3x P2, 1x suggestion).*
+
+### BUG-PM-050: Order creation race â€” items created after loyalty redeem (P0)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P0
+- **ÐšÐ¾Ð³Ð´Ð°:** S150 (Codex review, chain publicmenu-260320-173330)
+ succeeded in 4.85s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 4.90s:
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\MenuView.jsx
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\useTableSession.jsx
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\x.jsx
+codex
+I’ve confirmed the scope: six JSX files under `pages/PublicMenu/base/` plus the local `README.md` and `BUGS.md`. Next I’m reading only those files and extracting concrete bugs with fixes, then I’ll save the report to the requested pipeline path.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/ModeTabs.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/CartView.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/x.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/useTableSession.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/CheckoutView.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/MenuView.jsx'" in C:/Dev/menuapp-code-review succeeded in 4.02s:
+// ======================================================
+// pages/x.jsx — PUBLIC MENU with i18n + Channels Visibility + Gating
+// UPDATED: Simplified Hall logic (TASK-260123-01b)
+// FIXED: P0-1..P0-7 security and functionality fixes
+// UPDATED: TASK-260127-01 - session restore, UI cleanup
+// PATCHED: 2026-01-28 - P0-1, P0-2, P0-2b, P1-1..P1-4
+// PATCHED: 2026-02-01 - FIX-260131-07 FINAL - guest safeguard in submit
+// PATCHED: 2026-02-01 - TASK-260201-01 - Hall StickyBar always visible
+// PATCHED: 2026-03-03 - GAP-01 - Order Confirmation Screen
+// FIXED: 2026-03-03 - GAP-01 fix - Confirmation as full-screen overlay (z-60)
+// FIXED: 2026-03-03 - GAP-02 fix - Embed OrderStatusScreen inside x.jsx (no /orderstatus route)
+// FIXED: 2026-03-03 - GAP-02 fix - Remove auto-dismiss timer (race condition: ghost click on menu)
+// ======================================================
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { useI18n } from "@/components/i18n";
+import { toast } from "sonner"; // P0-6: sonner instead of custom toast
+ succeeded in 3.88s:
+import { useEffect, useMemo, useRef, useState } from "react";
+import { base44 } from "@/api/base44Client";
+import {
+  getSessionGuests,
+  getSessionOrders,
+  getDeviceId,
+  findGuestByDevice,
+  isSessionExpired,
+} from "@/components/sessionHelpers";
+
+// Persistence helpers (FIX-260131-01: session + guest, 8h TTL)
+const TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+
+// BUG-PM-004: TTL for optimistic data before server confirms
+const OPTIMISTIC_TTL_MS = 30000; // 30 seconds
+
+// FIX-260131-06: Normalize guest id (support both id and _id)
+const normalizeGuestId = (g) => String(g?.id ?? g?._id ?? "");
+
+// FIX-260131-07: Get menu_guest_code from localStorage
+ succeeded in 4.13s:
+import React from "react";
+import { XIcon, Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, X } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import Rating from "@/components/Rating";
+
+export default function CartView({
+  partner,
+  currentTable,
+  currentGuest,
+  t,
+  setView,
+  isEditingName,
+  guestNameInput,
+  setGuestNameInput,
+  handleUpdateGuestName,
+  setIsEditingName,
+  getGuestDisplayName,
+  cart,
+ succeeded in 4.11s:
+import React from "react";
+import { Loader2, ImageIcon, Minus, Plus, LayoutGrid, List } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import DishRating from "@/components/publicMenu/DishRating";
+
+// Grid mappings for Tailwind (explicit full class names)
+const DESKTOP_GRID = {
+  1: "md:grid-cols-1",
+  2: "md:grid-cols-2",
+  3: "md:grid-cols-3",
+  4: "md:grid-cols-4",
+  5: "md:grid-cols-5",
+};
+
+const MOBILE_GRID = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+};
+
+export default function MenuView({
+ succeeded in 4.23s:
+import React from "react";
+import { CheckCircle2, AlertCircle } from "lucide-react";
+
+export default function ModeTabs({
+  visibleModeTabs,
+  orderMode,
+  onModeChange,
+  getModeDescription,
+  isHallMode,
+  isTableVerified,
+  currentTableId,
+  currentTable,
+  tableCodeParam,
+  resolvedTable,
+  verifiedByCode,
+  t,
+}) {
+  return (
+    <div className="max-w-2xl mx-auto px-4 mt-4">
+      {visibleModeTabs.length > 1 ? (
+ succeeded in 4.12s:
+import React from "react";
+import { Plus, Minus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+export default function CheckoutView({
+  t,
+  setView,
+  cart,
+  updateQuantity,
+  formatPrice,
+  finalTotal,
+  activeCurrency,
+  defaultCurrency,
+  orderMode,
+  renderHallCheckoutContent,
+  clientName,
+  setClientName,
+  clientPhone,
+codex
+I’ve got the file set loaded. Now I’m checking the state logic in `x.jsx` and the UI components against the requested focus areas: drawer states, sticky bar behavior, terracotta palette consistency, error paths, and remaining i18n/mobile issues.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'hallSticky|showCartButton|drawerMode|handleModeChange|function PublicMenu|const \\[view|setDrawerMode|StickyCartBar|cart.length > 0|isTableVerified|billRequested|showLoyaltySection|I18N_FALLBACKS|console\\.' -Encoding UTF8 | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/CheckoutView.jsx','pages/PublicMenu/base/MenuView.jsx','pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'indigo|green-600|t\\(|aria-label|w-10 h-10|w-8 h-8|min-w\\[44px\\]|min-h\\[44px\\]|sticky|button' -Encoding UTF8 | ForEach-Object { \"{0}:{1}:{2}\" -f "'$_.Path, $_.LineNumber, $_.Line }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/CartView.jsx' -Pattern 'myOrdersExpanded|tableTotal|myBill|otherGuests|cart.length > 0|isTableVerified|bg-indigo|bg-green|green-600|hardcoded|Новый|МОИ|СЧЁТ|sticky|review|t\\(|tr\\(' -Encoding UTF8 | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line }' in C:/Dev/menuapp-code-review succeeded in 959ms:
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:4:import { Button } from "@/components/ui/button";
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:36:        <h2 className="text-xl font-bold text-slate-900">{t('cart.your_order')}</h2>
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:37:        <button type="button" onClick={() => setView("menu")} className="text-sm text-indigo-600 hover:underline">
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:38:          {t('cart.back_to_menu')}
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:39:        </button>
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:58:                  <button type="button" onClick={() => updateQuantity(item.dishId, -1)} className="p-1 hover:bg-white rounded-md">
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:60:                  </button>
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:62:                  <button type="button" onClick={() => updateQuantity(item.dishId, 1)} className="p-1 hover:bg-white rounded-md">
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:64:                  </button>
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:75:            <span className="font-semibold text-slate-900">{t('cart.total')}:</span>
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:76:            <span className="text-xl font-bold text-indigo-600">{formatPrice(finalTotal)}</span>
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:84:          {t('checkout.currency_note')} ({defaultCurrency})
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:92:            renderHallCheckoutContent()
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:98:                  {t('form.name')} <span className="text-red-500">{t('form.required')}</span>
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:104:                  placeholder={t('form.name')}
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:112:                  {t('form.phone')} <span className="text-red-500">{t('form.required')}</span>
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:121:                  placeholder={t('form.phone_placeholder')}
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:132:                {t('form.address')} <span className="text-red-500">{t('form.required')}</span>
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:138:                placeholder={t('form.address')}
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:146:            <label className="text-sm font-medium text-slate-700">{t('form.comment')}</label>
+ succeeded in 995ms:
+99:import StickyCartBar from "@/components/publicMenu/StickyCartBar";
+325:const I18N_FALLBACKS = {
+512: * Falls back to I18N_FALLBACKS map, supports {param} interpolation.
+524:    let fb = I18N_FALLBACKS[key];
+1251:  const [view, setView] = useState(initialTrackToken ? "orderstatus" : "menu"); /* menu | checkout | confirmation | orderstatus */
+1260:  const [drawerMode, setDrawerMode] = useState(null); // 'cart' | null
+1301:  const [billRequested, setBillRequested] = useState(false);
+1323:        console.warn("Partner primary lookup failed", e);
+1330:        console.warn("Partner fallback lookup failed", e);
+1371:      console.warn('Failed to load mobile layout preference', e);
+1388:      console.warn('Failed to save mobile layout preference', e);
+1408:    if (savedCart && savedCart.length > 0 && cart.length === 0) {
+1439:    setDrawerMode(null);
+1517:      console.error("Failed to save table", e);
+1543:  const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
+1599:      console.warn("Dish limit reached (100), menu may be incomplete");
+1602:      console.warn("Category limit reached (100), menu may be incomplete");
+1634:        console.warn("Failed to fetch category translations", e);
+1652:        console.warn("Failed to fetch dish translations", e);
+1944:  const showLoyaltySection = (loyaltyEnabled || discountEnabled) && cart.length > 0;
+ succeeded in 943ms:
+46:  reviewedItems,
+51:  myBill,
+52:  reviewableItems,
+53:  openReviewDialog,
+54:  setOtherGuestsExpanded,
+55:  otherGuestsExpanded,
+57:  otherGuestsReviewableItems,
+58:  tableTotal,
+65:  isTableVerified,
+76:  const safeReviewedItems = reviewedItems || new Set();
+82:  const [myOrdersExpanded, setMyOrdersExpanded] = React.useState(true); // default open
+100:  React.useEffect(() => () => clearTimeout(rewardTimerRef.current), []);
+125:  React.useEffect(() => {
+133:  React.useEffect(() => {
+143:  React.useEffect(() => {
+144:    if (isTableVerified === true) {
+151:  }, [isTableVerified]);
+154:  React.useEffect(() => {
+180:  React.useEffect(() => {
+182:    if (isTableVerified === true) return;
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content -Encoding UTF8 $p; for($i=1388;$i -le 1455;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content -Encoding UTF8 $p; for($i=2195;$i -le 2265;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content -Encoding UTF8 $p; for($i=2035;$i -le 2118;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }' in C:/Dev/menuapp-code-review succeeded in 2.01s:
+1388:      console.warn('Failed to save mobile layout preference', e);
+1389:    }
+1390:  };
+1391:
+1392:  // Save cart to localStorage on every change
+1393:  // BUG-PM-005: guard against saving empty cart before restore completes
+1394:  useEffect(() => {
+1395:    if (!partner?.id) return;
+1396:    if (!cartRestoredRef.current) return;
+1397:    saveCartToStorage(partner.id, cart);
+1398:  }, [cart, partner?.id]);
+1399:
+1400:  // Restore cart from localStorage on page load (once)
+1401:  // BUG-PM-005: mark restored before setCart to prevent save effect from firing on stale empty cart
+1402:  useEffect(() => {
+1403:    if (cartRestoredRef.current) return;
+1404:    if (!partner?.id) return;
+1405:    cartRestoredRef.current = true;
+1406:
+1407:    const savedCart = getCartFromStorage(partner.id);
+ succeeded in 2.27s:
+2035:        points_awarded: 0,
+2036:      });
+2037:      
+2038:      toast.success(t('review.thanks'), { id: 'mm1' });
+2039:      
+2040:      // Track that user has rated in this session
+2041:      setHasRatedInSession(true);
+2042:      
+2043:      // Refresh ratings
+2044:      queryClient.invalidateQueries({ queryKey: ["dishFeedbacksRecent", partnerId] });
+2045:      
+2046:    } catch (err) {
+2047:      console.error('Failed to save rating:', err);
+2048:      toast.error(t('error.save_failed'), { id: 'mm1' });
+2049:      // BUG-PM-028: Roll back draft rating so user can retry
+2050:      updateDraftRating(itemId, 0);
+2051:    } finally {
+2052:      setRatingSavingByItemId(prev => ({ ...prev, [itemId]: false }));
+2053:    }
+2054:  };
+ succeeded in 2.36s:
+2195:    if (key === "all") listTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+2196:    else sectionRefs.current[key]?.scrollIntoView({ behavior: "smooth", block: "start" });
+2197:
+2198:    setTimeout(() => {
+2199:      isManualScroll.current = false;
+2200:    }, MANUAL_SCROLL_LOCK_MS);
+2201:  };
+2202:
+2203:
+2204:
+2205:  const handleModeChange = (mode) => {
+2206:    const channel = channels[mode];
+2207:    if (!channel?.available) {
+2208:      return;
+2209:    }
+2210:
+2211:    const normalized = normalizeMode(mode);
+2212:    setOrderMode(normalized);
+2213:
+2214:    const url = new URL(window.location.href);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/base/CartView.jsx'; "'$lines=Get-Content -Encoding UTF8 $p; for($i=550;$i -le 830;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/base/CartView.jsx'; "'$lines=Get-Content -Encoding UTF8 $p; for($i=830;$i -le 1035;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/base/CartView.jsx'; "'$lines=Get-Content -Encoding UTF8 $p; for($i=1035;$i -le 1280;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }' in C:/Dev/menuapp-code-review succeeded in 2.61s:
+550:                </Button>
+551:              </div>
+552:            </div>
+553:          )}
+554:        </div>
+555:      )}
+556:
+557:      {/* SECTION 5: TABLE ORDERS (other guests) - STABLE based on sessionOrders */}
+558:      {showTableOrdersSection && (
+559:        <Card className="mb-4">
+560:          <CardContent className="p-4">
+561:            <button
+562:              onClick={() => setOtherGuestsExpanded(!otherGuestsExpanded)}
+563:              className="w-full flex items-center justify-between text-left"
+564:            >
+565:              <div className="flex items-center gap-2">
+566:                <Users className="w-4 h-4 text-slate-500" />
+567:                <span className="text-sm font-semibold text-slate-600">
+568:                  {tr('cart.table_orders', 'Заказы стола')} ({otherGuestIdsFromOrders.length})
+569:                </span>
+ succeeded in 3.04s:
+830:                      <ChevronUp className="w-4 h-4 text-slate-400" />
+831:                    ) : (
+832:                      <ChevronDown className="w-4 h-4 text-slate-400" />
+833:                    )
+834:                  ) : (
+835:                    <span className="text-xs text-slate-400">
+836:                      {tr('cart.split_disabled_hint', '(2+ гостей)')}
+837:                    </span>
+838:                  )}
+839:                </div>
+840:              </button>
+841:
+842:              {splitExpanded && canSplit && (
+843:                <div className="mt-3 flex items-center justify-center gap-6">
+844:                  <label className="flex items-center gap-2 cursor-pointer">
+845:                    <input
+846:                      type="radio"
+847:                      name="splitType"
+848:                      checked={splitType === 'single'}
+849:                      onChange={() => setSplitType('single')}
+ succeeded in 3.09s:
+1035:                    ⓘ
+1036:                  </button>
+1037:                </div>
+1038:
+1039:                {/* AC-03: Expected savings — separate from total, not subtracted */}
+1040:                {(discountAmount > 0 || (partner?.loyalty_enabled && earnedPoints > 0) || pointsDiscountAmount > 0) && (
+1041:                  <p className="text-xs text-amber-700 font-medium mb-1">
+1042:                    {tr('cart.expected_savings', 'Ожидаемая выгода')}:
+1043:                  </p>
+1044:                )}
+1045:                {discountAmount > 0 && (
+1046:                  <div className="flex justify-between text-sm text-amber-900">
+1047:                    <span>{tr('cart.verify.discount_label', 'Скидка за онлайн-заказ')}</span>
+1048:                    <span>−{formatPrice(discountAmount)}</span>
+1049:                  </div>
+1050:                )}
+1051:
+1052:                {partner?.loyalty_enabled && earnedPoints > 0 && (
+1053:                  <div className="flex justify-between text-sm text-amber-900">
+1054:                    <span>{tr('cart.verify.bonus_label', 'Бонусы за онлайн-заказ')}</span>
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/base/useTableSession.jsx'; "'$lines=Get-Content -Encoding UTF8 $p; for($i=612;$i -le 640;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }' in C:/Dev/menuapp-code-review succeeded in 704ms:
+612:                if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+613:                  items.push(...r.value);
+614:                }
+615:              }
+616:            }
+617:          }
+618:          
+619:          if (!cancelled) {
+620:            // BUG-PM-004: merge strategy — keep optimistic items (temp_ IDs)
+621:            setSessionItems(prev => {
+622:              const serverOrderIds = new Set(items.map(item => {
+623:                const oid = typeof item.order === 'object'
+624:                  ? (item.order?.id ?? item.order?._id) : item.order;
+625:                return String(oid || '');
+626:              }));
+627:              const now = Date.now();
+628:              const optimistic = prev.filter(item =>
+629:                String(item.id || '').startsWith('temp_') &&
+630:                item._optimisticAt &&
+631:                (now - item._optimisticAt) < OPTIMISTIC_TTL_MS &&
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/base/useTableSession.jsx'; "'$lines=Get-Content -Encoding UTF8 $p; for($i=700;$i -le 760;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }' in C:/Dev/menuapp-code-review succeeded in 696ms:
+700:      map.get(orderId).push(item);
+701:    });
+702:    return map;
+703:  }, [sessionItems, getLinkId]);
+704:
+705:  // Calculate split bills per guest
+706:  const billsByGuest = useMemo(() => {
+707:    const guestIdsFromGuests = (sessionGuests || []).map(g => normalizeGuestId(g));
+708:    const guestIdsFromOrders = Array.from(
+709:      new Set((sessionOrders || []).map(o => getLinkId(o.guest)).filter(Boolean))
+710:    );
+711:    const guestIds = guestIdsFromGuests.length ? guestIdsFromGuests : guestIdsFromOrders;
+712:    const guestCount = guestIds.length || 1;
+713:    
+714:    const bills = new Map();
+715:    
+716:    guestIds.forEach(id => {
+717:      bills.set(id, { singles: 0, shared: 0, total: 0 });
+718:    });
+719:    
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/base/useTableSession.jsx'; "'$lines=Get-Content -Encoding UTF8 $p; for($i=780;$i -le 812;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }' in C:/Dev/menuapp-code-review succeeded in 801ms:
+780:    const myId = normalizeGuestId(currentGuest);
+781:    return sessionOrders.filter(o => getLinkId(o.guest) === myId);
+782:  }, [sessionOrders, currentGuest, getLinkId]);
+783:
+784:  // Table total = all submitted orders + current cart
+785:  const tableTotal = useMemo(() => {
+786:    const submittedTotal = sessionOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+787:    return submittedTotal + cartTotalAmount;
+788:  }, [sessionOrders, cartTotalAmount]);
+789:
+790:  // OrderStages map for status lookup
+791:  const stagesMap = useMemo(() => {
+792:    if (!orderStages) return new Map();
+793:    return new Map(orderStages.map(s => [String(s.id), s]));
+794:  }, [orderStages]);
+795:
+796:  // Get order status helper
+797:  const getOrderStatus = (order) => {
+798:    const stageId = typeof order.stage_id === 'object' 
+799:      ? (order.stage_id?.id ?? order.stage_id?._id) 
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'x\\.hall\\.verified|hall\\.invalid_code|hall\\.invalid_code_desc|cart\\.view|cart\\.checkout|cart\\.my_bill|cart\\.table_orders|loyalty\\.review_reward_hint|loyalty\\.review_reward_prefix|help\\.call_waiter' -Encoding UTF8 | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/CartView.jsx','pages/PublicMenu/base/CheckoutView.jsx','pages/PublicMenu/base/MenuView.jsx','pages/PublicMenu/base/ModeTabs.jsx','pages/PublicMenu/base/useTableSession.jsx' -Pattern 'console\\.|createObjectURL|dangerouslySetInnerHTML|toLocaleString\\(|ru-RU|window\\.location|localStorage|setTimeout\\(|setInterval\\(|clearTimeout\\(|clearInterval\\(' -Encoding UTF8 | ForEach-Object { \"{0}:{1}:{2}\" -f "'$_.Path, $_.LineNumber, $_.Line }' in C:/Dev/menuapp-code-review succeeded in 680ms:
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:100:  React.useEffect(() => () => clearTimeout(rewardTimerRef.current), []);
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:128:    const id = window.setInterval(() => setNowTs(Date.now()), 250);
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:129:    return () => window.clearInterval(id);
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:189:    const id = setTimeout(() => {
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:206:    return () => clearTimeout(id);
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:276:  // Guest code from localStorage (e.g., "#6475")
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:280:      const raw = window.localStorage.getItem("menu_guest_code");
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:287:  // Effective guest code: prop takes priority, fallback to localStorage (only if hall guest codes enabled)
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:413:      return `${Number(loyaltyAccount.balance || 0).toLocaleString()} ${tr('loyalty.points_short', 'баллов')}`;
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:543:                    rewardTimerRef.current = setTimeout(() => {
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:944:                            {trFormat('loyalty.your_balance', { points: Number(loyaltyAccount.balance || 0).toLocaleString() }, `Ваш баланс: ${Number(loyaltyAccount.balance || 0).toLocaleString()} баллов`)}
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:981:                                max: maxRedeemPoints.toLocaleString(),
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:1011:                  <span>+{Number(earnedPoints || 0).toLocaleString()}{tr('loyalty.points_suffix', 'Б')}</span>
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:1055:                    <span>+{Number(earnedPoints || 0).toLocaleString()}{tr('loyalty.points_suffix', 'Б')}</span>
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\useTableSession.jsx:20:// FIX-260131-07: Get menu_guest_code from localStorage
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\useTableSession.jsx:23:    return localStorage.getItem("menu_guest_code");
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\useTableSession.jsx:37:    localStorage.setItem(key, JSON.stringify({ tableSessionId: sessionId, ts: Date.now() }));
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\useTableSession.jsx:47:    const raw = localStorage.getItem(key);
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\useTableSession.jsx:51:      localStorage.removeItem(key);
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\useTableSession.jsx:64:    localStorage.removeItem(key);
+ succeeded in 699ms:
+390:  "cart.checkout": "Оформить заказ",
+391:  "cart.my_bill": "Мой счёт",
+392:  "cart.table_orders": "Заказы стола",
+394:  "cart.view": "Открыть",
+499:  "loyalty.review_reward_hint": "За отзыв",
+500:  "loyalty.review_reward_prefix": "за отзыв",
+506:  "help.call_waiter": "Позвать официанта",
+2084:      ? tr("cart.checkout", "Оформить заказ")
+2086:        ? tr("cart.my_bill", "Мой счёт")
+2088:          ? tr("cart.table_orders", "Заказы стола")
+2091:            : tr("cart.view", "Открыть");
+2096:      ? tr("cart.my_bill", "Мой счёт")
+2098:        ? tr("cart.table_orders", "Заказы стола")
+3438:              buttonLabel={tr('cart.checkout', 'Оформить заказ')}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content -Encoding UTF8 $p; for($i=1900;$i -le 1988;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'const cartTotalAmount|const discountAmount|const pointsDiscountAmount|const finalTotal|const earnedPoints|const maxRedeemPoints|const showLoyaltySection|const discountEnabled|const loyaltyEnabled' -Encoding UTF8 | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line }' in C:/Dev/menuapp-code-review succeeded in 1.71s:
+1923:  const cartTotalAmount = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+1942:  const loyaltyEnabled = partner?.loyalty_enabled === true;
+1943:  const discountEnabled = partner?.discount_enabled === true;
+1944:  const showLoyaltySection = (loyaltyEnabled || discountEnabled) && cart.length > 0;
+ succeeded in 2.11s:
+1900:  }, [sortedCategoriesAll, visibleCategoryIds]);
+1901:
+1902:  const groupedDishes = useMemo(() => {
+1903:    const dishesByCategory = buildDishesByCategory({
+1904:      categories: sortedCategoriesAll,
+1905:      dishes: visibleDishes,
+1906:      mode: orderMode,
+1907:      includeDisabledCategories: false,
+1908:    });
+1909:
+1910:    const groups = {};
+1911:    for (const [catId, dishList] of dishesByCategory.entries()) {
+1912:      if (catId === "__uncat__") {
+1913:        if (dishList.length > 0) groups["no-category"] = dishList;
+1914:      } else {
+1915:        if (dishList.length > 0) groups[catId] = dishList;
+1916:      }
+1917:    }
+1918:
+1919:    return groups;
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content -Encoding UTF8 $p; for($i=2380;$i -le 2915;$i++){ if($i -le $lines.Length -and ($i -ge 2380 -and $i -le 2915)){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'showConfirmation\\(|finalTotal|confirmedTotal|processHallOrder|processDelivery|processPickup|pointsDiscountAmount|discountAmount' -Encoding UTF8 | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line }' in C:/Dev/menuapp-code-review succeeded in 948ms:
+1934:    discountAmount,
+1935:    pointsDiscountAmount,
+1936:    finalTotal,
+2374:  const processHallOrder = async (guestToUse, validatedSession) => {
+2420:        total_amount: finalTotal,
+2431:        discount_amount: discountAmount + pointsDiscountAmount,
+2541:      const confirmedTotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+2556:      showConfirmation({
+2558:        totalAmount: confirmedTotal,
+2739:        const success = await processHallOrder(guest, session);
+2800:          total_amount: finalTotal,
+2809:          discount_amount: discountAmount + pointsDiscountAmount,
+2878:        const confirmedTotal = finalTotal;
+2892:        showConfirmation({
+2894:          totalAmount: confirmedTotal,
+3194:          discountAmount={discountAmount}
+3195:          pointsDiscountAmount={pointsDiscountAmount}
+3196:          finalTotal={finalTotal}
+3291:              discountAmount={discountAmount}
+3292:              pointsDiscountAmount={pointsDiscountAmount}
+ succeeded in 984ms:
+2380:        const existingAccounts = await base44.entities.LoyaltyAccount.filter({
+2381:          partner: partner.id,
+2382:          email: emailLower
+2383:        });
+2384:        
+2385:        if (existingAccounts && existingAccounts.length > 0) {
+2386:          loyaltyAccountToUse = existingAccounts[0];
+2387:        } else if (loyaltyEnabled) {
+2388:          loyaltyAccountToUse = await base44.entities.LoyaltyAccount.create({
+2389:            partner: partner.id,
+2390:            email: emailLower,
+2391:            balance: 0,
+2392:            total_earned: 0,
+2393:            total_spent: 0,
+2394:            total_expired: 0,
+2395:            visit_count: 0
+2396:          });
+2397:        }
+2398:      }
+2399:
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content -Encoding UTF8 $p; for($i=3160;$i -le 3210;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/base/CheckoutView.jsx'; "'$lines=Get-Content -Encoding UTF8 $p; for($i=1;$i -le 190;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }' in C:/Dev/menuapp-code-review succeeded in 566ms:
+1:import React from "react";
+2:import { Plus, Minus } from "lucide-react";
+3:import { Card, CardContent } from "@/components/ui/card";
+4:import { Button } from "@/components/ui/button";
+5:import { Input } from "@/components/ui/input";
+6:
+7:export default function CheckoutView({
+8:  t,
+9:  setView,
+10:  cart,
+11:  updateQuantity,
+12:  formatPrice,
+13:  finalTotal,
+14:  activeCurrency,
+15:  defaultCurrency,
+16:  orderMode,
+17:  renderHallCheckoutContent,
+18:  clientName,
+19:  setClientName,
+20:  clientPhone,
+ succeeded in 582ms:
+3160:          getCategoryName={getCategoryName}
+3161:          sectionRefs={sectionRefs}
+3162:          cart={cart}
+3163:          getDishName={getDishName}
+3164:          getDishDescription={getDishDescription}
+3165:          formatPrice={formatPrice}
+3166:          addToCart={addToCart}
+3167:          updateQuantity={updateQuantity}
+3168:          t={t}
+3169:        />
+3170:      )}
+3171:
+3172:      {/* Checkout */}
+3173:      {view === "checkout" && (
+3174:        <CheckoutView
+3175:          t={t}
+3176:          setView={setView}
+3177:          cart={cart}
+3178:          updateQuantity={updateQuantity}
+3179:          formatPrice={formatPrice}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content -Encoding UTF8 $p; for($i=2280;$i -le 2378;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|function validate|validate\\(' -Encoding UTF8 | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line }' in C:/Dev/menuapp-code-review succeeded in 961ms:
+2280:      return;
+2281:    }
+2282:    const hasPlus = val.startsWith("+");
+2283:    const digitsOnly = val.replace(/\D/g, "");
+2284:    setClientPhone(hasPlus ? "+" + digitsOnly : digitsOnly);
+2285:  };
+2286:
+2287:  const handlePhoneFocus = () => {
+2288:    if (!clientPhone) setClientPhone("+");
+2289:  };
+2290:
+2291:  const validate = () => {
+2292:    const newErrors = {};
+2293:    const raw = (clientPhone || "").trim();
+2294:
+2295:    const checkPhone = () => {
+2296:      if (!/^\+?\d*$/.test(raw)) return t('error.phone_invalid');
+2297:      const digitsCount = raw.replace(/\D/g, "").length;
+2298:      if (digitsCount < 8) return t('error.phone_short');
+2299:      if (digitsCount > 15) return t('error.phone_long');
+ succeeded in 1.06s:
+2291:  const validate = () => {
+2577:    if (!validate()) return;
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content -Encoding UTF8 $p; for($i=2263;$i -le 2290;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }' in C:/Dev/menuapp-code-review succeeded in 391ms:
+2263:  // Check bill cooldown on mount
+2264:  useEffect(() => {
+2265:    if (currentTableId) {
+2266:      setBillCooldown(isBillOnCooldown(currentTableId));
+2267:    }
+2268:  }, [currentTableId]);
+2269:
+2270:  // Debug hook kept as no-op to maintain hook order (BUG-PM-040: removed prod logging)
+2271:  useEffect(() => {}, []);
+2272:
+2273:  // P0-7: Removed handleTableSelection - no dropdown
+2274:
+2275:  // Phone input
+2276:  const handlePhoneChange = (e) => {
+2277:    const val = e.target.value;
+2278:    if (!val) {
+2279:      setClientPhone("");
+2280:      return;
+2281:    }
+2282:    const hasPlus = val.startsWith("+");
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'billCooldown|setBillCooldown|billRequested|setBillRequested' -Encoding UTF8 | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line }' in C:/Dev/menuapp-code-review succeeded in 419ms:
+281:const getBillCooldownKey = (tableId) => `menuapp_bill_requested_${tableId}`;
+285:    const key = getBillCooldownKey(tableId);
+292:const setBillCooldownStorage = (tableId) => {
+294:    const key = getBillCooldownKey(tableId);
+1301:  const [billRequested, setBillRequested] = useState(false);
+1302:  const [billCooldown, setBillCooldown] = useState(false);
+2266:      setBillCooldown(isBillOnCooldown(currentTableId));
+2940:    if (billCooldown || billRequested) {
+2945:    setBillRequested(true);
+2956:      setBillCooldownStorage(currentTableId);
+2957:      setBillCooldown(true);
+2962:      setBillRequested(false);
+3309:              billRequested={billRequested}
+3310:              billCooldown={billCooldown}
+codex
+I’ve narrowed this to the concrete defects that are actually present in the reviewed files. Next I’m writing the findings report and the required local review artifacts, without modifying the page code itself.
+file update
+A C:/Dev/menuapp-code-review\pages/PublicMenu/commands_2026-03-21.log
+Get-ChildItem -File pages/PublicMenu/base/*.jsx | Select-Object -ExpandProperty FullName
+Get-Content pages/PublicMenu/README.md
+Get-Content pages/PublicMenu/BUGS.md
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/CartView.jsx'
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/CheckoutView.jsx'
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/MenuView.jsx'
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/ModeTabs.jsx'
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/useTableSession.jsx'
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/x.jsx'
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'hallSticky|showCartButton|drawerMode|handleModeChange|function PublicMenu|const \[view|setDrawerMode|StickyCartBar|cart.length > 0|isTableVerified|billRequested|showLoyaltySection|I18N_FALLBACKS|console\.' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/CartView.jsx' -Pattern 'myOrdersExpanded|tableTotal|myBill|otherGuests|cart.length > 0|isTableVerified|bg-indigo|bg-green|green-600|hardcoded|Новый|МОИ|СЧЁТ|sticky|review|t\(|tr\(' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/CheckoutView.jsx','pages/PublicMenu/base/MenuView.jsx','pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'indigo|green-600|t\(|aria-label|w-10 h-10|w-8 h-8|min-w\[44px\]|min-h\[44px\]|sticky|button' -Encoding UTF8 | ForEach-Object { "{0}:{1}:{2}" -f $_.Path, $_.LineNumber, $_.Line }
+$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2035;$i -le 2118;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2195;$i -le 2265;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1388;$i -le 1455;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+$p='pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=550;$i -le 830;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+$p='pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=830;$i -le 1035;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+$p='pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1035;$i -le 1280;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+$p='pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=612;$i -le 640;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+$p='pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=700;$i -le 760;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+$p='pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=780;$i -le 812;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'const cartTotalAmount|const discountAmount|const pointsDiscountAmount|const finalTotal|const earnedPoints|const maxRedeemPoints|const showLoyaltySection|const discountEnabled|const loyaltyEnabled' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
+$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1900;$i -le 1988;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'showConfirmation\(|finalTotal|confirmedTotal|processHallOrder|processDelivery|processPickup|pointsDiscountAmount|discountAmount' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
+$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2380;$i -le 2915;$i++){ if($i -le $lines.Length -and ($i -ge 2380 -and $i -le 2915)){ '{0}:{1}' -f $i,$lines[$i-1] } }
+$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=3160;$i -le 3210;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+$p='pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1;$i -le 190;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|function validate|validate\(' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
+$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2280;$i -le 2378;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|cart\.view|cart\.checkout|cart\.my_bill|cart\.table_orders|loyalty\.review_reward_hint|loyalty\.review_reward_prefix|help\.call_waiter' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/CartView.jsx','pages/PublicMenu/base/CheckoutView.jsx','pages/PublicMenu/base/MenuView.jsx','pages/PublicMenu/base/ModeTabs.jsx','pages/PublicMenu/base/useTableSession.jsx' -Pattern 'console\.|createObjectURL|dangerouslySetInnerHTML|toLocaleString\(|ru-RU|window\.location|localStorage|setTimeout\(|setInterval\(|clearTimeout\(|clearInterval\(' -Encoding UTF8 | ForEach-Object { "{0}:{1}:{2}" -f $_.Path, $_.LineNumber, $_.Line }
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'billCooldown|setBillCooldown|billRequested|setBillRequested' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
+$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2263;$i -le 2290;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+A C:/Dev/menuapp-code-review\pages/PublicMenu/review_2026-03-21.md
+# Codex Writer Findings — PublicMenu
+Chain: publicmenu-260321-093745
+
+## Findings
+1. [P0] Loyalty side effects run before order items exist - In both submit paths, `Order.create()` is followed by loyalty redeem/update before `OrderItem.bulkCreate()` (`pages/PublicMenu/base/x.jsx:2436-2470`, `pages/PublicMenu/base/x.jsx:2812-2843`). If item creation fails, points are already spent and the order can be left partial or empty. FIX: create all order items first, then apply loyalty side effects; if Base44 cannot do a transaction, treat item creation as the commit point and only debit loyalty after it succeeds.
+2. [P1] Hall confirmation shows raw cart total, not real order total - Hall orders are persisted with `total_amount: finalTotal` (`pages/PublicMenu/base/x.jsx:2420`), but the confirmation screen is fed `cart.reduce(...)` (`pages/PublicMenu/base/x.jsx:2540-2559`). Any loyalty discount or redeemed points makes the guest-facing total wrong. FIX: pass `finalTotal` or the created order's stored `total_amount` into the hall confirmation payload.
+3. [P1] Mode switches keep invalid cart items alive - `handleModeChange()` only flips `orderMode` and URL/localStorage (`pages/PublicMenu/base/x.jsx:2205-2225`); the cart is never revalidated, and cart entries only store `dishId`, `name`, `price`, `quantity` (`pages/PublicMenu/base/x.jsx:2229-2243`). A hall-only dish can stay in cart and be submitted from pickup/delivery after it disappears from the menu. FIX: on every mode change, revalidate cart items against mode availability and either drop invalid items with a toast or block checkout until the cart is cleaned.
+4. [P1] Pickup/delivery checkout drops loyalty and discount controls - `x.jsx` passes loyalty props into `CheckoutView` (`pages/PublicMenu/base/x.jsx:3174-3197`), but `CheckoutView` does not accept or render them (`pages/PublicMenu/base/CheckoutView.jsx:7-31`, `pages/PublicMenu/base/CheckoutView.jsx:88-150`). Guests cannot enter email, see balance, redeem points, or understand discount application in non-hall checkout. FIX: plumb the passed loyalty props through `CheckoutView` and render the same loyalty/discount block used for hall checkout.
+5. [P1] Visit-state UI is still count-driven instead of state-driven - `CartView` always renders the same section stack when data exists (`pages/PublicMenu/base/CartView.jsx:557-780`, `pages/PublicMenu/base/CartView.jsx:783-1277`), and the sticky footer exists only when `cart.length > 0` (`pages/PublicMenu/base/CartView.jsx:1245-1277`). In `x.jsx`, `hallStickyMode` has only `cart`, `myBill`, `tableOrders`, `cartEmpty` and is derived from counts (`pages/PublicMenu/base/x.jsx:2056-2115`). This misses the required visit/draft matrix: no bottom CTA for sent-orders-without-draft, no unpaid secondary line for new-draft-after-send, no paid/closed fade-out behavior. `useTableSession` also merges draft into table total and never filters paid orders (`pages/PublicMenu/base/useTableSession.jsx:722-747`, `pages/PublicMenu/base/useTableSession.jsx:784-788`). FIX: derive explicit visit state from session/order/payment status, compute unpaid sent totals separately from draft totals, and render drawer/sticky CTAs from that state matrix instead of `cart.length` or order counts.
+6. [P2] Terracotta palette is still incomplete - Primary UI elements still use indigo or green in the reviewed files: `MenuView.jsx` prices, add buttons, layout toggle, and loader (`pages/PublicMenu/base/MenuView.jsx:85`, `pages/PublicMenu/base/MenuView.jsx:104`, `pages/PublicMenu/base/MenuView.jsx:162`, `pages/PublicMenu/base/MenuView.jsx:203`, `pages/PublicMenu/base/MenuView.jsx:229`, `pages/PublicMenu/base/MenuView.jsx:240`, `pages/PublicMenu/base/MenuView.jsx:252`), `ModeTabs.jsx` active tab (`pages/PublicMenu/base/ModeTabs.jsx:33`), and `CheckoutView.jsx` link, total, and submit button (`pages/PublicMenu/base/CheckoutView.jsx:37`, `pages/PublicMenu/base/CheckoutView.jsx:76`, `pages/PublicMenu/base/CheckoutView.jsx:173`). FIX: replace remaining `indigo` and `green` primary styles with the terracotta token/color system used elsewhere.
+7. [P2] Mobile-first controls are still too small in key flows - Several tap targets are below 44px or icon-only in the reviewed mobile UI: list add button `40x40` and unlabeled list steppers in `MenuView.jsx` (`pages/PublicMenu/base/MenuView.jsx:102-121`), tile steppers `32x32` (`pages/PublicMenu/base/MenuView.jsx:168-183`), tiny checkout steppers in `CheckoutView.jsx` (`pages/PublicMenu/base/CheckoutView.jsx:57-64`), and thin mode tabs in `ModeTabs.jsx` (`pages/PublicMenu/base/ModeTabs.jsx:27-35`). These are hard to hit on phones and regress the mobile-first brief. FIX: raise all primary tap targets to at least `44x44`, add `aria-label`s to list-mode quantity buttons, and avoid icon-only controls for primary actions where space allows.
+8. [P2] Localization fallback is hardcoded in Russian inside page code - The page-level fallback path is a hardcoded Russian map in `x.jsx` (`pages/PublicMenu/base/x.jsx:325-506`), and `CartView.jsx` repeats many `tr('key', 'Русский текст')` fallbacks (`pages/PublicMenu/base/CartView.jsx:241-266`, `pages/PublicMenu/base/CartView.jsx:407-1273`). If any key is missing in EN/KZ, the UI silently mixes the selected locale with Russian copy instead of a locale-aware fallback. FIX: move fallback copy into translation catalogs, make fallback language configurable, and remove hardcoded per-component Russian strings.
+
+## Summary
+Total: 8 findings (1 P0, 4 P1, 3 P2, 0 P3)
+A C:/Dev/menuapp-code-review\pipeline/chain-state/publicmenu-260321-093745-codex-findings.md
+# Codex Writer Findings — PublicMenu
+Chain: publicmenu-260321-093745
+
+## Findings
+1. [P0] Loyalty side effects run before order items exist - In both submit paths, `Order.create()` is followed by loyalty redeem/update before `OrderItem.bulkCreate()` (`pages/PublicMenu/base/x.jsx:2436-2470`, `pages/PublicMenu/base/x.jsx:2812-2843`). If item creation fails, points are already spent and the order can be left partial or empty. FIX: create all order items first, then apply loyalty side effects; if Base44 cannot do a transaction, treat item creation as the commit point and only debit loyalty after it succeeds.
+2. [P1] Hall confirmation shows raw cart total, not real order total - Hall orders are persisted with `total_amount: finalTotal` (`pages/PublicMenu/base/x.jsx:2420`), but the confirmation screen is fed `cart.reduce(...)` (`pages/PublicMenu/base/x.jsx:2540-2559`). Any loyalty discount or redeemed points makes the guest-facing total wrong. FIX: pass `finalTotal` or the created order's stored `total_amount` into the hall confirmation payload.
+3. [P1] Mode switches keep invalid cart items alive - `handleModeChange()` only flips `orderMode` and URL/localStorage (`pages/PublicMenu/base/x.jsx:2205-2225`); the cart is never revalidated, and cart entries only store `dishId`, `name`, `price`, `quantity` (`pages/PublicMenu/base/x.jsx:2229-2243`). A hall-only dish can stay in cart and be submitted from pickup/delivery after it disappears from the menu. FIX: on every mode change, revalidate cart items against mode availability and either drop invalid items with a toast or block checkout until the cart is cleaned.
+4. [P1] Pickup/delivery checkout drops loyalty and discount controls - `x.jsx` passes loyalty props into `CheckoutView` (`pages/PublicMenu/base/x.jsx:3174-3197`), but `CheckoutView` does not accept or render them (`pages/PublicMenu/base/CheckoutView.jsx:7-31`, `pages/PublicMenu/base/CheckoutView.jsx:88-150`). Guests cannot enter email, see balance, redeem points, or understand discount application in non-hall checkout. FIX: plumb the passed loyalty props through `CheckoutView` and render the same loyalty/discount block used for hall checkout.
+5. [P1] Visit-state UI is still count-driven instead of state-driven - `CartView` always renders the same section stack when data exists (`pages/PublicMenu/base/CartView.jsx:557-780`, `pages/PublicMenu/base/CartView.jsx:783-1277`), and the sticky footer exists only when `cart.length > 0` (`pages/PublicMenu/base/CartView.jsx:1245-1277`). In `x.jsx`, `hallStickyMode` has only `cart`, `myBill`, `tableOrders`, `cartEmpty` and is derived from counts (`pages/PublicMenu/base/x.jsx:2056-2115`). This misses the required visit/draft matrix: no bottom CTA for sent-orders-without-draft, no unpaid secondary line for new-draft-after-send, no paid/closed fade-out behavior. `useTableSession` also merges draft into table total and never filters paid orders (`pages/PublicMenu/base/useTableSession.jsx:722-747`, `pages/PublicMenu/base/useTableSession.jsx:784-788`). FIX: derive explicit visit state from session/order/payment status, compute unpaid sent totals separately from draft totals, and render drawer/sticky CTAs from that state matrix instead of `cart.length` or order counts.
+6. [P2] Terracotta palette is still incomplete - Primary UI elements still use indigo or green in the reviewed files: `MenuView.jsx` prices, add buttons, layout toggle, and loader (`pages/PublicMenu/base/MenuView.jsx:85`, `pages/PublicMenu/base/MenuView.jsx:104`, `pages/PublicMenu/base/MenuView.jsx:162`, `pages/PublicMenu/base/MenuView.jsx:203`, `pages/PublicMenu/base/MenuView.jsx:229`, `pages/PublicMenu/base/MenuView.jsx:240`, `pages/PublicMenu/base/MenuView.jsx:252`), `ModeTabs.jsx` active tab (`pages/PublicMenu/base/ModeTabs.jsx:33`), and `CheckoutView.jsx` link, total, and submit button (`pages/PublicMenu/base/CheckoutView.jsx:37`, `pages/PublicMenu/base/CheckoutView.jsx:76`, `pages/PublicMenu/base/CheckoutView.jsx:173`). FIX: replace remaining `indigo` and `green` primary styles with the terracotta token/color system used elsewhere.
+7. [P2] Mobile-first controls are still too small in key flows - Several tap targets are below 44px or icon-only in the reviewed mobile UI: list add button `40x40` and unlabeled list steppers in `MenuView.jsx` (`pages/PublicMenu/base/MenuView.jsx:102-121`), tile steppers `32x32` (`pages/PublicMenu/base/MenuView.jsx:168-183`), tiny checkout steppers in `CheckoutView.jsx` (`pages/PublicMenu/base/CheckoutView.jsx:57-64`), and thin mode tabs in `ModeTabs.jsx` (`pages/PublicMenu/base/ModeTabs.jsx:27-35`). These are hard to hit on phones and regress the mobile-first brief. FIX: raise all primary tap targets to at least `44x44`, add `aria-label`s to list-mode quantity buttons, and avoid icon-only controls for primary actions where space allows.
+8. [P2] Localization fallback is hardcoded in Russian inside page code - The page-level fallback path is a hardcoded Russian map in `x.jsx` (`pages/PublicMenu/base/x.jsx:325-506`), and `CartView.jsx` repeats many `tr('key', 'Русский текст')` fallbacks (`pages/PublicMenu/base/CartView.jsx:241-266`, `pages/PublicMenu/base/CartView.jsx:407-1273`). If any key is missing in EN/KZ, the UI silently mixes the selected locale with Russian copy instead of a locale-aware fallback. FIX: move fallback copy into translation catalogs, make fallback language configurable, and remove hardcoded per-component Russian strings.
+
+## Summary
+Total: 8 findings (1 P0, 4 P1, 3 P2, 0 P3)
+apply_patch(auto_approved=true) exited 0 in 330ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260321-093745-codex-findings.md
+A pages/PublicMenu/review_2026-03-21.md
+A pages/PublicMenu/commands_2026-03-21.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-21.log b/pages/PublicMenu/commands_2026-03-21.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..c1dc1bcb10a9af250e641b7941b4d5cfaf7bcdd2
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-21.log
+@@ -0,0 +1,33 @@
++Get-ChildItem -File pages/PublicMenu/base/*.jsx | Select-Object -ExpandProperty FullName
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/CartView.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/CheckoutView.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/MenuView.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/ModeTabs.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/useTableSession.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/x.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'hallSticky|showCartButton|drawerMode|handleModeChange|function PublicMenu|const \[view|setDrawerMode|StickyCartBar|cart.length > 0|isTableVerified|billRequested|showLoyaltySection|I18N_FALLBACKS|console\.' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/CartView.jsx' -Pattern 'myOrdersExpanded|tableTotal|myBill|otherGuests|cart.length > 0|isTableVerified|bg-indigo|bg-green|green-600|hardcoded|Новый|МОИ|СЧЁТ|sticky|review|t\(|tr\(' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/CheckoutView.jsx','pages/PublicMenu/base/MenuView.jsx','pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'indigo|green-600|t\(|aria-label|w-10 h-10|w-8 h-8|min-w\[44px\]|min-h\[44px\]|sticky|button' -Encoding UTF8 | ForEach-Object { "{0}:{1}:{2}" -f $_.Path, $_.LineNumber, $_.Line }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2035;$i -le 2118;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2195;$i -le 2265;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1388;$i -le 1455;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=550;$i -le 830;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=830;$i -le 1035;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1035;$i -le 1280;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=612;$i -le 640;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=700;$i -le 760;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=780;$i -le 812;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'const cartTotalAmount|const discountAmount|const pointsDiscountAmount|const finalTotal|const earnedPoints|const maxRedeemPoints|const showLoyaltySection|const discountEnabled|const loyaltyEnabled' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1900;$i -le 1988;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'showConfirmation\(|finalTotal|confirmedTotal|processHallOrder|processDelivery|processPickup|pointsDiscountAmount|discountAmount' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2380;$i -le 2915;$i++){ if($i -le $lines.Length -and ($i -ge 2380 -and $i -le 2915)){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=3160;$i -le 3210;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1;$i -le 190;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|function validate|validate\(' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2280;$i -le 2378;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|cart\.view|cart\.checkout|cart\.my_bill|cart\.table_orders|loyalty\.review_reward_hint|loyalty\.review_reward_prefix|help\.call_waiter' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/CartView.jsx','pages/PublicMenu/base/CheckoutView.jsx','pages/PublicMenu/base/MenuView.jsx','pages/PublicMenu/base/ModeTabs.jsx','pages/PublicMenu/base/useTableSession.jsx' -Pattern 'console\.|createObjectURL|dangerouslySetInnerHTML|toLocaleString\(|ru-RU|window\.location|localStorage|setTimeout\(|setInterval\(|clearTimeout\(|clearInterval\(' -Encoding UTF8 | ForEach-Object { "{0}:{1}:{2}" -f $_.Path, $_.LineNumber, $_.Line }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'billCooldown|setBillCooldown|billRequested|setBillRequested' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2263;$i -le 2290;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+diff --git a/pages/PublicMenu/review_2026-03-21.md b/pages/PublicMenu/review_2026-03-21.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f3c3ef4278323e3a38fa032e4bed82a857385d44
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-21.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-093745
++
++## Findings
++1. [P0] Loyalty side effects run before order items exist - In both submit paths, `Order.create()` is followed by loyalty redeem/update before `OrderItem.bulkCreate()` (`pages/PublicMenu/base/x.jsx:2436-2470`, `pages/PublicMenu/base/x.jsx:2812-2843`). If item creation fails, points are already spent and the order can be left partial or empty. FIX: create all order items first, then apply loyalty side effects; if Base44 cannot do a transaction, treat item creation as the commit point and only debit loyalty after it succeeds.
++2. [P1] Hall confirmation shows raw cart total, not real order total - Hall orders are persisted with `total_amount: finalTotal` (`pages/PublicMenu/base/x.jsx:2420`), but the confirmation screen is fed `cart.reduce(...)` (`pages/PublicMenu/base/x.jsx:2540-2559`). Any loyalty discount or redeemed points makes the guest-facing total wrong. FIX: pass `finalTotal` or the created order's stored `total_amount` into the hall confirmation payload.
++3. [P1] Mode switches keep invalid cart items alive - `handleModeChange()` only flips `orderMode` and URL/localStorage (`pages/PublicMenu/base/x.jsx:2205-2225`); the cart is never revalidated, and cart entries only store `dishId`, `name`, `price`, `quantity` (`pages/PublicMenu/base/x.jsx:2229-2243`). A hall-only dish can stay in cart and be submitted from pickup/delivery after it disappears from the menu. FIX: on every mode change, revalidate cart items against mode availability and either drop invalid items with a toast or block checkout until the cart is cleaned.
++4. [P1] Pickup/delivery checkout drops loyalty and discount controls - `x.jsx` passes loyalty props into `CheckoutView` (`pages/PublicMenu/base/x.jsx:3174-3197`), but `CheckoutView` does not accept or render them (`pages/PublicMenu/base/CheckoutView.jsx:7-31`, `pages/PublicMenu/base/CheckoutView.jsx:88-150`). Guests cannot enter email, see balance, redeem points, or understand discount application in non-hall checkout. FIX: plumb the passed loyalty props through `CheckoutView` and render the same loyalty/discount block used for hall checkout.
++5. [P1] Visit-state UI is still count-driven instead of state-driven - `CartView` always renders the same section stack when data exists (`pages/PublicMenu/base/CartView.jsx:557-780`, `pages/PublicMenu/base/CartView.jsx:783-1277`), and the sticky footer exists only when `cart.length > 0` (`pages/PublicMenu/base/CartView.jsx:1245-1277`). In `x.jsx`, `hallStickyMode` has only `cart`, `myBill`, `tableOrders`, `cartEmpty` and is derived from counts (`pages/PublicMenu/base/x.jsx:2056-2115`). This misses the required visit/draft matrix: no bottom CTA for sent-orders-without-draft, no unpaid secondary line for new-draft-after-send, no paid/closed fade-out behavior. `useTableSession` also merges draft into table total and never filters paid orders (`pages/PublicMenu/base/useTableSession.jsx:722-747`, `pages/PublicMenu/base/useTableSession.jsx:784-788`). FIX: derive explicit visit state from session/order/payment status, compute unpaid sent totals separately from draft totals, and render drawer/sticky CTAs from that state matrix instead of `cart.length` or order counts.
++6. [P2] Terracotta palette is still incomplete - Primary UI elements still use indigo or green in the reviewed files: `MenuView.jsx` prices, add buttons, layout toggle, and loader (`pages/PublicMenu/base/MenuView.jsx:85`, `pages/PublicMenu/base/MenuView.jsx:104`, `pages/PublicMenu/base/MenuView.jsx:162`, `pages/PublicMenu/base/MenuView.jsx:203`, `pages/PublicMenu/base/MenuView.jsx:229`, `pages/PublicMenu/base/MenuView.jsx:240`, `pages/PublicMenu/base/MenuView.jsx:252`), `ModeTabs.jsx` active tab (`pages/PublicMenu/base/ModeTabs.jsx:33`), and `CheckoutView.jsx` link, total, and submit button (`pages/PublicMenu/base/CheckoutView.jsx:37`, `pages/PublicMenu/base/CheckoutView.jsx:76`, `pages/PublicMenu/base/CheckoutView.jsx:173`). FIX: replace remaining `indigo` and `green` primary styles with the terracotta token/color system used elsewhere.
++7. [P2] Mobile-first controls are still too small in key flows - Several tap targets are below 44px or icon-only in the reviewed mobile UI: list add button `40x40` and unlabeled list steppers in `MenuView.jsx` (`pages/PublicMenu/base/MenuView.jsx:102-121`), tile steppers `32x32` (`pages/PublicMenu/base/MenuView.jsx:168-183`), tiny checkout steppers in `CheckoutView.jsx` (`pages/PublicMenu/base/CheckoutView.jsx:57-64`), and thin mode tabs in `ModeTabs.jsx` (`pages/PublicMenu/base/ModeTabs.jsx:27-35`). These are hard to hit on phones and regress the mobile-first brief. FIX: raise all primary tap targets to at least `44x44`, add `aria-label`s to list-mode quantity buttons, and avoid icon-only controls for primary actions where space allows.
++8. [P2] Localization fallback is hardcoded in Russian inside page code - The page-level fallback path is a hardcoded Russian map in `x.jsx` (`pages/PublicMenu/base/x.jsx:325-506`), and `CartView.jsx` repeats many `tr('key', 'Русский текст')` fallbacks (`pages/PublicMenu/base/CartView.jsx:241-266`, `pages/PublicMenu/base/CartView.jsx:407-1273`). If any key is missing in EN/KZ, the UI silently mixes the selected locale with Russian copy instead of a locale-aware fallback. FIX: move fallback copy into translation catalogs, make fallback language configurable, and remove hardcoded per-component Russian strings.
++
++## Summary
++Total: 8 findings (1 P0, 4 P1, 3 P2, 0 P3)
+diff --git a/pipeline/chain-state/publicmenu-260321-093745-codex-findings.md b/pipeline/chain-state/publicmenu-260321-093745-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f3c3ef4278323e3a38fa032e4bed82a857385d44
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260321-093745-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-093745
++
++## Findings
++1. [P0] Loyalty side effects run before order items exist - In both submit paths, `Order.create()` is followed by loyalty redeem/update before `OrderItem.bulkCreate()` (`pages/PublicMenu/base/x.jsx:2436-2470`, `pages/PublicMenu/base/x.jsx:2812-2843`). If item creation fails, points are already spent and the order can be left partial or empty. FIX: create all order items first, then apply loyalty side effects; if Base44 cannot do a transaction, treat item creation as the commit point and only debit loyalty after it succeeds.
++2. [P1] Hall confirmation shows raw cart total, not real order total - Hall orders are persisted with `total_amount: finalTotal` (`pages/PublicMenu/base/x.jsx:2420`), but the confirmation screen is fed `cart.reduce(...)` (`pages/PublicMenu/base/x.jsx:2540-2559`). Any loyalty discount or redeemed points makes the guest-facing total wrong. FIX: pass `finalTotal` or the created order's stored `total_amount` into the hall confirmation payload.
++3. [P1] Mode switches keep invalid cart items alive - `handleModeChange()` only flips `orderMode` and URL/localStorage (`pages/PublicMenu/base/x.jsx:2205-2225`); the cart is never revalidated, and cart entries only store `dishId`, `name`, `price`, `quantity` (`pages/PublicMenu/base/x.jsx:2229-2243`). A hall-only dish can stay in cart and be submitted from pickup/delivery after it disappears from the menu. FIX: on every mode change, revalidate cart items against mode availability and either drop invalid items with a toast or block checkout until the cart is cleaned.
++4. [P1] Pickup/delivery checkout drops loyalty and discount controls - `x.jsx` passes loyalty props into `CheckoutView` (`pages/PublicMenu/base/x.jsx:3174-3197`), but `CheckoutView` does not accept or render them (`pages/PublicMenu/base/CheckoutView.jsx:7-31`, `pages/PublicMenu/base/CheckoutView.jsx:88-150`). Guests cannot enter email, see balance, redeem points, or understand discount application in non-hall checkout. FIX: plumb the passed loyalty props through `CheckoutView` and render the same loyalty/discount block used for hall checkout.
++5. [P1] Visit-state UI is still count-driven instead of state-driven - `CartView` always renders the same section stack when data exists (`pages/PublicMenu/base/CartView.jsx:557-780`, `pages/PublicMenu/base/CartView.jsx:783-1277`), and the sticky footer exists only when `cart.length > 0` (`pages/PublicMenu/base/CartView.jsx:1245-1277`). In `x.jsx`, `hallStickyMode` has only `cart`, `myBill`, `tableOrders`, `cartEmpty` and is derived from counts (`pages/PublicMenu/base/x.jsx:2056-2115`). This misses the required visit/draft matrix: no bottom CTA for sent-orders-without-draft, no unpaid secondary line for new-draft-after-send, no paid/closed fade-out behavior. `useTableSession` also merges draft into table total and never filters paid orders (`pages/PublicMenu/base/useTableSession.jsx:722-747`, `pages/PublicMenu/base/useTableSession.jsx:784-788`). FIX: derive explicit visit state from session/order/payment status, compute unpaid sent totals separately from draft totals, and render drawer/sticky CTAs from that state matrix instead of `cart.length` or order counts.
++6. [P2] Terracotta palette is still incomplete - Primary UI elements still use indigo or green in the reviewed files: `MenuView.jsx` prices, add buttons, layout toggle, and loader (`pages/PublicMenu/base/MenuView.jsx:85`, `pages/PublicMenu/base/MenuView.jsx:104`, `pages/PublicMenu/base/MenuView.jsx:162`, `pages/PublicMenu/base/MenuView.jsx:203`, `pages/PublicMenu/base/MenuView.jsx:229`, `pages/PublicMenu/base/MenuView.jsx:240`, `pages/PublicMenu/base/MenuView.jsx:252`), `ModeTabs.jsx` active tab (`pages/PublicMenu/base/ModeTabs.jsx:33`), and `CheckoutView.jsx` link, total, and submit button (`pages/PublicMenu/base/CheckoutView.jsx:37`, `pages/PublicMenu/base/CheckoutView.jsx:76`, `pages/PublicMenu/base/CheckoutView.jsx:173`). FIX: replace remaining `indigo` and `green` primary styles with the terracotta token/color system used elsewhere.
++7. [P2] Mobile-first controls are still too small in key flows - Several tap targets are below 44px or icon-only in the reviewed mobile UI: list add button `40x40` and unlabeled list steppers in `MenuView.jsx` (`pages/PublicMenu/base/MenuView.jsx:102-121`), tile steppers `32x32` (`pages/PublicMenu/base/MenuView.jsx:168-183`), tiny checkout steppers in `CheckoutView.jsx` (`pages/PublicMenu/base/CheckoutView.jsx:57-64`), and thin mode tabs in `ModeTabs.jsx` (`pages/PublicMenu/base/ModeTabs.jsx:27-35`). These are hard to hit on phones and regress the mobile-first brief. FIX: raise all primary tap targets to at least `44x44`, add `aria-label`s to list-mode quantity buttons, and avoid icon-only controls for primary actions where space allows.
++8. [P2] Localization fallback is hardcoded in Russian inside page code - The page-level fallback path is a hardcoded Russian map in `x.jsx` (`pages/PublicMenu/base/x.jsx:325-506`), and `CartView.jsx` repeats many `tr('key', 'Русский текст')` fallbacks (`pages/PublicMenu/base/CartView.jsx:241-266`, `pages/PublicMenu/base/CartView.jsx:407-1273`). If any key is missing in EN/KZ, the UI silently mixes the selected locale with Russian copy instead of a locale-aware fallback. FIX: move fallback copy into translation catalogs, make fallback language configurable, and remove hardcoded per-component Russian strings.
++
++## Summary
++Total: 8 findings (1 P0, 4 P1, 3 P2, 0 P3)
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-21.log b/pages/PublicMenu/commands_2026-03-21.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..c1dc1bcb10a9af250e641b7941b4d5cfaf7bcdd2
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-21.log
+@@ -0,0 +1,33 @@
++Get-ChildItem -File pages/PublicMenu/base/*.jsx | Select-Object -ExpandProperty FullName
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/CartView.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/CheckoutView.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/MenuView.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/ModeTabs.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/useTableSession.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/x.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'hallSticky|showCartButton|drawerMode|handleModeChange|function PublicMenu|const \[view|setDrawerMode|StickyCartBar|cart.length > 0|isTableVerified|billRequested|showLoyaltySection|I18N_FALLBACKS|console\.' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/CartView.jsx' -Pattern 'myOrdersExpanded|tableTotal|myBill|otherGuests|cart.length > 0|isTableVerified|bg-indigo|bg-green|green-600|hardcoded|Новый|МОИ|СЧЁТ|sticky|review|t\(|tr\(' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/CheckoutView.jsx','pages/PublicMenu/base/MenuView.jsx','pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'indigo|green-600|t\(|aria-label|w-10 h-10|w-8 h-8|min-w\[44px\]|min-h\[44px\]|sticky|button' -Encoding UTF8 | ForEach-Object { "{0}:{1}:{2}" -f $_.Path, $_.LineNumber, $_.Line }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2035;$i -le 2118;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2195;$i -le 2265;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1388;$i -le 1455;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=550;$i -le 830;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=830;$i -le 1035;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1035;$i -le 1280;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=612;$i -le 640;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=700;$i -le 760;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=780;$i -le 812;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'const cartTotalAmount|const discountAmount|const pointsDiscountAmount|const finalTotal|const earnedPoints|const maxRedeemPoints|const showLoyaltySection|const discountEnabled|const loyaltyEnabled' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1900;$i -le 1988;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'showConfirmation\(|finalTotal|confirmedTotal|processHallOrder|processDelivery|processPickup|pointsDiscountAmount|discountAmount' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2380;$i -le 2915;$i++){ if($i -le $lines.Length -and ($i -ge 2380 -and $i -le 2915)){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=3160;$i -le 3210;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1;$i -le 190;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|function validate|validate\(' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2280;$i -le 2378;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|cart\.view|cart\.checkout|cart\.my_bill|cart\.table_orders|loyalty\.review_reward_hint|loyalty\.review_reward_prefix|help\.call_waiter' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/CartView.jsx','pages/PublicMenu/base/CheckoutView.jsx','pages/PublicMenu/base/MenuView.jsx','pages/PublicMenu/base/ModeTabs.jsx','pages/PublicMenu/base/useTableSession.jsx' -Pattern 'console\.|createObjectURL|dangerouslySetInnerHTML|toLocaleString\(|ru-RU|window\.location|localStorage|setTimeout\(|setInterval\(|clearTimeout\(|clearInterval\(' -Encoding UTF8 | ForEach-Object { "{0}:{1}:{2}" -f $_.Path, $_.LineNumber, $_.Line }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'billCooldown|setBillCooldown|billRequested|setBillRequested' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2263;$i -le 2290;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+diff --git a/pages/PublicMenu/review_2026-03-21.md b/pages/PublicMenu/review_2026-03-21.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f3c3ef4278323e3a38fa032e4bed82a857385d44
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-21.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-093745
++
++## Findings
++1. [P0] Loyalty side effects run before order items exist - In both submit paths, `Order.create()` is followed by loyalty redeem/update before `OrderItem.bulkCreate()` (`pages/PublicMenu/base/x.jsx:2436-2470`, `pages/PublicMenu/base/x.jsx:2812-2843`). If item creation fails, points are already spent and the order can be left partial or empty. FIX: create all order items first, then apply loyalty side effects; if Base44 cannot do a transaction, treat item creation as the commit point and only debit loyalty after it succeeds.
++2. [P1] Hall confirmation shows raw cart total, not real order total - Hall orders are persisted with `total_amount: finalTotal` (`pages/PublicMenu/base/x.jsx:2420`), but the confirmation screen is fed `cart.reduce(...)` (`pages/PublicMenu/base/x.jsx:2540-2559`). Any loyalty discount or redeemed points makes the guest-facing total wrong. FIX: pass `finalTotal` or the created order's stored `total_amount` into the hall confirmation payload.
++3. [P1] Mode switches keep invalid cart items alive - `handleModeChange()` only flips `orderMode` and URL/localStorage (`pages/PublicMenu/base/x.jsx:2205-2225`); the cart is never revalidated, and cart entries only store `dishId`, `name`, `price`, `quantity` (`pages/PublicMenu/base/x.jsx:2229-2243`). A hall-only dish can stay in cart and be submitted from pickup/delivery after it disappears from the menu. FIX: on every mode change, revalidate cart items against mode availability and either drop invalid items with a toast or block checkout until the cart is cleaned.
++4. [P1] Pickup/delivery checkout drops loyalty and discount controls - `x.jsx` passes loyalty props into `CheckoutView` (`pages/PublicMenu/base/x.jsx:3174-3197`), but `CheckoutView` does not accept or render them (`pages/PublicMenu/base/CheckoutView.jsx:7-31`, `pages/PublicMenu/base/CheckoutView.jsx:88-150`). Guests cannot enter email, see balance, redeem points, or understand discount application in non-hall checkout. FIX: plumb the passed loyalty props through `CheckoutView` and render the same loyalty/discount block used for hall checkout.
++5. [P1] Visit-state UI is still count-driven instead of state-driven - `CartView` always renders the same section stack when data exists (`pages/PublicMenu/base/CartView.jsx:557-780`, `pages/PublicMenu/base/CartView.jsx:783-1277`), and the sticky footer exists only when `cart.length > 0` (`pages/PublicMenu/base/CartView.jsx:1245-1277`). In `x.jsx`, `hallStickyMode` has only `cart`, `myBill`, `tableOrders`, `cartEmpty` and is derived from counts (`pages/PublicMenu/base/x.jsx:2056-2115`). This misses the required visit/draft matrix: no bottom CTA for sent-orders-without-draft, no unpaid secondary line for new-draft-after-send, no paid/closed fade-out behavior. `useTableSession` also merges draft into table total and never filters paid orders (`pages/PublicMenu/base/useTableSession.jsx:722-747`, `pages/PublicMenu/base/useTableSession.jsx:784-788`). FIX: derive explicit visit state from session/order/payment status, compute unpaid sent totals separately from draft totals, and render drawer/sticky CTAs from that state matrix instead of `cart.length` or order counts.
++6. [P2] Terracotta palette is still incomplete - Primary UI elements still use indigo or green in the reviewed files: `MenuView.jsx` prices, add buttons, layout toggle, and loader (`pages/PublicMenu/base/MenuView.jsx:85`, `pages/PublicMenu/base/MenuView.jsx:104`, `pages/PublicMenu/base/MenuView.jsx:162`, `pages/PublicMenu/base/MenuView.jsx:203`, `pages/PublicMenu/base/MenuView.jsx:229`, `pages/PublicMenu/base/MenuView.jsx:240`, `pages/PublicMenu/base/MenuView.jsx:252`), `ModeTabs.jsx` active tab (`pages/PublicMenu/base/ModeTabs.jsx:33`), and `CheckoutView.jsx` link, total, and submit button (`pages/PublicMenu/base/CheckoutView.jsx:37`, `pages/PublicMenu/base/CheckoutView.jsx:76`, `pages/PublicMenu/base/CheckoutView.jsx:173`). FIX: replace remaining `indigo` and `green` primary styles with the terracotta token/color system used elsewhere.
++7. [P2] Mobile-first controls are still too small in key flows - Several tap targets are below 44px or icon-only in the reviewed mobile UI: list add button `40x40` and unlabeled list steppers in `MenuView.jsx` (`pages/PublicMenu/base/MenuView.jsx:102-121`), tile steppers `32x32` (`pages/PublicMenu/base/MenuView.jsx:168-183`), tiny checkout steppers in `CheckoutView.jsx` (`pages/PublicMenu/base/CheckoutView.jsx:57-64`), and thin mode tabs in `ModeTabs.jsx` (`pages/PublicMenu/base/ModeTabs.jsx:27-35`). These are hard to hit on phones and regress the mobile-first brief. FIX: raise all primary tap targets to at least `44x44`, add `aria-label`s to list-mode quantity buttons, and avoid icon-only controls for primary actions where space allows.
++8. [P2] Localization fallback is hardcoded in Russian inside page code - The page-level fallback path is a hardcoded Russian map in `x.jsx` (`pages/PublicMenu/base/x.jsx:325-506`), and `CartView.jsx` repeats many `tr('key', 'Русский текст')` fallbacks (`pages/PublicMenu/base/CartView.jsx:241-266`, `pages/PublicMenu/base/CartView.jsx:407-1273`). If any key is missing in EN/KZ, the UI silently mixes the selected locale with Russian copy instead of a locale-aware fallback. FIX: move fallback copy into translation catalogs, make fallback language configurable, and remove hardcoded per-component Russian strings.
++
++## Summary
++Total: 8 findings (1 P0, 4 P1, 3 P2, 0 P3)
+diff --git a/pipeline/chain-state/publicmenu-260321-093745-codex-findings.md b/pipeline/chain-state/publicmenu-260321-093745-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f3c3ef4278323e3a38fa032e4bed82a857385d44
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260321-093745-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-093745
++
++## Findings
++1. [P0] Loyalty side effects run before order items exist - In both submit paths, `Order.create()` is followed by loyalty redeem/update before `OrderItem.bulkCreate()` (`pages/PublicMenu/base/x.jsx:2436-2470`, `pages/PublicMenu/base/x.jsx:2812-2843`). If item creation fails, points are already spent and the order can be left partial or empty. FIX: create all order items first, then apply loyalty side effects; if Base44 cannot do a transaction, treat item creation as the commit point and only debit loyalty after it succeeds.
++2. [P1] Hall confirmation shows raw cart total, not real order total - Hall orders are persisted with `total_amount: finalTotal` (`pages/PublicMenu/base/x.jsx:2420`), but the confirmation screen is fed `cart.reduce(...)` (`pages/PublicMenu/base/x.jsx:2540-2559`). Any loyalty discount or redeemed points makes the guest-facing total wrong. FIX: pass `finalTotal` or the created order's stored `total_amount` into the hall confirmation payload.
++3. [P1] Mode switches keep invalid cart items alive - `handleModeChange()` only flips `orderMode` and URL/localStorage (`pages/PublicMenu/base/x.jsx:2205-2225`); the cart is never revalidated, and cart entries only store `dishId`, `name`, `price`, `quantity` (`pages/PublicMenu/base/x.jsx:2229-2243`). A hall-only dish can stay in cart and be submitted from pickup/delivery after it disappears from the menu. FIX: on every mode change, revalidate cart items against mode availability and either drop invalid items with a toast or block checkout until the cart is cleaned.
++4. [P1] Pickup/delivery checkout drops loyalty and discount controls - `x.jsx` passes loyalty props into `CheckoutView` (`pages/PublicMenu/base/x.jsx:3174-3197`), but `CheckoutView` does not accept or render them (`pages/PublicMenu/base/CheckoutView.jsx:7-31`, `pages/PublicMenu/base/CheckoutView.jsx:88-150`). Guests cannot enter email, see balance, redeem points, or understand discount application in non-hall checkout. FIX: plumb the passed loyalty props through `CheckoutView` and render the same loyalty/discount block used for hall checkout.
++5. [P1] Visit-state UI is still count-driven instead of state-driven - `CartView` always renders the same section stack when data exists (`pages/PublicMenu/base/CartView.jsx:557-780`, `pages/PublicMenu/base/CartView.jsx:783-1277`), and the sticky footer exists only when `cart.length > 0` (`pages/PublicMenu/base/CartView.jsx:1245-1277`). In `x.jsx`, `hallStickyMode` has only `cart`, `myBill`, `tableOrders`, `cartEmpty` and is derived from counts (`pages/PublicMenu/base/x.jsx:2056-2115`). This misses the required visit/draft matrix: no bottom CTA for sent-orders-without-draft, no unpaid secondary line for new-draft-after-send, no paid/closed fade-out behavior. `useTableSession` also merges draft into table total and never filters paid orders (`pages/PublicMenu/base/useTableSession.jsx:722-747`, `pages/PublicMenu/base/useTableSession.jsx:784-788`). FIX: derive explicit visit state from session/order/payment status, compute unpaid sent totals separately from draft totals, and render drawer/sticky CTAs from that state matrix instead of `cart.length` or order counts.
++6. [P2] Terracotta palette is still incomplete - Primary UI elements still use indigo or green in the reviewed files: `MenuView.jsx` prices, add buttons, layout toggle, and loader (`pages/PublicMenu/base/MenuView.jsx:85`, `pages/PublicMenu/base/MenuView.jsx:104`, `pages/PublicMenu/base/MenuView.jsx:162`, `pages/PublicMenu/base/MenuView.jsx:203`, `pages/PublicMenu/base/MenuView.jsx:229`, `pages/PublicMenu/base/MenuView.jsx:240`, `pages/PublicMenu/base/MenuView.jsx:252`), `ModeTabs.jsx` active tab (`pages/PublicMenu/base/ModeTabs.jsx:33`), and `CheckoutView.jsx` link, total, and submit button (`pages/PublicMenu/base/CheckoutView.jsx:37`, `pages/PublicMenu/base/CheckoutView.jsx:76`, `pages/PublicMenu/base/CheckoutView.jsx:173`). FIX: replace remaining `indigo` and `green` primary styles with the terracotta token/color system used elsewhere.
++7. [P2] Mobile-first controls are still too small in key flows - Several tap targets are below 44px or icon-only in the reviewed mobile UI: list add button `40x40` and unlabeled list steppers in `MenuView.jsx` (`pages/PublicMenu/base/MenuView.jsx:102-121`), tile steppers `32x32` (`pages/PublicMenu/base/MenuView.jsx:168-183`), tiny checkout steppers in `CheckoutView.jsx` (`pages/PublicMenu/base/CheckoutView.jsx:57-64`), and thin mode tabs in `ModeTabs.jsx` (`pages/PublicMenu/base/ModeTabs.jsx:27-35`). These are hard to hit on phones and regress the mobile-first brief. FIX: raise all primary tap targets to at least `44x44`, add `aria-label`s to list-mode quantity buttons, and avoid icon-only controls for primary actions where space allows.
++8. [P2] Localization fallback is hardcoded in Russian inside page code - The page-level fallback path is a hardcoded Russian map in `x.jsx` (`pages/PublicMenu/base/x.jsx:325-506`), and `CartView.jsx` repeats many `tr('key', 'Русский текст')` fallbacks (`pages/PublicMenu/base/CartView.jsx:241-266`, `pages/PublicMenu/base/CartView.jsx:407-1273`). If any key is missing in EN/KZ, the UI silently mixes the selected locale with Russian copy instead of a locale-aware fallback. FIX: move fallback copy into translation catalogs, make fallback language configurable, and remove hardcoded per-component Russian strings.
++
++## Summary
++Total: 8 findings (1 P0, 4 P1, 3 P2, 0 P3)
+
+codex
+1. [P0] Loyalty side effects run before `OrderItem.bulkCreate()` in both submit paths, so a failed item create can leave spent points and a partial order.
+2. [P1] Hall confirmation shows raw cart sum instead of the persisted discounted total.
+3. [P1] Mode switches do not revalidate the cart, so unavailable dishes can survive hall/pickup/delivery changes and still be submitted.
+4. [P1] Pickup/delivery checkout drops loyalty and discount UI even though `x.jsx` passes those props in.
+5. [P1] Drawer and sticky bar are still count-driven, not visit-state-driven: no proper V1-V7 state matrix, missing no-draft CTAs, and sent/draft totals are mixed.
+6. [P2] Terracotta rollout is incomplete; `MenuView.jsx`, `ModeTabs.jsx`, and `CheckoutView.jsx` still use indigo/green primary styles.
+7. [P2] Several core mobile controls are still under 44px or icon-only.
+8. [P2] Fallback localization is hardcoded in Russian inside page code, so missing EN/KZ keys will produce mixed-language UI.
+
+Full report saved to [publicmenu-260321-093745-codex-findings.md](C:/Dev/menuapp-code-review/pipeline/chain-state/publicmenu-260321-093745-codex-findings.md).
+
+Repo-required copies were also saved to [review_2026-03-21.md](C:/Dev/menuapp-code-review/pages/PublicMenu/review_2026-03-21.md) and [commands_2026-03-21.log](C:/Dev/menuapp-code-review/pages/PublicMenu/commands_2026-03-21.log).
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-21.log b/pages/PublicMenu/commands_2026-03-21.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..c1dc1bcb10a9af250e641b7941b4d5cfaf7bcdd2
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-21.log
+@@ -0,0 +1,33 @@
++Get-ChildItem -File pages/PublicMenu/base/*.jsx | Select-Object -ExpandProperty FullName
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/CartView.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/CheckoutView.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/MenuView.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/ModeTabs.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/useTableSession.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'pages/PublicMenu/base/x.jsx'
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'hallSticky|showCartButton|drawerMode|handleModeChange|function PublicMenu|const \[view|setDrawerMode|StickyCartBar|cart.length > 0|isTableVerified|billRequested|showLoyaltySection|I18N_FALLBACKS|console\.' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/CartView.jsx' -Pattern 'myOrdersExpanded|tableTotal|myBill|otherGuests|cart.length > 0|isTableVerified|bg-indigo|bg-green|green-600|hardcoded|Новый|МОИ|СЧЁТ|sticky|review|t\(|tr\(' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/CheckoutView.jsx','pages/PublicMenu/base/MenuView.jsx','pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'indigo|green-600|t\(|aria-label|w-10 h-10|w-8 h-8|min-w\[44px\]|min-h\[44px\]|sticky|button' -Encoding UTF8 | ForEach-Object { "{0}:{1}:{2}" -f $_.Path, $_.LineNumber, $_.Line }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2035;$i -le 2118;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2195;$i -le 2265;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1388;$i -le 1455;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=550;$i -le 830;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=830;$i -le 1035;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1035;$i -le 1280;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=612;$i -le 640;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=700;$i -le 760;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=780;$i -le 812;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'const cartTotalAmount|const discountAmount|const pointsDiscountAmount|const finalTotal|const earnedPoints|const maxRedeemPoints|const showLoyaltySection|const discountEnabled|const loyaltyEnabled' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1900;$i -le 1988;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'showConfirmation\(|finalTotal|confirmedTotal|processHallOrder|processDelivery|processPickup|pointsDiscountAmount|discountAmount' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2380;$i -le 2915;$i++){ if($i -le $lines.Length -and ($i -ge 2380 -and $i -le 2915)){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=3160;$i -le 3210;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++$p='pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=1;$i -le 190;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|function validate|validate\(' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2280;$i -le 2378;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|cart\.view|cart\.checkout|cart\.my_bill|cart\.table_orders|loyalty\.review_reward_hint|loyalty\.review_reward_prefix|help\.call_waiter' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/CartView.jsx','pages/PublicMenu/base/CheckoutView.jsx','pages/PublicMenu/base/MenuView.jsx','pages/PublicMenu/base/ModeTabs.jsx','pages/PublicMenu/base/useTableSession.jsx' -Pattern 'console\.|createObjectURL|dangerouslySetInnerHTML|toLocaleString\(|ru-RU|window\.location|localStorage|setTimeout\(|setInterval\(|clearTimeout\(|clearInterval\(' -Encoding UTF8 | ForEach-Object { "{0}:{1}:{2}" -f $_.Path, $_.LineNumber, $_.Line }
++[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Select-String -Path 'pages/PublicMenu/base/x.jsx' -Pattern 'billCooldown|setBillCooldown|billRequested|setBillRequested' -Encoding UTF8 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++$p='pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding UTF8 $p; for($i=2263;$i -le 2290;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+diff --git a/pages/PublicMenu/review_2026-03-21.md b/pages/PublicMenu/review_2026-03-21.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f3c3ef4278323e3a38fa032e4bed82a857385d44
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-21.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-093745
++
++## Findings
++1. [P0] Loyalty side effects run before order items exist - In both submit paths, `Order.create()` is followed by loyalty redeem/update before `OrderItem.bulkCreate()` (`pages/PublicMenu/base/x.jsx:2436-2470`, `pages/PublicMenu/base/x.jsx:2812-2843`). If item creation fails, points are already spent and the order can be left partial or empty. FIX: create all order items first, then apply loyalty side effects; if Base44 cannot do a transaction, treat item creation as the commit point and only debit loyalty after it succeeds.
++2. [P1] Hall confirmation shows raw cart total, not real order total - Hall orders are persisted with `total_amount: finalTotal` (`pages/PublicMenu/base/x.jsx:2420`), but the confirmation screen is fed `cart.reduce(...)` (`pages/PublicMenu/base/x.jsx:2540-2559`). Any loyalty discount or redeemed points makes the guest-facing total wrong. FIX: pass `finalTotal` or the created order's stored `total_amount` into the hall confirmation payload.
++3. [P1] Mode switches keep invalid cart items alive - `handleModeChange()` only flips `orderMode` and URL/localStorage (`pages/PublicMenu/base/x.jsx:2205-2225`); the cart is never revalidated, and cart entries only store `dishId`, `name`, `price`, `quantity` (`pages/PublicMenu/base/x.jsx:2229-2243`). A hall-only dish can stay in cart and be submitted from pickup/delivery after it disappears from the menu. FIX: on every mode change, revalidate cart items against mode availability and either drop invalid items with a toast or block checkout until the cart is cleaned.
++4. [P1] Pickup/delivery checkout drops loyalty and discount controls - `x.jsx` passes loyalty props into `CheckoutView` (`pages/PublicMenu/base/x.jsx:3174-3197`), but `CheckoutView` does not accept or render them (`pages/PublicMenu/base/CheckoutView.jsx:7-31`, `pages/PublicMenu/base/CheckoutView.jsx:88-150`). Guests cannot enter email, see balance, redeem points, or understand discount application in non-hall checkout. FIX: plumb the passed loyalty props through `CheckoutView` and render the same loyalty/discount block used for hall checkout.
++5. [P1] Visit-state UI is still count-driven instead of state-driven - `CartView` always renders the same section stack when data exists (`pages/PublicMenu/base/CartView.jsx:557-780`, `pages/PublicMenu/base/CartView.jsx:783-1277`), and the sticky footer exists only when `cart.length > 0` (`pages/PublicMenu/base/CartView.jsx:1245-1277`). In `x.jsx`, `hallStickyMode` has only `cart`, `myBill`, `tableOrders`, `cartEmpty` and is derived from counts (`pages/PublicMenu/base/x.jsx:2056-2115`). This misses the required visit/draft matrix: no bottom CTA for sent-orders-without-draft, no unpaid secondary line for new-draft-after-send, no paid/closed fade-out behavior. `useTableSession` also merges draft into table total and never filters paid orders (`pages/PublicMenu/base/useTableSession.jsx:722-747`, `pages/PublicMenu/base/useTableSession.jsx:784-788`). FIX: derive explicit visit state from session/order/payment status, compute unpaid sent totals separately from draft totals, and render drawer/sticky CTAs from that state matrix instead of `cart.length` or order counts.
++6. [P2] Terracotta palette is still incomplete - Primary UI elements still use indigo or green in the reviewed files: `MenuView.jsx` prices, add buttons, layout toggle, and loader (`pages/PublicMenu/base/MenuView.jsx:85`, `pages/PublicMenu/base/MenuView.jsx:104`, `pages/PublicMenu/base/MenuView.jsx:162`, `pages/PublicMenu/base/MenuView.jsx:203`, `pages/PublicMenu/base/MenuView.jsx:229`, `pages/PublicMenu/base/MenuView.jsx:240`, `pages/PublicMenu/base/MenuView.jsx:252`), `ModeTabs.jsx` active tab (`pages/PublicMenu/base/ModeTabs.jsx:33`), and `CheckoutView.jsx` link, total, and submit button (`pages/PublicMenu/base/CheckoutView.jsx:37`, `pages/PublicMenu/base/CheckoutView.jsx:76`, `pages/PublicMenu/base/CheckoutView.jsx:173`). FIX: replace remaining `indigo` and `green` primary styles with the terracotta token/color system used elsewhere.
++7. [P2] Mobile-first controls are still too small in key flows - Several tap targets are below 44px or icon-only in the reviewed mobile UI: list add button `40x40` and unlabeled list steppers in `MenuView.jsx` (`pages/PublicMenu/base/MenuView.jsx:102-121`), tile steppers `32x32` (`pages/PublicMenu/base/MenuView.jsx:168-183`), tiny checkout steppers in `CheckoutView.jsx` (`pages/PublicMenu/base/CheckoutView.jsx:57-64`), and thin mode tabs in `ModeTabs.jsx` (`pages/PublicMenu/base/ModeTabs.jsx:27-35`). These are hard to hit on phones and regress the mobile-first brief. FIX: raise all primary tap targets to at least `44x44`, add `aria-label`s to list-mode quantity buttons, and avoid icon-only controls for primary actions where space allows.
++8. [P2] Localization fallback is hardcoded in Russian inside page code - The page-level fallback path is a hardcoded Russian map in `x.jsx` (`pages/PublicMenu/base/x.jsx:325-506`), and `CartView.jsx` repeats many `tr('key', 'Русский текст')` fallbacks (`pages/PublicMenu/base/CartView.jsx:241-266`, `pages/PublicMenu/base/CartView.jsx:407-1273`). If any key is missing in EN/KZ, the UI silently mixes the selected locale with Russian copy instead of a locale-aware fallback. FIX: move fallback copy into translation catalogs, make fallback language configurable, and remove hardcoded per-component Russian strings.
++
++## Summary
++Total: 8 findings (1 P0, 4 P1, 3 P2, 0 P3)
+diff --git a/pipeline/chain-state/publicmenu-260321-093745-codex-findings.md b/pipeline/chain-state/publicmenu-260321-093745-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f3c3ef4278323e3a38fa032e4bed82a857385d44
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260321-093745-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-093745
++
++## Findings
++1. [P0] Loyalty side effects run before order items exist - In both submit paths, `Order.create()` is followed by loyalty redeem/update before `OrderItem.bulkCreate()` (`pages/PublicMenu/base/x.jsx:2436-2470`, `pages/PublicMenu/base/x.jsx:2812-2843`). If item creation fails, points are already spent and the order can be left partial or empty. FIX: create all order items first, then apply loyalty side effects; if Base44 cannot do a transaction, treat item creation as the commit point and only debit loyalty after it succeeds.
++2. [P1] Hall confirmation shows raw cart total, not real order total - Hall orders are persisted with `total_amount: finalTotal` (`pages/PublicMenu/base/x.jsx:2420`), but the confirmation screen is fed `cart.reduce(...)` (`pages/PublicMenu/base/x.jsx:2540-2559`). Any loyalty discount or redeemed points makes the guest-facing total wrong. FIX: pass `finalTotal` or the created order's stored `total_amount` into the hall confirmation payload.
++3. [P1] Mode switches keep invalid cart items alive - `handleModeChange()` only flips `orderMode` and URL/localStorage (`pages/PublicMenu/base/x.jsx:2205-2225`); the cart is never revalidated, and cart entries only store `dishId`, `name`, `price`, `quantity` (`pages/PublicMenu/base/x.jsx:2229-2243`). A hall-only dish can stay in cart and be submitted from pickup/delivery after it disappears from the menu. FIX: on every mode change, revalidate cart items against mode availability and either drop invalid items with a toast or block checkout until the cart is cleaned.
++4. [P1] Pickup/delivery checkout drops loyalty and discount controls - `x.jsx` passes loyalty props into `CheckoutView` (`pages/PublicMenu/base/x.jsx:3174-3197`), but `CheckoutView` does not accept or render them (`pages/PublicMenu/base/CheckoutView.jsx:7-31`, `pages/PublicMenu/base/CheckoutView.jsx:88-150`). Guests cannot enter email, see balance, redeem points, or understand discount application in non-hall checkout. FIX: plumb the passed loyalty props through `CheckoutView` and render the same loyalty/discount block used for hall checkout.
++5. [P1] Visit-state UI is still count-driven instead of state-driven - `CartView` always renders the same section stack when data exists (`pages/PublicMenu/base/CartView.jsx:557-780`, `pages/PublicMenu/base/CartView.jsx:783-1277`), and the sticky footer exists only when `cart.length > 0` (`pages/PublicMenu/base/CartView.jsx:1245-1277`). In `x.jsx`, `hallStickyMode` has only `cart`, `myBill`, `tableOrders`, `cartEmpty` and is derived from counts (`pages/PublicMenu/base/x.jsx:2056-2115`). This misses the required visit/draft matrix: no bottom CTA for sent-orders-without-draft, no unpaid secondary line for new-draft-after-send, no paid/closed fade-out behavior. `useTableSession` also merges draft into table total and never filters paid orders (`pages/PublicMenu/base/useTableSession.jsx:722-747`, `pages/PublicMenu/base/useTableSession.jsx:784-788`). FIX: derive explicit visit state from session/order/payment status, compute unpaid sent totals separately from draft totals, and render drawer/sticky CTAs from that state matrix instead of `cart.length` or order counts.
++6. [P2] Terracotta palette is still incomplete - Primary UI elements still use indigo or green in the reviewed files: `MenuView.jsx` prices, add buttons, layout toggle, and loader (`pages/PublicMenu/base/MenuView.jsx:85`, `pages/PublicMenu/base/MenuView.jsx:104`, `pages/PublicMenu/base/MenuView.jsx:162`, `pages/PublicMenu/base/MenuView.jsx:203`, `pages/PublicMenu/base/MenuView.jsx:229`, `pages/PublicMenu/base/MenuView.jsx:240`, `pages/PublicMenu/base/MenuView.jsx:252`), `ModeTabs.jsx` active tab (`pages/PublicMenu/base/ModeTabs.jsx:33`), and `CheckoutView.jsx` link, total, and submit button (`pages/PublicMenu/base/CheckoutView.jsx:37`, `pages/PublicMenu/base/CheckoutView.jsx:76`, `pages/PublicMenu/base/CheckoutView.jsx:173`). FIX: replace remaining `indigo` and `green` primary styles with the terracotta token/color system used elsewhere.
++7. [P2] Mobile-first controls are still too small in key flows - Several tap targets are below 44px or icon-only in the reviewed mobile UI: list add button `40x40` and unlabeled list steppers in `MenuView.jsx` (`pages/PublicMenu/base/MenuView.jsx:102-121`), tile steppers `32x32` (`pages/PublicMenu/base/MenuView.jsx:168-183`), tiny checkout steppers in `CheckoutView.jsx` (`pages/PublicMenu/base/CheckoutView.jsx:57-64`), and thin mode tabs in `ModeTabs.jsx` (`pages/PublicMenu/base/ModeTabs.jsx:27-35`). These are hard to hit on phones and regress the mobile-first brief. FIX: raise all primary tap targets to at least `44x44`, add `aria-label`s to list-mode quantity buttons, and avoid icon-only controls for primary actions where space allows.
++8. [P2] Localization fallback is hardcoded in Russian inside page code - The page-level fallback path is a hardcoded Russian map in `x.jsx` (`pages/PublicMenu/base/x.jsx:325-506`), and `CartView.jsx` repeats many `tr('key', 'Русский текст')` fallbacks (`pages/PublicMenu/base/CartView.jsx:241-266`, `pages/PublicMenu/base/CartView.jsx:407-1273`). If any key is missing in EN/KZ, the UI silently mixes the selected locale with Russian copy instead of a locale-aware fallback. FIX: move fallback copy into translation catalogs, make fallback language configurable, and remove hardcoded per-component Russian strings.
++
++## Summary
++Total: 8 findings (1 P0, 4 P1, 3 P2, 0 P3)
+
+tokens used
+217 803
+1. [P0] Loyalty side effects run before `OrderItem.bulkCreate()` in both submit paths, so a failed item create can leave spent points and a partial order.
+2. [P1] Hall confirmation shows raw cart sum instead of the persisted discounted total.
+3. [P1] Mode switches do not revalidate the cart, so unavailable dishes can survive hall/pickup/delivery changes and still be submitted.
+4. [P1] Pickup/delivery checkout drops loyalty and discount UI even though `x.jsx` passes those props in.
+5. [P1] Drawer and sticky bar are still count-driven, not visit-state-driven: no proper V1-V7 state matrix, missing no-draft CTAs, and sent/draft totals are mixed.
+6. [P2] Terracotta rollout is incomplete; `MenuView.jsx`, `ModeTabs.jsx`, and `CheckoutView.jsx` still use indigo/green primary styles.
+7. [P2] Several core mobile controls are still under 44px or icon-only.
+8. [P2] Fallback localization is hardcoded in Russian inside page code, so missing EN/KZ keys will produce mixed-language UI.
+
+Full report saved to [publicmenu-260321-093745-codex-findings.md](C:/Dev/menuapp-code-review/pipeline/chain-state/publicmenu-260321-093745-codex-findings.md).
+
+Repo-required copies were also saved to [review_2026-03-21.md](C:/Dev/menuapp-code-review/pages/PublicMenu/review_2026-03-21.md) and [commands_2026-03-21.log](C:/Dev/menuapp-code-review/pages/PublicMenu/commands_2026-03-21.log).

@@ -1,0 +1,780 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d1a02-60ee-78d0-a443-d51d2a712bcd
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260323-142202-d0a4 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Bugfix Batch 6: PublicMenu — regression + toast + dish detail + UI polish Reference: `BUGS_MASTER.md`, `menuapp-code-review/pages/PublicMenu/`. UX Lock: `ux-concepts/UX_LOCKED_PublicMenu.md`. **Production page** — `https://menu-app-mvp-49a4f5b2.base44.app/x?partner=69540a85f2492cff3e46a283&mode=hall&lang=RU` TARGET FILES (modify): - `pages/PublicMenu/x.jsx` - `pages/PublicMenu/MenuView.jsx` CONTEXT FILES (read-only, do NOT modify): - `pages/PublicMenu/CartView.jsx` - `pages/PublicMenu/CheckoutView.jsx` --- ## Fix 1 — PM-107 (P1) [MUST-FIX]: Programmatic BS close collapses entire sheet stack (regression КС-4) ### Сейчас КС-4 (commit 4da1dc4) added stack-based history: each sheet open calls `pushOverlay(name)` → `history.pushState(...)`. Each sheet programmatic close was also wired to call `history.back()`. Regression on Android: open order list → open table code BS on top → swipe down/tap × to close table code BS → **BOTH sheets close**, only menu remains. Expected: only table code BS closes, order list stays. ### Должно быть - **Hardware Back button** → `history.back()` → popstate fires → closes topmost sheet only. ✅ Already works. - **Programmatic close** (swipe, × button, overlay tap) → calls `setState(false)` + removes its own history entry WITHOUT triggering popstate for other sheets. Pattern: use a `isProgrammaticClose` ref flag. On programmatic close: set flag=true, call `history.back()`, in popstate handler: if flag=true, skip listener logic, reset flag=false. ### НЕ должно быть - Do NOT remove pushOverlay/popOverlay stack logic. - Do NOT break hardware back (PM-105, commit 4da1dc4 — already works, keep it). - Do NOT cascade history.back() to close multiple sheets. ### Файл и локация `pages/PublicMenu/x.jsx` - Search for: `pushOverlay`, `popOverlay`, `overlayStackRef` — КС-4 additions (commit 4da1dc4) - Search for: `popstate` — the listener - Search for: `setShowTableCodeSheet` — table code close handler - Add `isProgrammaticCloseRef = useRef(false)` flag to gate the popstate listener ### Уже пробовали КС-4 chain publicmenu-260323-124313-bcbe fixed hardware back ✅. Programmatic close was not handled — that is this regression. ### Проверка 1. Order list open → table code BS open → swipe/× table code → only table code closes, order list stays. ✅ 2. Order list open → hardware Back → only order list closes. ✅ 3. No frozen state, no infinite loops. --- ## Fix 2 — PM-103 (P2) [MUST-FIX]: Toast shows as thin line on Android (КС-5 fix did not work) ### Сейчас Toast appears as a thin horizontal line when adding a dish. КС-5 (commit c152dc7) removed a duplicate sonner Toaster — did NOT fix the issue on Android. ### Должно быть Proper toast: readable text "Добавлено в корзину", visible at 375px, auto-dismisses ~2s, fixed position (top or bottom center), z-index above all other elements. ### НЕ должно быть - Do NOT use `alert()`. Do NOT change toast trigger logic. - Do NOT add a new toast library — fix the existing implementation. ### Файл и локация `pages/PublicMenu/MenuView.jsx` and/or `pages/PublicMenu/x.jsx` - Search for `toastVisible` in MenuView.jsx — custom boolean state toast added in КС-3 (commit d633716) - The toast div likely has wrong styling: check for `h-0`, `overflow-hidden`, missing `z-index`, missing `fixed` positioning - Ensure toast div has: `fixed`, `z-[200]`, explicit `padding`, readable background (dark bg, white text) - Search for `sonner` or `<Toaster` in x.jsx to confirm no duplicate remains ### Уже пробовали КС-5 removed duplicate sonner — did not fix. Root cause is in custom `toastVisible` state-based toast CSS in MenuView.jsx. ### Проверка 1. Tap "+" on any dish at 375px → toast shows with readable text (not a line). ✅ 2. Toast auto-dismisses in ~2s. ✅ --- ## Fix 3 — PM-102 (P2) [MUST-FIX]: Dish detail dialog — "Add to cart" button has no visible text ### Сейчас КС-5 created a dish detail dialog (opens on card tap). Dialog shows name/description/price ✅. But the "Add to cart" button renders as an empty colored bar — no text inside. ### Должно быть Button shows text: "Добавить в корзину" (fallback for i18n: `t('menu.add_to_cart', 'Добавить в корзину')`). Button: `partner.primary_color` background, white text, min 44px height. ### НЕ должно быть - Do NOT remove or replace the dialog — only fix the button text. - Do NOT change dish data display (name/price work). ### Файл и локация `pages/PublicMenu/x.jsx` - Search for `DishDetail` or `dishDetailOpen` or `selectedDish` — the dialog added in КС-5 (commit c152dc7) - Find the `<Button` or `<button` inside — add text: `{t('menu.add_to_cart', 'Добавить в корзину')}` - If text exists but is invisible: check text color (add `text-white` class) ### Проверка 1. Tap dish card → dialog opens → button shows "Добавить в корзину". ✅ 2. Tap button → dish added to cart. ✅ --- ## Fix 4 — PM-108 (P2) [MUST-FIX]: "+" button clipped at right edge in list-mode ### Сейчас In list-mode, the circular "+" FAB button is cut off at the right edge of the dish card (only half-circle visible). The card `overflow-hidden` clips it. ### Должно быть "+" button fully visible and tappable — positioned inside card bounds (e.g. `right-2 bottom-2` with padding, not hanging outside the card). ### НЕ должно быть - Do NOT move "+" to center. Do NOT remove `overflow-hidden` if it clips the image — use targeted fix. ### Файл и локация `pages/PublicMenu/MenuView.jsx` - Search for `renderListCard` — list-mode card renderer - Find "+" button position: likely `absolute right-0 bottom-0` or similar — change to `right-2 bottom-2` (inside card bounds) - Or: change card container from `overflow-hidden` to `overflow-visible` if image is not affected ### Проверка 1. List mode on 375px → all "+" buttons fully visible as complete circles. ✅ --- ## Fix 5 — PM-096 (P2) [MUST-FIX]: Tile-mode stepper buttons below 44px touch target ### Сейчас Tile-mode stepper − / + buttons have `w-8 h-8` (32px) — below 44px minimum. ### Должно быть `w-11 h-11` (44px) or `min-w-[44px] min-h-[44px]`. ### НЕ должно быть Do NOT change list-mode stepper (fixed in PM-092, commit d633716). ### Файл и локация `pages/PublicMenu/MenuView.jsx` - Search for `renderTileCard` → find stepper buttons with `w-8 h-8` → change to `w-11 h-11` ### Проверка 1. Tile mode → tap − / + → easily tappable (44px). ✅ --- ## Fix 6 — PM-discount-check (P2) [MUST-FIX]: Discount badge shows when discount_enabled is false ### Сейчас Discount badge (-X%) shown when `discount_percent > 0`, ignoring `partner.discount_enabled`. ### Должно быть Badge shown ONLY when `partner.discount_enabled === true && partner.discount_percent > 0`. ### НЕ должно быть Do NOT change discount calculation. Do NOT change badge styling. ### Файл и локация `pages/PublicMenu/MenuView.jsx` - Search for `discount_percent` — in both `renderListCard` and `renderTileCard` - Add guard: `partner.discount_enabled && partner.discount_percent > 0` before rendering badge + strikethrough price ### Проверка 1. `discount_enabled: false`, `discount_percent: 5` → no badge. ✅ 2. `discount_enabled: true`, `discount_percent: 5` → badge "-5%". ✅ --- ## Fix 7 — #84b (P2) [MUST-FIX]: Discount badge uses hardcoded color instead of partner.discount_color ### Сейчас Discount badge uses hardcoded color (`bg-red-600` or `#C92A2A`). `partner.discount_color` field is ignored. ### Должно быть Badge background: `partner.discount_color || '#C92A2A'` (fallback to default red). ### НЕ должно быть Do NOT change badge shape/position. Badge text color stays white. ### Файл и локация `pages/PublicMenu/MenuView.jsx` - Search for `bg-red` or `#C92A2A` near `discount_percent` rendering - Replace with inline style: `style={{ backgroundColor: partner.discount_color || '#C92A2A' }}` - Apply in both `renderListCard` and `renderTileCard` ### Проверка 1. `discount_color: '#4CAF50'` → badge has green background. ✅ 2. `discount_color: null` → badge has `#C92A2A`. ✅ --- ## Fix 8 — PM-104 (P3) [NICE-TO-HAVE]: Chevron and gray line misaligned in cart drawer header ### Сейчас Chevron (˅, right-aligned) and gray separator line in cart drawer header are at slightly different vertical levels — looks misaligned. ### Должно быть Chevron and separator visually aligned or clearly separated. ### НЕ должно быть Do NOT remove chevron or separator. Do NOT change drawer behavior. ### Файл и локация `pages/PublicMenu/x.jsx` - Search for `ChevronDown` near cart drawer/sheet header - Adjust `margin-top` or `padding` to align - NOTE: Do NOT look in CartView.jsx — it is NOT in TARGET FILES ### Проверка 1. Open cart drawer → header area looks visually clean. ✅ --- ## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано выше - Modify ONLY: `pages/PublicMenu/x.jsx` and `pages/PublicMenu/MenuView.jsx` - Do NOT touch: CartView.jsx, CheckoutView.jsx, useTableSession.jsx, ModeTabs.jsx, StickyCartBar.jsx - Do NOT fix any bugs outside the 8 Fix sections above. - Extra findings = task FAILURE. - UX Lock: `ux-concepts/UX_LOCKED_PublicMenu.md` — do NOT change locked decisions. ## Implementation Notes - Priority: Fix 1 (P1 regression) → Fixes 2–7 (P2) → Fix 8 (P3, NICE-TO-HAVE) - НЕ ломать: PM-105 back button (commit 4da1dc4), PM-106 tile price (commit c152dc7), PM-064 table code BS - git add pages/PublicMenu/x.jsx pages/PublicMenu/MenuView.jsx && git commit -m "fix(PublicMenu): batch 6 — PM-107 regression, toast, dish detail, list+ clip, discount" && git push ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Verify at 375px width: - [ ] PM-107: swipe/× on table code BS → only that sheet closes, order list stays - [ ] PM-103: toast fully visible with readable text (not a thin line) - [ ] PM-102: dish detail button shows "Добавить в корзину" - [ ] PM-108: "+" button in list mode fully visible (no clipping) - [ ] PM-096: tile stepper >= 44px tap target - [ ] No regression: hardware Back still closes topmost sheet only (PM-105) === END ===
+mcp startup: no servers
+codex
+I’m reviewing only `pages/PublicMenu/x.jsx`, `pages/PublicMenu/MenuView.jsx`, plus `README.md`/`BUGS.md` in that folder, and I’ll keep scope locked to Fix 1–8. I’ll save the required findings file, a page-local review report, and a command log without touching the target code.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command Get-Location in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Force -Name pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 11.32s:
+
+ exited 124 in 11.53s:
+
+codex
+The first folder reads timed out, so I’m retrying with longer timeouts and then I’ll inspect just the page-local files needed for Fix 1–8. After that I’ll write the findings and the required review artifacts.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Force -Name pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw pages/PublicMenu/BUGS.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw pages/PublicMenu/README.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 13.68s:
+---
+version: "33.0"
+updated: "2026-03-23"
+session: 165
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*9 active bugs remaining (0x P0, 5x P1, 3x P2, 0x P3, 1x suggestion).*
+
+### BUG-PM-056: Drawer layout not visit-state-driven (P1 â€” Batch 2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P1
+- **ÐšÐ¾Ð³Ð´Ð°:** S153 (consensus chain publicmenu-260321-093745)
+ succeeded in 13.03s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 13.88s:
+components
+versions
+260320-01 useTableSession RELEASE.jsx
+260323-02 CartView RELEASE.jsx
+260323-03 CheckoutView RELEASE.jsx
+260323-07 MenuView RELEASE.jsx
+260323-07 x RELEASE.jsx
+ACCEPTANCE_CRITERIA_PHASE1.md
+BUGS.md
+CartView.jsx
+CheckoutView.jsx
+commands_2026-03-23.log
+COPY_SPEC.md
+i18n_DrawerUX_S79.csv
+i18n_WorkingHours_S79.csv
+MenuView.jsx
+ModeTabs.jsx
+PublicMenu README.md
+PublicMenu_BASE.txt
+README.md
+codex
+I have the page-local context. Next I’m pulling only the code slices tied to the 8 requested fixes so I can verify whether each one is actually fixed, partially fixed, or still regressed.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'pushOverlay|popOverlay|overlayStackRef|popstate|setShowTableCodeSheet|DishDetail|dishDetailOpen|selectedDish|ChevronDown|Toaster|sonner' -Context 4,6 | ForEach-Object { "'$_.ToString(); $_.Context.PreContext; $_.Line; $_.Context.PostContext; '"'---' }" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/MenuView.jsx -Pattern 'toastVisible|renderListCard|renderTileCard|discount_percent|discount_color|bg-red|C92A2A|w-8 h-8|w-11 h-11|right-0|right-2|bottom-0|bottom-2|overflow-hidden|overflow-visible' -Context 4,6 | ForEach-Object { "'$_.ToString(); $_.Context.PreContext; $_.Line; $_.Context.PostContext; '"'---' }" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.18s:
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:16:import { useLocation } from "react-router-dom";
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:17:import { useQuery, useQueryClient } from "@tanstack/react-query";
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:18:import { base44 } from "@/api/base44Client";
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:19:import { useI18n } from "@/components/i18n";
+> C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:20:import { toast } from "sonner"; // P0-6: sonner instead of custom toast
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:21:
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:22:import {
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:23:  AlertCircle,
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:24:  ArrowLeft,
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:25:  Bell,
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:26:  Check,
+import { useLocation } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { useI18n } from "@/components/i18n";
+import { toast } from "sonner"; // P0-6: sonner instead of custom toast
+
+import {
+  AlertCircle,
+  ArrowLeft,
+ succeeded in 10.74s:
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\MenuView.jsx:51:}) {
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\MenuView.jsx:52:  const primaryColor = partner?.primary_color || '#1A1A1A';
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\MenuView.jsx:53:
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\MenuView.jsx:54:  // Toast state for add-to-cart feedback (AC-09)
+> C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\MenuView.jsx:55:  const [toastVisible, setToastVisible] = React.useState(false);
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\MenuView.jsx:56:  const toastTimerRef = React.useRef(null);
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\MenuView.jsx:57:
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\MenuView.jsx:58:  const handleAddToCart = React.useCallback((dish) => {
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\MenuView.jsx:59:    addToCart(dish);
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\MenuView.jsx:60:    // Non-stacking: clear previous timer before setting new one
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\MenuView.jsx:61:    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+}) {
+  const primaryColor = partner?.primary_color || '#1A1A1A';
+
+  // Toast state for add-to-cart feedback (AC-09)
+  const [toastVisible, setToastVisible] = React.useState(false);
+  const toastTimerRef = React.useRef(null);
+
+  const handleAddToCart = React.useCallback((dish) => {
+    addToCart(dish);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 1290 -First 30' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 3490 -First 20' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 3650 -First 45' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 2360 -First 45' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 10.49s:
+ 1291:   const [drawerMode, setDrawerMode] = useState(null); // 'cart' | null
+ 1292: 
+ 1293:   // Just-in-time table confirmation (Batch A+5 Fix 1)
+ 1294:   const [showTableConfirmSheet, setShowTableConfirmSheet] = useState(false);
+ 1295:   const pendingSubmitRef = useRef(false);
+ 1296: 
+ 1297:   // PM-105: Ref-based overlay stack for Android back button priority
+ 1298:   const overlayStackRef = useRef([]);
+ 1299:   const isPopStateClosingRef = useRef(false);
+ 1300: 
+ 1301:   const pushOverlay = useCallback((name) => {
+ 1302:     overlayStackRef.current = [...overlayStackRef.current.filter(n => n !== name), name];
+ 1303:     window.history.pushState({ sheet: name }, '');
+ 1304:   }, []);
+ 1305: 
+ 1306:   const popOverlay = useCallback((name) => {
+ 1307:     overlayStackRef.current = overlayStackRef.current.filter(n => n !== name);
+ 1308:     if (!isPopStateClosingRef.current) {
+ 1309:       window.history.back();
+ 1310:     }
+ succeeded in 10.97s:
+ 3651: 
+ 3652:       {/* PM-102: Dish Detail Dialog */}
+ 3653:       <Dialog open={!!detailDish} onOpenChange={(open) => !open && setDetailDish(null)}>
+ 3654:         <DialogContent className="max-w-md p-0 overflow-hidden">
+ 3655:           {detailDish && (
+ 3656:             <>
+ 3657:               {detailDish.image && (
+ 3658:                 <div className="w-full h-48 bg-slate-100">
+ 3659:                   <img
+ 3660:                     src={detailDish.image}
+ 3661:                     alt={getDishName(detailDish)}
+ 3662:                     className="w-full h-full object-cover"
+ 3663:                   />
+ 3664:                 </div>
+ 3665:               )}
+ 3666:               <div className="p-4 space-y-3">
+ 3667:                 <DialogHeader>
+ 3668:                   <DialogTitle className="text-lg font-bold text-slate-900">
+ 3669:                     {getDishName(detailDish)}
+ 3670:                   </DialogTitle>
+ succeeded in 11.12s:
+ 2361: 
+ 2362:   // Check bill cooldown on mount
+ 2363:   useEffect(() => {
+ 2364:     if (currentTableId) {
+ 2365:       setBillCooldown(isBillOnCooldown(currentTableId));
+ 2366:     }
+ 2367:   }, [currentTableId]);
+ 2368: 
+ 2369:   // Debug hook kept as no-op to maintain hook order (BUG-PM-040: removed prod logging)
+ 2370:   useEffect(() => {}, []);
+ 2371: 
+ 2372:   // PM-S81-15 + PM-105: Android back button closes topmost overlay (stack-based)
+ 2373:   useEffect(() => {
+ 2374:     const handlePopState = () => {
+ 2375:       const stack = overlayStackRef.current;
+ 2376:       if (stack.length === 0) return; // No overlay open â€” let browser handle normally
+ 2377: 
+ 2378:       isPopStateClosingRef.current = true;
+ 2379:       const topOverlay = stack[stack.length - 1];
+ 2380:       overlayStackRef.current = stack.slice(0, -1);
+ succeeded in 11.32s:
+ 3491:       {/* PM-071: z-[60] on DrawerContent ensures BS renders above cart Drawer (z-50) */}
+ 3492:       <Drawer
+ 3493:         open={showTableConfirmSheet}
+ 3494:         onOpenChange={(open) => {
+ 3495:           if (!open) {
+ 3496:             pendingSubmitRef.current = false;
+ 3497:             popOverlay('tableConfirm');
+ 3498:             setShowTableConfirmSheet(false);
+ 3499:             if (!isTableVerified) {
+ 3500:               toast(tr('cart.confirm_table.dismissed', 'Ð”Ð»Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð·Ð°ÐºÐ°Ð·Ð° Ð½ÑƒÐ¶Ð½Ð¾ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ ÑÑ‚Ð¾Ð»'), { id: 'table-dismiss' });
+ 3501:             }
+ 3502:           }
+ 3503:         }}
+ 3504:       >
+ 3505:         <DrawerContent className="max-h-[85dvh] rounded-t-3xl z-[60]">
+ 3506:           <DrawerHeader className="text-center pb-2">
+ 3507: 
+ 3508:             <DrawerTitle className="text-lg font-semibold text-slate-900">
+ 3509:               {tr('cart.verify.enter_table_code', 'Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÐºÐ¾Ð´ ÑÑ‚Ð¾Ð»Ð°')}
+ 3510:             </DrawerTitle>
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 3404 -First 20' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 3692 -First 25' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 5.86s:
+ 3693:                 {showReviews && dishRatings?.[detailDish.id] && (
+ 3694:                   <div className="flex items-center gap-1 text-sm text-slate-500">
+ 3695:                     <span>{dishRatings[detailDish.id]?.avg?.toFixed(1)}</span>
+ 3696:                     <span>({dishRatings[detailDish.id]?.count})</span>
+ 3697:                   </div>
+ 3698:                 )}
+ 3699:                 <Button
+ 3700:                   className="w-full text-white"
+ 3701:                   style={{ backgroundColor: partner?.primary_color || '#1A1A1A' }}
+ 3702:                   onClick={() => { addToCart(detailDish); setDetailDish(null); }}
+ 3703:                 >
+ 3704:                   {t('menu.add_to_cart', 'Ð”Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ Ð² ÐºÐ¾Ñ€Ð·Ð¸Ð½Ñƒ')}
+ 3705:                 </Button>
+ 3706:               </div>
+ 3707:             </>
+ 3708:           )}
+ 3709:         </DialogContent>
+ 3710:       </Dialog>
+ 3711: 
+ 3712:       {/* Sticky cart bar - updated for TableSession */}
+ succeeded in 5.90s:
+ 3405:       <Drawer
+ 3406:         open={drawerMode === 'cart'}
+ 3407:         dismissible={!isSubmitting}
+ 3408:         onOpenChange={(open) => { if (!open && !isSubmitting) { popOverlay('cart'); setDrawerMode(null); } }}
+ 3409:       >
+ 3410:         <DrawerContent className="max-h-[85vh] overflow-hidden [&>[data-vaul-handle-hitarea]]:hidden">
+ 3411:           <DrawerHeader className="sr-only">
+ 3412:             <DrawerTitle>{t('cart.title')}</DrawerTitle>
+ 3413:           </DrawerHeader>
+ 3414:           <div className="overflow-y-auto max-h-[calc(85vh-2rem)]">
+ 3415:             <CartView
+ 3416:               partner={partner}
+ 3417:               currentTable={currentTable}
+ 3418:               currentGuest={currentGuest}
+ 3419:               t={t}
+ 3420:               setView={setView}
+ 3421:               isEditingName={isEditingName}
+ 3422:               guestNameInput={guestNameInput}
+ 3423:               setGuestNameInput={setGuestNameInput}
+ 3424:               handleUpdateGuestName={handleUpdateGuestName}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'ChevronDown' | ForEach-Object { "'$_.LineNumber.ToString() + '"': ' + "'$_.Line }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.84s:
+28:   ChevronDown,
+codex
+I’ve isolated one clear regression in the overlay stack logic already. I’m checking the remaining Fix 2–8 slices now against the current JSX so I can keep the final write-up limited to actual gaps, not theoretical issues.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 80 -First 120' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 332 -First 60' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 188 -First 120' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 1 -First 95' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 15.16s:
+  189:   // Render dish card for TILE mode (grid layout)
+  190:   // S72: Redesigned â€” flex-col alignment, round "+" on photo, pill stepper, no placeholder text
+  191:   const renderTileCard = (dish) => {
+  192:     const inCart = cart.find((i) => i.dishId === dish.id);
+  193: 
+  194:     return (
+  195:       <Card
+  196:         key={dish.id}
+  197:         className="relative overflow-hidden hover:shadow-md transition-shadow border-slate-200 flex flex-col cursor-pointer"
+  198:         onClick={() => onDishClick?.(dish)}
+  199:       >
+  200:         {/* Image area */}
+  201:         <div className="relative w-full h-36 sm:h-48 bg-slate-100">
+  202:           {dish.image ? (
+  203:             <img
+  204:               src={dish.image}
+  205:               alt={getDishName(dish)}
+  206:               className="w-full h-full object-cover"
+  207:               loading="lazy"
+  208:               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; }}
+ succeeded in 15.75s:
+  333:         </div>
+  334:       )}
+  335: 
+  336:       {loadingDishes ? (
+  337:         <div className="flex justify-center py-12">
+  338:           <Loader2 className="w-8 h-8 animate-spin" style={{color: primaryColor}} />
+  339:         </div>
+  340:       ) : sortedCategories.length > 0 ? (
+  341:         sortedCategories.map((category) => {
+  342:           const categoryDishes = groupedDishes[category.id];
+  343:           if (!categoryDishes) return null;
+  344: 
+  345:           return (
+  346:             <div
+  347:               key={category.id}
+  348:               id={`category-${category.id}`}
+  349:               ref={(el) => (sectionRefs.current[category.id] = el)}
+  350:               className="space-y-3 scroll-mt-[60px]"
+  351:             >
+  352:               <h3 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">
+ succeeded in 16.00s:
+   81:   const renderListCard = (dish) => {
+   82:     const inCart = cart.find((i) => i.dishId === dish.id);
+   83:     
+   84:     return (
+   85:       <Card
+   86:         key={dish.id}
+   87:         className="overflow-hidden hover:shadow-md transition-shadow border-slate-200 cursor-pointer"
+   88:         onClick={() => onDishClick?.(dish)}
+   89:       >
+   90:         <CardContent className="p-3 flex gap-3">
+   91:           {/* Image LEFT - fixed size */}
+   92:           <div className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100">
+   93:             {dish.image ? (
+   94:               <img
+   95:                 src={dish.image}
+   96:                 alt={getDishName(dish)}
+   97:                 className="w-full h-full object-cover"
+   98:                 loading="lazy"
+   99:                 onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; }}
+  100:               />
+ succeeded in 16.30s:
+    2: import { Loader2, ImageIcon, Minus, Plus, LayoutGrid, List } from "lucide-react";
+    3: import { Card, CardContent } from "@/components/ui/card";
+    4: import DishRating from "@/components/publicMenu/DishRating";
+    5: 
+    6: // Grid mappings for Tailwind (explicit full class names)
+    7: const DESKTOP_GRID = {
+    8:   1: "md:grid-cols-1",
+    9:   2: "md:grid-cols-2",
+   10:   3: "md:grid-cols-3",
+   11:   4: "md:grid-cols-4",
+   12:   5: "md:grid-cols-5",
+   13: };
+   14: 
+   15: const MOBILE_GRID = {
+   16:   1: "grid-cols-1",
+   17:   2: "grid-cols-2",
+   18:   3: "grid-cols-3",
+   19: };
+   20: 
+   21: function darkenColor(hex, amount) {
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/MenuView.jsx -Pattern 'added_to_cart|Добавлено|Добавлено в корзину' -Context 1,1 | ForEach-Object { "'$_.LineNumber.ToString() + '"': ' + "'$_.Line }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'added_to_cart|addToCart\\s*=|const addToCart|function addToCart|toast\\(' -Context 2,4 | ForEach-Object { "'$_.ToString(); $_.Context.PreContext; $_.Line; $_.Context.PostContext; '"'---' }" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.67s:
+378:           {t('menu.added_to_cart', '\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E')}
+ succeeded in 1.72s:
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:2327:
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:2328:  // Cart handlers - P1-8: use translated name
+> C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:2329:  const addToCart = (dish) => {
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:2330:    const translatedName = getDishName(dish);
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:2331:    setCart((prev) => {
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:2332:      const existing = prev.find((i) => i.dishId === dish.id);
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:2333:      if (existing) {
+
+  // Cart handlers - P1-8: use translated name
+  const addToCart = (dish) => {
+    const translatedName = getDishName(dish);
+    setCart((prev) => {
+      const existing = prev.find((i) => i.dishId === dish.id);
+      if (existing) {
+---
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:3315:          getDishDescription={getDishDescription}
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:3316:          formatPrice={formatPrice}
+> C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:3317:          addToCart={addToCart}
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:3318:          updateQuantity={updateQuantity}
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:3319:          onDishClick={(dish) => setDetailDish(dish)}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'from \"@/components/ui/button\"|<Button' -Context 0,0 | ForEach-Object { "'$_.LineNumber.ToString() + '"': ' + "'$_.Line }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.62s:
+73: import { Button } from "@/components/ui/button";
+750:         <Button
+758:         <Button
+768:           <Button
+1013:               <Button variant="outline" className="min-h-[44px]" onClick={onBackToMenu}>{t("order_status.back_to_menu")}</Button>
+1042:               <Button variant="outline" className="min-h-[44px]" onClick={() => refetchOrder()}>
+1062:               <Button variant="outline" className="min-h-[44px]" onClick={onBackToMenu}>{t("order_status.back_to_menu")}</Button>
+1079:               <Button variant="outline" className="min-h-[44px] mt-4" onClick={onBackToMenu}>{t("order_status.back_to_menu")}</Button>
+1095:         <button
+1195:             <Button
+3131:           <Button variant="outline" className="mt-4 min-h-[44px]" onClick={() => refetchPartner()}>
+3572:             <Button
+3699:                 <Button
+codex
+I’ve narrowed it to a small set of concrete gaps inside the requested fixes. I’m writing the findings artifact now, then I’ll append the required page-local review note and command log without touching the page code.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pipeline/chain-state' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pages/PublicMenu/commands_2026-03-23.log' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pages/PublicMenu/review_2026-03-23.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.17s:
+False
+ succeeded in 2.41s:
+True
+ succeeded in 2.48s:
+True
+ succeeded in 2.47s:
+True
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-142202-d0a4
+
+## Findings
+1. [P1] Fix 1 regression still present in programmatic sheet close — `popOverlay()` still calls `window.history.back()` whenever the close did not originate from `popstate` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306)). The table-code sheet’s programmatic close path still uses that helper ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494)), and the `popstate` handler then closes whatever overlay is now on top of the ref stack ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374)). With `cart -> tableConfirm` open, swiping or tapping `×` on `tableConfirm` still removes `tableConfirm` from the stack first, then `history.back()` closes `cart`. FIX: add the requested `isProgrammaticCloseRef`, set it before consuming the sheet’s own history entry, and make the `popstate` listener skip one cycle when that flag is set so only `tableConfirm` is removed.
+2. [P2] Fix 2 is still incomplete against the task contract — the custom toast now renders as a fixed chip ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376)), but it still uses fallback copy `Добавлено` instead of `Добавлено в корзину` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378)), dismisses after 1500ms instead of about 2000ms ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58)), and stays at `z-50`, below the `z-[60]` confirmation sheet in `x.jsx`. FIX: change the fallback text to `t('menu.added_to_cart', 'Добавлено в корзину')`, increase the timeout to about 2s, and raise the toast container to a guaranteed top layer such as `z-[200]`.
+3. [P2] Fix 3 restores the CTA text, but the dialog button still does not enforce the required 44px mobile target — the dish detail action now has visible text ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699)), yet its class is only `w-full text-white` and does not add `min-h-[44px]` or `h-11`. In this page file, other buttons explicitly add `min-h-[44px]` when that requirement matters, so this path still relies on shared defaults instead of guaranteeing the accepted touch size. FIX: add `min-h-[44px]` or `h-11` to the dish detail CTA while keeping the existing `t('menu.add_to_cart', 'Добавить в корзину')` text and white foreground.
+
+## Summary
+Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+apply_patch(auto_approved=true) exited 0 in 936ms:
+Success. Updated the following files:
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..102565293ee17215905eb9a02e723347d44e5523
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-142202-d0a4
++
++## Findings
++1. [P1] Fix 1 regression still present in programmatic sheet close — `popOverlay()` still calls `window.history.back()` whenever the close did not originate from `popstate` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306)). The table-code sheet’s programmatic close path still uses that helper ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494)), and the `popstate` handler then closes whatever overlay is now on top of the ref stack ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374)). With `cart -> tableConfirm` open, swiping or tapping `×` on `tableConfirm` still removes `tableConfirm` from the stack first, then `history.back()` closes `cart`. FIX: add the requested `isProgrammaticCloseRef`, set it before consuming the sheet’s own history entry, and make the `popstate` listener skip one cycle when that flag is set so only `tableConfirm` is removed.
++2. [P2] Fix 2 is still incomplete against the task contract — the custom toast now renders as a fixed chip ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376)), but it still uses fallback copy `Добавлено` instead of `Добавлено в корзину` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378)), dismisses after 1500ms instead of about 2000ms ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58)), and stays at `z-50`, below the `z-[60]` confirmation sheet in `x.jsx`. FIX: change the fallback text to `t('menu.added_to_cart', 'Добавлено в корзину')`, increase the timeout to about 2s, and raise the toast container to a guaranteed top layer such as `z-[200]`.
++3. [P2] Fix 3 restores the CTA text, but the dialog button still does not enforce the required 44px mobile target — the dish detail action now has visible text ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699)), yet its class is only `w-full text-white` and does not add `min-h-[44px]` or `h-11`. In this page file, other buttons explicitly add `min-h-[44px]` when that requirement matters, so this path still relies on shared defaults instead of guaranteeing the accepted touch size. FIX: add `min-h-[44px]` or `h-11` to the dish detail CTA while keeping the existing `t('menu.add_to_cart', 'Добавить в корзину')` text and white foreground.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..102565293ee17215905eb9a02e723347d44e5523
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-142202-d0a4
++
++## Findings
++1. [P1] Fix 1 regression still present in programmatic sheet close — `popOverlay()` still calls `window.history.back()` whenever the close did not originate from `popstate` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306)). The table-code sheet’s programmatic close path still uses that helper ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494)), and the `popstate` handler then closes whatever overlay is now on top of the ref stack ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374)). With `cart -> tableConfirm` open, swiping or tapping `×` on `tableConfirm` still removes `tableConfirm` from the stack first, then `history.back()` closes `cart`. FIX: add the requested `isProgrammaticCloseRef`, set it before consuming the sheet’s own history entry, and make the `popstate` listener skip one cycle when that flag is set so only `tableConfirm` is removed.
++2. [P2] Fix 2 is still incomplete against the task contract — the custom toast now renders as a fixed chip ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376)), but it still uses fallback copy `Добавлено` instead of `Добавлено в корзину` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378)), dismisses after 1500ms instead of about 2000ms ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58)), and stays at `z-50`, below the `z-[60]` confirmation sheet in `x.jsx`. FIX: change the fallback text to `t('menu.added_to_cart', 'Добавлено в корзину')`, increase the timeout to about 2s, and raise the toast container to a guaranteed top layer such as `z-[200]`.
++3. [P2] Fix 3 restores the CTA text, but the dialog button still does not enforce the required 44px mobile target — the dish detail action now has visible text ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699)), yet its class is only `w-full text-white` and does not add `min-h-[44px]` or `h-11`. In this page file, other buttons explicitly add `min-h-[44px]` when that requirement matters, so this path still relies on shared defaults instead of guaranteeing the accepted touch size. FIX: add `min-h-[44px]` or `h-11` to the dish detail CTA while keeping the existing `t('menu.add_to_cart', 'Добавить в корзину')` text and white foreground.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+I’ve finished the review and I’m appending the report artifacts now. The page code stays untouched; only the findings/report/log files are being written.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+
+---
+
+## 2026-03-23 — Chain publicmenu-260323-142202-d0a4
+
+Scope: "'`pages/PublicMenu/x.jsx`, `pages/PublicMenu/MenuView.jsx`, plus page-local `README.md` and `BUGS.md` for context. Review limited to Fix 1–8 only.
+
+### Findings
+1. [P1] Fix 1 regression still present in programmatic sheet close — `popOverlay()` in `x.jsx:1306-1310` still calls `window.history.back()` without a programmatic-close guard, and the table-confirm drawer still uses that path in `x.jsx:3494-3498`. With `cart -> tableConfirm` open, the subsequent `popstate` handler in `x.jsx:2374-2397` closes `cart` as the new top overlay.
+2. [P2] Fix 2 is incomplete against the task contract — the custom toast in `MenuView.jsx:376-379` is now fixed-positioned, but it still uses fallback text `Добавлено`, dismisses after 1500ms in `MenuView.jsx:58-64`, and remains `z-50` instead of a guaranteed top layer.
+3. [P2] Fix 3 restores the CTA text, but the dish-detail button in `x.jsx:3699-3704` still does not enforce the required 44px touch target because it only sets `className="w-full text-white"` and does not add `min-h-[44px]` or `h-11`.
+
+### Summary
+- Total findings: 3
+- Severity split: 0 P0, 1 P1, 2 P2, 0 P3
+- Prompt clarity: 5/5
+'"'@ | Add-Content pages/PublicMenu/review_2026-03-23.md" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.27s:
+
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..102565293ee17215905eb9a02e723347d44e5523
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-142202-d0a4
++
++## Findings
++1. [P1] Fix 1 regression still present in programmatic sheet close — `popOverlay()` still calls `window.history.back()` whenever the close did not originate from `popstate` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306)). The table-code sheet’s programmatic close path still uses that helper ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494)), and the `popstate` handler then closes whatever overlay is now on top of the ref stack ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374)). With `cart -> tableConfirm` open, swiping or tapping `×` on `tableConfirm` still removes `tableConfirm` from the stack first, then `history.back()` closes `cart`. FIX: add the requested `isProgrammaticCloseRef`, set it before consuming the sheet’s own history entry, and make the `popstate` listener skip one cycle when that flag is set so only `tableConfirm` is removed.
++2. [P2] Fix 2 is still incomplete against the task contract — the custom toast now renders as a fixed chip ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376)), but it still uses fallback copy `Добавлено` instead of `Добавлено в корзину` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378)), dismisses after 1500ms instead of about 2000ms ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58)), and stays at `z-50`, below the `z-[60]` confirmation sheet in `x.jsx`. FIX: change the fallback text to `t('menu.added_to_cart', 'Добавлено в корзину')`, increase the timeout to about 2s, and raise the toast container to a guaranteed top layer such as `z-[200]`.
++3. [P2] Fix 3 restores the CTA text, but the dialog button still does not enforce the required 44px mobile target — the dish detail action now has visible text ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699)), yet its class is only `w-full text-white` and does not add `min-h-[44px]` or `h-11`. In this page file, other buttons explicitly add `min-h-[44px]` when that requirement matters, so this path still relies on shared defaults instead of guaranteeing the accepted touch size. FIX: add `min-h-[44px]` or `h-11` to the dish detail CTA while keeping the existing `t('menu.add_to_cart', 'Добавить в корзину')` text and white foreground.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+
+=== 2026-03-23 — Chain publicmenu-260323-142202-d0a4 ===
+[timeout] Get-ChildItem -Force -Name pages/PublicMenu
+[timeout] Get-Location
+Get-ChildItem -Force -Name pages/PublicMenu
+Get-Content -Raw pages/PublicMenu/README.md
+Get-Content -Raw pages/PublicMenu/BUGS.md
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'pushOverlay|popOverlay|overlayStackRef|popstate|setShowTableCodeSheet|DishDetail|dishDetailOpen|selectedDish|ChevronDown|Toaster|sonner' -Context 4,6 | ForEach-Object { "'$_.ToString(); $_.Context.PreContext; $_.Line; $_.Context.PostContext; '"'---' }
+Select-String -Path pages/PublicMenu/MenuView.jsx -Pattern 'toastVisible|renderListCard|renderTileCard|discount_percent|discount_color|bg-red|C92A2A|w-8 h-8|w-11 h-11|right-0|right-2|bottom-0|bottom-2|overflow-hidden|overflow-visible' -Context 4,6 | ForEach-Object { "'$_.ToString(); $_.Context.PreContext; $_.Line; $_.Context.PostContext; '"'---' }
+"'$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 1290 -First 30
+$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 2360 -First 45
+$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 3490 -First 20
+$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 3650 -First 45
+$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 3692 -First 25
+$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 3404 -First 20
+Select-String -Path pages/PublicMenu/x.jsx -Pattern '"'ChevronDown' | ForEach-Object { "'$_.LineNumber.ToString() + '"': ' + "'$_.Line }
+$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 1 -First 95
+$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 80 -First 120
+$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 188 -First 120
+$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 332 -First 60
+Select-String -Path pages/PublicMenu/x.jsx -Pattern '"'added_to_cart|addToCart\\s*=|const addToCart|function addToCart|toast\\(' -Context 2,4 | ForEach-Object { "'$_.ToString(); $_.Context.PreContext; $_.Line; $_.Context.PostContext; '"'---' }
+Select-String -Path pages/PublicMenu/MenuView.jsx -Pattern 'added_to_cart|Добавлено|Добавлено в корзину' -Context 1,1 | ForEach-Object { "'$_.LineNumber.ToString() + '"': ' + "'$_.Line }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern '"'from \"@/components/ui/button\"|<Button' -Context 0,0 | ForEach-Object { "'$_.LineNumber.ToString() + '"': ' + "'$_.Line }
+Test-Path pipeline/chain-state
+Test-Path pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+Test-Path pages/PublicMenu/review_2026-03-23.md
+Test-Path pages/PublicMenu/commands_2026-03-23.log
+@'"' | Add-Content pages/PublicMenu/commands_2026-03-23.log" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 1 in 1.46s:
+The string is missing the terminator: '@.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : TerminatorExpectedAtEndOfString
+ 
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..102565293ee17215905eb9a02e723347d44e5523
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-142202-d0a4
++
++## Findings
++1. [P1] Fix 1 regression still present in programmatic sheet close — `popOverlay()` still calls `window.history.back()` whenever the close did not originate from `popstate` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306)). The table-code sheet’s programmatic close path still uses that helper ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494)), and the `popstate` handler then closes whatever overlay is now on top of the ref stack ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374)). With `cart -> tableConfirm` open, swiping or tapping `×` on `tableConfirm` still removes `tableConfirm` from the stack first, then `history.back()` closes `cart`. FIX: add the requested `isProgrammaticCloseRef`, set it before consuming the sheet’s own history entry, and make the `popstate` listener skip one cycle when that flag is set so only `tableConfirm` is removed.
++2. [P2] Fix 2 is still incomplete against the task contract — the custom toast now renders as a fixed chip ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376)), but it still uses fallback copy `Добавлено` instead of `Добавлено в корзину` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378)), dismisses after 1500ms instead of about 2000ms ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58)), and stays at `z-50`, below the `z-[60]` confirmation sheet in `x.jsx`. FIX: change the fallback text to `t('menu.added_to_cart', 'Добавлено в корзину')`, increase the timeout to about 2s, and raise the toast container to a guaranteed top layer such as `z-[200]`.
++3. [P2] Fix 3 restores the CTA text, but the dialog button still does not enforce the required 44px mobile target — the dish detail action now has visible text ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699)), yet its class is only `w-full text-white` and does not add `min-h-[44px]` or `h-11`. In this page file, other buttons explicitly add `min-h-[44px]` when that requirement matters, so this path still relies on shared defaults instead of guaranteeing the accepted touch size. FIX: add `min-h-[44px]` or `h-11` to the dish detail CTA while keeping the existing `t('menu.add_to_cart', 'Добавить в корзину')` text and white foreground.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+The command-log append hit a PowerShell here-string parse error. I’m rewriting that append in a simpler form so the log still captures the full command list, including the failed attempt.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = @(
+'"'=== 2026-03-23 — Chain publicmenu-260323-142202-d0a4 ===',
+'[timeout] Get-ChildItem -Force -Name pages/PublicMenu',
+'[timeout] Get-Location',
+'Get-ChildItem -Force -Name pages/PublicMenu',
+'Get-Content -Raw pages/PublicMenu/README.md',
+'Get-Content -Raw pages/PublicMenu/BUGS.md',
+\"Select-String -Path pages/PublicMenu/x.jsx -Pattern 'pushOverlay|popOverlay|overlayStackRef|popstate|setShowTableCodeSheet|DishDetail|dishDetailOpen|selectedDish|ChevronDown|Toaster|sonner' -Context 4,6 | ForEach-Object { "'`$_.ToString(); `$_.Context.PreContext; `$_.Line; `$_.Context.PostContext; '"'---' }\",
+\"Select-String -Path pages/PublicMenu/MenuView.jsx -Pattern 'toastVisible|renderListCard|renderTileCard|discount_percent|discount_color|bg-red|C92A2A|w-8 h-8|w-11 h-11|right-0|right-2|bottom-0|bottom-2|overflow-hidden|overflow-visible' -Context 4,6 | ForEach-Object { "'`$_.ToString(); `$_.Context.PreContext; `$_.Line; `$_.Context.PostContext; '"'---' }\",
+\""'`$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'`$i, `$_; `$i++ } | Select-Object -Skip 1290 -First 30",
+"`$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'`$i, `$_; `$i++ } | Select-Object -Skip 2360 -First 45",
+"`$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'`$i, `$_; `$i++ } | Select-Object -Skip 3490 -First 20",
+"`$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'`$i, `$_; `$i++ } | Select-Object -Skip 3650 -First 45",
+"`$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'`$i, `$_; `$i++ } | Select-Object -Skip 3692 -First 25",
+"`$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'`$i, `$_; `$i++ } | Select-Object -Skip 3404 -First 20",
+"Select-String -Path pages/PublicMenu/x.jsx -Pattern '"'ChevronDown' | ForEach-Object { "'`$_.LineNumber.ToString() + '"': ' + "'`$_.Line }",
+"`$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'`$i, `$_; `$i++ } | Select-Object -Skip 1 -First 95",
+"`$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'`$i, `$_; `$i++ } | Select-Object -Skip 80 -First 120",
+"`$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'`$i, `$_; `$i++ } | Select-Object -Skip 188 -First 120",
+"`$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'`$i, `$_; `$i++ } | Select-Object -Skip 332 -First 60",
+"Select-String -Path pages/PublicMenu/x.jsx -Pattern '"'added_to_cart|addToCart\\\\s*=|const addToCart|function addToCart|toast\\\\(' -Context 2,4 | ForEach-Object { "'`$_.ToString(); `$_.Context.PreContext; `$_.Line; `$_.Context.PostContext; '"'---' }\",
+\"Select-String -Path pages/PublicMenu/MenuView.jsx -Pattern 'added_to_cart|Добавлено|Добавлено в корзину' -Context 1,1 | ForEach-Object { "'`$_.LineNumber.ToString() + '"': ' + "'`$_.Line }",
+"Select-String -Path pages/PublicMenu/x.jsx -Pattern '"'from \\\"@/components/ui/button\\\"|<Button' -Context 0,0 | ForEach-Object { "'`$_.LineNumber.ToString() + '"': ' + "'`$_.Line }",
+'"'Test-Path pipeline/chain-state',
+'Test-Path pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md',
+'Test-Path pages/PublicMenu/review_2026-03-23.md',
+'Test-Path pages/PublicMenu/commands_2026-03-23.log',
+\"[failed parser] @' ... @' | Add-Content pages/PublicMenu/commands_2026-03-23.log\",
+\"@' ... '@ | Add-Content pages/PublicMenu/review_2026-03-23.md\",
+\""'`$lines = @(...) ; `$lines | Add-Content pages/PublicMenu/commands_2026-03-23.log"
+)
+Add-Content pages/PublicMenu/commands_2026-03-23.log ""
+$lines | Add-Content pages/PublicMenu/commands_2026-03-23.log' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 1 in 1.45s:
+At line:24 char:62
++ ... Select-String -Path pages/PublicMenu/x.jsx -Pattern 'from \"@/compone ...
++                                                                 ~
+Unrecognized token in source text.
+At line:24 char:62
++ ... Select-String -Path pages/PublicMenu/x.jsx -Pattern 'from \"@/compone ...
++                                                                 ~
+Unexpected token '@' in expression or statement.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : UnrecognizedToken
+ 
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..102565293ee17215905eb9a02e723347d44e5523
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-142202-d0a4
++
++## Findings
++1. [P1] Fix 1 regression still present in programmatic sheet close — `popOverlay()` still calls `window.history.back()` whenever the close did not originate from `popstate` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306)). The table-code sheet’s programmatic close path still uses that helper ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494)), and the `popstate` handler then closes whatever overlay is now on top of the ref stack ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374)). With `cart -> tableConfirm` open, swiping or tapping `×` on `tableConfirm` still removes `tableConfirm` from the stack first, then `history.back()` closes `cart`. FIX: add the requested `isProgrammaticCloseRef`, set it before consuming the sheet’s own history entry, and make the `popstate` listener skip one cycle when that flag is set so only `tableConfirm` is removed.
++2. [P2] Fix 2 is still incomplete against the task contract — the custom toast now renders as a fixed chip ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376)), but it still uses fallback copy `Добавлено` instead of `Добавлено в корзину` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378)), dismisses after 1500ms instead of about 2000ms ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58)), and stays at `z-50`, below the `z-[60]` confirmation sheet in `x.jsx`. FIX: change the fallback text to `t('menu.added_to_cart', 'Добавлено в корзину')`, increase the timeout to about 2s, and raise the toast container to a guaranteed top layer such as `z-[200]`.
++3. [P2] Fix 3 restores the CTA text, but the dialog button still does not enforce the required 44px mobile target — the dish detail action now has visible text ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699)), yet its class is only `w-full text-white` and does not add `min-h-[44px]` or `h-11`. In this page file, other buttons explicitly add `min-h-[44px]` when that requirement matters, so this path still relies on shared defaults instead of guaranteeing the accepted touch size. FIX: add `min-h-[44px]` or `h-11` to the dish detail CTA while keeping the existing `t('menu.add_to_cart', 'Добавить в корзину')` text and white foreground.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+TEST
+'@ | Add-Content pages/PublicMenu/commands_2026-03-23.log
+" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.58s:
+
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..102565293ee17215905eb9a02e723347d44e5523
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-142202-d0a4
++
++## Findings
++1. [P1] Fix 1 regression still present in programmatic sheet close — `popOverlay()` still calls `window.history.back()` whenever the close did not originate from `popstate` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306)). The table-code sheet’s programmatic close path still uses that helper ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494)), and the `popstate` handler then closes whatever overlay is now on top of the ref stack ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374)). With `cart -> tableConfirm` open, swiping or tapping `×` on `tableConfirm` still removes `tableConfirm` from the stack first, then `history.back()` closes `cart`. FIX: add the requested `isProgrammaticCloseRef`, set it before consuming the sheet’s own history entry, and make the `popstate` listener skip one cycle when that flag is set so only `tableConfirm` is removed.
++2. [P2] Fix 2 is still incomplete against the task contract — the custom toast now renders as a fixed chip ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376)), but it still uses fallback copy `Добавлено` instead of `Добавлено в корзину` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378)), dismisses after 1500ms instead of about 2000ms ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58)), and stays at `z-50`, below the `z-[60]` confirmation sheet in `x.jsx`. FIX: change the fallback text to `t('menu.added_to_cart', 'Добавлено в корзину')`, increase the timeout to about 2s, and raise the toast container to a guaranteed top layer such as `z-[200]`.
++3. [P2] Fix 3 restores the CTA text, but the dialog button still does not enforce the required 44px mobile target — the dish detail action now has visible text ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699)), yet its class is only `w-full text-white` and does not add `min-h-[44px]` or `h-11`. In this page file, other buttons explicitly add `min-h-[44px]` when that requirement matters, so this path still relies on shared defaults instead of guaranteeing the accepted touch size. FIX: add `min-h-[44px]` or `h-11` to the dish detail CTA while keeping the existing `t('menu.add_to_cart', 'Добавить в корзину')` text and white foreground.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+
+=== 2026-03-23 — Chain publicmenu-260323-142202-d0a4 ===
+[timeout] Get-ChildItem -Force -Name pages/PublicMenu
+[timeout] Get-Location
+Get-ChildItem -Force -Name pages/PublicMenu
+Get-Content -Raw pages/PublicMenu/README.md
+Get-Content -Raw pages/PublicMenu/BUGS.md
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'pushOverlay|popOverlay|overlayStackRef|popstate|setShowTableCodeSheet|DishDetail|dishDetailOpen|selectedDish|ChevronDown|Toaster|sonner' -Context 4,6 | ForEach-Object { "'$_.ToString(); $_.Context.PreContext; $_.Line; $_.Context.PostContext; '"'---' }
+Select-String -Path pages/PublicMenu/MenuView.jsx -Pattern 'toastVisible|renderListCard|renderTileCard|discount_percent|discount_color|bg-red|C92A2A|w-8 h-8|w-11 h-11|right-0|right-2|bottom-0|bottom-2|overflow-hidden|overflow-visible' -Context 4,6 | ForEach-Object { "'$_.ToString(); $_.Context.PreContext; $_.Line; $_.Context.PostContext; '"'---' }
+"'$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 1290 -First 30
+$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 2360 -First 45
+$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 3490 -First 20
+$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 3650 -First 45
+$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 3692 -First 25
+$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 3404 -First 20
+Select-String -Path pages/PublicMenu/x.jsx -Pattern '"'ChevronDown' | ForEach-Object { "'$_.LineNumber.ToString() + '"': ' + "'$_.Line }
+$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 1 -First 95
+$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 80 -First 120
+$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 188 -First 120
+$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 332 -First 60
+Select-String -Path pages/PublicMenu/x.jsx -Pattern '"'added_to_cart|addToCart\\s*=|const addToCart|function addToCart|toast\\(' -Context 2,4 | ForEach-Object { "'$_.ToString(); $_.Context.PreContext; $_.Line; $_.Context.PostContext; '"'---' }
+Select-String -Path pages/PublicMenu/MenuView.jsx -Pattern 'added_to_cart|Добавлено|Добавлено в корзину' -Context 1,1 | ForEach-Object { "'$_.LineNumber.ToString() + '"': ' + "'$_.Line }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern '"'from \"@/components/ui/button\"|<Button' -Context 0,0 | ForEach-Object { "'$_.LineNumber.ToString() + '"': ' + "'$_.Line }
+Test-Path pipeline/chain-state
+Test-Path pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+Test-Path pages/PublicMenu/review_2026-03-23.md
+Test-Path pages/PublicMenu/commands_2026-03-23.log
+[failed parser] @'"' ... @' | Add-Content pages/PublicMenu/commands_2026-03-23.log
+@' ... '@ | Add-Content pages/PublicMenu/review_2026-03-23.md
+@' ... '@ | Add-Content pages/PublicMenu/commands_2026-03-23.log
+'@ | Add-Content pages/PublicMenu/commands_2026-03-23.log
+" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.53s:
+
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..102565293ee17215905eb9a02e723347d44e5523
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-142202-d0a4
++
++## Findings
++1. [P1] Fix 1 regression still present in programmatic sheet close — `popOverlay()` still calls `window.history.back()` whenever the close did not originate from `popstate` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306)). The table-code sheet’s programmatic close path still uses that helper ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494)), and the `popstate` handler then closes whatever overlay is now on top of the ref stack ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374)). With `cart -> tableConfirm` open, swiping or tapping `×` on `tableConfirm` still removes `tableConfirm` from the stack first, then `history.back()` closes `cart`. FIX: add the requested `isProgrammaticCloseRef`, set it before consuming the sheet’s own history entry, and make the `popstate` listener skip one cycle when that flag is set so only `tableConfirm` is removed.
++2. [P2] Fix 2 is still incomplete against the task contract — the custom toast now renders as a fixed chip ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376)), but it still uses fallback copy `Добавлено` instead of `Добавлено в корзину` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378)), dismisses after 1500ms instead of about 2000ms ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58)), and stays at `z-50`, below the `z-[60]` confirmation sheet in `x.jsx`. FIX: change the fallback text to `t('menu.added_to_cart', 'Добавлено в корзину')`, increase the timeout to about 2s, and raise the toast container to a guaranteed top layer such as `z-[200]`.
++3. [P2] Fix 3 restores the CTA text, but the dialog button still does not enforce the required 44px mobile target — the dish detail action now has visible text ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699)), yet its class is only `w-full text-white` and does not add `min-h-[44px]` or `h-11`. In this page file, other buttons explicitly add `min-h-[44px]` when that requirement matters, so this path still relies on shared defaults instead of guaranteeing the accepted touch size. FIX: add `min-h-[44px]` or `h-11` to the dish detail CTA while keeping the existing `t('menu.add_to_cart', 'Добавить в корзину')` text and white foreground.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+Findings were saved to [publicmenu-260323-142202-d0a4-codex-findings.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md), and I appended the page-local report/log to [review_2026-03-23.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23.md) and [commands_2026-03-23.log](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23.log).
+
+1. [P1] Fix 1 is still regressed: programmatic close of `tableConfirm` still routes through `history.back()` in [x.jsx#L1306](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306), [x.jsx#L3494](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494), and [x.jsx#L2374](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374), so closing the top sheet can still collapse the cart underneath.
+2. [P2] Fix 2 is incomplete: the custom toast in [MenuView.jsx#L58](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58) and [MenuView.jsx#L376](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376) still uses fallback text `Добавлено`, dismisses after 1500ms, and stays at `z-50` instead of matching the requested `Добавлено в корзину`, ~2s, top-layer behavior.
+3. [P2] Fix 3 is incomplete: the dish-detail CTA text is visible now, but [x.jsx#L3699](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699) still does not enforce the required 44px minimum button height.
+
+No extra findings were reported outside Fix 1–8.
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..102565293ee17215905eb9a02e723347d44e5523
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-142202-d0a4
++
++## Findings
++1. [P1] Fix 1 regression still present in programmatic sheet close — `popOverlay()` still calls `window.history.back()` whenever the close did not originate from `popstate` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306)). The table-code sheet’s programmatic close path still uses that helper ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494)), and the `popstate` handler then closes whatever overlay is now on top of the ref stack ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374)). With `cart -> tableConfirm` open, swiping or tapping `×` on `tableConfirm` still removes `tableConfirm` from the stack first, then `history.back()` closes `cart`. FIX: add the requested `isProgrammaticCloseRef`, set it before consuming the sheet’s own history entry, and make the `popstate` listener skip one cycle when that flag is set so only `tableConfirm` is removed.
++2. [P2] Fix 2 is still incomplete against the task contract — the custom toast now renders as a fixed chip ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376)), but it still uses fallback copy `Добавлено` instead of `Добавлено в корзину` ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L378)), dismisses after 1500ms instead of about 2000ms ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58)), and stays at `z-50`, below the `z-[60]` confirmation sheet in `x.jsx`. FIX: change the fallback text to `t('menu.added_to_cart', 'Добавлено в корзину')`, increase the timeout to about 2s, and raise the toast container to a guaranteed top layer such as `z-[200]`.
++3. [P2] Fix 3 restores the CTA text, but the dialog button still does not enforce the required 44px mobile target — the dish detail action now has visible text ([C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699)), yet its class is only `w-full text-white` and does not add `min-h-[44px]` or `h-11`. In this page file, other buttons explicitly add `min-h-[44px]` when that requirement matters, so this path still relies on shared defaults instead of guaranteeing the accepted touch size. FIX: add `min-h-[44px]` or `h-11` to the dish detail CTA while keeping the existing `t('menu.add_to_cart', 'Добавить в корзину')` text and white foreground.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+tokens used
+162 413
+Findings were saved to [publicmenu-260323-142202-d0a4-codex-findings.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-142202-d0a4-codex-findings.md), and I appended the page-local report/log to [review_2026-03-23.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23.md) and [commands_2026-03-23.log](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23.log).
+
+1. [P1] Fix 1 is still regressed: programmatic close of `tableConfirm` still routes through `history.back()` in [x.jsx#L1306](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1306), [x.jsx#L3494](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3494), and [x.jsx#L2374](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2374), so closing the top sheet can still collapse the cart underneath.
+2. [P2] Fix 2 is incomplete: the custom toast in [MenuView.jsx#L58](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L58) and [MenuView.jsx#L376](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L376) still uses fallback text `Добавлено`, dismisses after 1500ms, and stays at `z-50` instead of matching the requested `Добавлено в корзину`, ~2s, top-layer behavior.
+3. [P2] Fix 3 is incomplete: the dish-detail CTA text is visible now, but [x.jsx#L3699](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3699) still does not enforce the required 44px minimum button height.
+
+No extra findings were reported outside Fix 1–8.

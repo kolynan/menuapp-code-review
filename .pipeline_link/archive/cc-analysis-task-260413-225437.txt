@@ -1,0 +1,213 @@
+=== CC Analysis: task-260413-225437 ===
+Task: PSSK Prompt Quality Review v2 — CartView Batch CV-A
+File: pages/PublicMenu/CartView.jsx (1163 lines)
+Mode: Prompt review only (code NOT changed)
+Date: 2026-04-13
+
+## Overall Assessment
+
+The prompt is well-structured with clear wireframes, scope locks, and verification steps.
+However, code-vs-prompt comparison reveals **6 critical inaccuracies** and **8 moderate issues**
+that would cause an implementer to waste time or produce incorrect code.
+
+Rating: 6.5/10 — good architecture, but grep targets and code assumptions need update.
+
+---
+
+## CRITICAL FINDINGS (would cause wrong implementation)
+
+### C1. Fix 1 — `getSafeStatus()` not mentioned (P0 — missed function)
+
+The prompt says to update or remove `getOrderStatus()`. But:
+- `getOrderStatus` is a **PROP** (line 53), defined outside CartView.jsx. Cannot be modified here.
+- The actual status-label function IN CartView is `getSafeStatus()` (lines 275-321).
+  It has a full 5-status fallback map with 'Отправлено', 'Готовится', 'Готов', 'Принят', 'Подано'.
+- `getSafeStatus` is called at line 788: `const status = getSafeStatus(getOrderStatus(order))`
+- Prompt never mentions `getSafeStatus` at all.
+
+**Fix for prompt:** Add: "Grep: `getSafeStatus` — this is the IN-FILE function that maps status
+codes to display labels. Either reduce to 2 labels or remove if bucket rendering no longer needs
+per-order status. `getOrderStatus` is a PROP — do NOT modify it, but its call sites may change."
+
+### C2. Fix 1 — `Новый заказ` rename to `В корзине` not in grep targets
+
+Prompt says CV-49 renames "Новый заказ" to "В корзине". But the grep targets in Fix 1's
+"Что менять" section don't include `Новый заказ`. The actual text is at:
+- Line 1011: `{tr('cart.new_order', 'Новый заказ')}`
+
+**Fix for prompt:** Add grep target: `Grep: 'Новый заказ' -> rename to 'В корзине'` and
+update the tr() key from `cart.new_order` to `cart.group.in_cart`.
+
+### C3. Fix 2 — Wrong grep patterns for price variables
+
+Prompt says: `Grep: totalPrice|grandTotal|orderTotal|cartTotal`
+Actual variable names in code:
+- `ordersSum` (line 417) — main header total for orders
+- `cartTotalAmount` (prop, line 44) — cart total
+- `totalPrice` exists only as a local field inside `renderBucketOrders` (line 567/571, scoped)
+- `grandTotal`, `orderTotal`, `cartTotal` do NOT EXIST in this file
+
+**Fix for prompt:** Replace grep targets with: `Grep: ordersSum|cartTotalAmount` — these are
+the actual variables. Add note: "The combined total for header = ordersSum + cartTotalAmount."
+
+### C4. Fix 2 — `Сумма заказа` and `К отправке` don't exist in code
+
+Prompt says to grep and remove `Сумма заказа` and `К отправке` — neither string exists
+in CartView.jsx. These appear to come from the HTML mockup, not the actual code.
+The footer (lines 1112-1161) has motivation text + CTA — no summary line.
+
+**Fix for prompt:** Remove these grep targets or mark them as "verify: may already be absent
+in current code." Add actual footer content to remove: the motivation text block at lines
+1117-1125 (`cart.motivation_bonus`), and the `cartTotalAmount` display in the "Новый заказ"
+section header (line 1013).
+
+### C5. Fix 3 — `submitPhase` state machine DUPLICATES existing props
+
+The code already has a 3-state CTA:
+- `isSubmitting` prop → "Отправляем..." (line 1142-1143)
+- `submitError` prop → "Повторить отправку" (line 1144-1145)
+- Default → "Отправить заказ официанту" (line 1146)
+
+Plus dedicated error display block (lines 1060-1067).
+
+The prompt's `submitPhase` useState('idle'|'submitting'|'success'|'error') would create
+DUPLICATE state for submitting and error, conflicting with existing props.
+
+**Fix for prompt:** Clarify: "Only the SUCCESS feedback phase is missing. Do NOT duplicate
+`isSubmitting`/`submitError` props. Add `submitPhase` with values `'idle'|'success'` only.
+Use existing `isSubmitting` prop for submitting state, existing `submitError` prop for error.
+The new state only tracks the 1.5s success window between isSubmitting->false and idle."
+
+### C6. Fix 7 — Header merge ALREADY DONE
+
+Lines 680-723 already show table + guest on line 1 (`{tableLabel} . {guestDisplay}`)
+and order count + sum on line 2. CV-31 was already implemented.
+
+The only actual change needed: line 714 counts ORDERS (`todayMyOrders.length`)
+but prompt wants DISH count (sum of quantities). And the header total doesn't include cart items.
+
+**Fix for prompt:** Replace Fix 7's "merge table + guest onto line1" (already done) with:
+"Change header line 2: replace ORDER count with DISH count (sum of all item quantities across
+orders + cart). Update `ordersSum` to include cart total. Change word from 'заказ/заказа/заказов'
+to 'блюдо/блюда/блюд'."
+
+---
+
+## MODERATE FINDINGS (would cause confusion or suboptimal code)
+
+### M1. Fix 1 — `bucketDisplayNames` has hardcoded Russian (i18n violation)
+
+Lines 492-498: `bucketDisplayNames` uses hardcoded Russian strings ('Подано', 'Готов', etc.)
+without tr(). After migration to 2 groups, new names ('В работе', 'Выдано') should use tr().
+Prompt doesn't flag this i18n violation.
+
+**Fix:** Add: "Replace bucketDisplayNames with tr() calls: `served: tr('cart.group.served', 'Выдано')`,
+`in_progress: tr('cart.group.in_progress', 'В работе')`."
+
+### M2. Fix 1 — Cancelled orders already filtered (prompt redundant warning)
+
+Line 393: `filter(o => o.status !== 'cancelled')` — cancelled orders are filtered in
+`todayMyOrders` BEFORE bucket creation. Prompt's bucket code says `if (s !== 'cancelled')`
+as a safety check — this is redundant but harmless. Worth noting to avoid confusion.
+
+### M3. Fix 1 — Empty drawer state already handled
+
+Lines 848-863: The `isV8` state already shows "Ничего не ждёте" when only served orders exist.
+Prompt asks to "verify that the drawer cannot be opened when empty OR show empty state" —
+the empty-all case (0 orders, 0 cart) is actually handled by StickyCartBar not showing the
+drawer trigger. But there's no explicit empty state IN the drawer. Worth adding a simple
+message for defensive robustness.
+
+### M4. Fix 3 — D12 hook reuse guidance is misleading
+
+Prompt says "prefer REUSING dead hook slots for submitPhase". But the 5-bucket
+`expandedStatuses` is a SINGLE useState object (line 93), not 5 separate useStates.
+Simplifying it to 2 keys doesn't free any hook slots. There are no dead hooks to reuse.
+
+**Fix:** Remove D12 hook reuse guidance for this specific case, or clarify: "No hook slots
+are freed by bucket simplification — expandedStatuses is one object. Place new useState
+after line 127 (after `nowTs` hook)."
+
+### M5. Fix 4 — Current auto-collapse is too aggressive
+
+Lines 102-113 collapse ALL statuses (served, ready, in_progress, accepted) when cart > 0.
+Prompt's Fix 4 only discusses served collapse but doesn't mention that the current code
+also collapses non-served buckets. After Fix 1 reduces to 2 groups, the implementer needs
+to know that the EXISTING useEffect at lines 102-113 must be rewritten, not just tweaked.
+
+### M6. Fix 5 — `earnedPoints` vs `motivationPoints` confusion
+
+Prompt says to show `earnedPoints` in cart group. But:
+- `earnedPoints` (prop, line 39) — earned from PLACED orders
+- `motivationPoints` (line 1119, calculated inline) — projected for CART items
+
+The correct value for "В корзине" bonus display is `motivationPoints`, not `earnedPoints`.
+
+**Fix:** Specify: "Use the same calculation as line 1119:
+`Math.round(cartTotalAmount * (partner?.loyalty_points_per_currency || 1))`."
+
+### M7. Fix 6 — Cart qty display format mismatch
+
+Prompt says cart should show "Суши x2  89.54". Actual code (line 1021) shows price breakdown:
+`{formatPrice(item.price)} x {item.quantity}` (e.g., "44.77 x 2").
+This is a different format from the prompt's wireframe. Clarify intended behavior.
+
+### M8. Fix 2 — Header total verification incomplete
+
+Prompt correctly says "Header total must include items from ALL three sources."
+Current `ordersSum` (line 417-420) only sums todayMyOrders. Adding cart items requires
+creating a new combined total: `ordersSum + (cartTotalAmount || 0)`. Prompt should
+provide the exact formula.
+
+---
+
+## MINOR FINDINGS (style, safety)
+
+### S1. Stepper touch targets below 44x44px
+Current stepper buttons (lines 1027-1042): `w-8 h-8` = 32x32px. Below the 44x44px minimum
+in the prompt's mobile-first checklist. This is a pre-existing issue, not caused by the prompt,
+but the regression checklist should flag it.
+
+### S2. renderBucketOrders has local `groups` variable (line 575)
+The function `renderBucketOrders` uses `const groups = Array.from(grouped.values())` —
+after Fix 1 renames `statusBuckets` to `groups`, this local variable will shadow the
+outer `groups`. Prompt should warn: "Rename inner variable in renderBucketOrders to avoid
+shadowing (e.g., `const dishGroups = ...`)."
+
+### S3. Frozen UX grep verification is good
+The prompt's final grep verification block is well-designed and catches regressions effectively.
+
+---
+
+## SUMMARY TABLE
+
+| # | Finding | Severity | Fix Complexity |
+|---|---------|----------|----------------|
+| C1 | getSafeStatus() not mentioned | Critical | Add grep + guidance |
+| C2 | 'Новый заказ' rename missing from grep targets | Critical | Add grep target |
+| C3 | Wrong price variable names | Critical | Fix grep patterns |
+| C4 | 'Сумма заказа'/'К отправке' don't exist in code | Critical | Update targets |
+| C5 | submitPhase duplicates existing props | Critical | Narrow scope |
+| C6 | Header merge already done | Critical | Reframe Fix 7 |
+| M1 | bucketDisplayNames hardcoded Russian | Moderate | Add i18n note |
+| M2 | Cancelled filter redundant | Moderate | Note only |
+| M3 | Empty state partially handled | Moderate | Note only |
+| M4 | D12 hook reuse misleading | Moderate | Clarify |
+| M5 | Existing auto-collapse too aggressive | Moderate | Add rewrite note |
+| M6 | earnedPoints vs motivationPoints | Moderate | Fix variable name |
+| M7 | Cart qty format mismatch | Moderate | Clarify wireframe |
+| M8 | Header combined total formula missing | Moderate | Add formula |
+| S1 | Stepper 32x32 < 44x44 | Minor | Flag in checklist |
+| S2 | 'groups' variable shadowing risk | Minor | Add warning |
+
+## VERDICT
+
+Prompt needs revision before sending to implementation model. The 6 critical findings
+would cause the implementer to:
+1. Miss getSafeStatus() entirely (ghost 'Отправлено' labels survive)
+2. Search for non-existent variables (wasted tokens)
+3. Create duplicate state management (submitPhase vs isSubmitting/submitError conflict)
+4. Redo work that's already done (header merge)
+
+Estimated prompt fix effort: 30-45 minutes to update all grep targets and clarify.
+After fixes, prompt quality would be ~8.5/10.

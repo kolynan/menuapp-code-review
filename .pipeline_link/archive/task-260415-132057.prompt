@@ -1,0 +1,123 @@
+IMPORTANT: Your VERY FIRST action must be: echo "started $(date -Iseconds)" > "C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/started-task-260415-132057.md"
+
+=== TASK SETUP ===
+Progress file: C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/progress-task-260415-132057.txt
+Task ID: task-260415-132057
+=== END TASK SETUP ===
+
+
+
+=== PROGRESS UPDATES ===
+Update progress file after each major step:
+  echo "[CC] $(date +%H:%M) <status>" >> "C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/progress-task-260415-132057.txt"
+Examples: CC started analysis, CC found N bugs, CC applying fixes, CC creating RELEASE
+=== END PROGRESS ===
+
+=== GIT RULES ===
+- Capture pre-task commit: PRE=$(git rev-parse HEAD)
+- After ALL fixes: git add <specific files only> && git commit -m 'fix: <description>' && git push
+- NEVER use git add . or git add -A
+- Update BUGS.md in the page folder
+=== END GIT RULES ===
+
+=== TASK ===
+---
+task_id: pssk-som-b1-codex-v1
+page: pssk-som-b1-codex
+budget: 5
+agent: cc
+model: claude-sonnet-4-5
+ws: WS-SOM
+created: 2026-04-15
+session: 281
+scope_summary: "SOM Батч Б1 — Codex perspective via CC wrapper (simple task на старом ВЧР). Параллельно с pssk-som-b1-cc-v1."
+---
+
+# START PROMPT — SOM Батч Б1 (Codex perspective via CC wrapper)
+
+**Role:** You are Claude Code acting as a **thin wrapper around Codex CLI**. Your only job is to (1) launch Codex via PowerShell with the analysis prompt below, (2) wait for Codex output, (3) save Codex's verbatim output to `pipeline/codex-findings-pssk-som-b1-codex-v1.txt`. DO NOT do your own analysis. DO NOT modify code. DO NOT rewrite Codex's output — just capture it.
+
+---
+
+## Step 1 — Prepare Codex prompt
+
+Write the Codex prompt to `pipeline/codex-prompt-pssk-som-b1-codex-v1.txt`. Prompt contents verbatim:
+
+```
+You are Codex. Analyze the SOM (StaffOrdersMobile) code independently and produce findings. This is a **review/analysis task only** — do not modify code. Output your findings in Markdown with grep-backed line numbers.
+
+## Context
+
+**Workstream:** WS-SOM (waiter interface).
+
+**Batch Б1 scope:**
+
+1. **SOM-BUG-S270-02 (P1):** "Close table" action in SOM does not move the table to the «Завершённые» (Completed) tab. Hypothesis: `closeSession()` in `components/sessionHelpers.js` (lines 155–171) updates `TableSession.status = "closed"` and bulk-closes Orders, but does NOT touch `Table.status`. The Table entity has a new `status` field (added in S271 per `B44_Entity_Schemas.md v3.0`). The Completed tab likely filters by `Table.status`.
+
+2. **SOM-BUG-S270-01 re-check (P0):** Rate limit 429 on single mutations. The `__batch` flag pattern prevents `invalidateQueries` storms for bulk ops, but single-click handlers may not set `__batch`, causing 429.
+
+**Main file:** `pages/StaffOrdersMobile/260414-02 StaffOrdersMobile RELEASE.jsx` (~4500 lines).
+**Helper:** `components/sessionHelpers.js` (closeSession at line 155).
+
+## Your deliverable
+
+### Section 1 — SOM-BUG-S270-02 (close table → Completed)
+1. Quote `closeSession()` verbatim with line numbers. Confirm: does it touch `Table.status`?
+2. Grep the RELEASE file for the Completed tab filter logic (status === "closed" / completed / archived). Return every hit with line + 2 lines context.
+3. Recommend fix: (A) add `Table.update` inside `closeSession` — but sessionId ≠ tableId, need resolution; (B) update Table.status at the call-site (line 4148) where tableId is already in scope. Choose which is safer and why.
+4. Regression risks: list 3.
+5. Manual test plan: 3 steps.
+
+### Section 2 — SOM-BUG-S270-01 re-check (rate limit)
+1. Grep RELEASE file for all single-mutation handlers without `__batch`. Return line numbers + handler names.
+2. For each mutation wrapper (advanceMutation, updateRequestMutation, direct base44.entities.*.update) — check its onSuccess → does it always invalidateQueries?
+3. Propose minimal fix pattern (pseudo-code, 5–10 lines). Safest approach.
+4. Do NOT design the actual КС fix — just diagnose.
+
+### Section 3 — Prompt Clarity rating (1–5)
+Rate how clearly Б1 scope was communicated. List ambiguities if <5.
+
+### Section 4 — Out-of-scope risks
+Max 5 items noticed while grepping that look broken/risky for Б1. 1 line each.
+
+## Scope lock
+- No code modifications.
+- Output only the findings Markdown, nothing else.
+
+Begin analysis. Use Read/Grep for every claim.
+```
+
+## Step 2 — Launch Codex
+
+Run Codex via PowerShell from the work directory:
+
+```powershell
+codex exec --cd "." --model o4-mini --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox --output-last-message "pipeline/codex-findings-pssk-som-b1-codex-v1.txt" "$(Get-Content -Raw pipeline/codex-prompt-pssk-som-b1-codex-v1.txt)"
+```
+
+If the exact PowerShell invocation fails, try the fallback used by the existing pipeline (see `pipeline/steps/codex-writer-v2.md` in the repo if available, or `scripts/task-watcher.py` around line 450 for `build_codex_instruction`). Timeout: 8 minutes.
+
+## Step 3 — Verify output
+
+1. Confirm `pipeline/codex-findings-pssk-som-b1-codex-v1.txt` exists and is non-empty (>500 chars).
+2. Write a 2-line status summary to `pipeline/cc-analysis-pssk-som-b1-codex-v1.txt`:
+   - Line 1: `Codex run: OK` or `Codex run: FAILED (reason)`
+   - Line 2: `Findings file: pipeline/codex-findings-pssk-som-b1-codex-v1.txt (N chars, M sections detected)`
+
+---
+
+## ⛔ SCOPE LOCK
+
+- Your role is **wrapper only**. Don't add your own analysis.
+- If Codex output is empty/truncated → retry once, then report FAILED.
+- DO NOT modify any code files.
+- DO NOT use subagents.
+
+Begin.
+
+=== END TASK ===
+
+=== FINAL STEPS ===
+1. Write final summary to: C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/cc-analysis-task-260415-132057.txt
+2. Update progress: echo "[OK] $(date +%H:%M) DONE: N bugs fixed, M from Codex" >> "C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/progress-task-260415-132057.txt"
+=== END FINAL STEPS ===

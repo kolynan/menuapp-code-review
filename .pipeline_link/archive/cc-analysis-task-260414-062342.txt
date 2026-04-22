@@ -1,0 +1,194 @@
+# PSSK v5: KS Prompt Quality Review — SOM Batch A v3
+# Reviewer: Claude Code (CC) + Codex (CDX)
+# Date: 2026-04-14
+# File: staffordersmobile.jsx (4524 lines actual)
+# Task: task-260414-062342, Session S267
+
+---
+
+## FIX RATINGS
+
+### Fix1 — Guest counter (#293): Rating 4/5 — WARNING Needs Clarification
+
+**Line numbers for 4 targets: CORRECT**
+- Line 2331 (new section header): VERIFIED. `newOrders.length` in guest slot confirmed.
+- Line 2333 (inProgressSections.map): VERIFIED. `section.orders.length` in guest slot confirmed.
+- Line 2335 (ready section header): VERIFIED. `readyOrders.length` in guest slot confirmed.
+- Line 2337 (served section header): VERIFIED. `servedOrders.length` in guest slot confirmed.
+
+**Grep coverage: COMPLETE**
+All `pluralRu` calls with guest-related text (`гост`) appear at:
+- Lines 670, 680, 708 — inside block comment 546-785 (dead code, correctly excluded)
+- Lines 1281, 1291, 1319 — inside block comment 1148-1414 (dead code, correctly excluded)
+- Lines 2331, 2333, 2335, 2337 — the 4 live targets (all covered by Fix1)
+
+No missed live guest-count sites.
+
+**countRows preservation: CORRECT**
+Prompt correctly preserves `countRows(newRows, newOrders.length)` etc. — these are dish counts, not guest counts.
+
+**Helper placement: WARNING**
+Prompt says "near `getLinkId` / `getAssignee` — lines ~780-800". But `getLinkId` is at line 528 (before block comment). Only `getAssignee` is at 786. Suggestion: reference only `getAssignee`.
+
+**uniqueGuests helper uses getLinkId: TDZ SAFE**
+`getLinkId` defined at 528, helper will be placed at ~787+. No TDZ risk.
+
+**BEFORE/AFTER code: MATCHES actual file content.**
+
+**Verdict: 4/5 — WARNING. Fix reference to getLinkId location. Otherwise clear.**
+
+---
+
+### Fix2 — Served visibility (#296): Rating 4.5/5 — CLEAR
+
+**Change 1 — sessionHelpers.js:**
+- Current `closeSession` at line 158-163: VERIFIED. Only updates TableSession, no order bulk-close.
+- Proposed addition (bulk-close orders): Logically sound.
+- PartnerTables callers VERIFIED:
+  - Line 61: `import { closeSession } from "@/components/sessionHelpers"` — confirmed
+  - Line 1981: `await closeSession(id)` in `handleCloseSession` (1972-1991) — confirmed
+  - Bulk-close semantics: admin closes table → all non-cancelled orders get `status: 'closed'` → correct for both SOM and PartnerTables.
+
+**Change 2 — line 3540 (activeOrders filter):**
+- VERIFIED. Current code: `return o.status !== 'served' && o.status !== 'closed' && o.status !== 'cancelled'`
+- Proposed: remove `'served'` from exclusion. Logic chain sound: served stays in visibleOrders → orderGroups keeps card → filteredGroups holds it in Active tab via new `hasServedButNotClosed`.
+
+**Change 3 — filteredGroups (3789-3801) + tabCounts (3804-3818):**
+- Both code blocks VERIFIED against actual file.
+- Proposed `hasServedButNotClosed` logic: `config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled'` — correct complement to existing `hasActiveOrder`.
+- Dep array unchanged: correct (no new external deps introduced).
+- Style consistency: tabCounts uses `forEach` + mutable counters — prompt matches existing pattern.
+
+**No scope creep risk.** Changes are minimal and well-bounded.
+
+**Verdict: 4.5/5 — CLEAR. Well-specified, all line numbers correct, PartnerTables regression risk addressed.**
+
+---
+
+### Fix3 — Star badge stopPropagation (#297): Rating 2/5 — REWRITE NEEDED
+
+**BLOCKER: Both line numbers are WRONG.**
+
+| Element | Prompt says | Actual line | What's at prompt line |
+|---------|------------|-------------|----------------------|
+| ★ badge div | 2249 | **2250** | 2249 = `{ownershipState === "mine" && (` (condition) |
+| ☆ badge div | 2257 | **2260** | 2257 = `</button>` (closing tag of 🔒 button!) |
+
+**The ★ badge div is at line 2250:**
+```
+<div style={{position:'absolute', ...}} aria-label={"Мой стол"}>
+```
+
+**The ☆ badge div is at line 2260:**
+```
+<div style={{position:'absolute', ...}} aria-label={"Свободный стол"}>
+```
+
+**Between them (lines 2254-2258):** the 🔒 `<button>` block for "other" ownership state.
+
+**Also:** Prompt says "🔒 badge at ~line 2253-2255" — actual 🔒 button is single line at 2255.
+
+**BEFORE/AFTER code snippets are schematic** (using `...` for style props). The actual lines are very long single-line JSX. The Edit tool needs exact string matches. Recommend providing the exact `aria-label={"Мой стол"}>` → `aria-label={"Мой стол"} onClick={(e) => e.stopPropagation()}>` replacement pattern instead of schematic BEFORE/AFTER.
+
+**The fix logic itself is correct** — adding `onClick={(e) => e.stopPropagation()}` to both divs. Just the line numbers and BEFORE/AFTER format need fixing.
+
+**Verdict: 2/5 — REWRITE NEEDED. Correct line numbers to 2250 and 2260. Provide exact replacement strings.**
+
+---
+
+## GLOBAL PROMPT ISSUES
+
+### BLOCKER: File line count wrong throughout
+- Prompt states "4426 строк" — actual is **4524 строк** (98 line difference).
+- Appears in: task header, file disambiguation warning, code_file yaml, and multiple inline references.
+- Impact: KS executor will see 4524 lines and may think they have the wrong file.
+- **Fix: Replace all "4426" with "4524".**
+
+### MEDIUM: Block-comment integrity check grep pattern is wrong
+The mandatory pre-commit check:
+```bash
+grep -nE "^\s*/\*$|^\s*\*/$" staffordersmobile.jsx
+# expected unchanged: 546 /*, 785 */, 1148 /*, 1414 */
+```
+
+Problems:
+1. `^\s*/\*$` requires `/*` at end of line. Line 1148 = `/* function RateLimitScreen...` — WON'T match.
+2. `^\s*\*/$` will also match doc comment closers at 821, 1074, 2732, 3382 — not mentioned in expected output.
+
+**Fix:** Use `grep -nE "^/\*$|^/\* function|^\*/$"` or more precisely:
+```bash
+grep -n "^/\*$\|^/\* function\|^\*/$" staffordersmobile.jsx
+# expected: 546:/*  785:*/  1148:/* function ...  1414:*/
+```
+
+### LOW: Fix3 reference to 🔒 at "~line 2253-2255"
+Actual 🔒 `<button>` is a single line at 2255. Not a range.
+
+---
+
+## BLOCK-COMMENT VERIFICATION (Task requirement #5)
+
+Target lines vs block comment ranges [547-784] and [1149-1413]:
+
+| Target line | Description | Inside block comment? |
+|-------------|-------------|----------------------|
+| 2250 (corrected) | ★ badge div | NO (after 1414) |
+| 2260 (corrected) | ☆ badge div | NO (after 1414) |
+| 2331 | new section header | NO (after 1414) |
+| 2333 | inProgress section header | NO (after 1414) |
+| 2335 | ready section header | NO (after 1414) |
+| 2337 | served section header | NO (after 1414) |
+| 3540 | activeOrders finish filter | NO (after 1414) |
+| 3789-3801 | filteredGroups useMemo | NO (after 1414) |
+| 3804-3818 | tabCounts useMemo | NO (after 1414) |
+
+**All target lines are in live code. PASS.**
+
+Block comment boundaries verified:
+```
+546:/*     785:*/     (range 547-784 = dead code)
+1148:/*    1414:*/    (range 1149-1413 = dead code)
+```
+
+---
+
+## PartnerTables REGRESSION CHECK (Task requirement #6)
+
+`closeSession()` in `components/sessionHelpers.js` (line 158-163):
+- Current: only updates TableSession status/closed_at
+- Proposed: adds bulk-close of non-cancelled orders in the session
+- PartnerTables `handleCloseSession` (line 1981): `await closeSession(id)` → will now also bulk-close orders
+- This is CORRECT behavior: admin closing a table should close all associated orders
+- No change to function signature or return value
+- No change to TableSession update logic
+- **SAFE. No regression.**
+
+---
+
+## FIX1 GREP COVERAGE (Task requirement #7)
+
+Pattern `(newOrders|readyOrders|servedOrders|section\.orders)\.length.*pluralRu` in live zone:
+- Only appears at lines 2331, 2333, 2335, 2337 — all 4 covered by Fix1
+- Dead-code appearances (670, 680, 708, 1281, 1291, 1319) correctly excluded
+- **COMPLETE COVERAGE. No missed sites.**
+
+---
+
+## OVERALL VERDICT
+
+| Fix | Rating | Status |
+|-----|--------|--------|
+| Fix1 (#293 guest count) | 4/5 | WARNING — fix getLinkId reference |
+| Fix2 (#296 served visibility) | 4.5/5 | CLEAR |
+| Fix3 (#297 star badge) | 2/5 | REWRITE NEEDED — wrong line numbers |
+| Global: file line count | — | BLOCKER — 4426 → 4524 |
+| Global: grep verification | — | MEDIUM — pattern won't match 1148 |
+
+**Target "all 3 Fix >= 4/5" NOT MET.** Fix3 at 2/5 blocks release.
+
+### Required changes before KS prompt can ship:
+1. Replace all "4426" with "4524" (5+ occurrences)
+2. Fix3: change line 2249 → 2250, line 2257 → 2260
+3. Fix3: provide exact replacement strings (not schematic `...`)
+4. Fix1: change "getLinkId / getAssignee" → "getAssignee" in helper placement hint
+5. Fix block-comment integrity check grep pattern to match line 1148

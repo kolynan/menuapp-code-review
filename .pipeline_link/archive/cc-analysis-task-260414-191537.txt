@@ -1,0 +1,53 @@
+== CC Analysis: SOM-BUG-S270-01 Sequential Batch Mutations ==
+Task: ks-som-p0-ratelimit-v1-260414 | Session: S271
+
+STATUS: COMPLETE
+Commit: fe5324d
+RELEASE: 260414-02 StaffOrdersMobile RELEASE.jsx
+Lines: 4538 -> 4575 (delta +37)
+Codex: TIMEOUT (PS commands timed out reading worktree file)
+
+FIXES APPLIED (4 fan-out sites + invalidate-once):
+
+1. Fix A [P0] handleOrdersAction (line 1956-1965)
+   forEach(mutate) -> runBatchSequential(mutateAsync)
+   + batchInFlightRef/batchInFlight for double-click guard
+   + disabled={advanceMutation.isPending || batchInFlight} on all bulk buttons
+
+2. Fix B [P0] startUndoWindow.onUndo (line 1932-1937)
+   forEach(mutate) -> runBatchSequential(mutateAsync)
+   + single invalidation after batch
+
+3. Fix E [P0] Bulk request bar (line 2333)
+   tableRequests.forEach(onCloseRequest) -> runBatchSequential(onBatchCloseRequestAsync)
+   + new async prop onBatchCloseRequestAsync (sync onCloseRequest unchanged for single-item)
+
+4. Fix F [P1] handleCloseAllOrders (line 4132-4133)
+   Promise.all(orders.map(update)) -> runBatchSequential(update)
+
+5. Invalidate-once
+   advanceMutation.onSettled: skip when vars?.__batch
+   updateRequestMutation.onSuccess: skip when vars?.__batch
+   updateRequestMutation.mutationFn: strip __batch from payload
+   Single invalidation after each batch completes
+
+HELPER ADDED:
+   runBatchSequential(items, fn, {delayMs=120})
+   - Sequential execution with 120ms delay between items
+   - Early break on 429 (isRateLimitError)
+   - Returns results array (no throw on single-item error)
+
+REGRESSION CHECKLIST:
+   (a) Single accept: OK (1-item array, no delay)
+   (b) Single serve: OK
+   (c) Accept all (4): sequential, 120ms gap, single invalidation
+   (d) Serve all (4): same
+   (e) Serve all (10+): ~1.5s total, no 429
+   (f) Undo: sequential revert
+   (g) Bulk requests: sequential via onBatchCloseRequestAsync
+   (h) Close table: sequential
+   (i) Single request buttons: unchanged (sync onCloseRequest)
+   (j) Button disabled during batch: batchInFlight state
+   (k) Partial failure: early break + existing 429 toast
+   (l) Line count: 4575 (4538 + 37)
+   (m) Dead-code blocks: untouched

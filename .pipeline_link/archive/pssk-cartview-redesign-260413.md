@@ -1,0 +1,411 @@
+---
+task_id: pssk-review-cartview-260413
+chain_template: pssk-review
+budget_usd: 3
+model: claude-sonnet-4-5
+page: PublicMenu
+ws: WS-CV
+---
+
+You are reviewing the quality of a КС implementation prompt for a React/Base44 app.
+DO NOT execute the changes. DO NOT read code files. Only review the prompt quality.
+
+Context: This prompt redesigns CartView.jsx (1163 lines) — collapses 5 status buckets into 2 groups (В работе/Выдано), moves money to header only, footer=CTA only, adds submit-feedback transition (State A2). Batch CV-A: States A/A2/B only.
+
+Find issues with the PROMPT DESIGN:
+1. Incorrect code snippets (wrong syntax, variable names, line numbers)
+2. Missing edge cases
+3. Ambiguous instructions
+4. Safety risks (unintended file changes)
+5. Validation: are post-fix checks sufficient?
+
+---
+
+# CartView Drawer Redesign: Core Structure (Batch CV-A) — КС Prompt
+
+## Context
+Файл: pages/PublicMenu/CartView.jsx (1163 lines, RELEASE `260330-02 CartView RELEASE.jsx`)
+Задача: Redesign CartView drawer — collapse 5 status buckets into 2 groups (В работе / Выдано), add "В корзине" group with stepper, move money to header only, make footer CTA-only, implement submit-feedback state A2.
+Вес: H (architectural UI redesign) | Бюджет: $18 | Модель: С5v2
+
+⚠️ If `wc -l pages/PublicMenu/CartView.jsx` < 1100 — restore: `cp "260330-02 CartView RELEASE.jsx" CartView.jsx` (KB-095).
+
+## UX Reference
+UX-документ: `ux-concepts/CartView/260408-00 CartView UX S246.md` v6.0 (60 decisions CV-01..CV-60, 8 states A→T, GPT R4 "Lock and build")
+HTML макет: `ux-concepts/CartView/260408-00 CartView Drawer Mockup S241.html` — **v5.1, pre-dates v6.0.**
+Скриншоты: `menuapp-code-review/pages/PublicMenu/screenshots/current/` — CartView_S241_asIs_drawer.jpg (as-is состояние до редизайна) Layout/structure is valid reference, but these v6.0 overrides apply:
+  - Footer `"К отправке:"` summary → **REMOVE** (v6.0 CV-51: footer = only CTA)
+  - Bucket `bucket-sum` in header → **REMOVE** (v6.0 CV-50: no subtotals in groups)
+  - "Отправлено" status → **REMOVE** (v6.0 CV-52: only 2 statuses)
+  - "Новый заказ" section name → rename to **"В корзине"** (v6.0 CV-49)
+BACKLOG: WS-CV (CartView Drawer)
+
+**CRITICAL: `OrderItem` has NO status field.** Status = `Order.status` only. All items in one order share the same status. Buckets group ORDERS, not items.
+
+**`Order.status` → Guest-facing groups (v6.0):**
+- `new`, `accepted`, `in_progress`, `ready` → **В работе**
+- `served`, `completed` → **Выдано**
+- `cancelled` → hidden
+
+This batch covers States A, A2, B only. Rating flow (C/C2/C3/D) and Tab "Стол" (T) → Batch CV-B.
+
+## FROZEN UX (DO NOT CHANGE)
+- **Tab switching** (Мои/Стол) — leave as-is, Batch CV-B will update Tab Стол
+- **Guest name editing** (`isEditingName`, `handleUpdateGuestName`) — leave as-is
+- **Help drawer integration** (`onCallWaiter`) — leave as-is
+- **Star rating rendering** on served items — leave existing rating code as-is, Batch CV-B refactors
+- **Table verification flow** (`hallGuestCodeEnabled`, `verifyTableCode`) — leave as-is
+- **Loyalty redemption** (`redeemedPoints`, `pointsDiscountAmount`) — leave as-is
+- **Close drawer** (`onClose`, vaul mechanics) — leave as-is
+- **StickyCartBar** in x.jsx — DO NOT TOUCH
+- **x.jsx** — DO NOT MODIFY. This batch = CartView.jsx only.
+
+---
+
+## Fix 1 — CV-01+CV-48+CV-52 [MUST-FIX, H]: Replace 5-status buckets with 2 groups + В корзине
+
+### Проблема
+CartView splits orders into 5 status buckets (served/ready/in_progress/accepted/new_order). Guest sees labels "Отправлено", "Принят", "Готовится", "Готов", "Подано". v6.0 says: guest needs only 2 statuses.
+
+### Wireframe (было → должно быть)
+```
+БЫЛО:                           ДОЛЖНО БЫТЬ:
+▾ Отправлено (1)                ▸ Выдано (2)         ← collapsed
+▾ Принят (1)                    ▾ В работе (3)       ← all non-served merged
+▾ Готовится (1)                   Суши       44.77 ₸
+▾ Подано (2)                      Стейк      64.02 ₸
+  [collapsed]                     New dish    10.00 ₸
+--- new order ---               ▾ В корзине (1)      ← cart items
+                                  Ризотто    32.00 ₸
+                                  [ − ] 1 [ + ]
+                                  +32 бонуса
+```
+
+### What the mockup shows (HTML reference)
+```html
+<!-- Bucket structure from mockup (adapt to v6.0 names) -->
+<div class="bucket">
+  <div class="bucket-header">
+    <span class="bucket-chevron open">▸</span>
+    <span class="bucket-name">В работе (4)</span>
+    <!-- NO bucket-sum here — v6.0 CV-50 removes subtotals -->
+  </div>
+  <div class="bucket-items">
+    <div class="item-row">
+      <span class="item-name">Суши</span>
+      <span class="item-price">44.77 ₸</span>
+    </div>
+  </div>
+</div>
+
+<!-- Cart group (mockup calls it "new-order-section", v6.0 calls it "В корзине") -->
+<div class="new-order-section">
+  <div class="new-order-header">
+    <span class="new-order-title">В корзине</span>
+    <!-- NO sum in header — v6.0 CV-50 -->
+  </div>
+  <div class="new-order-items">
+    <div class="cart-item-row">
+      <span class="cart-item-name">Ризотто</span>
+      <span class="cart-item-price">32.00 ₸</span>
+      <div class="stepper"><button>−</button><span>1</span><button>+</button></div>
+    </div>
+    <div class="bonus-hint">+32 бонуса</div>  <!-- CV-49: bonus in cart group -->
+  </div>
+</div>
+```
+
+### Что менять
+Grep: `const buckets = { served` → find bucket creation logic. Currently creates 5 buckets.
+Grep: `'Отправлено'` → find all 4 occurrences of this label. Remove all.
+Grep: `new_order:` → find bucket label map. Replace 5-label map with 2 labels.
+Grep: `statusBuckets` → find all usages. Update to use 2-group model.
+
+Change bucket creation:
+```javascript
+// OLD (5 buckets):
+const buckets = { served: [], ready: [], in_progress: [], accepted: [], new_order: [] };
+// ...complex per-status splitting...
+
+// NEW (2 groups):
+const groups = { served: [], in_progress: [] };
+todayMyOrders.forEach(o => {
+  const s = o.status?.toLowerCase?.() || 'new';
+  if (s === 'served' || s === 'completed') groups.served.push(o);
+  else if (s !== 'cancelled') groups.in_progress.push(o);
+});
+```
+
+Grep: `Отправлено` → 4 matches to delete:
+- `tr('status.sent', 'Отправлено')` in getOrderStatus
+- `'new': tr('status.sent', 'Отправлено')` in fallbacks map
+- `fallbacks[code] || tr('status.sent', 'Отправлено')` default
+- `new_order: 'Отправлено'` in bucket label map
+
+Replace render: 3 groups in order: Выдано (collapsed) → В работе (expanded) → В корзине (expanded). Empty groups hidden.
+
+### НЕ должно быть
+- NO 5-status sub-buckets visible to guest
+- NO "Отправлено" text/badge/color ANYWHERE
+- NO per-order rows with timestamps (CV-28: flat list by dish name)
+- NO horizontal dividers between items (CV-29)
+
+### Проверка
+1. Orders in `accepted` + `ready` → both under single "В работе" group.
+2. Grep `Отправлено` in modified file → 0 matches.
+
+---
+
+## Fix 2 — CV-50+CV-51 [MUST-FIX, M]: Money only in drawer header, footer = only CTA
+
+### Проблема
+Footer has summary (amount, count). Groups have subtotals. Money scattered across UI.
+
+### Wireframe (было → должно быть)
+```
+БЫЛО (footer):                  ДОЛЖНО БЫТЬ (footer):
+├─────────────────────┤         ├─────────────────────┤
+│ К отправке: 32.00 ₸│         │ [Отправить          │
+│ +32 бонуса          │         │  официанту]         │
+│ [Отправить офиц.]   │         └─────────────────────┘
+└─────────────────────┘
+                                ДОЛЖНО БЫТЬ (header):
+                                │ Стол 22 · Tulip (Г1) ˅│
+                                │ 4 блюда · 118.79 ₸    │
+```
+
+### What the mockup shows (adapt for v6.0)
+```html
+<!-- Header line2 from mockup (KEEP — this is the ONLY place for money) -->
+<div class="header-line2">
+  <span class="orders-info">4 блюда · 118.79 ₸</span>
+</div>
+
+<!-- Footer from mockup — v6.0 REMOVES summary, keeps only button -->
+<div class="sticky-footer">
+  <!-- DELETE: footer-summary, footer-bonus -->
+  <button class="footer-btn primary">Отправить официанту</button>
+</div>
+```
+
+### Что менять
+Grep: `orders-info\|ordersSum\|cnt.*plural` → header total calculation. Update to include BOTH submitted orders AND cart items in count/sum.
+Grep: `Сумма заказа` → find inline subtotal in bucket render. REMOVE this entire line.
+Grep: `footer-summary\|К отправке\|footer-bonus\|cartGrandTotal` → find footer summary elements. REMOVE all summary/bonus display from footer, keep ONLY the CTA button.
+
+**Header formula:** `N блюд` = total items across all groups (cart + active + served). `X ₸` = sum of all orders + cart items.
+
+### НЕ должно быть
+- NO `ИТОГО` / `К отправке` / `Всего` in footer
+- NO subtotals in group headers
+- **Banned labels:** `«За визит»`, `«ИТОГО ЗА ВИЗИТ»`, `«К отправке: X ₸»`
+
+### Проверка
+1. Open drawer → header: "4 блюда · 118.79 ₸". Footer: ONLY the button.
+2. Grep `Сумма заказа` → 0 matches.
+3. Grep `К отправке` → 0 matches.
+
+---
+
+## Fix 3 — CV-48 compensator [MUST-FIX, M]: State A2 — submit-feedback (1.5s CTA transition)
+
+### Проблема
+After removing "Отправлено" badge (Fix 1), guest gets no feedback that order was sent. Currently CTA just goes to loading state via `isSubmitting` prop.
+
+### Wireframe
+```
+State A:  [Отправить официанту]   ← primary
+          ↓ tap
+State A2: [⏳ Отправляем…]        ← disabled, 1-2s
+          ↓ success
+          [✅ Заказ отправлен]     ← disabled, success color, 1.5s
+          ↓ auto-transition
+State B:  [Заказать ещё]           ← outline
+```
+
+### Что менять
+Grep: `isSubmitting\|handleSubmitOrder` → find CTA render and submit handler.
+
+Add new state variable (place AFTER existing hooks to preserve React hook order):
+```javascript
+const [submitPhase, setSubmitPhase] = React.useState('idle'); // 'idle' | 'submitting' | 'success'
+```
+
+Wrap submit handler:
+```javascript
+// Inside CTA onClick:
+setSubmitPhase('submitting');
+handleSubmitOrder(); // existing prop call
+// After success (need to detect via isSubmitting prop going false):
+// useEffect watching isSubmitting: false + submitPhase === 'submitting' → setSubmitPhase('success')
+// setTimeout 1500ms → setSubmitPhase('idle')
+```
+
+CTA render — 3 states:
+```javascript
+submitPhase === 'submitting' ? tr('cart.submit.sending', 'Отправляем…')
+: submitPhase === 'success' ? tr('cart.submit.success', '✅ Заказ отправлен')
+: submitError ? tr('cart.submit.retry', 'Повторить отправку')
+: cart.length > 0 ? tr('cart.submit.send', 'Отправить официанту')
+: tr('cart.order_more', 'Заказать ещё')
+```
+
+**⚠️ Hook order safety (D12):** Place `useState('idle')` AFTER `const [infoModal, setInfoModal]` (grep: `infoModal`). Do NOT insert before existing hooks.
+
+### НЕ должно быть
+- NO "Отправлено" badge on orders after submit
+- NO silent transition
+- NO blocking dialog/modal
+
+### Проверка
+1. Add to cart → tap "Отправить" → see "Отправляем…" → "✅ Заказ отправлен" → "Заказать ещё".
+2. Double-tap → only 1 order created.
+
+---
+
+## Fix 4 — CV-46 [MUST-FIX, L]: Выдано auto-collapse logic
+
+### Проблема
+"Выдано" collapse may not auto-adjust based on other groups.
+
+### Что менять
+Grep: `expandedStatuses\|setExpandedStatuses` → find existing state and initializer.
+
+Auto-collapse rule: `served` expanded = `(inProgressItems.length === 0 && cart.length === 0)`. If Выдано is the ONLY group → expanded. Otherwise → collapsed.
+
+Update useEffect that recomputes `expandedStatuses`:
+```javascript
+// CV-46: Auto-collapse Выдано when other groups exist
+const otherGroupsExist = groups.in_progress.length > 0 || cart.length > 0;
+setExpandedStatuses(prev => ({
+  ...prev,
+  served: prev.served !== undefined ? prev.served : !otherGroupsExist
+}));
+```
+
+**CV-25/CV-47:** Polling must NOT reset manual expand/collapse. Only auto-set on FIRST render or when groups change structurally (group appears/disappears), not on every poll.
+
+### НЕ должно быть
+- NO forced collapse on every poll/re-render
+- NO always-collapsed Выдано when it's the only group
+
+### Проверка
+1. Cart non-empty + served orders → Выдано collapsed.
+2. Only served orders → Выдано expanded.
+3. User manually expands Выдано → polling triggers → stays expanded.
+
+---
+
+## Fix 5 — CV-33+CV-49 [MUST-FIX, L]: Remove "Для кого заказ", add bonuses in cart group
+
+### Что менять
+Grep: `splitType` → confirmed: appears ONLY in prop destructuring, no UI render in current code. ✅ No UI to remove.
+
+Grep: `earnedPoints\|loyalty_points\|бонус` → find loyalty info display. Move bonus line into "В корзине" group:
+```html
+<!-- Inside cart group, after last cart item -->
+<div class="bonus-hint">+{loyaltyPoints} бонусов</div>
+```
+Show ONLY if partner has loyalty configured. Grep: `partner.loyalty` to find condition.
+
+### НЕ должно быть
+- NO bonus info in footer
+- NO yellow loyalty banner
+
+### Проверка
+1. Partner has loyalty + cart items → "+32 бонуса" below stepper.
+2. Partner without loyalty → no bonus line.
+
+---
+
+## Fix 6 — CV-23+CV-34 [MUST-FIX, L]: Qty display cleanup
+
+### Что менять
+Grep: `totalQty > 1.*×` → find existing qty display. Currently: `{g.totalQty > 1 ? \` ×${g.totalQty}\` : ''}`. ✅ Already hides ×1 for ordered items.
+
+Check cart items: grep `quantity\|stepper` in cart render section. If cart shows `price × 1` text when qty=1 → hide it.
+
+### НЕ должно быть
+- NO "×1" visible anywhere
+
+### Проверка
+1. Single-qty: "Суши  44.77 ₸" (no ×1).
+2. Multi-qty: "Суши ×2  89.54 ₸" (muted ×2).
+
+---
+
+## Fix 7 — CV-31 [NICE-TO-HAVE, L]: Compact header — table + guest on one line
+
+### Wireframe
+```
+БЫЛО:                    ДОЛЖНО БЫТЬ:
+│ Стол 22               │ Стол 22 · Tulip (Г1) ˅│
+│ Tulip (Гость 1)       │ 4 блюда · 118.79 ₸    │
+│ 4 заказа · 118 ₸      │                        │
+```
+
+### What the mockup shows
+```html
+<div class="header-line1">
+  Стол 22 · <a class="restaurant-link">Tulip</a> <span>(Гость 1)</span>
+</div>
+<div class="header-line2">
+  <span class="orders-info">4 блюда · 118.79 ₸</span>
+</div>
+```
+
+### Что менять
+Grep: `header-line1\|tablePrefix\|tableLabel\|getGuestDisplayName` → find header render. Merge table + guest onto line1. Line2 = total from Fix 2.
+
+### Проверка
+1. Header = 2 lines max: line1=table+guest, line2=total.
+
+---
+
+## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано в Fix 1-7
+
+- Изменяй ТОЛЬКО код из Fix-секций.
+- ВСЁ остальное — НЕ ТРОГАТЬ.
+- Rating flow (States C/C2/C3/D) — **OUT OF SCOPE**. Do NOT change star rating, DishFeedback, isRatingMode.
+- Tab "Стол" content — **OUT OF SCOPE**. Leave tab Стол render as-is.
+- Email bottom sheet — **OUT OF SCOPE**.
+- Table verification — **OUT OF SCOPE**.
+- Loyalty redemption logic — **OUT OF SCOPE** (only DISPLAY bonus line in cart group).
+- **x.jsx — DO NOT MODIFY.**
+
+## Implementation Notes
+- i18n: file uses `tr(key, fallback)` (grep: `const tr =`). For ALL new strings use same `tr(key, fallback)` pattern. Keys: `cart.group.served`, `cart.group.in_progress`, `cart.group.in_cart`, `cart.submit.sending`, `cart.submit.success`, `cart.cta.order_more`.
+- `formatPrice` prop for currency formatting — use it for ALL price displays.
+- **⚠️ D7 — DrawerContent `relative` ban:** Do NOT add `className="relative"` to any top-level div. Breaks vaul drawer (KB-096).
+- **⚠️ D12 — Deletion safety:** When removing 5-bucket code, grep each variable for usage outside deleted block. If useState/useMemo hooks become dead → comment out with `// reserved — hook order`, do NOT delete.
+- **⚠️ D15 — stopPropagation:** Group headers have `onClick` for expand/collapse. Clickable elements INSIDE header (e.g., rating chip in future) need `e.stopPropagation()`.
+- **⚠️ D16 — useMemo:** Derived arrays combining items from different groups MUST use `React.useMemo`. No naked `const x = [...a, ...b]`.
+- git add pages/PublicMenu/CartView.jsx && git commit after all fixes.
+
+## MOBILE-FIRST CHECK (MANDATORY before commit)
+This is a mobile-first restaurant app (320-420px, one-handed use at table). Verify:
+- [ ] Drawer header: 2 lines, readable at 320px
+- [ ] Group headers: tappable, touch targets >= 44px height
+- [ ] Stepper buttons in cart: >= 44x44px
+- [ ] Footer CTA: full width, prominent, sticky bottom
+- [ ] No horizontal overflow
+- [ ] No excessive whitespace between groups
+
+## Regression Check (MANDATORY after implementation)
+- [ ] Cart items: add/remove via stepper still works
+- [ ] Submit order: `handleSubmitOrder` still called correctly
+- [ ] Star ratings on served items still render (rating MODE is out of scope, but display is not)
+- [ ] Tab switching (Мои/Стол) still works
+- [ ] Drawer close (chevron/swipe) still works
+- [ ] Guest name display correct
+- [ ] Price formatting correct (`formatPrice`)
+
+## FROZEN UX grep verification (run before commit)
+```bash
+grep -n "Отправлено" pages/PublicMenu/CartView.jsx      # should return 0
+grep -n "Сумма заказа" pages/PublicMenu/CartView.jsx     # should return 0
+grep -n "К отправке" pages/PublicMenu/CartView.jsx       # should return 0
+grep -n "ИТОГО" pages/PublicMenu/CartView.jsx             # should return 0
+grep -n "isRatingMode" pages/PublicMenu/CartView.jsx      # should still exist (untouched)
+grep -n "handleUpdateGuestName" pages/PublicMenu/CartView.jsx  # should still exist
+```

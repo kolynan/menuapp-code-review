@@ -1,0 +1,1250 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d327f-94a8-7101-b9fb-763c942ad1a7
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260328-083047-385c ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Feature: CartView Drawer UX Redesign v3 (#174) Reference: `ux-concepts/cart-view.md` (12 решений CV-01..CV-12, 3 ASCII-макета). UX agreed S183 + GPT 2 rounds. Production page: https://menu-app-mvp-49a4f5b2.base44.app **Context:** CartView drawer was restructured in #161 (sections Заказано/Новый заказ). Now needs UX polish based on GPT consultation: sticky footer, collapsed rows, rating logic, label fixes, status rename. This is a UI/layout change — no new data fetching or API changes. TARGET FILES (modify): - `pages/PublicMenu/CartView.jsx` (main: sections, footer, rating, filter, D3 screen) - `pages/PublicMenu/x.jsx` (PM-151 success screen, PM-152/153 guest name localStorage) ⚠️ KB-095 RISK: Two files modified in one chain. After chain completes: ``` git show HEAD:pages/PublicMenu/CartView.jsx | wc -l wc -l pages/PublicMenu/CartView.jsx git show HEAD:pages/PublicMenu/x.jsx | wc -l wc -l pages/PublicMenu/x.jsx ``` Line counts must match. If diff > 0 → restore from git HEAD before deploy. CONTEXT FILES (read-only): - `ux-concepts/cart-view.md` (full UX spec with ASCII mockups) - `ux-concepts/visit-lifecycle.md` (VL-04: D3 screen spec) - `BUGS_MASTER.md` --- ## Fix 1 — CV-01+CV-09: Section restructure [MUST-FIX] ### Сейчас CartView drawer has sections: «Заказано (N)» → «Новый заказ» → «+ Добавить ещё» → «ИТОГО ЗА ВИЗИТ». All submitted orders in one flat section «Заказано» with per-order status badges. ### Должно быть Three sections: **⏱ Сейчас** → **📋 История** → **🛒 Новый заказ**. **«Сейчас»** — active orders (statuses: Принят, Готовится, Готов). Sub-grouped by status with status as sub-header: ``` ⏱ Сейчас ── Готовится ── 15:48 New dish, Карбонара 69.27 ₸ ── Принят ── 18:19 Стейк, Карбонара 70.36 ₸ 17:40 New York Steak 32.01 ₸ ``` **«История»** — delivered orders (status: Подано/Выдан гостю). **Collapsed by default**. Summary line: `📋 История · N заказ · оценить ˅`. Tap to expand. **«Новый заказ»** — current cart with steppers (same as current implementation). Keep existing stepper, quantity, price logic unchanged. **Rules:** - Empty sections are NOT rendered. No empty «Сейчас» if no active orders. No «История» if no delivered orders. No «Новый заказ» if cart empty. - Sub-headers inside «Сейчас»: order by urgency top→bottom: Готов → Готовится → Принят. - Within each sub-group: newest first (by full datetime). ### НЕ должно быть - Old section name «Заказано (N)» — replace with «Сейчас» - Per-order status badge repeating — status is now a sub-header - Flat unsorted list of all orders ### Файл и локация File: `CartView.jsx` Search for the current section rendering: `"Заказано"` or `"Заказано ("` to find the section header. The orders rendering likely uses `.map()` over filtered orders. ⚠️ **Dependencies (C3):** - Fix 1 defines the categorization logic using RAW DB status values: `['Принят','Готовится','Готов']` → «Сейчас»; `['Подано','Выдан гостю']` → «История». Fix 6 changes only DISPLAY labels — do NOT change the filter condition values in Fix 1. - Fix 3 («Оценить блюда») must use the SAME status condition as Fix 1's «История» section: show CTA only when `order.status === 'Подано' || order.status === 'Выдан гостю'`. - Fix 7 (PM-154) changes the date filter cutoff. Fix 1 organizes the ALREADY-filtered orders into sections. Execution order: Fix 7 filter → Fix 1 sections. No conflict, but Fix 1 must run AFTER Fix 7's filter is in place (same file, both in CartView.jsx — writer should ensure filter is applied before section rendering). - Fix 10 (D3 screen) uses the same «Сейчас» / «История» / cart data as Fix 1. Use the same arrays/counts already computed by Fix 1. ### Проверка 1. With mix of statuses (Принят + Готовится) → two sub-groups visible in «Сейчас» 2. With delivered orders → «История» shows collapsed with count 3. With empty cart → no «Новый заказ» section 4. With only cart (no previous orders) → no «Сейчас» or «История» --- ## Fix 2 — CV-02+CV-03: Sticky footer with correct scope [MUST-FIX] ### Сейчас «ИТОГО ЗА ВИЗИТ: 248.51 ₸» is inside scrollable content, followed by «Отправить официанту» button. ### Должно быть ИТОГО + CTA button = **sticky footer** (always visible at bottom of drawer, does NOT scroll). **When cart is NOT empty:** ``` ├═════════════════════════════════════┤ │ К отправке: 44.77 ₸ │ ← main, bold, larger │ Всего: 248.51 ₸ │ ← secondary, smaller, text-gray-500 │ [ Отправить официанту ] │ └─────────────────────────────────────┘ ``` **When cart IS empty (no items to submit):** ``` ├═════════════════════════════════════┤ │ ИТОГО: 248.51 ₸ │ ← only total │ [ Заказать ещё ] │ ← secondary style (outline, not filled) └─────────────────────────────────────┘ ``` **When cart is not empty but NO previous orders (first order):** ``` ├═════════════════════════════════════┤ │ ИТОГО: 87.87 ₸ │ ← just cart total, no "К отправке" │ +88 бонусов │ │ [ Отправить официанту ] │ └─────────────────────────────────────┘ ``` ### Implementation notes - Use a wrapper div with classes for sticky positioning. ⚠️ Do NOT use `position: relative` on direct children of DrawerContent (breaks vaul). Instead use a flex layout: scrollable content area + fixed footer. - Pattern: `<div className="flex flex-col h-full"><div className="flex-1 overflow-y-auto">{scrollable}</div><div className="border-t p-4">{footer}</div></div>` - "К отправке" label appears ONLY when there are BOTH cart items AND previous orders. - "Заказать ещё" button: outline style, navigates back to menu (same as current «+ Добавить ещё»). - ⚠️ Float fix: wrap all sums with `parseFloat(total.toFixed(2))`. ### НЕ должно быть - «ИТОГО ЗА ВИЗИТ» label (remove everywhere) - Total inside scrollable area - Active «Отправить» button when cart is empty ### Проверка 1. Scroll long order list → footer stays visible 2. Cart empty → shows «ИТОГО» + «Заказать ещё» (secondary) 3. Cart + history → shows «К отправке: X» (bold) + «Всего: Y» (small) 4. First order only → shows «ИТОГО: X» without «К отправке» --- ## Fix 3 — CV-04+CV-05: Remove stars until delivery [MUST-FIX] ### Сейчас Empty star rating (☆☆☆☆☆) shown under EVERY item in EVERY order, regardless of status. ### Должно быть - Orders with status Принят/Готовится/Готов: **NO rating shown at all** - Orders with status Подано/Выдан гостю: show CTA button `Оценить блюда` (not empty stars) - Tap «Оценить блюда» → expand to show star rating per item (existing rating component) ### Файл и локация Search for star/rating rendering: `"Rating"` or `"Star"` or `"⭐"` or `rating` in CartView.jsx. ### Проверка 1. Order with status «Заказано/Принято/Готовится» → no stars visible 2. Order with status «Выдан гостю» → button «Оценить блюда» visible 3. Tap «Оценить» → stars appear for each item in that order --- ## Fix 4 — CV-06: Collapsed summary rows [MUST-FIX] ### Сейчас Each order shows full item list expanded by default. ### Должно быть Orders in «Сейчас» section show as **collapsed summary rows**: ``` 18:19 Стейк, Карбонара 70.36 ₸ ▾ ``` Rules: - Show first 2 item names, then `+N` for remaining: `Стейк, Карбонара +3 70.36 ₸ ▾` - Tap ▾ → expand to show full item list with prices - «Новый заказ» section items are ALWAYS expanded (user needs steppers) - ⚠️ C7: For the order total (`70.36 ₸`) in collapsed rows, use the SAME price formatter already used for individual item prices in this component (search for how `item.price` or `item.total` is displayed — use that exact pattern, do NOT use `Math.round` or raw `toFixed`) ### Проверка 1. Order with 2 items → shows both names, no «+N» 2. Order with 5 items → shows 2 names + «+3» 3. Tap chevron → full list expands 4. «Новый заказ» items always show with steppers (NOT collapsed) --- ## Fix 5 — CV-07: «Кому заказ» selector [SHOULD-FIX] ### Сейчас Shows «Для кого заказ: Только мне (2+ гостей)» — confusing label. ### Должно быть - When 1 guest at table: **do not show this element at all** - When 2+ guests: show `Кому заказ: Мне ▾` — stateful selector - Tap → **open a new simple Sheet/Popover** (this does NOT exist yet in code — create it) with guest list (Мне / Гость 1 / Гость 2 / etc.) - After selection: `Кому заказ: Гость 2 ▾` - ⚠️ D6(c): This is a NEW secondary sheet inside the CartView drawer. Do NOT use `pushOverlay`/`popOverlay` for it — use simple local `useState` open/close (e.g., `isGuestPickerOpen`). Android Back is handled by the parent CartView drawer; this picker closes on backdrop tap or item selection. ### Файл и локация Search for: `"Для кого"` or `"Только мне"` in CartView.jsx. ### Проверка 1. Table with 1 guest → no selector visible 2. Table with 2+ guests → shows «Кому заказ: Мне ▾» 3. Tap → guest picker opens (new component, local state) 4. Select guest → label updates to «Кому заказ: [name] ▾» --- ## Fix 6 — CV-08: Guest-facing status labels [SHOULD-FIX] ### Сейчас Status labels: Заказано, Принято, Готовится, Готов, Выдан гостю. ### Должно быть Rename for guest clarity (4 statuses): - «Заказано» → **«Принят»** (or map both «Заказано» and «Принято» to display as «Принят») - «Готовится» → stays **«Готовится»** - «Готов» → stays **«Готов»** - «Выдан гостю» → **«Подано»** ### Проверка 1. No badge/label says «Заказано» or «Выдан гостю» — only «Принят», «Готовится», «Готов», «Подано» --- --- ## Fix 7 — PM-154: Order filter 06:00 (today's shift) [MUST-FIX] ### Сейчас Заказы фильтруются по «сегодняшнему дню» (midnight cutoff), но PM-142 fix не работает правильно — гость видит заказы прошлых дней/смен (PM-154 регрессия). ### Должно быть Filter: show only orders where `createdAt >= today at 06:00 AM`. Reason: restaurants work past midnight — orders placed at 01:00 belong to the *previous* evening shift, not "today". 06:00 AM is the business-day reset point (VL-07). ### Implementation In `CartView.jsx`, find the order filtering logic (search for `createdAt`, `filter`, or the PM-142 date filter). Replace the current date cutoff with: ```js const today6am = new Date(); today6am.setHours(6, 0, 0, 0); // If current time is before 06:00 → use yesterday's 06:00 if (new Date() < today6am) today6am.setDate(today6am.getDate() - 1); const filtered = orders.filter(o => new Date(o.created_date) >= today6am); ``` Note: B44 date field may be `created_date` or `createdAt` — search for the actual field name used in the current filter. ### НЕ должно быть - Midnight (00:00) as cutoff - Orders from yesterday evening visible to today's guest ### Проверка 1. Orders placed before 06:00 AM today → NOT shown (belong to last night's shift) 2. Orders placed after 06:00 AM today → shown 3. Edge case: it's 02:00 AM → show orders since yesterday 06:00 AM --- ## Fix 8 — PM-151: Float in success screen [MUST-FIX] ### Сейчас After submitting an order, the success screen «Заказ принят!» shows floating point total: `31.00999999999998 ₸`. ### Должно быть All total values on the success screen wrapped with `parseFloat((value).toFixed(2))`. ### Файл и локация File: `x.jsx`. Confirmed: success screen is in x.jsx, NOT in CartView.jsx. Search for `"confirmation.total"` or `formatPrice(totalAmount)` → ~line 728–731. Apply: `{formatPrice(parseFloat(totalAmount.toFixed(2)))}` instead of `{formatPrice(totalAmount)}`. ### Проверка 1. Submit order → success screen shows `31.01 ₸` (not `31.00999...`) --- ## Fix 9 — PM-152 + PM-153: Guest name localStorage [MUST-FIX] ### Сейчас - PM-152: stale name — guest enters «Артур» but sees old name «Mike» from previous session. localStorage guest name not reset on new session/table. - PM-153: name lost on kill — after killing and reopening Chrome, name shows as «Гость» (localStorage for name not implemented). ### Должно быть Persist guest name in localStorage and clear it on table change: 1. When guest enters name → save to `localStorage.setItem('guestName', name)`. 2. On component mount → read `localStorage.getItem('guestName')` to restore name. 3. When table changes (new `tableCode`) → clear guest name from localStorage: `localStorage.removeItem('guestName')`. 4. If name is empty/null → show «Гость» as default. ### Файл и локация File: `x.jsx`. Search for `guestName` state and the input where guest enters their name. Also search for `tableCode` change handler (where to add the clear logic). Note: If `SessionGuest.guest_number` exists in B44 entities — do NOT use it here, this is purely frontend localStorage. No backend changes. ### НЕ должно быть - Name from previous visitor shown to new guest - Name reset to «Гость» after Chrome kill (if name was entered this session) ### Проверка 1. Enter name «Артур» → kill Chrome → reopen → name still «Артур» ✅ 2. Change table → name cleared (shows «Гость») ✅ 3. New session on different table → no stale name from previous guest ✅ --- ## Fix 10 — D3 (VL-04): «Все блюда поданы ✅» screen [MUST-FIX] ### Сейчас When all orders are delivered (no active orders, no new cart), CartView drawer shows empty «Сейчас» section or is confusing. Guest doesn't know what to do. ### Должно быть When **«Сейчас» is empty AND «История» has delivered orders AND «Новый заказ» cart is empty**: Show a special summary screen instead of empty state: ``` ┌─────────────────────────────────────┐ │ ✅ Все блюда поданы │ │ │ │ 📋 История (collapsed, tap →) │ │ [existing collapsed История] │ │ │ └─────────────────────────────────────┘ ┌─────────────────────────────┐ │ ИТОГО: 248.51 ₸ │ ← sticky footer │ [ Дозаказать ] │ ← primary button │ [ Попросить счёт ] │ ← secondary button └─────────────────────────────┘ ``` **Rules:** - «Дозаказать» button: navigates back to menu (same as «Заказать ещё» / «+ Добавить ещё»). - «Попросить счёт» button: sends a help request (same mechanism as help drawer «Попросить счёт» option if it exists, or a new API call). If no backend support yet → show as disabled with tooltip «Попросите официанта напрямую». - ИТОГО: total of all delivered orders (same float fix as Fix 2). - This screen only shows when: `сейчасOrders.length === 0 AND историяOrders.length > 0 AND cartItems.length === 0`. ### НЕ должно быть - Empty blank area after all orders delivered - «Отправить официанту» button when cart is empty (Fix 2 already handles this) ### Проверка 1. All orders delivered → ✅ banner visible, «Дозаказать» + «Попросить счёт» visible 2. Add item to cart → screen switches back to normal CartView with «Новый заказ» 3. Active order still in progress → normal view, no D3 screen --- ## ⚠️ D7 — DrawerContent: NO `relative` class CartView.jsx uses DrawerContent (vaul library). Any new wrapper elements added inside DrawerContent must NOT have the `relative` class — it breaks vaul. KB-096. ## ⛔ SCOPE LOCK - Modify ONLY: section structure, footer, rating visibility, collapsed rows, labels, selector, date filter, success screen float, guest name localStorage, D3 screen - Do NOT change: stepper +/- behavior, order submission logic, "Отправить официанту" API call - Do NOT change: loyalty points calculation, table header chevron, help drawer logic - In x.jsx: ONLY touch guest name localStorage (PM-152/153) and success screen float (PM-151) ## FROZEN UX (DO NOT CHANGE) - PM-104 ✅: chevron (˅) in right part of table card header, NOT sticky - PM-140 ✅: "Вернуться в меню" + "Мои заказы" buttons after successful order - PM-141 ✅: star rating touch targets ≥ 44px (keep when stars ARE shown) - PM-142 ✅: orders filtered to current shift only (Fix 7 REFINES this to 06:00 AM cutoff — do NOT revert to showing all-time orders) - PM-143 ✅: sort by full datetime (newest first within each section) - PM-145 ✅: float fix on totals (parseFloat toFixed(2)) ## FROZEN UX grep verification Before commit, verify these have NOT changed: ``` grep -n "ChevronDown" pages/PublicMenu/CartView.jsx | head -5 grep -n "Вернуться в меню\|back_to_menu" pages/PublicMenu/CartView.jsx | head -5 grep -n "toFixed\|parseFloat" pages/PublicMenu/CartView.jsx | head -5 ``` ## Regression Check (MANDATORY after implementation) - [ ] "Отправить официанту" button still submits order correctly - [ ] Stepper (—/+) still adjusts quantities in "Новый заказ" - [ ] "Для кого заказ" selector still works (or replaced with new selector) - [ ] Stars rating works when shown (on delivered orders) - [ ] Table header with chevron still collapses/expands - [ ] 06:00 filter: no past-day orders visible - [ ] Float fix applied on all totals (CartView + success screen) - [ ] Guest name persists after Chrome kill - [ ] Guest name clears on table change - [ ] D3 screen appears when all orders delivered + cart empty - [ ] Help drawer still opens (x.jsx unchanged outside scope) ## MOBILE-FIRST CHECK (MANDATORY before commit) At 375px viewport width: - [ ] «Сейчас» section visible at top when drawer opens - [ ] Sticky footer does not overlap scrollable content - [ ] Collapsed rows: chevron ≥ 44×44px touch target - [ ] «Новый заказ» steppers work correctly - [ ] Long dish names truncated (not overflowing) ## Implementation Notes - TARGET FILES: `pages/PublicMenu/CartView.jsx` - CONTEXT: `pages/PublicMenu/x.jsx`, `ux-concepts/cart-view.md` - Do NOT use `git add .` — only: `git add pages/PublicMenu/CartView.jsx pages/PublicMenu/x.jsx pages/PublicMenu/BUGS.md` - git commit -m "feat: CartView v3 — sections, sticky footer, 06:00 filter, guest name, D3 screen" - git push ⚠️ DRAFT — Run prompt-checker before moving to queue/. ⚠️ Run AFTER #162 is DONE (Rule 26 — one chain at a time). === END ===
+mcp startup: no servers
+codex
+I’m reviewing only the `PublicMenu` target files and local context files in that page folder, then I’ll write the findings to the requested pipeline file plus the repository-required review artifacts in `pages/PublicMenu`.
+codex
+I’m pulling the two target files plus `README.md` and `BUGS.md` from `pages/PublicMenu`, with line numbers so the findings can point at exact locations without scanning the rest of the repo.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content '"'pages/PublicMenu/x.jsx' | ForEach-Object { '{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content '"'pages/PublicMenu/BUGS.md' | ForEach-Object { '{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content '"'pages/PublicMenu/README.md' | ForEach-Object { '{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content '"'pages/PublicMenu/CartView.jsx' | ForEach-Object { '{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Force 'pages/PublicMenu' | Select-Object Name,Length,Mode" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 13.12s:
+
+ exited 124 in 12.99s:
+
+ exited 124 in 15.55s:
+
+ exited 124 in 11.63s:
+
+ exited 124 in 11.02s:
+
+codex
+`CartView.jsx` and `x.jsx` are large enough that full numbered dumps timed out, so I’m switching to targeted reads inside those same files: line counts first, then only the sections tied to Fix 1–10.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/BUGS.md' -Raw" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "(Get-Content 'pages/PublicMenu/CartView.jsx').Count" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "(Get-Content 'pages/PublicMenu/x.jsx').Count" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Force 'pages/PublicMenu' | Select-Object Name,Length,Mode" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/README.md' -Raw" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 21.34s:
+
+ exited 124 in 21.41s:
+
+ succeeded in 25.06s:
+1045
+ exited 124 in 21.83s:
+
+ succeeded in 27.40s:
+4004
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'Заказано','ИТОГО','rating','Rating','Star','Для кого','Только мне','createdAt','created_date','DrawerContent','Отправить официанту','Добавить ещё','Попросить счёт','Выдан гостю','Подано' | ForEach-Object { \"{0}:{1}: {2}\" -f "'$_.Filename, $_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "cmd /c dir /b \"pages\\PublicMenu\"" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/BUGS.md' -TotalCount 200" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'guestName','localStorage','tableCode','formatPrice','totalAmount','confirmation.total','Заказ принят' | ForEach-Object { \"{0}:{1}: {2}\" -f "'$_.Filename, $_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/README.md' -TotalCount 200" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 20.94s:
+CartView.jsx:6: import Rating from "@/components/Rating";
+CartView.jsx:13: return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
+CartView.jsx:34: showLoginPromptAfterRating,
+CartView.jsx:55: draftRatings,
+CartView.jsx:56: updateDraftRating,
+CartView.jsx:69: ratingSavingByItemId,
+CartView.jsx:87: const safeDraftRatings = draftRatings || {};
+CartView.jsx:93: const [activeExpanded, setActiveExpanded] = React.useState(true); // PM-144: Заказано expanded by default
+CartView.jsx:237: if (norm === key || norm.startsWith(key + ":")) return fallback;
+CartView.jsx:246: if (norm === key || norm.startsWith(key)) return fallback;
+CartView.jsx:253: return { icon: '🔵', label: tr('status.new', 'Заказано'), color: '#3B82F6' };
+CartView.jsx:259: if (label.includes('.') && (label.startsWith('orderprocess') || label.startsWith('status'))) {
+CartView.jsx:266: 'new': tr('status.new', 'Заказано'),
+CartView.jsx:267: 'start': tr('status.cooking', 'Готовится'),
+CartView.jsx:278: label = fallbacks[code] || tr('status.new', 'Заказано');
+CartView.jsx:316: if (rawTableLabel.trim().toLowerCase().startsWith(tablePrefix.trim().toLowerCase())) {
+CartView.jsx:355: const d = o.created_at || o.created_date || o.createdAt;
+CartView.jsx:360: const da = new Date(a.created_at || a.created_date || a.createdAt || 0);
+CartView.jsx:361: const db = new Date(b.created_at || b.created_date || b.createdAt || 0);
+CartView.jsx:366: // ===== PM-144: Split orders into Выдано (served) vs Заказано (active) =====
+ succeeded in 21.10s:
+260320-01 useTableSession RELEASE.jsx
+260323-03 CheckoutView RELEASE.jsx
+260325-06 CartView RELEASE.jsx
+260326-01 CartView RELEASE.jsx
+260327-01 CartView RELEASE.jsx
+260327-01 ModeTabs RELEASE.jsx
+260327-03 MenuView RELEASE.jsx
+260327-03 x RELEASE.jsx
+ACCEPTANCE_CRITERIA_PHASE1.md
+BUGS.md
+CartView.jsx
+CheckoutView.jsx
+components
+COPY_SPEC.md
+i18n_DrawerUX_S79.csv
+i18n_WorkingHours_S79.csv
+MenuView.jsx
+ModeTabs.jsx
+PublicMenu README.md
+PublicMenu_BASE.txt
+ succeeded in 20.91s:
+---
+version: "37.0"
+updated: "2026-03-27"
+session: 184
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*9 active bugs remaining (0x P0, 4x P1, 4x P2, 0x P3, 1x suggestion).*
+
+### BUG-PM-132: List mode stepper buttons use w-9 h-9 (36px) instead of w-11 h-11 (44px) (P2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P2
+- **ÐšÐ¾Ð³Ð´Ð°:** S177 (found by Codex in chain 74b9, confirmed by CC)
+ succeeded in 22.43s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 23.70s:
+x.jsx:175: localStorage.removeItem(key);
+x.jsx:178: localStorage.setItem(key, JSON.stringify({ items: cartData, ts: Date.now() }));
+x.jsx:186: const raw = localStorage.getItem(key);
+x.jsx:192: localStorage.setItem(key, JSON.stringify({ items: data, ts: Date.now() }));
+x.jsx:199: localStorage.removeItem(key);
+x.jsx:212: localStorage.removeItem(key);
+x.jsx:287: const timestamp = localStorage.getItem(key);
+x.jsx:296: localStorage.setItem(key, String(Date.now()));
+x.jsx:432: "confirmation.total": "Итого",
+x.jsx:609: totalAmount,
+x.jsx:614: formatPrice,
+x.jsx:718: {formatPrice(Math.round(item.price * item.quantity * 100) / 100)}
+x.jsx:728: {tr("confirmation.total", "Итого")}
+x.jsx:731: {formatPrice(totalAmount)}
+x.jsx:988: const formatPrice = (amount) => {
+x.jsx:1154: {formatPrice(item.line_total != null ? item.line_total : item.dish_price * item.quantity)}
+x.jsx:1162: <span className="font-semibold text-slate-800 tabular-nums">{formatPrice(displayTotal)}</span>
+x.jsx:1167: {t("order_status.discount")}: -{formatPrice(order.discount_amount)}
+x.jsx:1358: const [guestNameInput, setGuestNameInput] = useState(() => {
+x.jsx:1359: try { return localStorage.getItem('menuapp_guest_name') || ''; } catch (e) { return ''; }
+codex
+I have the anchor lines. Next I’m reading only the code blocks around filtering, section rendering, rating, footer, success total, and guest-name persistence to verify each numbered fix against the current implementation.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/x.jsx'; "'$start=700; $end=735; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '"'{0,5}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/x.jsx'; "'$start=1348; $end=1370; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '"'{0,5}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/CartView.jsx'; "'$start=780; $end=1010; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '"'{0,5}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/x.jsx'; "'$start=1550; $end=1610; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '"'{0,5}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/CartView.jsx'; "'$start=330; $end=390; $i=1; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '"'{0,5}: {1}' -f ("'$start++), $_ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/CartView.jsx'; "'$start=450; $end=620; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '"'{0,5}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/x.jsx'; "'$start=3138; $end=3170; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '"'{0,5}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 24.10s:
+  700:       <Card className="mb-6">
+  701:         <CardContent className="p-4">
+  702:           <p className="text-sm font-medium text-slate-600 mb-3">
+  703:             {tr("confirmation.your_order", "Ð’Ð°Ñˆ Ð·Ð°ÐºÐ°Ð·")}
+  704:           </p>
+  705: 
+  706:           {/* Items list */}
+  707:           <div className="space-y-2 mb-3">
+  708:             {items.map((item, idx) => (
+  709:               <div
+  710:                 key={item.dishId || idx}
+  711:                 className="flex justify-between items-center text-sm"
+  712:               >
+  713:                 <span className="text-slate-700">
+  714:                   {item.name}{" "}
+  715:                   <span className="text-slate-400">x{item.quantity}</span>
+  716:                 </span>
+  717:                 <span className="text-slate-700 font-medium tabular-nums">
+  718:                   {formatPrice(Math.round(item.price * item.quantity * 100) / 100)}
+  719:                 </span>
+ succeeded in 22.65s:
+ 1348: 
+ 1349:   const [isSubmitting, setIsSubmitting] = useState(false);
+ 1350:   const [submitError, setSubmitError] = useState(null);
+ 1351: 
+ 1352:   // Guest code (4-digit code for showing to waiter)
+ 1353:   const [guestCode, setGuestCode] = useState(null);
+ 1354: 
+ 1355:   // Hall UI state (not in session hook)
+ 1356:   const [splitType, setSplitType] = useState('single'); // 'single' | 'all'
+ 1357:   const [otherGuestsExpanded, setOtherGuestsExpanded] = useState(false);
+ 1358:   const [guestNameInput, setGuestNameInput] = useState(() => {
+ 1359:     try { return localStorage.getItem('menuapp_guest_name') || ''; } catch (e) { return ''; }
+ 1360:   });
+ 1361:   const [isEditingName, setIsEditingName] = useState(false);
+ 1362: 
+ 1363:   // Bill request state
+ 1364:   const [billRequested, setBillRequested] = useState(false);
+ 1365:   const [billCooldown, setBillCooldown] = useState(false);
+ 1366: 
+ 1367:   // Rating flow state (TASK-260130-09)
+ succeeded in 23.55s:
+ 1550:       return;
+ 1551:     }
+ 1552:     if (url.startsWith("tel:") || url.startsWith("mailto:")) {
+ 1553:       window.location.href = url;
+ 1554:     } else {
+ 1555:       window.open(url, "_blank", "noopener,noreferrer");
+ 1556:     }
+ 1557:   };
+ 1558: 
+ 1559:   // Hall table verification hook
+ 1560:   const {
+ 1561:     tableCodeParam,
+ 1562:     resolvedTable,
+ 1563:     isHallMode,
+ 1564:     tableCodeInput,
+ 1565:     setTableCodeInput,
+ 1566:     isVerifyingCode,
+ 1567:     verifiedByCode,
+ 1568:     verifiedTableId,
+ 1569:     verifiedTable,
+ succeeded in 26.25s:
+  780:             >
+  781:               <div className="flex items-center gap-2">
+  782:                 <span>âœ…</span>
+  783:                 <span className="text-base font-semibold text-slate-800">
+  784:                   {tr('cart.served', 'Ð’Ñ‹Ð´Ð°Ð½Ð¾')} ({servedOrders.length})
+  785:                 </span>
+  786:               </div>
+  787:               <div className="min-w-[44px] min-h-[44px] flex items-center justify-end">
+  788:                 {servedExpanded ? (
+  789:                   <ChevronUp className="w-5 h-5 text-slate-400" />
+  790:                 ) : (
+  791:                   <ChevronDown className="w-5 h-5 text-slate-400" />
+  792:                 )}
+  793:               </div>
+  794:             </button>
+  795: 
+  796:             {servedExpanded && (
+  797:               <div className="mt-4 pt-4 border-t">
+  798:                 {renderOrderItems(servedOrders)}
+  799:               </div>
+ succeeded in 22.56s:
+  330:     try {
+  331:       const ids = new Set(
+  332:         (sessionOrders || [])
+  333:           .map(o => (getLinkId ? getLinkId(o.guest) : o.guest))
+  334:           .filter(Boolean)
+  335:           .map(x => String(x))
+  336:       );
+  337:       return ids.size;
+  338:     } catch {
+  339:       return 0;
+  340:     }
+  341:   }, [sessionOrders, getLinkId]);
+  342: 
+  343:   const guestCount = Math.max(
+  344:     Array.isArray(sessionGuests) ? sessionGuests.length : 0,
+  345:     guestCountFromOrders,
+  346:     1
+  347:   );
+  348:   const canSplit = guestCount > 1;
+  349: 
+ succeeded in 23.48s:
+  450:   const splitSummary = splitType === "all" 
+  451:     ? `${tr('cart.for_all', 'ÐÐ° Ð²ÑÐµÑ…')} (Ã·${guestCount})`
+  452:     : tr('cart.only_me', 'Ð¢Ð¾Ð»ÑŒÐºÐ¾ Ñ');
+  453: 
+  454:   // loyaltySummary + reviewRewardLabel removed â€” loyalty section simplified (#87 KS-1)
+  455: 
+  456:   // ===== PM-144: Reusable order list renderer for Ð’Ñ‹Ð´Ð°Ð½Ð¾ / Ð—Ð°ÐºÐ°Ð·Ð°Ð½Ð¾ sections =====
+  457:   const renderOrderItems = (orders) => (
+  458:     <div className="space-y-3">
+  459:       {orders.map((order) => {
+  460:         const orderItems = itemsByOrder.get(order.id) || [];
+  461:         const rawStatus = getOrderStatus(order);
+  462:         const status = getSafeStatus(rawStatus);
+  463: 
+  464:         return (
+  465:           <div key={order.id} className="border-b pb-3 last:border-0 last:pb-0">
+  466:             <div className="flex items-center justify-between mb-2">
+  467:               <span className="text-xs text-slate-400">
+  468:                 {formatOrderTime(order)}
+  469:               </span>
+ succeeded in 22.32s:
+ 3138:       setSubmitError(t('error.send.title'));
+ 3139:     } finally {
+ 3140:       submitLockRef.current = false;
+ 3141:       setIsSubmitting(false);
+ 3142:     }
+ 3143:   };
+ 3144: 
+ 3145:   // Update guest name (inline on cart page)
+ 3146:   const handleUpdateGuestName = async () => {
+ 3147:     const trimmedName = guestNameInput.trim();
+ 3148:     if (!trimmedName) return;
+ 3149: 
+ 3150:     try {
+ 3151:       // DB update only if guest record exists
+ 3152:       if (currentGuest?.id) {
+ 3153:         await base44.entities.SessionGuest.update(currentGuest.id, {
+ 3154:           name: trimmedName
+ 3155:         });
+ 3156:         setSessionGuests(prev => prev.map(g =>
+ 3157:           g.id === currentGuest.id ? { ...g, name: trimmedName } : g
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/CartView.jsx'; "'$start=80; $end=105; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '"'{0,5}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/CartView.jsx'; "'$start=740; $end=805; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '"'{0,5}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/CartView.jsx'; "'$start=1007; $end=1045; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '"'{0,5}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/CartView.jsx'; "'$start=230; $end=285; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '"'{0,5}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'menuapp_guest_name','removeItem\\(' | ForEach-Object { \"x.jsx:{0}: {1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 19.95s:
+   80:   guestCode,
+   81:   showLoyaltySection,
+   82: }) {
+   83:   const primaryColor = partner?.primary_color || '#1A1A1A';
+   84: 
+   85:   // ===== P0: Safe prop defaults (BUG-PM-023, BUG-PM-025) =====
+   86:   const safeReviewedItems = reviewedItems || new Set();
+   87:   const safeDraftRatings = draftRatings || {};
+   88: 
+   89:   // ===== P1 Expandable States =====
+   90:   const [splitExpanded, setSplitExpanded] = React.useState(false);
+   91:   // loyaltyExpanded removed â€” loyalty section simplified to motivation text (#87 KS-1)
+   92:   const [servedExpanded, setServedExpanded] = React.useState(false); // PM-144: Ð’Ñ‹Ð´Ð°Ð½Ð¾ collapsed by default
+   93:   const [activeExpanded, setActiveExpanded] = React.useState(true); // PM-144: Ð—Ð°ÐºÐ°Ð·Ð°Ð½Ð¾ expanded by default
+   94:   const [showRewardEmailForm, setShowRewardEmailForm] = React.useState(false);
+   95:   const [rewardEmail, setRewardEmail] = React.useState('');
+   96:   const [rewardEmailSubmitting, setRewardEmailSubmitting] = React.useState(false);
+   97:   const [emailError, setEmailError] = React.useState('');
+   98: 
+   99:   // ===== P0: Table-code verification UX (mask + auto-verify + cooldown) =====
+ succeeded in 18.26s:
+x.jsx:175: localStorage.removeItem(key);
+x.jsx:199: localStorage.removeItem(key);
+x.jsx:212: localStorage.removeItem(key);
+x.jsx:1359: try { return localStorage.getItem('menuapp_guest_name') || ''; } catch (e) { return ''; }
+x.jsx:3162: try { localStorage.setItem('menuapp_guest_name', trimmedName); } catch (e) { /* quota */ }
+ succeeded in 18.87s:
+ 1007:       {/* Submit button - sticky at bottom of drawer scroll area */}
+ 1008:       {cart.length > 0 && (
+ 1009:         <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 -mx-4">
+ 1010:           {/* Motivation text â€” only if loyalty enabled (#87 KS-1 Fix 1) */}
+ 1011:           {partner?.loyalty_enabled && (() => {
+ 1012:             const motivationPoints = Math.round((Number(cartTotalAmount) || 0) * (Number(partner?.loyalty_points_per_currency) || 1));
+ 1013:             return motivationPoints > 0 ? (
+ 1014:               <p className="text-sm text-gray-500 text-center mt-1 mb-1">
+ 1015:                 {trFormat('cart.motivation_bonus', { points: motivationPoints }, `ÐžÑ‚Ð¿Ñ€Ð°Ð²ÑŒÑ‚Ðµ Ð·Ð°ÐºÐ°Ð· Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ Ð¸ Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ñ‚Ðµ +${motivationPoints} Ð±Ð¾Ð½ÑƒÑÐ¾Ð²`)}
+ 1016:               </p>
+ 1017:             ) : null;
+ 1018:           })()}
+ 1019:           <Button
+ 1020:             size="lg"
+ 1021:             className={`w-full text-white ${
+ 1022:               isSubmitting || emailError
+ 1023:                 ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
+ 1024:                 : submitError
+ 1025:                   ? 'bg-red-600 hover:bg-red-700'
+ 1026:                   : ''
+ succeeded in 20.11s:
+  230:   // ===== P0 UX helpers =====
+  231: 
+  232:   // Safe translation with fallback
+  233:   const tr = (key, fallback) => {
+  234:     const val = typeof t === "function" ? t(key) : "";
+  235:     if (!val || typeof val !== "string") return fallback;
+  236:     const norm = val.trim();
+  237:     if (norm === key || norm.startsWith(key + ":")) return fallback;
+  238:     return norm;
+  239:   };
+  240: 
+  241:   // Translation with params
+  242:   const trFormat = (key, params, fallback) => {
+  243:     const val = typeof t === "function" ? t(key, params) : "";
+  244:     if (!val || typeof val !== "string") return fallback;
+  245:     const norm = val.trim();
+  246:     if (norm === key || norm.startsWith(key)) return fallback;
+  247:     return norm;
+  248:   };
+  249: 
+ succeeded in 18.64s:
+  740:                 })}
+  741: 
+  742:                 {/* Review button for other guests' dishes */}
+  743:                 {otherGuestsReviewableItems.length > 0 && (
+  744:                   <Button
+  745:                     variant="outline"
+  746:                     size="sm"
+  747:                     className="w-full mt-2"
+  748:                     onClick={() => openReviewDialog(otherGuestsReviewableItems)}
+  749:                   >
+  750:                     â­ {tr('review.rate_others', 'ÐžÑ†ÐµÐ½Ð¸Ñ‚ÑŒ Ð±Ð»ÑŽÐ´Ð° Ð³Ð¾ÑÑ‚ÐµÐ¹')}
+  751:                     {loyaltyAccount && (partner?.loyalty_review_points ?? 0) > 0 && ` (+${otherGuestsReviewableItems.length * (partner?.loyalty_review_points ?? 0)} ${tr('review.points', 'Ð±Ð°Ð»Ð»Ð¾Ð²')})`}
+  752:                   </Button>
+  753:                 )}
+  754:               </div>
+  755:             )}
+  756:           </CardContent>
+  757:         </Card>
+  758:       )}
+  759: 
+codex
+I’ve confirmed the main areas. I’m doing one more narrow pass for table-change handling in `x.jsx` and any existing “all dishes delivered” branch in `CartView.jsx`, because those affect Fix 9 and Fix 10 directly.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'Все блюда поданы','Дозаказать','Попросить счёт','bill','servedOrders.length','activeOrders.length','cart.length === 0 && todayMyOrders.length > 0' | ForEach-Object { \"CartView.jsx:{0}: {1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'verifiedTableId','verifiedTable','resolvedTable','currentTableId','tableCodeParam','useEffect\\(' | ForEach-Object { \"x.jsx:{0}: {1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 10.70s:
+x.jsx:963: useEffect(() => {
+x.jsx:975: useEffect(() => {
+x.jsx:980: useEffect(() => {
+x.jsx:1401: useEffect(() => {
+x.jsx:1416: useEffect(() => {
+x.jsx:1458: useEffect(() => {
+x.jsx:1466: useEffect(() => {
+x.jsx:1488: useEffect(() => {
+x.jsx:1531: useEffect(() => {
+x.jsx:1561: tableCodeParam,
+x.jsx:1562: resolvedTable,
+x.jsx:1568: verifiedTableId,
+x.jsx:1569: verifiedTable,
+x.jsx:1575: useEffect(() => {
+x.jsx:1602: useEffect(() => {
+x.jsx:1620: const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
+x.jsx:1630: // P0-2: currentTableId only from resolved table or code verification
+x.jsx:1631: const currentTableId = resolvedTable?.id || verifiedTableId || null;
+x.jsx:1634: const currentTable = resolvedTable || verifiedTable || null;
+x.jsx:1650: } = useHelpRequests({ partner, currentTableId, t, toast, isRateLimitError, saveTableSelection });
+ succeeded in 10.74s:
+CartView.jsx:59: myBill,
+CartView.jsx:773: {servedOrders.length > 0 && (
+CartView.jsx:784: {tr('cart.served', 'Выдано')} ({servedOrders.length})
+CartView.jsx:806: {activeOrders.length > 0 && (
+CartView.jsx:817: {tr('cart.ordered', 'Заказано')} ({activeOrders.length})
+CartView.jsx:851: {cart.length === 0 && todayMyOrders.length > 0 && (
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/x.jsx'; "'$start=2448; $end=2466; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '"'{0,5}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/x.jsx'; "'$start=2288; $end=2330; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '"'{0,5}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/x.jsx'; "'$start=3298; $end=3310; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '"'{0,5}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.53s:
+ 3298:   // ============================================================
+ 3299:   // HALL CHECKOUT SCREEN (TASK-260127-01: removed "Ð¡Ñ‚Ð¾Ð» Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´Ñ‘Ð½" block)
+ 3300:   // ============================================================
+ 3301:   const renderHallCheckoutContent = () => {
+ 3302:     // Table already verified - nothing special needed here
+ 3303:     // (table info shown in menu header, comment field below)
+ 3304:     if (isTableVerified && currentTableId) {
+ 3305:       return null;
+ 3306:     }
+ 3307: 
+ 3308:     // Table NOT verified - show verification options (NO dropdown per P0-7)
+ 3309:     const showHallOnlineBenefitsHint = !!(partner?.discount_enabled || partner?.loyalty_enabled);
+ 3310: 
+ succeeded in 11.72s:
+ 2288:   const hallStickyIsLoadingBill = 
+ 2289:     (hallStickyMode === "myBill" || hallStickyMode === "tableOrders") && 
+ 2290:     (sessionItems.length === 0 && sessionOrders.length > 0);
+ 2291: 
+ 2292:   // Generate guest code for Hall mode (if enabled)
+ 2293:   useEffect(() => {
+ 2294:     if (!isHallMode || !hallGuestCodeEnabled) return;
+ 2295:     
+ 2296:     try {
+ 2297:       // P2-2: Should be tied to partner, but keeping simple for now
+ 2298:       let code = localStorage.getItem("menu_guest_code");
+ 2299:       if (!code) {
+ 2300:         code = String(Math.floor(1000 + Math.random() * 9000));
+ 2301:         localStorage.setItem("menu_guest_code", code);
+ 2302:       }
+ 2303:       setGuestCode(code);
+ 2304:     } catch (e) {
+ 2305:       // silent
+ 2306:     }
+ 2307:   }, [isHallMode, hallGuestCodeEnabled]);
+ succeeded in 11.71s:
+ 2448:     setRedeemedPoints(0);
+ 2449:   };
+ 2450: 
+ 2451:   // Check bill cooldown on mount
+ 2452:   useEffect(() => {
+ 2453:     if (currentTableId) {
+ 2454:       setBillCooldown(isBillOnCooldown(currentTableId));
+ 2455:     }
+ 2456:   }, [currentTableId]);
+ 2457: 
+ 2458:   // Debug hook kept as no-op to maintain hook order (BUG-PM-040: removed prod logging)
+ 2459:   useEffect(() => {}, []);
+ 2460: 
+ 2461:   // PM-S81-15 + PM-105: Android back button closes topmost overlay (stack-based)
+ 2462:   useEffect(() => {
+ 2463:     const handlePopState = () => {
+ 2464:       // PM-107: If popOverlay triggered this back, skip â€” sheet already closed
+ 2465:       if (isProgrammaticCloseRef.current) {
+ 2466:         isProgrammaticCloseRef.current = false;
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'showTableOrdersSection','reviewableItems','otherGuestsReviewableItems','openReviewDialog','servedExpanded','activeExpanded' | ForEach-Object { \"CartView.jsx:{0}: {1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'setGuestNameInput\\(','currentGuest\\?\\.name','setCurrentGuest\\(' | ForEach-Object { \"x.jsx:{0}: {1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.46s:
+CartView.jsx:60: reviewableItems,
+CartView.jsx:61: openReviewDialog,
+CartView.jsx:65: otherGuestsReviewableItems,
+CartView.jsx:92: const [servedExpanded, setServedExpanded] = React.useState(false); // PM-144: Выдано collapsed by default
+CartView.jsx:93: const [activeExpanded, setActiveExpanded] = React.useState(true); // PM-144: Заказано expanded by default
+CartView.jsx:422: const showTableOrdersSection = otherGuestIdsFromOrders.length > 0;
+CartView.jsx:444: const shouldShowReviewRewardHint = isReviewRewardActive && (reviewableItems?.length > 0);
+CartView.jsx:664: {showTableOrdersSection && (
+CartView.jsx:743: {otherGuestsReviewableItems.length > 0 && (
+CartView.jsx:748: onClick={() => openReviewDialog(otherGuestsReviewableItems)}
+CartView.jsx:751: {loyaltyAccount && (partner?.loyalty_review_points ?? 0) > 0 && ` (+${otherGuestsReviewableItems.length * (partner?.loyalty_review_points ?? 0)} ${tr('review.points', 'баллов')})`}
+CartView.jsx:761: {(sessionGuests.length > 1 || showTableOrdersSection) && (
+CartView.jsx:779: onClick={() => setServedExpanded(!servedExpanded)}
+CartView.jsx:788: {servedExpanded ? (
+CartView.jsx:796: {servedExpanded && (
+CartView.jsx:812: onClick={() => setActiveExpanded(!activeExpanded)}
+CartView.jsx:821: {activeExpanded ? (
+CartView.jsx:829: {activeExpanded && (
+CartView.jsx:834: {reviewableItems.length > 0 && (
+CartView.jsx:839: onClick={() => openReviewDialog(reviewableItems)}
+ succeeded in 8.55s:
+x.jsx:2939: setCurrentGuest(guest);
+x.jsx:2959: setCurrentGuest(guest);
+x.jsx:3163: setCurrentGuest(prev => ({ ...(prev || {}), name: trimmedName }));
+x.jsx:3165: setGuestNameInput(trimmedName);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/x.jsx'; "'$start=1620; $end=1636; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '"'{0,5}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'menuapp_guest_name','currentTableId','tableCodeParam','resolvedTable\\?\\.id','verifiedTableId' | ForEach-Object { \"x.jsx:{0}: {1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.74s:
+x.jsx:1359: try { return localStorage.getItem('menuapp_guest_name') || ''; } catch (e) { return ''; }
+x.jsx:1561: tableCodeParam,
+x.jsx:1568: verifiedTableId,
+x.jsx:1620: const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
+x.jsx:1630: // P0-2: currentTableId only from resolved table or code verification
+x.jsx:1631: const currentTableId = resolvedTable?.id || verifiedTableId || null;
+x.jsx:1650: } = useHelpRequests({ partner, currentTableId, t, toast, isRateLimitError, saveTableSelection });
+x.jsx:1659: // PM-133: Guard for null currentTableId — redirect to table code entry
+x.jsx:1662: if (!currentTableId) {
+x.jsx:1672: }, [pushOverlay, currentTableId, setShowTableConfirmSheet, setHelpComment]);
+x.jsx:2126: currentTableId,
+x.jsx:2151: currentTableId,
+x.jsx:2225: if (pendingSubmitRef.current && isTableVerified && currentTableId) {
+x.jsx:2236: }, [isTableVerified, currentTableId]);
+x.jsx:2312: if (tableCodeParam && orderMode !== "hall") {
+x.jsx:2315: }, [tableCodeParam, orderMode]);
+x.jsx:2453: if (currentTableId) {
+x.jsx:2454: setBillCooldown(isBillOnCooldown(currentTableId));
+x.jsx:2456: }, [currentTableId]);
+x.jsx:2535: if (!currentTableId) {
+ succeeded in 1.88s:
+ 1620:   const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
+ 1621: 
+ 1622:   // Table code config (for Bottom Sheet â€” PM-064)
+ 1623:   const tableCodeLength = useMemo(() => {
+ 1624:     const n = Number(partner?.table_code_length);
+ 1625:     return (Number.isFinite(n) && n > 0) ? Math.max(3, Math.min(8, Math.round(n))) : 4;
+ 1626:   }, [partner?.table_code_length]);
+ 1627: 
+ 1628:   // P0-7: Removed activeTables query - no dropdown needed
+ 1629: 
+ 1630:   // P0-2: currentTableId only from resolved table or code verification
+ 1631:   const currentTableId = resolvedTable?.id || verifiedTableId || null;
+ 1632:   
+ 1633:   // Current table object for display (from QR resolve or code verify)
+ 1634:   const currentTable = resolvedTable || verifiedTable || null;
+ 1635: 
+ 1636:   // Help / ServiceRequest hook
+codex
+I’ve finished the review pass. I’m writing the scoped findings to the requested pipeline artifact, then mirroring them into the `pages/PublicMenu` review file and saving the exact command log for this run.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pipeline/chain-state'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pages/PublicMenu'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.79s:
+True
+ succeeded in 1.79s:
+True
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-083047-385c
+
+## Findings
+1. [P1] Fix 1 — CartView still uses the old `Выдано` / `Заказано` split instead of `Сейчас` / `История` / `Новый заказ`. `todayMyOrders` is only partitioned into `servedOrders` and `activeOrders` at `CartView.jsx:351-374`, and the renderer still prints flat order lists with per-order badges under `Выдано` and `Заказано` at `CartView.jsx:456-529` and `CartView.jsx:772-845`. There is no urgency subgrouping (`Готов` -> `Готовится` -> `Принят`) or collapsed `История` summary row. FIX: replace the old served/active split with explicit `currentOrders` and `historyOrders` arrays based on the raw DB statuses from the task, group current orders by status priority, and render `История` as the collapsed summary block.
+2. [P1] Fix 2 — The visit total is still inside scrollable content, and the footer logic only handles the non-empty-cart submit state. `ИТОГО за визит` remains a normal card at `CartView.jsx:980-991`, while the sticky block at `CartView.jsx:1007-1041` appears only when `cart.length > 0` and never renders the required empty-cart or first-order variants (`ИТОГО`, `К отправке`, `Всего`, `Заказать ещё`). FIX: convert the drawer body to `flex flex-col h-full` with a scrollable content area and a persistent footer that switches copy/buttons by visit state, while keeping totals float-safe via `parseFloat(...toFixed(2))`.
+3. [P1] Fix 3 — Rating UI is still shown before delivery. Inside `renderOrderItems`, every item renders `<Rating>` whenever `reviewsEnabled` is true at `CartView.jsx:489-516`, regardless of `order.status`, and the only review CTA is the generic section button at `CartView.jsx:834-842` / `CartView.jsx:742-752` instead of a per-order `Оценить блюда` trigger for delivered orders. FIX: gate review UI by delivered statuses only, show a per-order `Оценить блюда` button for `Подано` / `Выдан гостю`, and expand the existing stars only after that CTA is tapped.
+4. [P1] Fix 4 — Orders in the active section are still fully expanded rows, not collapsed summaries. Each order renders its full item list immediately at `CartView.jsx:474-520`, with only time + badge in the header at `CartView.jsx:466-473`; there is no 2-item preview, `+N` remainder, per-order chevron, or collapsed/expanded state per active order. FIX: add per-order collapse state for `Сейчас`, render the summary row with the first two item names plus `+N` and the existing formatted total, then reveal the full item list on expand.
+5. [P2] Fix 5 — The old split toggle is still in place instead of the new guest selector. `splitSummary` still resolves to `На всех` / `Только я` at `CartView.jsx:450-452`, and the cart renders an inline `Для кого заказ` radio group at `CartView.jsx:904-970`, even when `canSplit` is false. There is no local sheet/popover picker and the selector is not hidden for single-guest tables. FIX: hide the control when `guestCount <= 1`, replace the inline radios with a local open/close guest picker, and surface the selected guest as `Кому заказ: ...`.
+6. [P2] Fix 6 — Guest-facing status copy is still the old set. `getSafeStatus` falls back to `Заказано` and `Готово` at `CartView.jsx:252-278`, and those labels are rendered directly in the badge at `CartView.jsx:470-472`. There is no display-layer mapping that turns `Заказано` / `Принято` into `Принят` or `Выдан гостю` into `Подано`. FIX: normalize display labels to `Принят`, `Готовится`, `Готов`, and `Подано` without changing the raw status values used for filtering.
+7. [P1] Fix 7 — The shift filter still uses midnight, not the 06:00 business-day cutoff. `todayMyOrders` compares `new Date(d).toDateString()` with today's date at `CartView.jsx:351-358`, so orders from the previous evening shift can still leak across midnight and early-morning orders can be misclassified. FIX: replace the date-only equality check with the rolling `today6am` cutoff described in the task, then run the existing newest-first sort on the filtered result.
+8. [P1] Fix 8 — The success screen total still passes the raw floating-point value to `formatPrice`. The confirmation footer renders `formatPrice(totalAmount)` at `x.jsx:726-731`, so totals like `31.00999999999998` can still appear. FIX: wrap the value with `parseFloat(totalAmount.toFixed(2))` before formatting.
+9. [P1] Fix 9 — Guest name persistence is global and never resets on table change. `guestNameInput` initializes from a single `menuapp_guest_name` key at `x.jsx:1358-1360`, writes back to the same key at `x.jsx:3161-3165`, and the current table identity is available as `currentTableId` at `x.jsx:1630-1634` but is never used to clear or scope the stored name. That leaves the stale-name regression in place for a new table/session. FIX: clear or namespace guest-name storage when `tableCodeParam` / `currentTableId` changes and fall back to `Гость` when no saved name exists.
+10. [P1] Fix 10 — The dedicated "all dishes delivered" state is missing. When only delivered orders remain, CartView still shows the regular collapsed `Выдано` section at `CartView.jsx:773-803`, the old `+ Добавить к заказу` button at `CartView.jsx:851-861`, and the generic visit-total / submit footer flow at `CartView.jsx:980-1041`. There is no `Все блюда поданы` banner, no `Дозаказать` primary CTA, and no `Попросить счёт` action/disabled fallback. FIX: add a D3 branch for `activeOrders.length === 0 && servedOrders.length > 0 && cart.length === 0`, render the special summary screen, and attach the sticky footer to the delivered-orders total.
+
+## Summary
+Total: 10 findings (0 P0, 8 P1, 2 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none required for this scoped review
+- Scope questions (anything you weren't sure if it's in scope): the task says `TARGET FILES (modify)` and references external UX docs / `BUGS_MASTER.md`, but the speed rules also say to read only `pages/PublicMenu` files; I treated the page-folder-only rule as authoritative.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-28.log
+# PublicMenu review command log — 2026-03-28
+
+1. [timed out] Get-ChildItem -Force 'pages/PublicMenu' | Select-Object Name,Length,Mode
+2. [timed out] $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+3. [timed out] $i=1; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+4. [timed out] $i=1; Get-Content 'pages/PublicMenu/README.md' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+5. [timed out] $i=1; Get-Content 'pages/PublicMenu/BUGS.md' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+6. [ok] (Get-Content 'pages/PublicMenu/CartView.jsx').Count
+7. [ok] (Get-Content 'pages/PublicMenu/x.jsx').Count
+8. [timed out] Get-ChildItem -Force 'pages/PublicMenu' | Select-Object Name,Length,Mode
+9. [timed out] Get-Content 'pages/PublicMenu/README.md' -Raw
+10. [timed out] Get-Content 'pages/PublicMenu/BUGS.md' -Raw
+11. [ok] cmd /c dir /b "pages\PublicMenu"
+12. [ok] Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'Заказано','ИТОГО','rating','Rating','Star','Для кого','Только мне','createdAt','created_date','DrawerContent','Отправить официанту','Добавить ещё','Попросить счёт','Выдан гостю','Подано' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename, $_.LineNumber, $_.Line.Trim() }
+13. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'guestName','localStorage','tableCode','formatPrice','totalAmount','confirmation.total','Заказ принят' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename, $_.LineNumber, $_.Line.Trim() }
+14. [ok] Get-Content 'pages/PublicMenu/README.md' -TotalCount 200
+15. [ok] Get-Content 'pages/PublicMenu/BUGS.md' -TotalCount 200
+16. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=330; $end=390; $i=1; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f ($start++), $_ }
+17. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=450; $end=620; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
+18. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=780; $end=1010; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
+19. [ok] $path='pages/PublicMenu/x.jsx'; $start=700; $end=735; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
+20. [ok] $path='pages/PublicMenu/x.jsx'; $start=1348; $end=1370; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
+21. [ok] $path='pages/PublicMenu/x.jsx'; $start=1550; $end=1610; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
+22. [ok] $path='pages/PublicMenu/x.jsx'; $start=3138; $end=3170; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
+23. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=80; $end=105; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
+24. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=230; $end=285; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
+25. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=740; $end=805; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
+26. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=1007; $end=1045; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
+27. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'menuapp_guest_name','removeItem\(' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
+28. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'verifiedTableId','verifiedTable','resolvedTable','currentTableId','tableCodeParam','useEffect\(' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
+29. [ok] Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'Все блюда поданы','Дозаказать','Попросить счёт','bill','servedOrders.length','activeOrders.length','cart.length === 0 && todayMyOrders.length > 0' | ForEach-Object { "CartView.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
+30. [ok] $path='pages/PublicMenu/x.jsx'; $start=2288; $end=2330; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
+31. [ok] $path='pages/PublicMenu/x.jsx'; $start=2448; $end=2466; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
+32. [ok] $path='pages/PublicMenu/x.jsx'; $start=3298; $end=3310; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
+33. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'setGuestNameInput\(','currentGuest\?\.name','setCurrentGuest\(' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
+34. [ok] Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'showTableOrdersSection','reviewableItems','otherGuestsReviewableItems','openReviewDialog','servedExpanded','activeExpanded' | ForEach-Object { "CartView.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
+35. [ok] $path='pages/PublicMenu/x.jsx'; $start=1620; $end=1636; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
+36. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'menuapp_guest_name','currentTableId','tableCodeParam','resolvedTable\?\.id','verifiedTableId' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
+37. [ok] Test-Path 'pipeline/chain-state'
+38. [ok] Test-Path 'pages/PublicMenu'
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/round1_2026-03-28.md
+# PublicMenu review round 1 — 2026-03-28
+
+Scope reviewed:
+- `pages/PublicMenu/CartView.jsx`
+- `pages/PublicMenu/x.jsx`
+- `pages/PublicMenu/README.md`
+- `pages/PublicMenu/BUGS.md`
+
+Constraints followed:
+- Read only files inside `pages/PublicMenu`
+- Reported only numbered Fix 1–10 items from the task
+- No code changes applied
+
+Result:
+- Final scoped findings saved in `pages/PublicMenu/review_2026-03-28.md`
+- Pipeline artifact saved in `pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md`
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-28.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-083047-385c
+
+## Findings
+1. [P1] Fix 1 — CartView still uses the old `Выдано` / `Заказано` split instead of `Сейчас` / `История` / `Новый заказ`. `todayMyOrders` is only partitioned into `servedOrders` and `activeOrders` at `CartView.jsx:351-374`, and the renderer still prints flat order lists with per-order badges under `Выдано` and `Заказано` at `CartView.jsx:456-529` and `CartView.jsx:772-845`. There is no urgency subgrouping (`Готов` -> `Готовится` -> `Принят`) or collapsed `История` summary row. FIX: replace the old served/active split with explicit `currentOrders` and `historyOrders` arrays based on the raw DB statuses from the task, group current orders by status priority, and render `История` as the collapsed summary block.
+2. [P1] Fix 2 — The visit total is still inside scrollable content, and the footer logic only handles the non-empty-cart submit state. `ИТОГО за визит` remains a normal card at `CartView.jsx:980-991`, while the sticky block at `CartView.jsx:1007-1041` appears only when `cart.length > 0` and never renders the required empty-cart or first-order variants (`ИТОГО`, `К отправке`, `Всего`, `Заказать ещё`). FIX: convert the drawer body to `flex flex-col h-full` with a scrollable content area and a persistent footer that switches copy/buttons by visit state, while keeping totals float-safe via `parseFloat(...toFixed(2))`.
+3. [P1] Fix 3 — Rating UI is still shown before delivery. Inside `renderOrderItems`, every item renders `<Rating>` whenever `reviewsEnabled` is true at `CartView.jsx:489-516`, regardless of `order.status`, and the only review CTA is the generic section button at `CartView.jsx:834-842` / `CartView.jsx:742-752` instead of a per-order `Оценить блюда` trigger for delivered orders. FIX: gate review UI by delivered statuses only, show a per-order `Оценить блюда` button for `Подано` / `Выдан гостю`, and expand the existing stars only after that CTA is tapped.
+4. [P1] Fix 4 — Orders in the active section are still fully expanded rows, not collapsed summaries. Each order renders its full item list immediately at `CartView.jsx:474-520`, with only time + badge in the header at `CartView.jsx:466-473`; there is no 2-item preview, `+N` remainder, per-order chevron, or collapsed/expanded state per active order. FIX: add per-order collapse state for `Сейчас`, render the summary row with the first two item names plus `+N` and the existing formatted total, then reveal the full item list on expand.
+5. [P2] Fix 5 — The old split toggle is still in place instead of the new guest selector. `splitSummary` still resolves to `На всех` / `Только я` at `CartView.jsx:450-452`, and the cart renders an inline `Для кого заказ` radio group at `CartView.jsx:904-970`, even when `canSplit` is false. There is no local sheet/popover picker and the selector is not hidden for single-guest tables. FIX: hide the control when `guestCount <= 1`, replace the inline radios with a local open/close guest picker, and surface the selected guest as `Кому заказ: ...`.
+6. [P2] Fix 6 — Guest-facing status copy is still the old set. `getSafeStatus` falls back to `Заказано` and `Готово` at `CartView.jsx:252-278`, and those labels are rendered directly in the badge at `CartView.jsx:470-472`. There is no display-layer mapping that turns `Заказано` / `Принято` into `Принят` or `Выдан гостю` into `Подано`. FIX: normalize display labels to `Принят`, `Готовится`, `Готов`, and `Подано` without changing the raw status values used for filtering.
+7. [P1] Fix 7 — The shift filter still uses midnight, not the 06:00 business-day cutoff. `todayMyOrders` compares `new Date(d).toDateString()` with today's date at `CartView.jsx:351-358`, so orders from the previous evening shift can still leak across midnight and early-morning orders can be misclassified. FIX: replace the date-only equality check with the rolling `today6am` cutoff described in the task, then run the existing newest-first sort on the filtered result.
+8. [P1] Fix 8 — The success screen total still passes the raw floating-point value to `formatPrice`. The confirmation footer renders `formatPrice(totalAmount)` at `x.jsx:726-731`, so totals like `31.00999999999998` can still appear. FIX: wrap the value with `parseFloat(totalAmount.toFixed(2))` before formatting.
+9. [P1] Fix 9 — Guest name persistence is global and never resets on table change. `guestNameInput` initializes from a single `menuapp_guest_name` key at `x.jsx:1358-1360`, writes back to the same key at `x.jsx:3161-3165`, and the current table identity is available as `currentTableId` at `x.jsx:1630-1634` but is never used to clear or scope the stored name. That leaves the stale-name regression in place for a new table/session. FIX: clear or namespace guest-name storage when `tableCodeParam` / `currentTableId` changes and fall back to `Гость` when no saved name exists.
+10. [P1] Fix 10 — The dedicated "all dishes delivered" state is missing. When only delivered orders remain, CartView still shows the regular collapsed `Выдано` section at `CartView.jsx:773-803`, the old `+ Добавить к заказу` button at `CartView.jsx:851-861`, and the generic visit-total / submit footer flow at `CartView.jsx:980-1041`. There is no `Все блюда поданы` banner, no `Дозаказать` primary CTA, and no `Попросить счёт` action/disabled fallback. FIX: add a D3 branch for `activeOrders.length === 0 && servedOrders.length > 0 && cart.length === 0`, render the special summary screen, and attach the sticky footer to the delivered-orders total.
+
+## Summary
+Total: 10 findings (0 P0, 8 P1, 2 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none required for this scoped review
+- Scope questions (anything you weren't sure if it's in scope): the task says `TARGET FILES (modify)` and references external UX docs / `BUGS_MASTER.md`, but the speed rules also say to read only `pages/PublicMenu` files; I treated the page-folder-only rule as authoritative.
+apply_patch(auto_approved=true) exited 0 in 971ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md
+A pages/PublicMenu/review_2026-03-28.md
+A pages/PublicMenu/commands_2026-03-28.log
+A pages/PublicMenu/round1_2026-03-28.md
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-28.log b/pages/PublicMenu/commands_2026-03-28.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..771fa70140794ddcf4a1b0a2823b6a41a04d6519
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-28.log
+@@ -0,0 +1,40 @@
++# PublicMenu review command log — 2026-03-28
++
++1. [timed out] Get-ChildItem -Force 'pages/PublicMenu' | Select-Object Name,Length,Mode
++2. [timed out] $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++3. [timed out] $i=1; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++4. [timed out] $i=1; Get-Content 'pages/PublicMenu/README.md' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++5. [timed out] $i=1; Get-Content 'pages/PublicMenu/BUGS.md' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++6. [ok] (Get-Content 'pages/PublicMenu/CartView.jsx').Count
++7. [ok] (Get-Content 'pages/PublicMenu/x.jsx').Count
++8. [timed out] Get-ChildItem -Force 'pages/PublicMenu' | Select-Object Name,Length,Mode
++9. [timed out] Get-Content 'pages/PublicMenu/README.md' -Raw
++10. [timed out] Get-Content 'pages/PublicMenu/BUGS.md' -Raw
++11. [ok] cmd /c dir /b "pages\PublicMenu"
++12. [ok] Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'Заказано','ИТОГО','rating','Rating','Star','Для кого','Только мне','createdAt','created_date','DrawerContent','Отправить официанту','Добавить ещё','Попросить счёт','Выдан гостю','Подано' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename, $_.LineNumber, $_.Line.Trim() }
++13. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'guestName','localStorage','tableCode','formatPrice','totalAmount','confirmation.total','Заказ принят' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename, $_.LineNumber, $_.Line.Trim() }
++14. [ok] Get-Content 'pages/PublicMenu/README.md' -TotalCount 200
++15. [ok] Get-Content 'pages/PublicMenu/BUGS.md' -TotalCount 200
++16. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=330; $end=390; $i=1; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f ($start++), $_ }
++17. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=450; $end=620; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++18. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=780; $end=1010; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++19. [ok] $path='pages/PublicMenu/x.jsx'; $start=700; $end=735; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++20. [ok] $path='pages/PublicMenu/x.jsx'; $start=1348; $end=1370; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++21. [ok] $path='pages/PublicMenu/x.jsx'; $start=1550; $end=1610; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++22. [ok] $path='pages/PublicMenu/x.jsx'; $start=3138; $end=3170; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++23. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=80; $end=105; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++24. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=230; $end=285; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++25. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=740; $end=805; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++26. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=1007; $end=1045; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++27. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'menuapp_guest_name','removeItem\(' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++28. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'verifiedTableId','verifiedTable','resolvedTable','currentTableId','tableCodeParam','useEffect\(' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++29. [ok] Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'Все блюда поданы','Дозаказать','Попросить счёт','bill','servedOrders.length','activeOrders.length','cart.length === 0 && todayMyOrders.length > 0' | ForEach-Object { "CartView.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++30. [ok] $path='pages/PublicMenu/x.jsx'; $start=2288; $end=2330; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++31. [ok] $path='pages/PublicMenu/x.jsx'; $start=2448; $end=2466; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++32. [ok] $path='pages/PublicMenu/x.jsx'; $start=3298; $end=3310; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++33. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'setGuestNameInput\(','currentGuest\?\.name','setCurrentGuest\(' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++34. [ok] Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'showTableOrdersSection','reviewableItems','otherGuestsReviewableItems','openReviewDialog','servedExpanded','activeExpanded' | ForEach-Object { "CartView.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++35. [ok] $path='pages/PublicMenu/x.jsx'; $start=1620; $end=1636; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++36. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'menuapp_guest_name','currentTableId','tableCodeParam','resolvedTable\?\.id','verifiedTableId' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++37. [ok] Test-Path 'pipeline/chain-state'
++38. [ok] Test-Path 'pages/PublicMenu'
+diff --git a/pages/PublicMenu/review_2026-03-28.md b/pages/PublicMenu/review_2026-03-28.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef62f71dfd3c068f25bfabc15adedcc50cd8c2a4
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-28.md
+@@ -0,0 +1,22 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-083047-385c
++
++## Findings
++1. [P1] Fix 1 — CartView still uses the old `Выдано` / `Заказано` split instead of `Сейчас` / `История` / `Новый заказ`. `todayMyOrders` is only partitioned into `servedOrders` and `activeOrders` at `CartView.jsx:351-374`, and the renderer still prints flat order lists with per-order badges under `Выдано` and `Заказано` at `CartView.jsx:456-529` and `CartView.jsx:772-845`. There is no urgency subgrouping (`Готов` -> `Готовится` -> `Принят`) or collapsed `История` summary row. FIX: replace the old served/active split with explicit `currentOrders` and `historyOrders` arrays based on the raw DB statuses from the task, group current orders by status priority, and render `История` as the collapsed summary block.
++2. [P1] Fix 2 — The visit total is still inside scrollable content, and the footer logic only handles the non-empty-cart submit state. `ИТОГО за визит` remains a normal card at `CartView.jsx:980-991`, while the sticky block at `CartView.jsx:1007-1041` appears only when `cart.length > 0` and never renders the required empty-cart or first-order variants (`ИТОГО`, `К отправке`, `Всего`, `Заказать ещё`). FIX: convert the drawer body to `flex flex-col h-full` with a scrollable content area and a persistent footer that switches copy/buttons by visit state, while keeping totals float-safe via `parseFloat(...toFixed(2))`.
++3. [P1] Fix 3 — Rating UI is still shown before delivery. Inside `renderOrderItems`, every item renders `<Rating>` whenever `reviewsEnabled` is true at `CartView.jsx:489-516`, regardless of `order.status`, and the only review CTA is the generic section button at `CartView.jsx:834-842` / `CartView.jsx:742-752` instead of a per-order `Оценить блюда` trigger for delivered orders. FIX: gate review UI by delivered statuses only, show a per-order `Оценить блюда` button for `Подано` / `Выдан гостю`, and expand the existing stars only after that CTA is tapped.
++4. [P1] Fix 4 — Orders in the active section are still fully expanded rows, not collapsed summaries. Each order renders its full item list immediately at `CartView.jsx:474-520`, with only time + badge in the header at `CartView.jsx:466-473`; there is no 2-item preview, `+N` remainder, per-order chevron, or collapsed/expanded state per active order. FIX: add per-order collapse state for `Сейчас`, render the summary row with the first two item names plus `+N` and the existing formatted total, then reveal the full item list on expand.
++5. [P2] Fix 5 — The old split toggle is still in place instead of the new guest selector. `splitSummary` still resolves to `На всех` / `Только я` at `CartView.jsx:450-452`, and the cart renders an inline `Для кого заказ` radio group at `CartView.jsx:904-970`, even when `canSplit` is false. There is no local sheet/popover picker and the selector is not hidden for single-guest tables. FIX: hide the control when `guestCount <= 1`, replace the inline radios with a local open/close guest picker, and surface the selected guest as `Кому заказ: ...`.
++6. [P2] Fix 6 — Guest-facing status copy is still the old set. `getSafeStatus` falls back to `Заказано` and `Готово` at `CartView.jsx:252-278`, and those labels are rendered directly in the badge at `CartView.jsx:470-472`. There is no display-layer mapping that turns `Заказано` / `Принято` into `Принят` or `Выдан гостю` into `Подано`. FIX: normalize display labels to `Принят`, `Готовится`, `Готов`, and `Подано` without changing the raw status values used for filtering.
++7. [P1] Fix 7 — The shift filter still uses midnight, not the 06:00 business-day cutoff. `todayMyOrders` compares `new Date(d).toDateString()` with today's date at `CartView.jsx:351-358`, so orders from the previous evening shift can still leak across midnight and early-morning orders can be misclassified. FIX: replace the date-only equality check with the rolling `today6am` cutoff described in the task, then run the existing newest-first sort on the filtered result.
++8. [P1] Fix 8 — The success screen total still passes the raw floating-point value to `formatPrice`. The confirmation footer renders `formatPrice(totalAmount)` at `x.jsx:726-731`, so totals like `31.00999999999998` can still appear. FIX: wrap the value with `parseFloat(totalAmount.toFixed(2))` before formatting.
++9. [P1] Fix 9 — Guest name persistence is global and never resets on table change. `guestNameInput` initializes from a single `menuapp_guest_name` key at `x.jsx:1358-1360`, writes back to the same key at `x.jsx:3161-3165`, and the current table identity is available as `currentTableId` at `x.jsx:1630-1634` but is never used to clear or scope the stored name. That leaves the stale-name regression in place for a new table/session. FIX: clear or namespace guest-name storage when `tableCodeParam` / `currentTableId` changes and fall back to `Гость` when no saved name exists.
++10. [P1] Fix 10 — The dedicated "all dishes delivered" state is missing. When only delivered orders remain, CartView still shows the regular collapsed `Выдано` section at `CartView.jsx:773-803`, the old `+ Добавить к заказу` button at `CartView.jsx:851-861`, and the generic visit-total / submit footer flow at `CartView.jsx:980-1041`. There is no `Все блюда поданы` banner, no `Дозаказать` primary CTA, and no `Попросить счёт` action/disabled fallback. FIX: add a D3 branch for `activeOrders.length === 0 && servedOrders.length > 0 && cart.length === 0`, render the special summary screen, and attach the sticky footer to the delivered-orders total.
++
++## Summary
++Total: 10 findings (0 P0, 8 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for this scoped review
++- Scope questions (anything you weren't sure if it's in scope): the task says `TARGET FILES (modify)` and references external UX docs / `BUGS_MASTER.md`, but the speed rules also say to read only `pages/PublicMenu` files; I treated the page-folder-only rule as authoritative.
+diff --git a/pages/PublicMenu/round1_2026-03-28.md b/pages/PublicMenu/round1_2026-03-28.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..edb6f0e78f598780fb540ee4dd0891fffedc311f
+--- /dev/null
++++ b/pages/PublicMenu/round1_2026-03-28.md
+@@ -0,0 +1,16 @@
++# PublicMenu review round 1 — 2026-03-28
++
++Scope reviewed:
++- `pages/PublicMenu/CartView.jsx`
++- `pages/PublicMenu/x.jsx`
++- `pages/PublicMenu/README.md`
++- `pages/PublicMenu/BUGS.md`
++
++Constraints followed:
++- Read only files inside `pages/PublicMenu`
++- Reported only numbered Fix 1–10 items from the task
++- No code changes applied
++
++Result:
++- Final scoped findings saved in `pages/PublicMenu/review_2026-03-28.md`
++- Pipeline artifact saved in `pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md`
+diff --git a/pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md b/pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef62f71dfd3c068f25bfabc15adedcc50cd8c2a4
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md
+@@ -0,0 +1,22 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-083047-385c
++
++## Findings
++1. [P1] Fix 1 — CartView still uses the old `Выдано` / `Заказано` split instead of `Сейчас` / `История` / `Новый заказ`. `todayMyOrders` is only partitioned into `servedOrders` and `activeOrders` at `CartView.jsx:351-374`, and the renderer still prints flat order lists with per-order badges under `Выдано` and `Заказано` at `CartView.jsx:456-529` and `CartView.jsx:772-845`. There is no urgency subgrouping (`Готов` -> `Готовится` -> `Принят`) or collapsed `История` summary row. FIX: replace the old served/active split with explicit `currentOrders` and `historyOrders` arrays based on the raw DB statuses from the task, group current orders by status priority, and render `История` as the collapsed summary block.
++2. [P1] Fix 2 — The visit total is still inside scrollable content, and the footer logic only handles the non-empty-cart submit state. `ИТОГО за визит` remains a normal card at `CartView.jsx:980-991`, while the sticky block at `CartView.jsx:1007-1041` appears only when `cart.length > 0` and never renders the required empty-cart or first-order variants (`ИТОГО`, `К отправке`, `Всего`, `Заказать ещё`). FIX: convert the drawer body to `flex flex-col h-full` with a scrollable content area and a persistent footer that switches copy/buttons by visit state, while keeping totals float-safe via `parseFloat(...toFixed(2))`.
++3. [P1] Fix 3 — Rating UI is still shown before delivery. Inside `renderOrderItems`, every item renders `<Rating>` whenever `reviewsEnabled` is true at `CartView.jsx:489-516`, regardless of `order.status`, and the only review CTA is the generic section button at `CartView.jsx:834-842` / `CartView.jsx:742-752` instead of a per-order `Оценить блюда` trigger for delivered orders. FIX: gate review UI by delivered statuses only, show a per-order `Оценить блюда` button for `Подано` / `Выдан гостю`, and expand the existing stars only after that CTA is tapped.
++4. [P1] Fix 4 — Orders in the active section are still fully expanded rows, not collapsed summaries. Each order renders its full item list immediately at `CartView.jsx:474-520`, with only time + badge in the header at `CartView.jsx:466-473`; there is no 2-item preview, `+N` remainder, per-order chevron, or collapsed/expanded state per active order. FIX: add per-order collapse state for `Сейчас`, render the summary row with the first two item names plus `+N` and the existing formatted total, then reveal the full item list on expand.
++5. [P2] Fix 5 — The old split toggle is still in place instead of the new guest selector. `splitSummary` still resolves to `На всех` / `Только я` at `CartView.jsx:450-452`, and the cart renders an inline `Для кого заказ` radio group at `CartView.jsx:904-970`, even when `canSplit` is false. There is no local sheet/popover picker and the selector is not hidden for single-guest tables. FIX: hide the control when `guestCount <= 1`, replace the inline radios with a local open/close guest picker, and surface the selected guest as `Кому заказ: ...`.
++6. [P2] Fix 6 — Guest-facing status copy is still the old set. `getSafeStatus` falls back to `Заказано` and `Готово` at `CartView.jsx:252-278`, and those labels are rendered directly in the badge at `CartView.jsx:470-472`. There is no display-layer mapping that turns `Заказано` / `Принято` into `Принят` or `Выдан гостю` into `Подано`. FIX: normalize display labels to `Принят`, `Готовится`, `Готов`, and `Подано` without changing the raw status values used for filtering.
++7. [P1] Fix 7 — The shift filter still uses midnight, not the 06:00 business-day cutoff. `todayMyOrders` compares `new Date(d).toDateString()` with today's date at `CartView.jsx:351-358`, so orders from the previous evening shift can still leak across midnight and early-morning orders can be misclassified. FIX: replace the date-only equality check with the rolling `today6am` cutoff described in the task, then run the existing newest-first sort on the filtered result.
++8. [P1] Fix 8 — The success screen total still passes the raw floating-point value to `formatPrice`. The confirmation footer renders `formatPrice(totalAmount)` at `x.jsx:726-731`, so totals like `31.00999999999998` can still appear. FIX: wrap the value with `parseFloat(totalAmount.toFixed(2))` before formatting.
++9. [P1] Fix 9 — Guest name persistence is global and never resets on table change. `guestNameInput` initializes from a single `menuapp_guest_name` key at `x.jsx:1358-1360`, writes back to the same key at `x.jsx:3161-3165`, and the current table identity is available as `currentTableId` at `x.jsx:1630-1634` but is never used to clear or scope the stored name. That leaves the stale-name regression in place for a new table/session. FIX: clear or namespace guest-name storage when `tableCodeParam` / `currentTableId` changes and fall back to `Гость` when no saved name exists.
++10. [P1] Fix 10 — The dedicated "all dishes delivered" state is missing. When only delivered orders remain, CartView still shows the regular collapsed `Выдано` section at `CartView.jsx:773-803`, the old `+ Добавить к заказу` button at `CartView.jsx:851-861`, and the generic visit-total / submit footer flow at `CartView.jsx:980-1041`. There is no `Все блюда поданы` banner, no `Дозаказать` primary CTA, and no `Попросить счёт` action/disabled fallback. FIX: add a D3 branch for `activeOrders.length === 0 && servedOrders.length > 0 && cart.length === 0`, render the special summary screen, and attach the sticky footer to the delivered-orders total.
++
++## Summary
++Total: 10 findings (0 P0, 8 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for this scoped review
++- Scope questions (anything you weren't sure if it's in scope): the task says `TARGET FILES (modify)` and references external UX docs / `BUGS_MASTER.md`, but the speed rules also say to read only `pages/PublicMenu` files; I treated the page-folder-only rule as authoritative.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-28.log b/pages/PublicMenu/commands_2026-03-28.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..771fa70140794ddcf4a1b0a2823b6a41a04d6519
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-28.log
+@@ -0,0 +1,40 @@
++# PublicMenu review command log — 2026-03-28
++
++1. [timed out] Get-ChildItem -Force 'pages/PublicMenu' | Select-Object Name,Length,Mode
++2. [timed out] $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++3. [timed out] $i=1; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++4. [timed out] $i=1; Get-Content 'pages/PublicMenu/README.md' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++5. [timed out] $i=1; Get-Content 'pages/PublicMenu/BUGS.md' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++6. [ok] (Get-Content 'pages/PublicMenu/CartView.jsx').Count
++7. [ok] (Get-Content 'pages/PublicMenu/x.jsx').Count
++8. [timed out] Get-ChildItem -Force 'pages/PublicMenu' | Select-Object Name,Length,Mode
++9. [timed out] Get-Content 'pages/PublicMenu/README.md' -Raw
++10. [timed out] Get-Content 'pages/PublicMenu/BUGS.md' -Raw
++11. [ok] cmd /c dir /b "pages\PublicMenu"
++12. [ok] Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'Заказано','ИТОГО','rating','Rating','Star','Для кого','Только мне','createdAt','created_date','DrawerContent','Отправить официанту','Добавить ещё','Попросить счёт','Выдан гостю','Подано' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename, $_.LineNumber, $_.Line.Trim() }
++13. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'guestName','localStorage','tableCode','formatPrice','totalAmount','confirmation.total','Заказ принят' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename, $_.LineNumber, $_.Line.Trim() }
++14. [ok] Get-Content 'pages/PublicMenu/README.md' -TotalCount 200
++15. [ok] Get-Content 'pages/PublicMenu/BUGS.md' -TotalCount 200
++16. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=330; $end=390; $i=1; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f ($start++), $_ }
++17. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=450; $end=620; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++18. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=780; $end=1010; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++19. [ok] $path='pages/PublicMenu/x.jsx'; $start=700; $end=735; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++20. [ok] $path='pages/PublicMenu/x.jsx'; $start=1348; $end=1370; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++21. [ok] $path='pages/PublicMenu/x.jsx'; $start=1550; $end=1610; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++22. [ok] $path='pages/PublicMenu/x.jsx'; $start=3138; $end=3170; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++23. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=80; $end=105; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++24. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=230; $end=285; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++25. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=740; $end=805; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++26. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=1007; $end=1045; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++27. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'menuapp_guest_name','removeItem\(' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++28. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'verifiedTableId','verifiedTable','resolvedTable','currentTableId','tableCodeParam','useEffect\(' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++29. [ok] Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'Все блюда поданы','Дозаказать','Попросить счёт','bill','servedOrders.length','activeOrders.length','cart.length === 0 && todayMyOrders.length > 0' | ForEach-Object { "CartView.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++30. [ok] $path='pages/PublicMenu/x.jsx'; $start=2288; $end=2330; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++31. [ok] $path='pages/PublicMenu/x.jsx'; $start=2448; $end=2466; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++32. [ok] $path='pages/PublicMenu/x.jsx'; $start=3298; $end=3310; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++33. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'setGuestNameInput\(','currentGuest\?\.name','setCurrentGuest\(' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++34. [ok] Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'showTableOrdersSection','reviewableItems','otherGuestsReviewableItems','openReviewDialog','servedExpanded','activeExpanded' | ForEach-Object { "CartView.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++35. [ok] $path='pages/PublicMenu/x.jsx'; $start=1620; $end=1636; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++36. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'menuapp_guest_name','currentTableId','tableCodeParam','resolvedTable\?\.id','verifiedTableId' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++37. [ok] Test-Path 'pipeline/chain-state'
++38. [ok] Test-Path 'pages/PublicMenu'
+diff --git a/pages/PublicMenu/review_2026-03-28.md b/pages/PublicMenu/review_2026-03-28.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef62f71dfd3c068f25bfabc15adedcc50cd8c2a4
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-28.md
+@@ -0,0 +1,22 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-083047-385c
++
++## Findings
++1. [P1] Fix 1 — CartView still uses the old `Выдано` / `Заказано` split instead of `Сейчас` / `История` / `Новый заказ`. `todayMyOrders` is only partitioned into `servedOrders` and `activeOrders` at `CartView.jsx:351-374`, and the renderer still prints flat order lists with per-order badges under `Выдано` and `Заказано` at `CartView.jsx:456-529` and `CartView.jsx:772-845`. There is no urgency subgrouping (`Готов` -> `Готовится` -> `Принят`) or collapsed `История` summary row. FIX: replace the old served/active split with explicit `currentOrders` and `historyOrders` arrays based on the raw DB statuses from the task, group current orders by status priority, and render `История` as the collapsed summary block.
++2. [P1] Fix 2 — The visit total is still inside scrollable content, and the footer logic only handles the non-empty-cart submit state. `ИТОГО за визит` remains a normal card at `CartView.jsx:980-991`, while the sticky block at `CartView.jsx:1007-1041` appears only when `cart.length > 0` and never renders the required empty-cart or first-order variants (`ИТОГО`, `К отправке`, `Всего`, `Заказать ещё`). FIX: convert the drawer body to `flex flex-col h-full` with a scrollable content area and a persistent footer that switches copy/buttons by visit state, while keeping totals float-safe via `parseFloat(...toFixed(2))`.
++3. [P1] Fix 3 — Rating UI is still shown before delivery. Inside `renderOrderItems`, every item renders `<Rating>` whenever `reviewsEnabled` is true at `CartView.jsx:489-516`, regardless of `order.status`, and the only review CTA is the generic section button at `CartView.jsx:834-842` / `CartView.jsx:742-752` instead of a per-order `Оценить блюда` trigger for delivered orders. FIX: gate review UI by delivered statuses only, show a per-order `Оценить блюда` button for `Подано` / `Выдан гостю`, and expand the existing stars only after that CTA is tapped.
++4. [P1] Fix 4 — Orders in the active section are still fully expanded rows, not collapsed summaries. Each order renders its full item list immediately at `CartView.jsx:474-520`, with only time + badge in the header at `CartView.jsx:466-473`; there is no 2-item preview, `+N` remainder, per-order chevron, or collapsed/expanded state per active order. FIX: add per-order collapse state for `Сейчас`, render the summary row with the first two item names plus `+N` and the existing formatted total, then reveal the full item list on expand.
++5. [P2] Fix 5 — The old split toggle is still in place instead of the new guest selector. `splitSummary` still resolves to `На всех` / `Только я` at `CartView.jsx:450-452`, and the cart renders an inline `Для кого заказ` radio group at `CartView.jsx:904-970`, even when `canSplit` is false. There is no local sheet/popover picker and the selector is not hidden for single-guest tables. FIX: hide the control when `guestCount <= 1`, replace the inline radios with a local open/close guest picker, and surface the selected guest as `Кому заказ: ...`.
++6. [P2] Fix 6 — Guest-facing status copy is still the old set. `getSafeStatus` falls back to `Заказано` and `Готово` at `CartView.jsx:252-278`, and those labels are rendered directly in the badge at `CartView.jsx:470-472`. There is no display-layer mapping that turns `Заказано` / `Принято` into `Принят` or `Выдан гостю` into `Подано`. FIX: normalize display labels to `Принят`, `Готовится`, `Готов`, and `Подано` without changing the raw status values used for filtering.
++7. [P1] Fix 7 — The shift filter still uses midnight, not the 06:00 business-day cutoff. `todayMyOrders` compares `new Date(d).toDateString()` with today's date at `CartView.jsx:351-358`, so orders from the previous evening shift can still leak across midnight and early-morning orders can be misclassified. FIX: replace the date-only equality check with the rolling `today6am` cutoff described in the task, then run the existing newest-first sort on the filtered result.
++8. [P1] Fix 8 — The success screen total still passes the raw floating-point value to `formatPrice`. The confirmation footer renders `formatPrice(totalAmount)` at `x.jsx:726-731`, so totals like `31.00999999999998` can still appear. FIX: wrap the value with `parseFloat(totalAmount.toFixed(2))` before formatting.
++9. [P1] Fix 9 — Guest name persistence is global and never resets on table change. `guestNameInput` initializes from a single `menuapp_guest_name` key at `x.jsx:1358-1360`, writes back to the same key at `x.jsx:3161-3165`, and the current table identity is available as `currentTableId` at `x.jsx:1630-1634` but is never used to clear or scope the stored name. That leaves the stale-name regression in place for a new table/session. FIX: clear or namespace guest-name storage when `tableCodeParam` / `currentTableId` changes and fall back to `Гость` when no saved name exists.
++10. [P1] Fix 10 — The dedicated "all dishes delivered" state is missing. When only delivered orders remain, CartView still shows the regular collapsed `Выдано` section at `CartView.jsx:773-803`, the old `+ Добавить к заказу` button at `CartView.jsx:851-861`, and the generic visit-total / submit footer flow at `CartView.jsx:980-1041`. There is no `Все блюда поданы` banner, no `Дозаказать` primary CTA, and no `Попросить счёт` action/disabled fallback. FIX: add a D3 branch for `activeOrders.length === 0 && servedOrders.length > 0 && cart.length === 0`, render the special summary screen, and attach the sticky footer to the delivered-orders total.
++
++## Summary
++Total: 10 findings (0 P0, 8 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for this scoped review
++- Scope questions (anything you weren't sure if it's in scope): the task says `TARGET FILES (modify)` and references external UX docs / `BUGS_MASTER.md`, but the speed rules also say to read only `pages/PublicMenu` files; I treated the page-folder-only rule as authoritative.
+diff --git a/pages/PublicMenu/round1_2026-03-28.md b/pages/PublicMenu/round1_2026-03-28.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..edb6f0e78f598780fb540ee4dd0891fffedc311f
+--- /dev/null
++++ b/pages/PublicMenu/round1_2026-03-28.md
+@@ -0,0 +1,16 @@
++# PublicMenu review round 1 — 2026-03-28
++
++Scope reviewed:
++- `pages/PublicMenu/CartView.jsx`
++- `pages/PublicMenu/x.jsx`
++- `pages/PublicMenu/README.md`
++- `pages/PublicMenu/BUGS.md`
++
++Constraints followed:
++- Read only files inside `pages/PublicMenu`
++- Reported only numbered Fix 1–10 items from the task
++- No code changes applied
++
++Result:
++- Final scoped findings saved in `pages/PublicMenu/review_2026-03-28.md`
++- Pipeline artifact saved in `pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md`
+diff --git a/pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md b/pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef62f71dfd3c068f25bfabc15adedcc50cd8c2a4
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md
+@@ -0,0 +1,22 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-083047-385c
++
++## Findings
++1. [P1] Fix 1 — CartView still uses the old `Выдано` / `Заказано` split instead of `Сейчас` / `История` / `Новый заказ`. `todayMyOrders` is only partitioned into `servedOrders` and `activeOrders` at `CartView.jsx:351-374`, and the renderer still prints flat order lists with per-order badges under `Выдано` and `Заказано` at `CartView.jsx:456-529` and `CartView.jsx:772-845`. There is no urgency subgrouping (`Готов` -> `Готовится` -> `Принят`) or collapsed `История` summary row. FIX: replace the old served/active split with explicit `currentOrders` and `historyOrders` arrays based on the raw DB statuses from the task, group current orders by status priority, and render `История` as the collapsed summary block.
++2. [P1] Fix 2 — The visit total is still inside scrollable content, and the footer logic only handles the non-empty-cart submit state. `ИТОГО за визит` remains a normal card at `CartView.jsx:980-991`, while the sticky block at `CartView.jsx:1007-1041` appears only when `cart.length > 0` and never renders the required empty-cart or first-order variants (`ИТОГО`, `К отправке`, `Всего`, `Заказать ещё`). FIX: convert the drawer body to `flex flex-col h-full` with a scrollable content area and a persistent footer that switches copy/buttons by visit state, while keeping totals float-safe via `parseFloat(...toFixed(2))`.
++3. [P1] Fix 3 — Rating UI is still shown before delivery. Inside `renderOrderItems`, every item renders `<Rating>` whenever `reviewsEnabled` is true at `CartView.jsx:489-516`, regardless of `order.status`, and the only review CTA is the generic section button at `CartView.jsx:834-842` / `CartView.jsx:742-752` instead of a per-order `Оценить блюда` trigger for delivered orders. FIX: gate review UI by delivered statuses only, show a per-order `Оценить блюда` button for `Подано` / `Выдан гостю`, and expand the existing stars only after that CTA is tapped.
++4. [P1] Fix 4 — Orders in the active section are still fully expanded rows, not collapsed summaries. Each order renders its full item list immediately at `CartView.jsx:474-520`, with only time + badge in the header at `CartView.jsx:466-473`; there is no 2-item preview, `+N` remainder, per-order chevron, or collapsed/expanded state per active order. FIX: add per-order collapse state for `Сейчас`, render the summary row with the first two item names plus `+N` and the existing formatted total, then reveal the full item list on expand.
++5. [P2] Fix 5 — The old split toggle is still in place instead of the new guest selector. `splitSummary` still resolves to `На всех` / `Только я` at `CartView.jsx:450-452`, and the cart renders an inline `Для кого заказ` radio group at `CartView.jsx:904-970`, even when `canSplit` is false. There is no local sheet/popover picker and the selector is not hidden for single-guest tables. FIX: hide the control when `guestCount <= 1`, replace the inline radios with a local open/close guest picker, and surface the selected guest as `Кому заказ: ...`.
++6. [P2] Fix 6 — Guest-facing status copy is still the old set. `getSafeStatus` falls back to `Заказано` and `Готово` at `CartView.jsx:252-278`, and those labels are rendered directly in the badge at `CartView.jsx:470-472`. There is no display-layer mapping that turns `Заказано` / `Принято` into `Принят` or `Выдан гостю` into `Подано`. FIX: normalize display labels to `Принят`, `Готовится`, `Готов`, and `Подано` without changing the raw status values used for filtering.
++7. [P1] Fix 7 — The shift filter still uses midnight, not the 06:00 business-day cutoff. `todayMyOrders` compares `new Date(d).toDateString()` with today's date at `CartView.jsx:351-358`, so orders from the previous evening shift can still leak across midnight and early-morning orders can be misclassified. FIX: replace the date-only equality check with the rolling `today6am` cutoff described in the task, then run the existing newest-first sort on the filtered result.
++8. [P1] Fix 8 — The success screen total still passes the raw floating-point value to `formatPrice`. The confirmation footer renders `formatPrice(totalAmount)` at `x.jsx:726-731`, so totals like `31.00999999999998` can still appear. FIX: wrap the value with `parseFloat(totalAmount.toFixed(2))` before formatting.
++9. [P1] Fix 9 — Guest name persistence is global and never resets on table change. `guestNameInput` initializes from a single `menuapp_guest_name` key at `x.jsx:1358-1360`, writes back to the same key at `x.jsx:3161-3165`, and the current table identity is available as `currentTableId` at `x.jsx:1630-1634` but is never used to clear or scope the stored name. That leaves the stale-name regression in place for a new table/session. FIX: clear or namespace guest-name storage when `tableCodeParam` / `currentTableId` changes and fall back to `Гость` when no saved name exists.
++10. [P1] Fix 10 — The dedicated "all dishes delivered" state is missing. When only delivered orders remain, CartView still shows the regular collapsed `Выдано` section at `CartView.jsx:773-803`, the old `+ Добавить к заказу` button at `CartView.jsx:851-861`, and the generic visit-total / submit footer flow at `CartView.jsx:980-1041`. There is no `Все блюда поданы` banner, no `Дозаказать` primary CTA, and no `Попросить счёт` action/disabled fallback. FIX: add a D3 branch for `activeOrders.length === 0 && servedOrders.length > 0 && cart.length === 0`, render the special summary screen, and attach the sticky footer to the delivered-orders total.
++
++## Summary
++Total: 10 findings (0 P0, 8 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for this scoped review
++- Scope questions (anything you weren't sure if it's in scope): the task says `TARGET FILES (modify)` and references external UX docs / `BUGS_MASTER.md`, but the speed rules also say to read only `pages/PublicMenu` files; I treated the page-folder-only rule as authoritative.
+
+codex
+The report files are written. I’m doing a quick sanity check on the saved artifacts, then I’ll give you the paths and the headline counts only.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/review_2026-03-28.md' -TotalCount 5" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/round1_2026-03-28.md' -TotalCount 8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/commands_2026-03-28.log' -TotalCount 5" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md' -TotalCount 12" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.99s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260328-083047-385c
+
+## Findings
+1. [P1] Fix 1 â€” CartView still uses the old `Ð’Ñ‹Ð´Ð°Ð½Ð¾` / `Ð—Ð°ÐºÐ°Ð·Ð°Ð½Ð¾` split instead of `Ð¡ÐµÐ¹Ñ‡Ð°Ñ` / `Ð˜ÑÑ‚Ð¾Ñ€Ð¸Ñ` / `ÐÐ¾Ð²Ñ‹Ð¹ Ð·Ð°ÐºÐ°Ð·`. `todayMyOrders` is only partitioned into `servedOrders` and `activeOrders` at `CartView.jsx:351-374`, and the renderer still prints flat order lists with per-order badges under `Ð’Ñ‹Ð´Ð°Ð½Ð¾` and `Ð—Ð°ÐºÐ°Ð·Ð°Ð½Ð¾` at `CartView.jsx:456-529` and `CartView.jsx:772-845`. There is no urgency subgrouping (`Ð“Ð¾Ñ‚Ð¾Ð²` -> `Ð“Ð¾Ñ‚Ð¾Ð²Ð¸Ñ‚ÑÑ` -> `ÐŸÑ€Ð¸Ð½ÑÑ‚`) or collapsed `Ð˜ÑÑ‚Ð¾Ñ€Ð¸Ñ` summary row. FIX: replace the old served/active split with explicit `currentOrders` and `historyOrders` arrays based on the raw DB statuses from the task, group current orders by status priority, and render `Ð˜ÑÑ‚Ð¾Ñ€Ð¸Ñ` as the collapsed summary block.
+2. [P1] Fix 2 â€” The visit total is still inside scrollable content, and the footer logic only handles the non-empty-cart submit state. `Ð˜Ð¢ÐžÐ“Ðž Ð·Ð° Ð²Ð¸Ð·Ð¸Ñ‚` remains a normal card at `CartView.jsx:980-991`, while the sticky block at `CartView.jsx:1007-1041` appears only when `cart.length > 0` and never renders the required empty-cart or first-order variants (`Ð˜Ð¢ÐžÐ“Ðž`, `Ðš Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐµ`, `Ð’ÑÐµÐ³Ð¾`, `Ð—Ð°ÐºÐ°Ð·Ð°Ñ‚ÑŒ ÐµÑ‰Ñ‘`). FIX: convert the drawer body to `flex flex-col h-full` with a scrollable content area and a persistent footer that switches copy/buttons by visit state, while keeping totals float-safe via `parseFloat(...toFixed(2))`.
+ succeeded in 1.94s:
+# PublicMenu review round 1 â€” 2026-03-28
+
+Scope reviewed:
+- `pages/PublicMenu/CartView.jsx`
+- `pages/PublicMenu/x.jsx`
+- `pages/PublicMenu/README.md`
+- `pages/PublicMenu/BUGS.md`
+
+ succeeded in 1.96s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260328-083047-385c
+
+## Findings
+1. [P1] Fix 1 â€” CartView still uses the old `Ð’Ñ‹Ð´Ð°Ð½Ð¾` / `Ð—Ð°ÐºÐ°Ð·Ð°Ð½Ð¾` split instead of `Ð¡ÐµÐ¹Ñ‡Ð°Ñ` / `Ð˜ÑÑ‚Ð¾Ñ€Ð¸Ñ` / `ÐÐ¾Ð²Ñ‹Ð¹ Ð·Ð°ÐºÐ°Ð·`. `todayMyOrders` is only partitioned into `servedOrders` and `activeOrders` at `CartView.jsx:351-374`, and the renderer still prints flat order lists with per-order badges under `Ð’Ñ‹Ð´Ð°Ð½Ð¾` and `Ð—Ð°ÐºÐ°Ð·Ð°Ð½Ð¾` at `CartView.jsx:456-529` and `CartView.jsx:772-845`. There is no urgency subgrouping (`Ð“Ð¾Ñ‚Ð¾Ð²` -> `Ð“Ð¾Ñ‚Ð¾Ð²Ð¸Ñ‚ÑÑ` -> `ÐŸÑ€Ð¸Ð½ÑÑ‚`) or collapsed `Ð˜ÑÑ‚Ð¾Ñ€Ð¸Ñ` summary row. FIX: replace the old served/active split with explicit `currentOrders` and `historyOrders` arrays based on the raw DB statuses from the task, group current orders by status priority, and render `Ð˜ÑÑ‚Ð¾Ñ€Ð¸Ñ` as the collapsed summary block.
+2. [P1] Fix 2 â€” The visit total is still inside scrollable content, and the footer logic only handles the non-empty-cart submit state. `Ð˜Ð¢ÐžÐ“Ðž Ð·Ð° Ð²Ð¸Ð·Ð¸Ñ‚` remains a normal card at `CartView.jsx:980-991`, while the sticky block at `CartView.jsx:1007-1041` appears only when `cart.length > 0` and never renders the required empty-cart or first-order variants (`Ð˜Ð¢ÐžÐ“Ðž`, `Ðš Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐµ`, `Ð’ÑÐµÐ³Ð¾`, `Ð—Ð°ÐºÐ°Ð·Ð°Ñ‚ÑŒ ÐµÑ‰Ñ‘`). FIX: convert the drawer body to `flex flex-col h-full` with a scrollable content area and a persistent footer that switches copy/buttons by visit state, while keeping totals float-safe via `parseFloat(...toFixed(2))`.
+3. [P1] Fix 3 â€” Rating UI is still shown before delivery. Inside `renderOrderItems`, every item renders `<Rating>` whenever `reviewsEnabled` is true at `CartView.jsx:489-516`, regardless of `order.status`, and the only review CTA is the generic section button at `CartView.jsx:834-842` / `CartView.jsx:742-752` instead of a per-order `ÐžÑ†ÐµÐ½Ð¸Ñ‚ÑŒ Ð±Ð»ÑŽÐ´Ð°` trigger for delivered orders. FIX: gate review UI by delivered statuses only, show a per-order `ÐžÑ†ÐµÐ½Ð¸Ñ‚ÑŒ Ð±Ð»ÑŽÐ´Ð°` button for `ÐŸÐ¾Ð´Ð°Ð½Ð¾` / `Ð’Ñ‹Ð´Ð°Ð½ Ð³Ð¾ÑÑ‚ÑŽ`, and expand the existing stars only after that CTA is tapped.
+4. [P1] Fix 4 â€” Orders in the active section are still fully expanded rows, not collapsed summaries. Each order renders its full item list immediately at `CartView.jsx:474-520`, with only time + badge in the header at `CartView.jsx:466-473`; there is no 2-item preview, `+N` remainder, per-order chevron, or collapsed/expanded state per active order. FIX: add per-order collapse state for `Ð¡ÐµÐ¹Ñ‡Ð°Ñ`, render the summary row with the first two item names plus `+N` and the existing formatted total, then reveal the full item list on expand.
+5. [P2] Fix 5 â€” The old split toggle is still in place instead of the new guest selector. `splitSummary` still resolves to `ÐÐ° Ð²ÑÐµÑ…` / `Ð¢Ð¾Ð»ÑŒÐºÐ¾ Ñ` at `CartView.jsx:450-452`, and the cart renders an inline `Ð”Ð»Ñ ÐºÐ¾Ð³Ð¾ Ð·Ð°ÐºÐ°Ð·` radio group at `CartView.jsx:904-970`, even when `canSplit` is false. There is no local sheet/popover picker and the selector is not hidden for single-guest tables. FIX: hide the control when `guestCount <= 1`, replace the inline radios with a local open/close guest picker, and surface the selected guest as `ÐšÐ¾Ð¼Ñƒ Ð·Ð°ÐºÐ°Ð·: ...`.
+6. [P2] Fix 6 â€” Guest-facing status copy is still the old set. `getSafeStatus` falls back to `Ð—Ð°ÐºÐ°Ð·Ð°Ð½Ð¾` and `Ð“Ð¾Ñ‚Ð¾Ð²Ð¾` at `CartView.jsx:252-278`, and those labels are rendered directly in the badge at `CartView.jsx:470-472`. There is no display-layer mapping that turns `Ð—Ð°ÐºÐ°Ð·Ð°Ð½Ð¾` / `ÐŸÑ€Ð¸Ð½ÑÑ‚Ð¾` into `ÐŸÑ€Ð¸Ð½ÑÑ‚` or `Ð’Ñ‹Ð´Ð°Ð½ Ð³Ð¾ÑÑ‚ÑŽ` into `ÐŸÐ¾Ð´Ð°Ð½Ð¾`. FIX: normalize display labels to `ÐŸÑ€Ð¸Ð½ÑÑ‚`, `Ð“Ð¾Ñ‚Ð¾Ð²Ð¸Ñ‚ÑÑ`, `Ð“Ð¾Ñ‚Ð¾Ð²`, and `ÐŸÐ¾Ð´Ð°Ð½Ð¾` without changing the raw status values used for filtering.
+7. [P1] Fix 7 â€” The shift filter still uses midnight, not the 06:00 business-day cutoff. `todayMyOrders` compares `new Date(d).toDateString()` with today's date at `CartView.jsx:351-358`, so orders from the previous evening shift can still leak across midnight and early-morning orders can be misclassified. FIX: replace the date-only equality check with the rolling `today6am` cutoff described in the task, then run the existing newest-first sort on the filtered result.
+8. [P1] Fix 8 â€” The success screen total still passes the raw floating-point value to `formatPrice`. The confirmation footer renders `formatPrice(totalAmount)` at `x.jsx:726-731`, so totals like `31.00999999999998` can still appear. FIX: wrap the value with `parseFloat(totalAmount.toFixed(2))` before formatting.
+9. [P1] Fix 9 â€” Guest name persistence is global and never resets on table change. `guestNameInput` initializes from a single `menuapp_guest_name` key at `x.jsx:1358-1360`, writes back to the same key at `x.jsx:3161-3165`, and the current table identity is available as `currentTableId` at `x.jsx:1630-1634` but is never used to clear or scope the stored name. That leaves the stale-name regression in place for a new table/session. FIX: clear or namespace guest-name storage when `tableCodeParam` / `currentTableId` changes and fall back to `Ð“Ð¾ÑÑ‚ÑŒ` when no saved name exists.
+ succeeded in 1.99s:
+# PublicMenu review command log â€” 2026-03-28
+
+1. [timed out] Get-ChildItem -Force 'pages/PublicMenu' | Select-Object Name,Length,Mode
+2. [timed out] $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+3. [timed out] $i=1; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-28.log b/pages/PublicMenu/commands_2026-03-28.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..771fa70140794ddcf4a1b0a2823b6a41a04d6519
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-28.log
+@@ -0,0 +1,40 @@
++# PublicMenu review command log — 2026-03-28
++
++1. [timed out] Get-ChildItem -Force 'pages/PublicMenu' | Select-Object Name,Length,Mode
++2. [timed out] $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++3. [timed out] $i=1; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++4. [timed out] $i=1; Get-Content 'pages/PublicMenu/README.md' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++5. [timed out] $i=1; Get-Content 'pages/PublicMenu/BUGS.md' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++6. [ok] (Get-Content 'pages/PublicMenu/CartView.jsx').Count
++7. [ok] (Get-Content 'pages/PublicMenu/x.jsx').Count
++8. [timed out] Get-ChildItem -Force 'pages/PublicMenu' | Select-Object Name,Length,Mode
++9. [timed out] Get-Content 'pages/PublicMenu/README.md' -Raw
++10. [timed out] Get-Content 'pages/PublicMenu/BUGS.md' -Raw
++11. [ok] cmd /c dir /b "pages\PublicMenu"
++12. [ok] Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'Заказано','ИТОГО','rating','Rating','Star','Для кого','Только мне','createdAt','created_date','DrawerContent','Отправить официанту','Добавить ещё','Попросить счёт','Выдан гостю','Подано' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename, $_.LineNumber, $_.Line.Trim() }
++13. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'guestName','localStorage','tableCode','formatPrice','totalAmount','confirmation.total','Заказ принят' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename, $_.LineNumber, $_.Line.Trim() }
++14. [ok] Get-Content 'pages/PublicMenu/README.md' -TotalCount 200
++15. [ok] Get-Content 'pages/PublicMenu/BUGS.md' -TotalCount 200
++16. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=330; $end=390; $i=1; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f ($start++), $_ }
++17. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=450; $end=620; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++18. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=780; $end=1010; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++19. [ok] $path='pages/PublicMenu/x.jsx'; $start=700; $end=735; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++20. [ok] $path='pages/PublicMenu/x.jsx'; $start=1348; $end=1370; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++21. [ok] $path='pages/PublicMenu/x.jsx'; $start=1550; $end=1610; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++22. [ok] $path='pages/PublicMenu/x.jsx'; $start=3138; $end=3170; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++23. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=80; $end=105; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++24. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=230; $end=285; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++25. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=740; $end=805; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++26. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=1007; $end=1045; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++27. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'menuapp_guest_name','removeItem\(' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++28. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'verifiedTableId','verifiedTable','resolvedTable','currentTableId','tableCodeParam','useEffect\(' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++29. [ok] Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'Все блюда поданы','Дозаказать','Попросить счёт','bill','servedOrders.length','activeOrders.length','cart.length === 0 && todayMyOrders.length > 0' | ForEach-Object { "CartView.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++30. [ok] $path='pages/PublicMenu/x.jsx'; $start=2288; $end=2330; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++31. [ok] $path='pages/PublicMenu/x.jsx'; $start=2448; $end=2466; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++32. [ok] $path='pages/PublicMenu/x.jsx'; $start=3298; $end=3310; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++33. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'setGuestNameInput\(','currentGuest\?\.name','setCurrentGuest\(' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++34. [ok] Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'showTableOrdersSection','reviewableItems','otherGuestsReviewableItems','openReviewDialog','servedExpanded','activeExpanded' | ForEach-Object { "CartView.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++35. [ok] $path='pages/PublicMenu/x.jsx'; $start=1620; $end=1636; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++36. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'menuapp_guest_name','currentTableId','tableCodeParam','resolvedTable\?\.id','verifiedTableId' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++37. [ok] Test-Path 'pipeline/chain-state'
++38. [ok] Test-Path 'pages/PublicMenu'
+diff --git a/pages/PublicMenu/review_2026-03-28.md b/pages/PublicMenu/review_2026-03-28.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef62f71dfd3c068f25bfabc15adedcc50cd8c2a4
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-28.md
+@@ -0,0 +1,22 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-083047-385c
++
++## Findings
++1. [P1] Fix 1 — CartView still uses the old `Выдано` / `Заказано` split instead of `Сейчас` / `История` / `Новый заказ`. `todayMyOrders` is only partitioned into `servedOrders` and `activeOrders` at `CartView.jsx:351-374`, and the renderer still prints flat order lists with per-order badges under `Выдано` and `Заказано` at `CartView.jsx:456-529` and `CartView.jsx:772-845`. There is no urgency subgrouping (`Готов` -> `Готовится` -> `Принят`) or collapsed `История` summary row. FIX: replace the old served/active split with explicit `currentOrders` and `historyOrders` arrays based on the raw DB statuses from the task, group current orders by status priority, and render `История` as the collapsed summary block.
++2. [P1] Fix 2 — The visit total is still inside scrollable content, and the footer logic only handles the non-empty-cart submit state. `ИТОГО за визит` remains a normal card at `CartView.jsx:980-991`, while the sticky block at `CartView.jsx:1007-1041` appears only when `cart.length > 0` and never renders the required empty-cart or first-order variants (`ИТОГО`, `К отправке`, `Всего`, `Заказать ещё`). FIX: convert the drawer body to `flex flex-col h-full` with a scrollable content area and a persistent footer that switches copy/buttons by visit state, while keeping totals float-safe via `parseFloat(...toFixed(2))`.
++3. [P1] Fix 3 — Rating UI is still shown before delivery. Inside `renderOrderItems`, every item renders `<Rating>` whenever `reviewsEnabled` is true at `CartView.jsx:489-516`, regardless of `order.status`, and the only review CTA is the generic section button at `CartView.jsx:834-842` / `CartView.jsx:742-752` instead of a per-order `Оценить блюда` trigger for delivered orders. FIX: gate review UI by delivered statuses only, show a per-order `Оценить блюда` button for `Подано` / `Выдан гостю`, and expand the existing stars only after that CTA is tapped.
++4. [P1] Fix 4 — Orders in the active section are still fully expanded rows, not collapsed summaries. Each order renders its full item list immediately at `CartView.jsx:474-520`, with only time + badge in the header at `CartView.jsx:466-473`; there is no 2-item preview, `+N` remainder, per-order chevron, or collapsed/expanded state per active order. FIX: add per-order collapse state for `Сейчас`, render the summary row with the first two item names plus `+N` and the existing formatted total, then reveal the full item list on expand.
++5. [P2] Fix 5 — The old split toggle is still in place instead of the new guest selector. `splitSummary` still resolves to `На всех` / `Только я` at `CartView.jsx:450-452`, and the cart renders an inline `Для кого заказ` radio group at `CartView.jsx:904-970`, even when `canSplit` is false. There is no local sheet/popover picker and the selector is not hidden for single-guest tables. FIX: hide the control when `guestCount <= 1`, replace the inline radios with a local open/close guest picker, and surface the selected guest as `Кому заказ: ...`.
++6. [P2] Fix 6 — Guest-facing status copy is still the old set. `getSafeStatus` falls back to `Заказано` and `Готово` at `CartView.jsx:252-278`, and those labels are rendered directly in the badge at `CartView.jsx:470-472`. There is no display-layer mapping that turns `Заказано` / `Принято` into `Принят` or `Выдан гостю` into `Подано`. FIX: normalize display labels to `Принят`, `Готовится`, `Готов`, and `Подано` without changing the raw status values used for filtering.
++7. [P1] Fix 7 — The shift filter still uses midnight, not the 06:00 business-day cutoff. `todayMyOrders` compares `new Date(d).toDateString()` with today's date at `CartView.jsx:351-358`, so orders from the previous evening shift can still leak across midnight and early-morning orders can be misclassified. FIX: replace the date-only equality check with the rolling `today6am` cutoff described in the task, then run the existing newest-first sort on the filtered result.
++8. [P1] Fix 8 — The success screen total still passes the raw floating-point value to `formatPrice`. The confirmation footer renders `formatPrice(totalAmount)` at `x.jsx:726-731`, so totals like `31.00999999999998` can still appear. FIX: wrap the value with `parseFloat(totalAmount.toFixed(2))` before formatting.
++9. [P1] Fix 9 — Guest name persistence is global and never resets on table change. `guestNameInput` initializes from a single `menuapp_guest_name` key at `x.jsx:1358-1360`, writes back to the same key at `x.jsx:3161-3165`, and the current table identity is available as `currentTableId` at `x.jsx:1630-1634` but is never used to clear or scope the stored name. That leaves the stale-name regression in place for a new table/session. FIX: clear or namespace guest-name storage when `tableCodeParam` / `currentTableId` changes and fall back to `Гость` when no saved name exists.
++10. [P1] Fix 10 — The dedicated "all dishes delivered" state is missing. When only delivered orders remain, CartView still shows the regular collapsed `Выдано` section at `CartView.jsx:773-803`, the old `+ Добавить к заказу` button at `CartView.jsx:851-861`, and the generic visit-total / submit footer flow at `CartView.jsx:980-1041`. There is no `Все блюда поданы` banner, no `Дозаказать` primary CTA, and no `Попросить счёт` action/disabled fallback. FIX: add a D3 branch for `activeOrders.length === 0 && servedOrders.length > 0 && cart.length === 0`, render the special summary screen, and attach the sticky footer to the delivered-orders total.
++
++## Summary
++Total: 10 findings (0 P0, 8 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for this scoped review
++- Scope questions (anything you weren't sure if it's in scope): the task says `TARGET FILES (modify)` and references external UX docs / `BUGS_MASTER.md`, but the speed rules also say to read only `pages/PublicMenu` files; I treated the page-folder-only rule as authoritative.
+diff --git a/pages/PublicMenu/round1_2026-03-28.md b/pages/PublicMenu/round1_2026-03-28.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..edb6f0e78f598780fb540ee4dd0891fffedc311f
+--- /dev/null
++++ b/pages/PublicMenu/round1_2026-03-28.md
+@@ -0,0 +1,16 @@
++# PublicMenu review round 1 — 2026-03-28
++
++Scope reviewed:
++- `pages/PublicMenu/CartView.jsx`
++- `pages/PublicMenu/x.jsx`
++- `pages/PublicMenu/README.md`
++- `pages/PublicMenu/BUGS.md`
++
++Constraints followed:
++- Read only files inside `pages/PublicMenu`
++- Reported only numbered Fix 1–10 items from the task
++- No code changes applied
++
++Result:
++- Final scoped findings saved in `pages/PublicMenu/review_2026-03-28.md`
++- Pipeline artifact saved in `pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md`
+diff --git a/pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md b/pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef62f71dfd3c068f25bfabc15adedcc50cd8c2a4
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md
+@@ -0,0 +1,22 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-083047-385c
++
++## Findings
++1. [P1] Fix 1 — CartView still uses the old `Выдано` / `Заказано` split instead of `Сейчас` / `История` / `Новый заказ`. `todayMyOrders` is only partitioned into `servedOrders` and `activeOrders` at `CartView.jsx:351-374`, and the renderer still prints flat order lists with per-order badges under `Выдано` and `Заказано` at `CartView.jsx:456-529` and `CartView.jsx:772-845`. There is no urgency subgrouping (`Готов` -> `Готовится` -> `Принят`) or collapsed `История` summary row. FIX: replace the old served/active split with explicit `currentOrders` and `historyOrders` arrays based on the raw DB statuses from the task, group current orders by status priority, and render `История` as the collapsed summary block.
++2. [P1] Fix 2 — The visit total is still inside scrollable content, and the footer logic only handles the non-empty-cart submit state. `ИТОГО за визит` remains a normal card at `CartView.jsx:980-991`, while the sticky block at `CartView.jsx:1007-1041` appears only when `cart.length > 0` and never renders the required empty-cart or first-order variants (`ИТОГО`, `К отправке`, `Всего`, `Заказать ещё`). FIX: convert the drawer body to `flex flex-col h-full` with a scrollable content area and a persistent footer that switches copy/buttons by visit state, while keeping totals float-safe via `parseFloat(...toFixed(2))`.
++3. [P1] Fix 3 — Rating UI is still shown before delivery. Inside `renderOrderItems`, every item renders `<Rating>` whenever `reviewsEnabled` is true at `CartView.jsx:489-516`, regardless of `order.status`, and the only review CTA is the generic section button at `CartView.jsx:834-842` / `CartView.jsx:742-752` instead of a per-order `Оценить блюда` trigger for delivered orders. FIX: gate review UI by delivered statuses only, show a per-order `Оценить блюда` button for `Подано` / `Выдан гостю`, and expand the existing stars only after that CTA is tapped.
++4. [P1] Fix 4 — Orders in the active section are still fully expanded rows, not collapsed summaries. Each order renders its full item list immediately at `CartView.jsx:474-520`, with only time + badge in the header at `CartView.jsx:466-473`; there is no 2-item preview, `+N` remainder, per-order chevron, or collapsed/expanded state per active order. FIX: add per-order collapse state for `Сейчас`, render the summary row with the first two item names plus `+N` and the existing formatted total, then reveal the full item list on expand.
++5. [P2] Fix 5 — The old split toggle is still in place instead of the new guest selector. `splitSummary` still resolves to `На всех` / `Только я` at `CartView.jsx:450-452`, and the cart renders an inline `Для кого заказ` radio group at `CartView.jsx:904-970`, even when `canSplit` is false. There is no local sheet/popover picker and the selector is not hidden for single-guest tables. FIX: hide the control when `guestCount <= 1`, replace the inline radios with a local open/close guest picker, and surface the selected guest as `Кому заказ: ...`.
++6. [P2] Fix 6 — Guest-facing status copy is still the old set. `getSafeStatus` falls back to `Заказано` and `Готово` at `CartView.jsx:252-278`, and those labels are rendered directly in the badge at `CartView.jsx:470-472`. There is no display-layer mapping that turns `Заказано` / `Принято` into `Принят` or `Выдан гостю` into `Подано`. FIX: normalize display labels to `Принят`, `Готовится`, `Готов`, and `Подано` without changing the raw status values used for filtering.
++7. [P1] Fix 7 — The shift filter still uses midnight, not the 06:00 business-day cutoff. `todayMyOrders` compares `new Date(d).toDateString()` with today's date at `CartView.jsx:351-358`, so orders from the previous evening shift can still leak across midnight and early-morning orders can be misclassified. FIX: replace the date-only equality check with the rolling `today6am` cutoff described in the task, then run the existing newest-first sort on the filtered result.
++8. [P1] Fix 8 — The success screen total still passes the raw floating-point value to `formatPrice`. The confirmation footer renders `formatPrice(totalAmount)` at `x.jsx:726-731`, so totals like `31.00999999999998` can still appear. FIX: wrap the value with `parseFloat(totalAmount.toFixed(2))` before formatting.
++9. [P1] Fix 9 — Guest name persistence is global and never resets on table change. `guestNameInput` initializes from a single `menuapp_guest_name` key at `x.jsx:1358-1360`, writes back to the same key at `x.jsx:3161-3165`, and the current table identity is available as `currentTableId` at `x.jsx:1630-1634` but is never used to clear or scope the stored name. That leaves the stale-name regression in place for a new table/session. FIX: clear or namespace guest-name storage when `tableCodeParam` / `currentTableId` changes and fall back to `Гость` when no saved name exists.
++10. [P1] Fix 10 — The dedicated "all dishes delivered" state is missing. When only delivered orders remain, CartView still shows the regular collapsed `Выдано` section at `CartView.jsx:773-803`, the old `+ Добавить к заказу` button at `CartView.jsx:851-861`, and the generic visit-total / submit footer flow at `CartView.jsx:980-1041`. There is no `Все блюда поданы` banner, no `Дозаказать` primary CTA, and no `Попросить счёт` action/disabled fallback. FIX: add a D3 branch for `activeOrders.length === 0 && servedOrders.length > 0 && cart.length === 0`, render the special summary screen, and attach the sticky footer to the delivered-orders total.
++
++## Summary
++Total: 10 findings (0 P0, 8 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for this scoped review
++- Scope questions (anything you weren't sure if it's in scope): the task says `TARGET FILES (modify)` and references external UX docs / `BUGS_MASTER.md`, but the speed rules also say to read only `pages/PublicMenu` files; I treated the page-folder-only rule as authoritative.
+
+codex
+Saved artifacts:
+- [pipeline findings](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md)
+- [review copy](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-28.md)
+- [commands log](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-28.log)
+- [round 1 note](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/round1_2026-03-28.md)
+
+Summary: 10 findings total, scoped only to Fix 1–10 in `CartView.jsx` and `x.jsx` plus page-local `README.md` / `BUGS.md`. Breakdown: 8 P1, 2 P2. The main gaps are the old `Выдано/Заказано` section model, non-spec sticky footer behavior, ratings still visible before delivery, midnight-based order filtering, global guest-name storage without table reset, and the missing D3 “all dishes delivered” state. Prompt clarity scored 4/5.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-28.log b/pages/PublicMenu/commands_2026-03-28.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..771fa70140794ddcf4a1b0a2823b6a41a04d6519
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-28.log
+@@ -0,0 +1,40 @@
++# PublicMenu review command log — 2026-03-28
++
++1. [timed out] Get-ChildItem -Force 'pages/PublicMenu' | Select-Object Name,Length,Mode
++2. [timed out] $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++3. [timed out] $i=1; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++4. [timed out] $i=1; Get-Content 'pages/PublicMenu/README.md' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++5. [timed out] $i=1; Get-Content 'pages/PublicMenu/BUGS.md' | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++6. [ok] (Get-Content 'pages/PublicMenu/CartView.jsx').Count
++7. [ok] (Get-Content 'pages/PublicMenu/x.jsx').Count
++8. [timed out] Get-ChildItem -Force 'pages/PublicMenu' | Select-Object Name,Length,Mode
++9. [timed out] Get-Content 'pages/PublicMenu/README.md' -Raw
++10. [timed out] Get-Content 'pages/PublicMenu/BUGS.md' -Raw
++11. [ok] cmd /c dir /b "pages\PublicMenu"
++12. [ok] Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'Заказано','ИТОГО','rating','Rating','Star','Для кого','Только мне','createdAt','created_date','DrawerContent','Отправить официанту','Добавить ещё','Попросить счёт','Выдан гостю','Подано' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename, $_.LineNumber, $_.Line.Trim() }
++13. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'guestName','localStorage','tableCode','formatPrice','totalAmount','confirmation.total','Заказ принят' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename, $_.LineNumber, $_.Line.Trim() }
++14. [ok] Get-Content 'pages/PublicMenu/README.md' -TotalCount 200
++15. [ok] Get-Content 'pages/PublicMenu/BUGS.md' -TotalCount 200
++16. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=330; $end=390; $i=1; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f ($start++), $_ }
++17. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=450; $end=620; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++18. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=780; $end=1010; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++19. [ok] $path='pages/PublicMenu/x.jsx'; $start=700; $end=735; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++20. [ok] $path='pages/PublicMenu/x.jsx'; $start=1348; $end=1370; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++21. [ok] $path='pages/PublicMenu/x.jsx'; $start=1550; $end=1610; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++22. [ok] $path='pages/PublicMenu/x.jsx'; $start=3138; $end=3170; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++23. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=80; $end=105; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++24. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=230; $end=285; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++25. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=740; $end=805; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++26. [ok] $path='pages/PublicMenu/CartView.jsx'; $start=1007; $end=1045; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++27. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'menuapp_guest_name','removeItem\(' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++28. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'verifiedTableId','verifiedTable','resolvedTable','currentTableId','tableCodeParam','useEffect\(' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++29. [ok] Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'Все блюда поданы','Дозаказать','Попросить счёт','bill','servedOrders.length','activeOrders.length','cart.length === 0 && todayMyOrders.length > 0' | ForEach-Object { "CartView.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++30. [ok] $path='pages/PublicMenu/x.jsx'; $start=2288; $end=2330; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++31. [ok] $path='pages/PublicMenu/x.jsx'; $start=2448; $end=2466; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++32. [ok] $path='pages/PublicMenu/x.jsx'; $start=3298; $end=3310; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++33. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'setGuestNameInput\(','currentGuest\?\.name','setCurrentGuest\(' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++34. [ok] Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'showTableOrdersSection','reviewableItems','otherGuestsReviewableItems','openReviewDialog','servedExpanded','activeExpanded' | ForEach-Object { "CartView.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++35. [ok] $path='pages/PublicMenu/x.jsx'; $start=1620; $end=1636; Get-Content $path | Select-Object -Skip ($start-1) -First ($end-$start+1) | ForEach-Object { '{0,5}: {1}' -f $start, $_; $start++ }
++36. [ok] Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'menuapp_guest_name','currentTableId','tableCodeParam','resolvedTable\?\.id','verifiedTableId' | ForEach-Object { "x.jsx:{0}: {1}" -f $_.LineNumber, $_.Line.Trim() }
++37. [ok] Test-Path 'pipeline/chain-state'
++38. [ok] Test-Path 'pages/PublicMenu'
+diff --git a/pages/PublicMenu/review_2026-03-28.md b/pages/PublicMenu/review_2026-03-28.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef62f71dfd3c068f25bfabc15adedcc50cd8c2a4
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-28.md
+@@ -0,0 +1,22 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-083047-385c
++
++## Findings
++1. [P1] Fix 1 — CartView still uses the old `Выдано` / `Заказано` split instead of `Сейчас` / `История` / `Новый заказ`. `todayMyOrders` is only partitioned into `servedOrders` and `activeOrders` at `CartView.jsx:351-374`, and the renderer still prints flat order lists with per-order badges under `Выдано` and `Заказано` at `CartView.jsx:456-529` and `CartView.jsx:772-845`. There is no urgency subgrouping (`Готов` -> `Готовится` -> `Принят`) or collapsed `История` summary row. FIX: replace the old served/active split with explicit `currentOrders` and `historyOrders` arrays based on the raw DB statuses from the task, group current orders by status priority, and render `История` as the collapsed summary block.
++2. [P1] Fix 2 — The visit total is still inside scrollable content, and the footer logic only handles the non-empty-cart submit state. `ИТОГО за визит` remains a normal card at `CartView.jsx:980-991`, while the sticky block at `CartView.jsx:1007-1041` appears only when `cart.length > 0` and never renders the required empty-cart or first-order variants (`ИТОГО`, `К отправке`, `Всего`, `Заказать ещё`). FIX: convert the drawer body to `flex flex-col h-full` with a scrollable content area and a persistent footer that switches copy/buttons by visit state, while keeping totals float-safe via `parseFloat(...toFixed(2))`.
++3. [P1] Fix 3 — Rating UI is still shown before delivery. Inside `renderOrderItems`, every item renders `<Rating>` whenever `reviewsEnabled` is true at `CartView.jsx:489-516`, regardless of `order.status`, and the only review CTA is the generic section button at `CartView.jsx:834-842` / `CartView.jsx:742-752` instead of a per-order `Оценить блюда` trigger for delivered orders. FIX: gate review UI by delivered statuses only, show a per-order `Оценить блюда` button for `Подано` / `Выдан гостю`, and expand the existing stars only after that CTA is tapped.
++4. [P1] Fix 4 — Orders in the active section are still fully expanded rows, not collapsed summaries. Each order renders its full item list immediately at `CartView.jsx:474-520`, with only time + badge in the header at `CartView.jsx:466-473`; there is no 2-item preview, `+N` remainder, per-order chevron, or collapsed/expanded state per active order. FIX: add per-order collapse state for `Сейчас`, render the summary row with the first two item names plus `+N` and the existing formatted total, then reveal the full item list on expand.
++5. [P2] Fix 5 — The old split toggle is still in place instead of the new guest selector. `splitSummary` still resolves to `На всех` / `Только я` at `CartView.jsx:450-452`, and the cart renders an inline `Для кого заказ` radio group at `CartView.jsx:904-970`, even when `canSplit` is false. There is no local sheet/popover picker and the selector is not hidden for single-guest tables. FIX: hide the control when `guestCount <= 1`, replace the inline radios with a local open/close guest picker, and surface the selected guest as `Кому заказ: ...`.
++6. [P2] Fix 6 — Guest-facing status copy is still the old set. `getSafeStatus` falls back to `Заказано` and `Готово` at `CartView.jsx:252-278`, and those labels are rendered directly in the badge at `CartView.jsx:470-472`. There is no display-layer mapping that turns `Заказано` / `Принято` into `Принят` or `Выдан гостю` into `Подано`. FIX: normalize display labels to `Принят`, `Готовится`, `Готов`, and `Подано` without changing the raw status values used for filtering.
++7. [P1] Fix 7 — The shift filter still uses midnight, not the 06:00 business-day cutoff. `todayMyOrders` compares `new Date(d).toDateString()` with today's date at `CartView.jsx:351-358`, so orders from the previous evening shift can still leak across midnight and early-morning orders can be misclassified. FIX: replace the date-only equality check with the rolling `today6am` cutoff described in the task, then run the existing newest-first sort on the filtered result.
++8. [P1] Fix 8 — The success screen total still passes the raw floating-point value to `formatPrice`. The confirmation footer renders `formatPrice(totalAmount)` at `x.jsx:726-731`, so totals like `31.00999999999998` can still appear. FIX: wrap the value with `parseFloat(totalAmount.toFixed(2))` before formatting.
++9. [P1] Fix 9 — Guest name persistence is global and never resets on table change. `guestNameInput` initializes from a single `menuapp_guest_name` key at `x.jsx:1358-1360`, writes back to the same key at `x.jsx:3161-3165`, and the current table identity is available as `currentTableId` at `x.jsx:1630-1634` but is never used to clear or scope the stored name. That leaves the stale-name regression in place for a new table/session. FIX: clear or namespace guest-name storage when `tableCodeParam` / `currentTableId` changes and fall back to `Гость` when no saved name exists.
++10. [P1] Fix 10 — The dedicated "all dishes delivered" state is missing. When only delivered orders remain, CartView still shows the regular collapsed `Выдано` section at `CartView.jsx:773-803`, the old `+ Добавить к заказу` button at `CartView.jsx:851-861`, and the generic visit-total / submit footer flow at `CartView.jsx:980-1041`. There is no `Все блюда поданы` banner, no `Дозаказать` primary CTA, and no `Попросить счёт` action/disabled fallback. FIX: add a D3 branch for `activeOrders.length === 0 && servedOrders.length > 0 && cart.length === 0`, render the special summary screen, and attach the sticky footer to the delivered-orders total.
++
++## Summary
++Total: 10 findings (0 P0, 8 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for this scoped review
++- Scope questions (anything you weren't sure if it's in scope): the task says `TARGET FILES (modify)` and references external UX docs / `BUGS_MASTER.md`, but the speed rules also say to read only `pages/PublicMenu` files; I treated the page-folder-only rule as authoritative.
+diff --git a/pages/PublicMenu/round1_2026-03-28.md b/pages/PublicMenu/round1_2026-03-28.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..edb6f0e78f598780fb540ee4dd0891fffedc311f
+--- /dev/null
++++ b/pages/PublicMenu/round1_2026-03-28.md
+@@ -0,0 +1,16 @@
++# PublicMenu review round 1 — 2026-03-28
++
++Scope reviewed:
++- `pages/PublicMenu/CartView.jsx`
++- `pages/PublicMenu/x.jsx`
++- `pages/PublicMenu/README.md`
++- `pages/PublicMenu/BUGS.md`
++
++Constraints followed:
++- Read only files inside `pages/PublicMenu`
++- Reported only numbered Fix 1–10 items from the task
++- No code changes applied
++
++Result:
++- Final scoped findings saved in `pages/PublicMenu/review_2026-03-28.md`
++- Pipeline artifact saved in `pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md`
+diff --git a/pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md b/pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef62f71dfd3c068f25bfabc15adedcc50cd8c2a4
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md
+@@ -0,0 +1,22 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260328-083047-385c
++
++## Findings
++1. [P1] Fix 1 — CartView still uses the old `Выдано` / `Заказано` split instead of `Сейчас` / `История` / `Новый заказ`. `todayMyOrders` is only partitioned into `servedOrders` and `activeOrders` at `CartView.jsx:351-374`, and the renderer still prints flat order lists with per-order badges under `Выдано` and `Заказано` at `CartView.jsx:456-529` and `CartView.jsx:772-845`. There is no urgency subgrouping (`Готов` -> `Готовится` -> `Принят`) or collapsed `История` summary row. FIX: replace the old served/active split with explicit `currentOrders` and `historyOrders` arrays based on the raw DB statuses from the task, group current orders by status priority, and render `История` as the collapsed summary block.
++2. [P1] Fix 2 — The visit total is still inside scrollable content, and the footer logic only handles the non-empty-cart submit state. `ИТОГО за визит` remains a normal card at `CartView.jsx:980-991`, while the sticky block at `CartView.jsx:1007-1041` appears only when `cart.length > 0` and never renders the required empty-cart or first-order variants (`ИТОГО`, `К отправке`, `Всего`, `Заказать ещё`). FIX: convert the drawer body to `flex flex-col h-full` with a scrollable content area and a persistent footer that switches copy/buttons by visit state, while keeping totals float-safe via `parseFloat(...toFixed(2))`.
++3. [P1] Fix 3 — Rating UI is still shown before delivery. Inside `renderOrderItems`, every item renders `<Rating>` whenever `reviewsEnabled` is true at `CartView.jsx:489-516`, regardless of `order.status`, and the only review CTA is the generic section button at `CartView.jsx:834-842` / `CartView.jsx:742-752` instead of a per-order `Оценить блюда` trigger for delivered orders. FIX: gate review UI by delivered statuses only, show a per-order `Оценить блюда` button for `Подано` / `Выдан гостю`, and expand the existing stars only after that CTA is tapped.
++4. [P1] Fix 4 — Orders in the active section are still fully expanded rows, not collapsed summaries. Each order renders its full item list immediately at `CartView.jsx:474-520`, with only time + badge in the header at `CartView.jsx:466-473`; there is no 2-item preview, `+N` remainder, per-order chevron, or collapsed/expanded state per active order. FIX: add per-order collapse state for `Сейчас`, render the summary row with the first two item names plus `+N` and the existing formatted total, then reveal the full item list on expand.
++5. [P2] Fix 5 — The old split toggle is still in place instead of the new guest selector. `splitSummary` still resolves to `На всех` / `Только я` at `CartView.jsx:450-452`, and the cart renders an inline `Для кого заказ` radio group at `CartView.jsx:904-970`, even when `canSplit` is false. There is no local sheet/popover picker and the selector is not hidden for single-guest tables. FIX: hide the control when `guestCount <= 1`, replace the inline radios with a local open/close guest picker, and surface the selected guest as `Кому заказ: ...`.
++6. [P2] Fix 6 — Guest-facing status copy is still the old set. `getSafeStatus` falls back to `Заказано` and `Готово` at `CartView.jsx:252-278`, and those labels are rendered directly in the badge at `CartView.jsx:470-472`. There is no display-layer mapping that turns `Заказано` / `Принято` into `Принят` or `Выдан гостю` into `Подано`. FIX: normalize display labels to `Принят`, `Готовится`, `Готов`, and `Подано` without changing the raw status values used for filtering.
++7. [P1] Fix 7 — The shift filter still uses midnight, not the 06:00 business-day cutoff. `todayMyOrders` compares `new Date(d).toDateString()` with today's date at `CartView.jsx:351-358`, so orders from the previous evening shift can still leak across midnight and early-morning orders can be misclassified. FIX: replace the date-only equality check with the rolling `today6am` cutoff described in the task, then run the existing newest-first sort on the filtered result.
++8. [P1] Fix 8 — The success screen total still passes the raw floating-point value to `formatPrice`. The confirmation footer renders `formatPrice(totalAmount)` at `x.jsx:726-731`, so totals like `31.00999999999998` can still appear. FIX: wrap the value with `parseFloat(totalAmount.toFixed(2))` before formatting.
++9. [P1] Fix 9 — Guest name persistence is global and never resets on table change. `guestNameInput` initializes from a single `menuapp_guest_name` key at `x.jsx:1358-1360`, writes back to the same key at `x.jsx:3161-3165`, and the current table identity is available as `currentTableId` at `x.jsx:1630-1634` but is never used to clear or scope the stored name. That leaves the stale-name regression in place for a new table/session. FIX: clear or namespace guest-name storage when `tableCodeParam` / `currentTableId` changes and fall back to `Гость` when no saved name exists.
++10. [P1] Fix 10 — The dedicated "all dishes delivered" state is missing. When only delivered orders remain, CartView still shows the regular collapsed `Выдано` section at `CartView.jsx:773-803`, the old `+ Добавить к заказу` button at `CartView.jsx:851-861`, and the generic visit-total / submit footer flow at `CartView.jsx:980-1041`. There is no `Все блюда поданы` banner, no `Дозаказать` primary CTA, and no `Попросить счёт` action/disabled fallback. FIX: add a D3 branch for `activeOrders.length === 0 && servedOrders.length > 0 && cart.length === 0`, render the special summary screen, and attach the sticky footer to the delivered-orders total.
++
++## Summary
++Total: 10 findings (0 P0, 8 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for this scoped review
++- Scope questions (anything you weren't sure if it's in scope): the task says `TARGET FILES (modify)` and references external UX docs / `BUGS_MASTER.md`, but the speed rules also say to read only `pages/PublicMenu` files; I treated the page-folder-only rule as authoritative.
+
+tokens used
+71 428
+Saved artifacts:
+- [pipeline findings](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260328-083047-385c-codex-findings.md)
+- [review copy](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-28.md)
+- [commands log](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-28.log)
+- [round 1 note](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/round1_2026-03-28.md)
+
+Summary: 10 findings total, scoped only to Fix 1–10 in `CartView.jsx` and `x.jsx` plus page-local `README.md` / `BUGS.md`. Breakdown: 8 P1, 2 P2. The main gaps are the old `Выдано/Заказано` section model, non-spec sticky footer behavior, ratings still visible before delivery, midnight-based order filtering, global guest-name storage without table reset, and the missing D3 “all dishes delivered” state. Prompt clarity scored 4/5.

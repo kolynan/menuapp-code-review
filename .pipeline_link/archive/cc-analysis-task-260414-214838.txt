@@ -1,0 +1,177 @@
+# PSSK Review: CartView Batch B2 Draft Prompt
+# Reviewed by: CC (Claude Code), Session 273
+# Date: 2026-04-14
+
+## CRITICAL: File Path Error
+
+The prompt says `pages/CartView/cartview.jsx` throughout ALL Fix descriptions and grep commands.
+Actual file: `pages/PublicMenu/CartView.jsx` (1192 lines, confirmed).
+This WILL cause every grep command to fail and confuse the implementor.
+
+**Action required:** Replace ALL occurrences of `pages/CartView/cartview.jsx` with `pages/PublicMenu/CartView.jsx`.
+
+---
+
+## Fix-by-Fix Review
+
+### Fix 1: CV-BUG-03 — Drawer opens scrolled past header [ISSUE]
+
+- **Path:** WRONG (see above)
+- **Code reality:** CartView.jsx is a CHILD COMPONENT receiving props (line 16: `export default function CartView({...})`). It does NOT manage drawer open/close state — `isOpen`, `onOpen`, `openDrawer`, `setIsOpen` do NOT exist in this file. The only scroll-to-top is at line 206 inside `isTableVerified` effect, not on drawer open.
+- **Problem:** The drawer open/close and `isOpen` state live in the PARENT component (likely PublicMenu.jsx or a drawer wrapper). CartView receives `onClose` prop but no `onOpen` or `isOpen` prop.
+- **Impact:** Fix 1 cannot be implemented in CartView.jsx alone. The prompt needs to:
+  1. Identify the parent component that manages drawer state
+  2. Either add an `onDrawerOpen` callback prop to CartView, or implement scroll-to-top in the parent
+  3. Specify which file the scroll logic should be added to
+- **grep verification:** `grep -n "isOpen|drawerOpen|onOpen"` → 0 hits in CartView.jsx (confirmed). The prompt says "Likely near line ~185" but line 206 is `isTableVerified` scroll, not drawer open.
+
+**Verdict: Fix 1: ISSUE — Cannot be implemented as described. Drawer open state is NOT in CartView.jsx. Needs parent file identification.**
+
+---
+
+### Fix 2: CV-BUG-04 — Chip "Oценить (N)" does not auto-expand [OK with notes]
+
+- **Code reality confirmed:** Lines 936-941 (v8 branch) and 1005-1014 (normal branch) both have:
+  ```js
+  onClick={() => {
+    setExpandedStatuses(prev => ({ ...prev, served: true }));
+    setIsRatingMode(true);
+    setTimeout(() => { ... scrollIntoView ... }, 100);
+  }}
+  ```
+- **WAIT — already fixed?** The chip handler at lines 937 and 1010 ALREADY calls `setExpandedStatuses(prev => ({ ...prev, served: true }))`. The prompt says this is missing ("NEW — force-expand the section"), but it's ALREADY THERE.
+- **The prompt also mentions `deliveredExpanded`** — this state name does NOT exist. The actual state is `expandedStatuses.served` (line 93).
+- **e.stopPropagation():** Not needed for the "Oценить" chip — it already has its own onClick. The parent button's onClick is on the collapsible header toggle. The chip uses `e.stopPropagation()` only in the "Готово" handler (line 927), not in "Oценить". But since "Oценить" is INSIDE the parent button element, a click WILL bubble to the parent's onClick, which toggles expand. However: chip sets `served: true`, then bubble toggles `served → !served = false`. Net effect: section COLLAPSES. THIS IS THE ACTUAL BUG.
+
+**Verdict: Fix 2: ISSUE — The `setExpandedStatuses(served: true)` is already there, but the REAL bug is likely event bubbling: click propagates to parent button toggle, which flips `served` back to `false`. Fix description should say "add `e.stopPropagation()` to the Oценить chip onClick" (both at line 936 and line 1009). The prompt's fix description is misleading — it says to ADD `setDeliveredExpanded(true)` (wrong state name) alongside `setRatingMode(true)`, but both are already present. The actual fix is the stopPropagation, which is mentioned as a "Note" but should be the PRIMARY fix.**
+
+---
+
+### Fix 3: CV-70/71 — CTA unification [ISSUE — multiple problems]
+
+1. **CV-70 State B logic gap:** The prompt says State B = "cart empty + active/delivered orders exist" → CTA = "Вернуться в меню". Current code (line 1150-1188):
+   - `cart.length > 0` → submit button (correct for State A)
+   - `else` (within footer condition `cart.length > 0 || todayMyOrders.length > 0`) → outline "Заказать ещё"
+   The fix needs to replace the outline button with primary filled. OK so far.
+
+2. **CV-70 State C missing entirely:** The prompt defines State C as "all delivered + rating pending → CTA = Оценить блюда и получить бонусы". But:
+   - There's no `ratingPending` variable. The closest is `!allServedRated` (line 540).
+   - There's no `hasActiveOrDelivered` variable either. Need to derive from `statusBuckets`.
+   - The prompt doesn't specify how to compute these conditions. Implementor must guess.
+   - Priority ambiguity: State C condition (`allDelivered && ratingPending`) OVERLAPS with State B (`hasActiveOrDelivered`). If all are delivered, both conditions are true. The prompt should clarify State C takes priority over State B.
+
+3. **CV-71 Success screen:** The prompt references `submitSuccess` but `grep -n "submitSuccess"` = 0 hits. The actual success state is `submitPhase === 'success'` (line 115). Current success behavior: button shows "Заказ отправлен" for 1.5s then reverts to idle. There is NO dedicated success screen. The prompt describes a full success screen with "Мои заказы" text-link, but NO such screen exists in the code. This is a NEW FEATURE, not a fix. The prompt should:
+   - Clarify where in the JSX the success screen should be rendered
+   - Specify the condition for showing it vs the current flash-state
+   - Specify what happens to the existing submitPhase === 'success' behavior
+
+4. **i18n keys:** Prompt uses `cta.submit_order`, `cta.return_to_menu`, `cta.rate_dishes`. But existing code uses `cart.send_to_waiter` (line 1176) and `cart.cta.order_more` (line 1186). The key namespace is inconsistent — prompt should use `cart.cta.*` to match existing pattern, or explicitly say to change namespace.
+
+5. **"Заказать ещё" grep expectation:** Prompt says "Expected after fix: 0 occurrences". But line 903 has `'cart.can_order_or_rate', 'Можно заказать ещё или оценить.'` — this is a different string but contains "Заказать ещё" substring in Russian. The grep `"Заказать ещё"` will match line 903 too. Prompt should note this is OK (it's content text, not a CTA label) or adjust the grep.
+
+**Verdict: Fix 3: ISSUE — (a) State C conditions not computable from existing variables, needs derivation spec. (b) No success screen exists — this is new feature, needs JSX placement spec. (c) i18n key namespace mismatch. (d) "0 hits" grep expectation is wrong due to line 903.**
+
+---
+
+### Fix 4: CV-72/73 — Auto-scroll to "В корзине" + pulse [ISSUE — same as Fix 1]
+
+- **Same parent-component problem as Fix 1:** The `add_to_cart_auto_open` trigger does NOT exist in CartView.jsx. CartView is a stateless child that receives cart items via props. The "drawer opens" logic is in the parent.
+- **No `auto_open`/`autoOpen`/`setIsOpen` in this file** (confirmed by grep: 0 hits).
+- **`cartSectionRef` approach is fine** for the "В корзине" header (line 1043-1044), but the triggering logic must be in the parent or communicated via a new prop.
+- **Pulse animation:** Prompt suggests CSS `@keyframes` but CartView uses Tailwind only. Should specify: add a Tailwind `animate-pulse` class or a custom keyframe in the component? Base44 constraint: no custom CSS. This needs clarification.
+- **setTimeout cleanup (PQ-101):** Described correctly, but WHERE to put the useEffect is unclear since the trigger is external.
+
+**Verdict: Fix 4: ISSUE — Same parent-file dependency as Fix 1. Also: pulse animation approach conflicts with "Tailwind only" rule. Need to specify Tailwind-compatible pulse (e.g., `animate-pulse` or inline keyframes via style prop).**
+
+---
+
+### Fix 5: CV-76/78 — Double-tap prevention + footer stability [PARTIAL OK]
+
+1. **CV-76 double-tap:** ALREADY IMPLEMENTED. Lines 1153-1177 show `submitPhase` state machine with:
+   - `disabled={submitPhase !== 'idle'}` (line 1168) — prevents re-tap
+   - Label changes to "Отправляем..." during submit (line 1171)
+   - Error phase exists (line 1158-1159, line 1174-1175)
+   - The prompt's own note says "If `isSubmitting` prop already exists → mark [VERIFY ONLY]". Both `isSubmitting` (prop, line 47) AND `submitPhase` (local state, line 115) exist and work together.
+   **This fix is already done.** Prompt should mark as [VERIFY ONLY].
+
+2. **CV-76 minor gap:** The prompt says `submitPhase → 'idle'` after 3s delay on error. Current code: error phase stays until user clicks retry (line 1163-1166: `if (submitPhase !== 'idle') return; ... handleSubmitOrder()`). There's no auto-reset timer. Is the 3s auto-reset actually desired? If so, it's a NEW behavior not currently implemented. Prompt should clarify.
+
+3. **CV-78 footer height:** Current footer (line 1151) uses same wrapper for both states but:
+   - State A button: `min-h-[44px]` (line 1155)
+   - State B button: `min-h-[44px]` (line 1182)
+   - Same padding `p-4` on wrapper
+   Heights should be identical. **Potentially already OK.** But the prompt should specify: verify and confirm, or identify specific height difference to fix. As written, it's vague.
+
+**Verdict: Fix 5 (CV-76): ISSUE — Already implemented. Mark [VERIFY ONLY]. The 3s auto-reset on error is a new behavior — clarify if desired. Fix 5 (CV-78): OK — but specify it as [VERIFY ONLY] since heights appear identical.**
+
+---
+
+## Additional Issues Found
+
+### A1: DECISIONS_INDEX.md does not exist
+The prompt references `DECISIONS_INDEX.md §2` for CV-70..CV-80 FROZEN UX decisions. This file does NOT exist in the repo (`find . -name "DECISIONS_INDEX*"` = 0 hits). Implementor cannot verify frozen decisions against source of truth.
+
+### A2: CartView BUGS.md location
+Prompt references `menuapp-code-review/pages/CartView/BUGS.md`. Actual BUGS.md is at `pages/PublicMenu/BUGS.md`. There is no `pages/CartView/` directory.
+
+### A3: Mockup HTML file path
+Prompt references `ux-concepts/CartView/260408-05 CartView Drawer Mockup v9 S244.html`. This file does NOT exist in `ux-concepts/CartView/` (only 3 files there, all .md). If the mockup is authoritative ("mockup wins"), it must be present.
+
+### A4: Component architecture mismatch
+CartView.jsx is a PROP-DRIVEN child component (receives 60+ props including `onClose`, `cart`, `isSubmitting`, `handleSubmitOrder`). It does NOT:
+- Manage drawer open/close
+- Control when it becomes visible
+- Have access to "add to cart" trigger
+- Have a "success screen" (just a button label change)
+
+Fixes 1, 3 (success screen part), and 4 ALL require changes in the PARENT component. The prompt must identify the parent file. Likely: `pages/PublicMenu/PublicMenu.jsx` or similar.
+
+### A5: `tr()` vs `t()` inconsistency
+Prompt says "All new user-visible strings MUST use `tr(key, fallback)`, NOT `t(key)`". The component receives `t` as a prop (line 20). But all existing calls use `tr()` (not `t()`). Need to clarify: is `tr` defined inside the component or imported? Quick check: `tr` is NOT in the props list (line 16-82). It's likely a global or imported function. The prompt should verify `tr` is available in scope and not something that needs importing.
+
+---
+
+## FROZEN UX Completeness Check
+
+CV-70 through CV-80 are all listed. However:
+- CV-74: Listed as "do NOT implement" — OK
+- CV-75: Listed as "do NOT implement" — OK
+- CV-77: Listed as "reference only" — OK
+- CV-79: Listed as "reference only" — OK
+- CV-80: Listed as "reference only" — OK
+- **Missing: No CV-76 error auto-reset behavior is specified in FROZEN UX table, but Fix 5 introduces 3s auto-reset. Is this frozen or open?**
+
+---
+
+## Reviewer Checklist Answers
+
+1. **Fix descriptions unambiguous?** NO — Fix 1 and Fix 4 target wrong file scope. Fix 2 describes adding code that already exists. Fix 3 success screen is new feature without JSX spec. Fix 5 CV-76 already implemented.
+
+2. **Grep patterns cover all variants?** NO — (a) All greps target wrong file path. (b) Fix 3 "0 hits for Заказать ещё" will false-match line 903. (c) Fix 1 grep for `isOpen|drawerOpen|onOpen` will return 0 hits (none exist in CartView.jsx).
+
+3. **Fix 5 CV-76: existing isSubmitting?** YES — `isSubmitting` prop exists (line 47) AND `submitPhase` state machine exists (line 115). Double-tap prevention is fully implemented. Mark [VERIFY ONLY].
+
+4. **Fix 4 setTimeout cleanup (PQ-101)?** YES, described in prompt. But placement unclear due to parent-file dependency.
+
+5. **Fix 3 "Заказать ещё" grep — OOS tab clash?** YES — line 903 has Russian text containing "заказать ещё" (lowercase) in a non-CTA context. Grep will match.
+
+6. **FROZEN UX complete?** YES for CV-70..CV-80, all listed. Minor: CV-76 error auto-reset not explicitly frozen.
+
+7. **Scope Lock sufficient?** YES for CartView.jsx, but INSUFFICIENT because Fixes 1/3/4 require parent file changes not mentioned in scope.
+
+---
+
+## Prompt Clarity Score
+
+## ⛔ Prompt Clarity: 2/5
+
+**Rationale:** The prompt has a CRITICAL file path error throughout (wrong path), correctly identifies real UX issues, but several fixes target code that (a) doesn't exist in the target file (drawer state), (b) is already implemented (double-tap), or (c) requires a new feature without sufficient JSX spec (success screen). The component's prop-driven architecture means 3 of 5 fixes need parent-file changes not addressed in the prompt. The Fix descriptions read as if CartView owns the drawer lifecycle, which it does not.
+
+**Before this prompt can be used for implementation:**
+1. Fix the file path everywhere
+2. Identify the parent component (drawer host) and add it to scope
+3. Mark Fix 5 CV-76 as [VERIFY ONLY]
+4. Rewrite Fix 2 to focus on stopPropagation (the actual bug), not adding already-present code
+5. Specify Fix 3 success screen JSX structure and placement
+6. Verify DECISIONS_INDEX.md and mockup HTML exist or remove references
+7. Clarify pulse animation approach within Tailwind-only constraint

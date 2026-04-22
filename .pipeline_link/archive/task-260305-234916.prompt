@@ -1,0 +1,77 @@
+IMPORTANT: Your VERY FIRST action must be: echo "started $(date -Iseconds)" > "C:/Users/ASUS/OneDrive/002 Menu/Claude AI Cowork/pipeline/started-task-260305-234916.md" — this confirms to Cowork that you started working.
+
+
+=== TASK SETUP ===
+Progress file: C:/Users/ASUS/OneDrive/002 Menu/Claude AI Cowork/pipeline/progress-task-260305-234916.txt
+Task ID: task-260305-234916
+=== END TASK SETUP ===
+
+
+---
+task: rewrite-task-watcher-python-s83
+type: infrastructure
+budget: "$15"
+priority: P1
+page: scripts
+---
+
+# Задача: Переписать task-watcher.sh на Python
+
+## Контекст
+
+`scripts/task-watcher.sh` — bash-скрипт, который автоматически подхватывает задачи из `pipeline/queue/` и запускает их через Claude Code CLI. За 20 сессий (S63–S82) скрипт прошёл 6 версий (v3.1 → v4.8), каждая чинила баг предыдущей:
+- v3.1: парсинг бюджета (кавычки+$ ломали bash)
+- v4.0: баг параллельного запуска (ждал любой .done файл, не конкретный)
+- v4.4→v4.5: syntax error в nohup (unescaped `"` внутри `bash -c "..."`)
+- v4.6→v4.7: heartbeat тихое обновление
+- v4.8: heartbeat editMessageText
+- S82 баг: TG [DONE] уведомление теряется при рестарте ПК
+
+Bash усложнился до предела: парсинг YAML frontmatter, JSON для Telegram API, PID management, файловые сигналы — всё на string manipulation.
+
+## Что делает task-watcher
+
+1. **Watch** `pipeline/queue/` на новые `.md` файлы
+2. **Parse** YAML frontmatter: task, type, budget, priority, page
+3. **Run** Claude Code CLI headless: `claude -p "..." --allowedTools ...`
+4. **Signal** прогресс через файлы: `pipeline/started-*`, `pipeline/progress-*`, `pipeline/result-*`
+5. **Telegram** уведомления: START, heartbeat (каждые 3 мин), DONE (с $ и время)
+6. **Move** completed task from queue/ (или mark as done)
+7. **Sequential** — одна задача за раз, следующая подхватывается автоматически
+
+## Acceptance Criteria
+
+1. Python скрипт `scripts/task-watcher.py` делает ВСЁ что делает bash-версия
+2. JSON конфиг вместо парсинга `$` и кавычек в bash
+3. Нормальная обработка ошибок (try/except, не `set -e`)
+4. PID файл (`pipeline/.task-watcher.pid`) — решает баг S82 с рестартом ПК
+5. Heartbeat через editMessageText (не sendMessage) — как v4.8
+6. [DONE] уведомление надёжное: даже если процесс убит, при следующем запуске отправляет [DONE] для незавершённых задач
+7. Логирование в файл `pipeline/task-watcher.log`
+8. Обратная совместимость: те же файлы-сигналы (`started-*`, `progress-*`, `result-*`)
+9. Запуск: `python scripts/task-watcher.py` (Python 3.13.0 уже установлен)
+10. Тесты не требуются в первой версии, но код должен быть модульным
+
+## Файлы для анализа
+
+- `scripts/task-watcher.sh` — текущая bash-версия (изучить логику)
+- `scripts/run-vsc-task.sh` — скрипт запуска задач (вызывается из watcher)
+- `PIPELINE.md` — документация pipeline
+- `pipeline/queue/*.md` — примеры заданий (формат frontmatter)
+
+## RELEASE
+
+`scripts/task-watcher.py` (новый файл)
+`scripts/task-watcher-config.json` (конфиг: telegram token, chat_id, paths)
+
+## Note для CC+Codex
+
+Это рефакторинг, не новая функциональность. Логика один-в-один как в bash, но на Python.
+Ключевые улучшения:
+- `json` для конфига и Telegram API (вместо curl + string interpolation)
+- `subprocess` для Claude Code CLI (вместо nohup + bash -c)
+- `pathlib` для файловых операций
+- `signal` handler для graceful shutdown (отправить [DONE] при SIGTERM)
+- `fcntl.flock` или PID файл для предотвращения двойного запуска
+
+НЕ менять: формат файлов-сигналов, формат заданий в queue/, формат YAML frontmatter.

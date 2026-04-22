@@ -1,0 +1,107 @@
+# PSSK v2 Review: SOM Batch A КС Prompt — Final Analysis
+
+Task: task-260414-042356 | Session: S266 | Date: 2026-04-14
+Reviewers: CC (Claude Code) + Codex (independent)
+Source verified: staffordersmobile.jsx = 260413-00 RELEASE = 4524 lines (identical, diff confirmed)
+
+---
+
+## Fix Ratings
+
+### Fix 1 — Guest counter (SOM-S256-02 / #293) — RATING: ⚠️ Needs clarification (3.5/5)
+
+VERIFIED CORRECT:
+- B1 line numbers: 670, 680, 708 — MATCH
+- B3 line numbers: 1281, 1291, 1319 — MATCH
+- B6 line numbers: 2331, 2333, 2335, 2337 — MATCH
+- `getLinkId(o.guest)` pattern exists in codebase (lines 1563, 1965) — VALID
+- `new Set` approach for unique guests — CORRECT
+
+ISSUES TO FIX:
+1. Header says "6 EXACT PLACES in three render branches" but actual count is 10 (6 in B1+B3, 4 in B6). Fix the header.
+2. B6 uses hardcoded Russian strings ("гость"/"гостя"/"гостей"), NOT `HALL_UI_TEXT.guests`. Grep verification `grep -n "HALL_UI_TEXT.guests"` will MISS B6. Add: `grep -n 'pluralRu.*гост' staffordersmobile.jsx`
+3. The AFTER pattern computes `new Set(...)` twice. Make `uniqueGuests(orders)` helper REQUIRED, not "recommendation."
+4. Fix1+Fix4 interaction at lines 680/1291: prompt notes "after Fix4 this place is removed" — add explicit sequencing: "Apply Fix1 first, Fix4 will remove the wrapper but keep the per-section guest count."
+
+ACTION: Fix items 1-4, then rating becomes ✅ (4.5/5).
+
+---
+
+### Fix 2 — Table card disappears (SOM-S256-04 / #296) — RATING: ⚠️ Needs clarification (3/5)
+
+VERIFIED CORRECT:
+- activeOrders filter line 3539-3540 — EXACT MATCH
+- filteredGroups lines 3792-3801 — EXACT MATCH
+- tabCounts lines 3804-3818 — EXACT MATCH
+- closeSession exists at components/sessionHelpers.js:158 — CONFIRMED
+- Proposed code for closeSession bulk-close — SYNTACTICALLY VALID
+
+CRITICAL ISSUE:
+**closeSession is NOT used only in SOM.** `partnertables/260301-00 partnertables RELEASE.js` imports and calls `closeSession(id)` at lines 61 and 1981.
+
+The prompt says: "closeSession is used ONLY in SOM (verified grep 2026-04-14)" — THIS IS FALSE.
+
+Impact: When admin closes a table from partnertables, ALL orders of that session will now be bulk-set to status:'closed'. This is likely SAFE (desired behavior), but the prompt MUST:
+(a) Acknowledge partnertables usage explicitly
+(b) Assert safety ("closing orders when closing table from admin is also correct")
+(c) Add partnertables to regression check list
+
+OTHER ISSUES:
+1. Change 3 — "Decision for implementor" for filteredGroups is underspecified. КС prompt must provide ONE clear approach with exact code, not leave it as an architecture decision.
+2. `tabCounts` update (lines 3804-3818) is mentioned but not given explicit code. Provide the exact hasServedButNotClosed logic for both filteredGroups and tabCounts.
+
+ACTION: Fix the closeSession claim + specify filteredGroups/tabCounts code explicitly. Then rating becomes ✅ (4/5).
+
+---
+
+### Fix 3 — Star badge stopPropagation (SOM-S256-05 / #297) — RATING: ✅ Clear (5/5)
+
+VERIFIED CORRECT:
+- Line 2250-2252: ★ mine badge — plain `<div>`, no onClick — CONFIRMED
+- Line 2259-2262: ☆ free badge — plain `<div>`, no onClick — CONFIRMED
+- Line 2255: 🔒 other badge — already has stopPropagation via `<button>` — CONFIRMED
+- Fix is minimal: add `onClick={(e) => e.stopPropagation()}` to 2 divs
+- No scope creep risk
+
+NO CHANGES NEEDED. Ready for implementation.
+
+---
+
+### Fix 4 — Remove "В РАБОТЕ" wrapper (SOM-S235-03 / #271) — RATING: ⚠️ Needs clarification (3.5/5)
+
+VERIFIED CORRECT:
+- B1 lines 677-703 (wrapper with inProgressExpanded) — EXACT MATCH
+- B2 lines 761-769 (legacy card wrapper) — EXACT MATCH
+- B3 lines 1288-1314 (mirror of B1) — EXACT MATCH
+- B4 lines 1374-1398 (mirror of B2) — EXACT MATCH
+- inProgressExpanded state (line 1780) — CONFIRMED still used on line 2346 (legacy) — KEEP
+- B6 line 2333 reference model — CONFIRMED correct pattern
+- Grep expectations (4-5 hits after fix) — CORRECT (will be 4: 1780, 1816, 1823, 2346)
+
+ISSUES TO FIX:
+1. B2/B4 use `subGroups.map(...)` while B1/B3/B6 use `inProgressSections.map(...)`. These are different: `inProgressSections` (line 2035) derives from `subGroups` and adds `label`, `rowCount`, `bulkLabel`, `rows`. The prompt should SPECIFY that B2/B4 should switch from `subGroups` to `inProgressSections` for consistency with B6 reference.
+2. B2 has a special case: `if (subGroups.length === 1) return <div key={sid}>...orders.map(renderLegacyOrderCard)...</div>` (line 767). What happens to this shortcut when switching to inProgressSections? Should be preserved or dropped? Specify.
+
+ACTION: Clarify B2/B4 data source migration (subGroups -> inProgressSections). Then rating becomes ✅ (4/5).
+
+---
+
+## Summary Table
+
+| Fix | Issue | Rating | Score | Blocker? |
+|-----|-------|--------|-------|----------|
+| Fix 1 | Guest counter | ⚠️ Needs clarification | 3.5/5 | No — minor edits |
+| Fix 2 | Table disappears | ⚠️ Needs clarification | 3/5 | **Yes — closeSession claim is wrong** |
+| Fix 3 | Star badge | ✅ Clear | 5/5 | No |
+| Fix 4 | В РАБОТЕ wrapper | ⚠️ Needs clarification | 3.5/5 | No — minor edits |
+
+## Verdict
+
+**NOT READY for implementation КС.** Fix2 has a factual error (closeSession usage) that could cause a regression in partnertables. Fix1 and Fix4 need minor clarifications that can be done quickly.
+
+### Required changes before implementation round:
+1. **Fix2:** Correct the closeSession claim, add partnertables to regression check, provide explicit filteredGroups/tabCounts code
+2. **Fix1:** Fix header count (6→10), add B6 grep pattern, make uniqueGuests helper required
+3. **Fix4:** Specify B2/B4 should use inProgressSections not subGroups
+
+### Estimated effort to reach ≥4/5 on all fixes: ~30 min of prompt editing.

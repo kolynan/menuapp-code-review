@@ -1,0 +1,963 @@
+OpenAI Codex v0.115.0 (research preview)
+--------
+workdir: C:/Dev/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d0e62-6ff8-7d22-9ea2-f1e96fdf1390
+--------
+user
+Review the file pages/TestPage/base/*.jsx for bugs in a React restaurant QR-menu app on Base44 platform. Also check pages/TestPage/README.md and pages/TestPage/BUGS.md for context (ONLY these 3 files, nothing else). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the 3 files above. Do NOT search the repo, do NOT read old findings, do NOT read files outside pages/TestPage/. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. Find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/testpage-260321-081342-codex-findings.md FORMAT: # Codex Writer Findings — TestPage Chain: testpage-260321-081342 ## Findings 1. [P0] Title — Description. FIX: ... 2. [P1] Title — Description. FIX: ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) Do NOT apply fixes — only document findings. === TASK CONTEXT === Review TestPage code in pages/TestPage/base/. Focus on: React best practices, UX bugs, Performance. Update BUGS.md and README.md. git commit and push at the end. === END ===
+mcp startup: no servers
+codex
+Reviewing only the specified TestPage files and nothing else. I’m reading the JSX in `pages/TestPage/base/` plus `pages/TestPage/README.md` and `pages/TestPage/BUGS.md`, then I’ll write a concise findings file without applying code fixes.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/TestPage/BUGS.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/TestPage/base' -Filter *.jsx | Select-Object -ExpandProperty FullName" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/TestPage/README.md'" in C:/Dev/menuapp-code-review2026-03-21T03:14:49.236552Z ERROR codex_core::exec: exec error: windows sandbox: CreateProcessWithLogonW failed: 1056
+ exited -1 in 0ms:
+execution error: Io(Custom { kind: Other, error: "windows sandbox: CreateProcessWithLogonW failed: 1056" })
+ succeeded in 9.40s:
+# TestPage â€” Known Bugs
+
+## Review 2026-03-20 (`testpage-260320-203824`)
+- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+- **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
+- **[P2] Async callbacks are not fully unmount-safe** (lines 17-31, 34-45) - `AbortController` cleanup exists, but resolved promise callbacks can still update state after unmount or after a newer request starts. Suggested fix: add a mounted or request-token guard around state updates.
+- **[P3] Silent payload filtering hides backend issues** (lines 24, 82) - Invalid rows are dropped and can fall through to the `no_items` empty state instead of surfacing bad payloads. Suggested fix: convert malformed rows into an error or warning path.
+- **[P3] Delete has no confirmation or undo** (lines 87-90) - A single tap removes an item immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
+
+## Fixed
+- **[P0] Missing await on response.json()** (line ~17) â€” `response.json()` returns a Promise; without `await`, `setItems` receives a Promise object instead of data. Fixed: added `await`.
+- **[P1] No error handling in fetchItems** (line ~15) â€” Network errors crash silently, `loading` stays true forever. Fixed: added try/catch/finally.
+- **[P1] No error handling in deleteItem** (line ~23) â€” Failed DELETE removes item from UI optimistically with no rollback. Fixed: added try/catch, check `res.ok`.
+
+- **[P1] Hardcoded user-facing strings** (lines 36,40,44) â€” No i18n. Fixed: added useI18n, replaced with t() keys.
+- **[P1] Stale closure in deleteItem** (line 30) â€” `setItems(items.filter(...))` loses concurrent deletes. Fixed: functional updater `setItems(prev => ...)`.
+- **[P1] No response.ok check in fetchItems** (line 17) â€” Non-2xx responses treated as success. Fixed: added `if (!response.ok) throw`.
+- **[P2] Inline styles instead of Tailwind** (line 39) â€” `style={{ padding: 16 }}`. Fixed: replaced with `className="p-4"`.
+- **[P2] console.error in production** (lines 20,32) â€” No user feedback. Fixed: removed console.error, added error state display.
+- **[P2] No minimum touch target for Delete** (line 44) â€” Below 44x44px. Fixed: added min-h/min-w classes.
+ exited 124 in 15.59s:
+
+codex
+I have `BUGS.md` content. Next I’m reading the exact JSX file list under `pages/TestPage/base/` and the local `README.md`; I’m not scanning beyond that folder.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/TestPage/base' -Filter *.jsx -Name" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/TestPage/README.md'" in C:/Dev/menuapp-code-review succeeded in 684ms:
+testpage.jsx
+ succeeded in 817ms:
+# TestPage
+
+Fake page for pipeline smoke testing. Contains intentional bugs.
+Not a real MenuApp page â€” safe to modify/delete.
+Review update 2026-03-20 (`testpage-260320-200136`): consensus chain found 4 issues (1 P1, 1 P2, 2 P3). Applied 2 fixes (abort controller cleanup, semantic list markup). 2 P3 notes only.
+Review update 2026-03-20 (`testpage-260320-203824`): writer review found 5 open issues (2 P1, 1 P2, 2 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+<!-- smoke-parallel-v3-testpage -->
+<!-- smoke-parallel-v3-testpage-b -->
+<!-- smoke-d-tp -->
+<!-- smoke-e-tp -->
+<!-- smoke-f-tp -->
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx'" in C:/Dev/menuapp-code-review succeeded in 743ms:
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useI18n } from "@/components/i18n";
+import { Loader2 } from "lucide-react";
+
+// TestPage â€” minimal fake page for pipeline smoke testing
+
+export default function TestPage() {
+  const { t } = useI18n();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorKey, setErrorKey] = useState(null);
+  const abortRef = useRef(null);
+
+  const fetchItems = useCallback((signal) => {
+    setLoading(true);
+    setErrorKey(null);
+    fetch("/api/items", { signal })
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+codex
+I’ve finished reading the three allowed files. I’m consolidating the open issues that still exist in `testpage.jsx`, then I’ll document them in:
+- `pipeline/chain-state/testpage-260321-081342-codex-findings.md`
+- `pages/TestPage/BUGS.md`
+- `pages/TestPage/README.md`
+
+I won’t touch the JSX itself. After that I’ll commit the documentation changes and try the requested push.
+codex
+I have the issue set. I’m pulling exact line numbers from `testpage.jsx` once, then I’ll write the findings file and mirror the same review summary into `BUGS.md` and `README.md`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=0; Get-Content '"'C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx' | ForEach-Object { "'$i++; '"'{0,4}: {1}' -f "'$i, $_ }' in C:/Dev/menuapp-code-review succeeded in 417ms:
+   1: import React, { useState, useEffect, useCallback, useRef } from "react";
+   2: import { useI18n } from "@/components/i18n";
+   3: import { Loader2 } from "lucide-react";
+   4: 
+   5: // TestPage â€” minimal fake page for pipeline smoke testing
+   6: 
+   7: export default function TestPage() {
+   8:   const { t } = useI18n();
+   9:   const [items, setItems] = useState([]);
+  10:   const [loading, setLoading] = useState(true);
+  11:   const [errorKey, setErrorKey] = useState(null);
+  12:   const abortRef = useRef(null);
+  13: 
+  14:   const fetchItems = useCallback((signal) => {
+  15:     setLoading(true);
+  16:     setErrorKey(null);
+  17:     fetch("/api/items", { signal })
+  18:       .then(res => {
+  19:         if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  20:         return res.json();
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'" in C:/Dev/menuapp-code-review succeeded in 374ms:
+True
+codex
+I’m writing the review artifacts now. These are documentation-only edits: new chain findings file plus a short synced entry in `BUGS.md` and `README.md`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'C:/Dev/menuapp-code-review/pages/TestPage/BUGS.md' -TotalCount 6" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'C:/Dev/menuapp-code-review/pages/TestPage/README.md' -TotalCount 8" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state/testpage-260321-081342-codex-findings.md'" in C:/Dev/menuapp-code-review succeeded in 426ms:
+# TestPage â€” Known Bugs
+
+## Review 2026-03-20 (`testpage-260320-203824`)
+- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+- **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
+- **[P2] Async callbacks are not fully unmount-safe** (lines 17-31, 34-45) - `AbortController` cleanup exists, but resolved promise callbacks can still update state after unmount or after a newer request starts. Suggested fix: add a mounted or request-token guard around state updates.
+ succeeded in 422ms:
+False
+ succeeded in 449ms:
+# TestPage
+
+Fake page for pipeline smoke testing. Contains intentional bugs.
+Not a real MenuApp page â€” safe to modify/delete.
+Review update 2026-03-20 (`testpage-260320-200136`): consensus chain found 4 issues (1 P1, 1 P2, 2 P3). Applied 2 fixes (abort controller cleanup, semantic list markup). 2 P3 notes only.
+Review update 2026-03-20 (`testpage-260320-203824`): writer review found 5 open issues (2 P1, 1 P2, 2 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+<!-- smoke-parallel-v3-testpage -->
+<!-- smoke-parallel-v3-testpage-b -->
+codex
+The first patch attempt failed on context matching in `BUGS.md`; I’m retrying with narrower patches so I don’t touch unrelated content.
+file update
+A C:/Dev/menuapp-code-review/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+# Codex Writer Findings — TestPage
+Chain: testpage-260321-081342
+
+## Findings
+1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
+2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
+3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
+4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
+5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
+6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
+
+## Summary
+Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+apply_patch(auto_approved=true) exited 0 in 511ms:
+Success. Updated the following files:
+A C:/Dev/menuapp-code-review/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+file update:
+diff --git a/pipeline/chain-state/testpage-260321-081342-codex-findings.md b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8198ac210ec7027ca6b1c35b06e4ba9073bf1934
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-081342
++
++## Findings
++1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
++2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
++3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
++4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
++5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
++6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+file update:
+diff --git a/pipeline/chain-state/testpage-260321-081342-codex-findings.md b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8198ac210ec7027ca6b1c35b06e4ba9073bf1934
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-081342
++
++## Findings
++1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
++2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
++3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
++4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
++5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
++6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+file update:
+diff --git a/pipeline/chain-state/testpage-260321-081342-codex-findings.md b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8198ac210ec7027ca6b1c35b06e4ba9073bf1934
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-081342
++
++## Findings
++1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
++2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
++3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
++4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
++5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
++6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+file update:
+diff --git a/pipeline/chain-state/testpage-260321-081342-codex-findings.md b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8198ac210ec7027ca6b1c35b06e4ba9073bf1934
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-081342
++
++## Findings
++1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
++2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
++3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
++4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
++5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
++6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+file update
+M C:/Dev/menuapp-code-review/pages/TestPage/BUGS.md
+@@ -2,2 +2,10 @@
+ 
++## Review 2026-03-21 (`testpage-260321-081342`)
++- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
++- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
++- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
++- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
++- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
++- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
++
+ ## Review 2026-03-20 (`testpage-260320-203824`)
+apply_patch(auto_approved=true) exited 0 in 199ms:
+Success. Updated the following files:
+M C:/Dev/menuapp-code-review/pages/TestPage/BUGS.md
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index e5e171f063929d857c7635f579fc98f914dbec12..d5887375dd629c46deaeac29144f5c3a14520ccc
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -1,5 +1,13 @@
+ # TestPage — Known Bugs
+ 
++## Review 2026-03-21 (`testpage-260321-081342`)
++- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
++- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
++- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
++- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
++- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
++- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
++
+ ## Review 2026-03-20 (`testpage-260320-203824`)
+ - **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+ - **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
+diff --git a/pipeline/chain-state/testpage-260321-081342-codex-findings.md b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8198ac210ec7027ca6b1c35b06e4ba9073bf1934
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-081342
++
++## Findings
++1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
++2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
++3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
++4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
++5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
++6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index e5e171f063929d857c7635f579fc98f914dbec12..d5887375dd629c46deaeac29144f5c3a14520ccc
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -1,5 +1,13 @@
+ # TestPage — Known Bugs
+ 
++## Review 2026-03-21 (`testpage-260321-081342`)
++- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
++- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
++- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
++- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
++- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
++- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
++
+ ## Review 2026-03-20 (`testpage-260320-203824`)
+ - **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+ - **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
+diff --git a/pipeline/chain-state/testpage-260321-081342-codex-findings.md b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8198ac210ec7027ca6b1c35b06e4ba9073bf1934
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-081342
++
++## Findings
++1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
++2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
++3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
++4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
++5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
++6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+file update
+M C:/Dev/menuapp-code-review/pages/TestPage/README.md
+@@ -6,3 +6,4 @@
+ Review update 2026-03-20 (`testpage-260320-203824`): writer review found 5 open issues (2 P1, 1 P2, 2 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-21 (`testpage-260321-081342`): writer review found 6 open issues (2 P1, 3 P2, 1 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+apply_patch(auto_approved=true) exited 0 in 240ms:
+Success. Updated the following files:
+M C:/Dev/menuapp-code-review/pages/TestPage/README.md
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index e5e171f063929d857c7635f579fc98f914dbec12..d5887375dd629c46deaeac29144f5c3a14520ccc
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -1,5 +1,13 @@
+ # TestPage — Known Bugs
+ 
++## Review 2026-03-21 (`testpage-260321-081342`)
++- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
++- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
++- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
++- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
++- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
++- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
++
+ ## Review 2026-03-20 (`testpage-260320-203824`)
+ - **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+ - **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 07481c8f6737b3ea91579bc2eacd9faaa83ae0cc..fca86e4640e9194b1b2ba0fe27125cef42f005ae
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -4,7 +4,8 @@
+ Not a real MenuApp page — safe to modify/delete.
+ Review update 2026-03-20 (`testpage-260320-200136`): consensus chain found 4 issues (1 P1, 1 P2, 2 P3). Applied 2 fixes (abort controller cleanup, semantic list markup). 2 P3 notes only.
+ Review update 2026-03-20 (`testpage-260320-203824`): writer review found 5 open issues (2 P1, 1 P2, 2 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-21 (`testpage-260321-081342`): writer review found 6 open issues (2 P1, 3 P2, 1 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260321-081342-codex-findings.md b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8198ac210ec7027ca6b1c35b06e4ba9073bf1934
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-081342
++
++## Findings
++1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
++2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
++3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
++4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
++5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
++6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index e5e171f063929d857c7635f579fc98f914dbec12..d5887375dd629c46deaeac29144f5c3a14520ccc
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -1,5 +1,13 @@
+ # TestPage — Known Bugs
+ 
++## Review 2026-03-21 (`testpage-260321-081342`)
++- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
++- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
++- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
++- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
++- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
++- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
++
+ ## Review 2026-03-20 (`testpage-260320-203824`)
+ - **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+ - **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 07481c8f6737b3ea91579bc2eacd9faaa83ae0cc..fca86e4640e9194b1b2ba0fe27125cef42f005ae
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -4,7 +4,8 @@
+ Not a real MenuApp page — safe to modify/delete.
+ Review update 2026-03-20 (`testpage-260320-200136`): consensus chain found 4 issues (1 P1, 1 P2, 2 P3). Applied 2 fixes (abort controller cleanup, semantic list markup). 2 P3 notes only.
+ Review update 2026-03-20 (`testpage-260320-203824`): writer review found 5 open issues (2 P1, 1 P2, 2 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-21 (`testpage-260321-081342`): writer review found 6 open issues (2 P1, 3 P2, 1 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260321-081342-codex-findings.md b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8198ac210ec7027ca6b1c35b06e4ba9073bf1934
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-081342
++
++## Findings
++1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
++2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
++3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
++4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
++5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
++6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+codex
+The documentation files are updated. I’m verifying the written findings and the exact diff now, then I’ll make the requested git commit and attempt a push.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pipeline/chain-state/testpage-260321-081342-codex-findings.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git status --short' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -TotalCount 8 'C:/Dev/menuapp-code-review/pages/TestPage/README.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -TotalCount 12 'C:/Dev/menuapp-code-review/pages/TestPage/BUGS.md'" in C:/Dev/menuapp-code-review succeeded in 478ms:
+# Codex Writer Findings â€” TestPage
+Chain: testpage-260321-081342
+
+## Findings
+1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
+2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
+3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
+4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
+5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
+6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
+
+## Summary
+Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+ succeeded in 463ms:
+# TestPage
+
+Fake page for pipeline smoke testing. Contains intentional bugs.
+Not a real MenuApp page â€” safe to modify/delete.
+Review update 2026-03-20 (`testpage-260320-200136`): consensus chain found 4 issues (1 P1, 1 P2, 2 P3). Applied 2 fixes (abort controller cleanup, semantic list markup). 2 P3 notes only.
+Review update 2026-03-20 (`testpage-260320-203824`): writer review found 5 open issues (2 P1, 1 P2, 2 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+Review update 2026-03-21 (`testpage-260321-081342`): writer review found 6 open issues (2 P1, 3 P2, 1 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+<!-- smoke-parallel-v3-testpage -->
+ succeeded in 482ms:
+ M "pages/MenuManage/260306-00 menumanage RELEASE.jsx"
+ M pages/PageHelpButton/PageHelpButton_v1.1_BASE.jsx
+ M pages/PartnerShell/PartnerShell_v1.0_BASE.jsx
+ D "pages/PublicMenu/260302-06 useTableSession RELEASE.jsx"
+ D "pages/PublicMenu/260305-02 MenuView RELEASE.jsx"
+ D "pages/PublicMenu/260305-03 CartView RELEASE.jsx"
+ D "pages/PublicMenu/260306-01 x RELEASE.jsx"
+ M pages/PublicMenu/base/x.jsx.bak
+ M pages/TestPage/BUGS.md
+ M pages/TestPage/README.md
+ M scripts/__pycache__/task-watcher.cpython-313.pyc
+ M scripts/task-watcher-config.json
+ M scripts/task-watcher.py
+?? AGENTS.md
+?? menuapp-code-review/
+?? "pages/PartnerContacts/versions/260301-01 partnercontacts RELEASE.jsx"
+?? pages/Profile/commands_2026-03-16.log
+?? pages/Profile/commands_2026-03-18.log
+?? pages/Profile/review_2026-03-16.md
+?? pages/Profile/review_2026-03-18.md
+ succeeded in 531ms:
+# TestPage â€” Known Bugs
+
+## Review 2026-03-21 (`testpage-260321-081342`)
+- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
+- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
+- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
+- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
+- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
+- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
+
+## Review 2026-03-20 (`testpage-260320-203824`)
+- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index e5e171f063929d857c7635f579fc98f914dbec12..d5887375dd629c46deaeac29144f5c3a14520ccc
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -1,5 +1,13 @@
+ # TestPage — Known Bugs
+ 
++## Review 2026-03-21 (`testpage-260321-081342`)
++- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
++- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
++- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
++- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
++- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
++- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
++
+ ## Review 2026-03-20 (`testpage-260320-203824`)
+ - **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+ - **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 07481c8f6737b3ea91579bc2eacd9faaa83ae0cc..fca86e4640e9194b1b2ba0fe27125cef42f005ae
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -4,7 +4,8 @@
+ Not a real MenuApp page — safe to modify/delete.
+ Review update 2026-03-20 (`testpage-260320-200136`): consensus chain found 4 issues (1 P1, 1 P2, 2 P3). Applied 2 fixes (abort controller cleanup, semantic list markup). 2 P3 notes only.
+ Review update 2026-03-20 (`testpage-260320-203824`): writer review found 5 open issues (2 P1, 1 P2, 2 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-21 (`testpage-260321-081342`): writer review found 6 open issues (2 P1, 3 P2, 1 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260321-081342-codex-findings.md b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8198ac210ec7027ca6b1c35b06e4ba9073bf1934
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-081342
++
++## Findings
++1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
++2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
++3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
++4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
++5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
++6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "git diff -- 'pages/TestPage/README.md' 'pages/TestPage/BUGS.md' 'pipeline/chain-state/testpage-260321-081342-codex-findings.md'" in C:/Dev/menuapp-code-review succeeded in 394ms:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index e5e171f..d588737 100644
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -1,5 +1,13 @@
+ # TestPage — Known Bugs
+ 
++## Review 2026-03-21 (`testpage-260321-081342`)
++- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
++- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
++- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
++- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
++- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
++- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
++
+ ## Review 2026-03-20 (`testpage-260320-203824`)
+ - **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+ - **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 07481c8..fca86e4 100644
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index e5e171f063929d857c7635f579fc98f914dbec12..d5887375dd629c46deaeac29144f5c3a14520ccc
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -1,5 +1,13 @@
+ # TestPage — Known Bugs
+ 
++## Review 2026-03-21 (`testpage-260321-081342`)
++- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
++- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
++- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
++- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
++- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
++- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
++
+ ## Review 2026-03-20 (`testpage-260320-203824`)
+ - **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+ - **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 07481c8f6737b3ea91579bc2eacd9faaa83ae0cc..fca86e4640e9194b1b2ba0fe27125cef42f005ae
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -4,7 +4,8 @@
+ Not a real MenuApp page — safe to modify/delete.
+ Review update 2026-03-20 (`testpage-260320-200136`): consensus chain found 4 issues (1 P1, 1 P2, 2 P3). Applied 2 fixes (abort controller cleanup, semantic list markup). 2 P3 notes only.
+ Review update 2026-03-20 (`testpage-260320-203824`): writer review found 5 open issues (2 P1, 1 P2, 2 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-21 (`testpage-260321-081342`): writer review found 6 open issues (2 P1, 3 P2, 1 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260321-081342-codex-findings.md b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8198ac210ec7027ca6b1c35b06e4ba9073bf1934
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-081342
++
++## Findings
++1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
++2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
++3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
++4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
++5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
++6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+codex
+The repo has many unrelated changes, so I’m isolating this to just the three review artifacts before committing. No page code is being staged.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "git add -- 'pages/TestPage/README.md' 'pages/TestPage/BUGS.md' 'pipeline/chain-state/testpage-260321-081342-codex-findings.md' && git commit -m \"Add TestPage 2026-03-21 review findings\"" in C:/Dev/menuapp-code-review exited 1 in 385ms:
+At line:2 char:128
++ ... line/chain-state/testpage-260321-081342-codex-findings.md' && git com ...
++                                                                ~~
+The token '&&' is not a valid statement separator in this version.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : InvalidEndOfLine
+ 
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index e5e171f063929d857c7635f579fc98f914dbec12..d5887375dd629c46deaeac29144f5c3a14520ccc
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -1,5 +1,13 @@
+ # TestPage — Known Bugs
+ 
++## Review 2026-03-21 (`testpage-260321-081342`)
++- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
++- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
++- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
++- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
++- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
++- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
++
+ ## Review 2026-03-20 (`testpage-260320-203824`)
+ - **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+ - **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 07481c8f6737b3ea91579bc2eacd9faaa83ae0cc..fca86e4640e9194b1b2ba0fe27125cef42f005ae
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -4,7 +4,8 @@
+ Not a real MenuApp page — safe to modify/delete.
+ Review update 2026-03-20 (`testpage-260320-200136`): consensus chain found 4 issues (1 P1, 1 P2, 2 P3). Applied 2 fixes (abort controller cleanup, semantic list markup). 2 P3 notes only.
+ Review update 2026-03-20 (`testpage-260320-203824`): writer review found 5 open issues (2 P1, 1 P2, 2 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-21 (`testpage-260321-081342`): writer review found 6 open issues (2 P1, 3 P2, 1 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260321-081342-codex-findings.md b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8198ac210ec7027ca6b1c35b06e4ba9073bf1934
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-081342
++
++## Findings
++1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
++2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
++3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
++4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
++5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
++6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "git add -- 'pages/TestPage/README.md' 'pages/TestPage/BUGS.md' 'pipeline/chain-state/testpage-260321-081342-codex-findings.md'" in C:/Dev/menuapp-code-review succeeded in 366ms:
+warning: in the working copy of 'pages/TestPage/README.md', CRLF will be replaced by LF the next time Git touches it
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index e5e171f063929d857c7635f579fc98f914dbec12..d5887375dd629c46deaeac29144f5c3a14520ccc
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -1,5 +1,13 @@
+ # TestPage — Known Bugs
+ 
++## Review 2026-03-21 (`testpage-260321-081342`)
++- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
++- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
++- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
++- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
++- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
++- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
++
+ ## Review 2026-03-20 (`testpage-260320-203824`)
+ - **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+ - **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 07481c8f6737b3ea91579bc2eacd9faaa83ae0cc..fca86e4640e9194b1b2ba0fe27125cef42f005ae
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -4,7 +4,8 @@
+ Not a real MenuApp page — safe to modify/delete.
+ Review update 2026-03-20 (`testpage-260320-200136`): consensus chain found 4 issues (1 P1, 1 P2, 2 P3). Applied 2 fixes (abort controller cleanup, semantic list markup). 2 P3 notes only.
+ Review update 2026-03-20 (`testpage-260320-203824`): writer review found 5 open issues (2 P1, 1 P2, 2 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-21 (`testpage-260321-081342`): writer review found 6 open issues (2 P1, 3 P2, 1 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260321-081342-codex-findings.md b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8198ac210ec7027ca6b1c35b06e4ba9073bf1934
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-081342
++
++## Findings
++1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
++2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
++3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
++4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
++5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
++6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git commit -m "Add TestPage 2026-03-21 review findings"' in C:/Dev/menuapp-code-review succeeded in 971ms:
+[main a16e58b] Add TestPage 2026-03-21 review findings
+ 3 files changed, 22 insertions(+)
+ create mode 100644 pipeline/chain-state/testpage-260321-081342-codex-findings.md
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index e5e171f063929d857c7635f579fc98f914dbec12..d5887375dd629c46deaeac29144f5c3a14520ccc
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -1,5 +1,13 @@
+ # TestPage — Known Bugs
+ 
++## Review 2026-03-21 (`testpage-260321-081342`)
++- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
++- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
++- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
++- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
++- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
++- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
++
+ ## Review 2026-03-20 (`testpage-260320-203824`)
+ - **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+ - **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 07481c8f6737b3ea91579bc2eacd9faaa83ae0cc..fca86e4640e9194b1b2ba0fe27125cef42f005ae
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -4,7 +4,8 @@
+ Not a real MenuApp page — safe to modify/delete.
+ Review update 2026-03-20 (`testpage-260320-200136`): consensus chain found 4 issues (1 P1, 1 P2, 2 P3). Applied 2 fixes (abort controller cleanup, semantic list markup). 2 P3 notes only.
+ Review update 2026-03-20 (`testpage-260320-203824`): writer review found 5 open issues (2 P1, 1 P2, 2 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-21 (`testpage-260321-081342`): writer review found 6 open issues (2 P1, 3 P2, 1 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260321-081342-codex-findings.md b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8198ac210ec7027ca6b1c35b06e4ba9073bf1934
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-081342
++
++## Findings
++1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
++2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
++3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
++4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
++5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
++6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+codex
+The findings are committed locally. I’m attempting the requested `git push` next; if the sandbox blocks it, I’ll report that explicitly.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git push' in C:/Dev/menuapp-code-review succeeded in 17.24s:
+To https://github.com/kolynan/menuapp-code-review.git
+   9e4d904..a16e58b  main -> main
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index e5e171f063929d857c7635f579fc98f914dbec12..d5887375dd629c46deaeac29144f5c3a14520ccc
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -1,5 +1,13 @@
+ # TestPage — Known Bugs
+ 
++## Review 2026-03-21 (`testpage-260321-081342`)
++- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
++- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
++- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
++- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
++- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
++- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
++
+ ## Review 2026-03-20 (`testpage-260320-203824`)
+ - **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+ - **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 07481c8f6737b3ea91579bc2eacd9faaa83ae0cc..fca86e4640e9194b1b2ba0fe27125cef42f005ae
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -4,7 +4,8 @@
+ Not a real MenuApp page — safe to modify/delete.
+ Review update 2026-03-20 (`testpage-260320-200136`): consensus chain found 4 issues (1 P1, 1 P2, 2 P3). Applied 2 fixes (abort controller cleanup, semantic list markup). 2 P3 notes only.
+ Review update 2026-03-20 (`testpage-260320-203824`): writer review found 5 open issues (2 P1, 1 P2, 2 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-21 (`testpage-260321-081342`): writer review found 6 open issues (2 P1, 3 P2, 1 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260321-081342-codex-findings.md b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8198ac210ec7027ca6b1c35b06e4ba9073bf1934
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-081342
++
++## Findings
++1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
++2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
++3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
++4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
++5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
++6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+codex
+Reviewed only the requested TestPage files. Findings in [testpage-260321-081342-codex-findings.md](C:/Dev/menuapp-code-review/pipeline/chain-state/testpage-260321-081342-codex-findings.md):
+
+1. [P1] Shallow payload validation can still crash rendering in [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L24) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L86): filtering only by truthy `id` still allows render-unsafe `name` values and bad ids into state.
+2. [P1] i18n keys violate the required Base44 naming format in [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L29) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L64): keys like `test_page.title` do not follow `page.section.element`.
+3. [P2] Async success path is not fully unmount-safe in [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22): resolved callbacks still set state with no mounted/request guard.
+4. [P2] Delete is UI-only in [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48): it removes local state but never calls the backend or handles failure.
+5. [P2] Malformed payload can be shown as an empty menu in [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L24) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L82): bad rows are dropped silently and can fall through to `no_items`.
+6. [P3] Mobile delete UX has no confirmation or undo in [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L87): one tap removes a row immediately.
+
+I also synced the review note into [BUGS.md](C:/Dev/menuapp-code-review/pages/TestPage/BUGS.md) and [README.md](C:/Dev/menuapp-code-review/pages/TestPage/README.md). No fixes were applied to the JSX. Commit `a16e58b` is pushed to `main`.
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index e5e171f063929d857c7635f579fc98f914dbec12..d5887375dd629c46deaeac29144f5c3a14520ccc
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -1,5 +1,13 @@
+ # TestPage — Known Bugs
+ 
++## Review 2026-03-21 (`testpage-260321-081342`)
++- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
++- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
++- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
++- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
++- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
++- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
++
+ ## Review 2026-03-20 (`testpage-260320-203824`)
+ - **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Rows are filtered only by truthy `id`, but `item.name` is rendered directly. If the API returns an object or array in `name`, React will throw during render. Suggested fix: normalize rows before `setItems`, requiring a primitive `id` and string or null `name`.
+ - **[P1] i18n keys violate required naming format** (lines 29, 64, 78, 82, 86, 89, 92) - User-facing keys like `test_page.title` and `test_page.error` do not follow the required `page.section.element` convention. Suggested fix: rename to structured keys and update translations.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 07481c8f6737b3ea91579bc2eacd9faaa83ae0cc..fca86e4640e9194b1b2ba0fe27125cef42f005ae
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -4,7 +4,8 @@
+ Not a real MenuApp page — safe to modify/delete.
+ Review update 2026-03-20 (`testpage-260320-200136`): consensus chain found 4 issues (1 P1, 1 P2, 2 P3). Applied 2 fixes (abort controller cleanup, semantic list markup). 2 P3 notes only.
+ Review update 2026-03-20 (`testpage-260320-203824`): writer review found 5 open issues (2 P1, 1 P2, 2 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-21 (`testpage-260321-081342`): writer review found 6 open issues (2 P1, 3 P2, 1 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260321-081342-codex-findings.md b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8198ac210ec7027ca6b1c35b06e4ba9073bf1934
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-081342-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-081342
++
++## Findings
++1. [P1] Shallow payload validation can still crash rendering - `setItems(data.filter(item => item && item.id))` on line 24 only checks for a truthy `id`. A row with an object/array `name` or non-primitive `id` will still pass, and line 86 then tries to render that value directly, which can throw and break the page. FIX: normalize API rows before storing them, requiring a primitive `id` and a render-safe `name` string or `null`, and reject malformed rows as an error state.
++2. [P1] i18n keys do not follow the required Base44 naming scheme - keys such as `test_page.title`, `test_page.error`, `test_page.no_items`, `test_page.unnamed_item`, and `test_page.delete_item` on lines 29, 64, 82, 86, and 89 are translated, but they do not use the required `page.section.element` structure. FIX: rename them to structured keys such as `test_page.header.title`, `test_page.state.error`, `test_page.state.no_items`, `test_page.item.unnamed`, and `test_page.action.delete_item`.
++3. [P2] Async success path is not fully unmount-safe - the effect aborts active fetches on cleanup, but the resolved `.then()` path on lines 22-25 still calls `setItems` and `setLoading` with no mounted/request guard. A fast unmount or overlapping retry can let stale completion update state after the component should ignore it. FIX: track a mounted flag or request token and skip all state updates from stale completions.
++4. [P2] Delete action is UI-only and does not handle failures - `handleDelete` on lines 48-50 removes the row from local state but never calls the backend, so the item returns on the next fetch and there is no failure path at all. FIX: either wire the button to a real DELETE request with optimistic rollback/error handling, or relabel/remove the action so the UI does not promise persistence it does not perform.
++5. [P2] Invalid payloads can be misreported as an empty menu - line 24 silently drops malformed rows, and line 82 shows `no_items` whenever the filtered list becomes empty. If the backend returns only bad records, the UI looks like a legitimate empty state instead of surfacing a data problem. FIX: detect discarded rows and switch to an explicit error or warning state instead of treating malformed payload as empty data.
++6. [P3] Mobile delete UX is too easy to trigger accidentally - each list row exposes an immediate destructive action on lines 87-90 with no confirmation or undo. In a tap-heavy mobile QR flow, an accidental press removes the row instantly from the screen. FIX: add a confirmation step or an undo snackbar before finalizing the delete state update.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+tokens used
+35 234
+Reviewed only the requested TestPage files. Findings in [testpage-260321-081342-codex-findings.md](C:/Dev/menuapp-code-review/pipeline/chain-state/testpage-260321-081342-codex-findings.md):
+
+1. [P1] Shallow payload validation can still crash rendering in [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L24) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L86): filtering only by truthy `id` still allows render-unsafe `name` values and bad ids into state.
+2. [P1] i18n keys violate the required Base44 naming format in [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L29) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L64): keys like `test_page.title` do not follow `page.section.element`.
+3. [P2] Async success path is not fully unmount-safe in [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22): resolved callbacks still set state with no mounted/request guard.
+4. [P2] Delete is UI-only in [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48): it removes local state but never calls the backend or handles failure.
+5. [P2] Malformed payload can be shown as an empty menu in [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L24) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L82): bad rows are dropped silently and can fall through to `no_items`.
+6. [P3] Mobile delete UX has no confirmation or undo in [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L87): one tap removes a row immediately.
+
+I also synced the review note into [BUGS.md](C:/Dev/menuapp-code-review/pages/TestPage/BUGS.md) and [README.md](C:/Dev/menuapp-code-review/pages/TestPage/README.md). No fixes were applied to the JSX. Commit `a16e58b` is pushed to `main`.

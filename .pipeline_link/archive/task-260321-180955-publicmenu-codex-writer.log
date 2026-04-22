@@ -1,0 +1,829 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Dev/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d1084-4406-7803-8071-fcd5a0bbf71c
+--------
+user
+Review the file pages/PublicMenu/base/*.jsx for bugs in a React restaurant QR-menu app on Base44 platform. Also check pages/PublicMenu/README.md and pages/PublicMenu/BUGS.md for context (ONLY these 3 files, nothing else). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the 3 files above. Do NOT search the repo, do NOT read old findings, do NOT read files outside pages/PublicMenu/. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. Find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260321-173134-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260321-173134 ## Findings 1. [P0] Title — Description. FIX: ... 2. [P1] Title — Description. FIX: ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... Do NOT apply fixes — only document findings. === TASK CONTEXT === # PM-062: Category chips — active chip color indigo → terracotta [L] Reference: `STYLE_GUIDE.md` v3.2, `BUGS_MASTER.md`, `ux-concepts/UX_LOCKED_PublicMenu.md`. --- ## Fix 1 — PM-062 (P3) [MUST-FIX]: Active category chip still indigo ### Сейчас (текущее поведение) Активный чип категории («Все», «Блюдо дня», «Основные блюда» и т.д.) отображается с фоном `bg-indigo-600` (`rgb(79, 70, 229)`) и белым текстом. Скриншот подтверждён: S153 (Batch A+5 TC-1 ❌), S155A (Batch 4 TC-1 ❌). CSS-класс кнопки: `snap-start flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-all bg-indigo-600 text-white`. ### Должно быть (ожидаемое поведение) Активный чип → терракотовый фон `#B5543A` (`rgb(181, 84, 58)`), белый текст. Неактивные чипы → белый/серый фон, серый текст, без изменений. Ref: STYLE_GUIDE.md v3.2 (primary color = `#B5543A`). ### НЕ должно быть (анти-паттерны) - Никаких `indigo`, `purple`, `violet` цветов на чипах категорий. - НЕ менять структуру чипов, их порядок, scroll-поведение, snap-поведение. - НЕ менять неактивные чипы — только active state. ### Файл и локация Проблема в рендере category chips внутри `x.jsx` (главный файл PublicMenu). Искать: компонент/секцию, которая рендерит `<button>` для категорий (Все, Блюдо дня, и т.д.). Текущий active-класс содержит `bg-indigo-600 text-white` — заменить на inline style или Tailwind-эквивалент: ``` style={{ backgroundColor: '#B5543A', color: 'white' }} ``` или: ``` className="... bg-[#B5543A] text-white ..." ``` ⚠️ **ВАЖНО:** Tailwind custom colors `bg-[#B5543A]` работают в B44 (проверено: таб «В зале» = `rgb(181, 84, 58)` через `bg-[#B5543A]`). Предпочтительнее `bg-[#B5543A]` чем inline style. Также проверить: если есть prop `activeColor` или `activeClassName` — использовать его корректно. Если `activeColor` передаётся но игнорируется — найти где игнорируется и применить. ### Уже пробовали 1. Batch 2+3 (chain 260321-093745): КС пометил «architectural» → SKIPPED. 2. Batch A+5 (chain 260321-110752): КС передал `activeColor` prop, но компонент CategoryChips его проигнорировал → partial. KB-077. 3. Batch 4 (chain 260321-140331): задача не включала PM-062 явно (фокус на PM-064). **Урок KB-077:** расплывчатое описание «chips indigo» не помогает. Точная инструкция: найти `bg-indigo-600` в условном классе active-чипа и заменить на `bg-[#B5543A]`. ### Проверка (мини тест-кейс) 1. Открыть `/x?partner=69540a85f2492cff3e46a283&mode=hall&lang=RU` 2. Смотреть чип «Все» (активный по умолчанию) → фон = терракота (#B5543A) 3. Нажать «Блюдо дня» → этот чип = терракота, «Все» = белый/серый 4. JS проверка: `getComputedStyle(activeChip).backgroundColor` === `rgb(181, 84, 58)` --- ## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано выше - Изменяй ТОЛЬКО цвет active-состояния category chips. - ВСЁ остальное (табы В зале/Самовывоз/Доставка, карточки блюд, drawer, stepper, Bottom Sheet) — НЕ ТРОГАТЬ. - Если видишь «проблему» не из этой задачи — ПРОПУСТИ, не чини. - Locked UX decisions: см. `ux-concepts/UX_LOCKED_PublicMenu.md` — ЗАПРЕЩЕНО менять. ## Prompt Clarity _(заполняется CC/Codex writer после выполнения)_ ## Implementation Notes - Файл: `x.jsx` (category chips рендерятся в основном файле, не в ModeTabs) - НЕ ломать: PM-063 (stepper), PM-041 (polling), PM-071 (BS trigger если уже применён) - Ref: STYLE_GUIDE.md v3.2 (primary = #B5543A) - git add pages/PublicMenu/base/x.jsx && git commit -m "PM-062: active chip bg-indigo-600 → bg-[#B5543A] terracotta" && git push === END ===
+mcp startup: no servers
+codex
+Reviewing only the PublicMenu target files now. I’ll read the `.jsx` in `pages/PublicMenu/base/` plus `README.md` and `BUGS.md`, then write the findings file and the required review artifacts without touching anything else.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/PublicMenu/base/*.jsx' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw pages/PublicMenu/BUGS.md' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw pages/PublicMenu/README.md' in C:/Dev/menuapp-code-review exited 124 in 11.14s:
+
+ exited 124 in 11.40s:
+
+ exited 124 in 11.39s:
+
+codex
+The first read attempt hit shell startup timeouts, not a code issue. I’m rerunning the same three targeted reads with a longer timeout and keeping scope locked to `pages/PublicMenu/`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/PublicMenu/base/*.jsx' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw pages/PublicMenu/README.md' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw pages/PublicMenu/BUGS.md' in C:/Dev/menuapp-code-review succeeded in 15.66s:
+CartView.jsx
+CheckoutView.jsx
+MenuView.jsx
+ModeTabs.jsx
+useTableSession.jsx
+x.jsx
+ succeeded in 15.87s:
+---
+version: "29.0"
+updated: "2026-03-21"
+session: 153
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*16 active bugs remaining (0x P0, 8x P1, 5x P2, 2x P3, 1x suggestion).*
+
+### BUG-PM-056: Drawer layout not visit-state-driven (P1 â€” Batch 2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P1
+- **ÐšÐ¾Ð³Ð´Ð°:** S153 (consensus chain publicmenu-260321-093745)
+ succeeded in 15.60s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+codex
+The base folder has multiple JSX files, but the task context is clearly about the main PublicMenu page and the “only these 3 files” constraint. I’m treating the scope as `pages/PublicMenu/base/x.jsx`, `pages/PublicMenu/README.md`, and `pages/PublicMenu/BUGS.md` only.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw pages/PublicMenu/base/x.jsx' in C:/Dev/menuapp-code-review succeeded in 5.96s:
+// ======================================================
+// pages/x.jsx â€” PUBLIC MENU with i18n + Channels Visibility + Gating
+// UPDATED: Simplified Hall logic (TASK-260123-01b)
+// FIXED: P0-1..P0-7 security and functionality fixes
+// UPDATED: TASK-260127-01 - session restore, UI cleanup
+// PATCHED: 2026-01-28 - P0-1, P0-2, P0-2b, P1-1..P1-4
+// PATCHED: 2026-02-01 - FIX-260131-07 FINAL - guest safeguard in submit
+// PATCHED: 2026-02-01 - TASK-260201-01 - Hall StickyBar always visible
+// PATCHED: 2026-03-03 - GAP-01 - Order Confirmation Screen
+// FIXED: 2026-03-03 - GAP-01 fix - Confirmation as full-screen overlay (z-60)
+// FIXED: 2026-03-03 - GAP-02 fix - Embed OrderStatusScreen inside x.jsx (no /orderstatus route)
+// FIXED: 2026-03-03 - GAP-02 fix - Remove auto-dismiss timer (race condition: ghost click on menu)
+// ======================================================
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { useI18n } from "@/components/i18n";
+import { toast } from "sonner"; // P0-6: sonner instead of custom toast
+codex
+I have the main file loaded. Now I’m checking the specific risk areas inside `x.jsx`: partner/error flows, i18n violations, mobile interaction issues, and whether the category-chip fix is actually possible from page code.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/base/x.jsx; $patterns = '"'useQuery\\(','partner_not_found','catch {','console\\\\.','dangerouslySetInnerHTML','createObjectURL','CategoryChips','activeColor','bg-indigo','aria-label','placeholder=','useEffect\\(','useMemo\\('; for ("'$i=0; $i -lt $lines.Length; $i++) { foreach ($p in $patterns) { if ($lines[$i] -match $p) { '"'{0}:{1}' -f ("'$i+1), $lines[$i]; break } } }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'useQuery\\(|partner_not_found|catch \\{|console\\.|dangerouslySetInnerHTML|createObjectURL|CategoryChips|activeColor|bg-indigo|aria-label|placeholder=|useEffect\\(|useMemo\\(' -Context 3,6" in C:/Dev/menuapp-code-review succeeded in 18.30s:
+105:import CategoryChips from "@/components/publicMenu/refactor/CategoryChips";
+145:  } catch {
+178:  } catch {}
+192:      } catch {}
+202:  } catch {
+212:  } catch {}
+235:  return useMemo(() => {
+289:  } catch { return false; }
+296:  } catch { /* private browsing â€” ignore */ }
+384:  "error.partner_not_found": "Ð ÐµÑÑ‚Ð¾Ñ€Ð°Ð½ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½",
+895:  } = useQuery({
+913:  const isExpired = useMemo(() => {
+919:  const { data: partner } = useQuery({
+929:  const { data: orderItems = [] } = useQuery({
+939:  const { data: contactLinks = [] } = useQuery({
+949:  const phoneLink = useMemo(() => {
+957:  useEffect(() => {
+963:      } catch { /* retry on next poll */ }
+969:  useEffect(() => {
+974:  useEffect(() => {
+ succeeded in 16.93s:
+
+  pages\PublicMenu\base\x.jsx:102:import RedirectBanner from "@/components/publicMenu/refactor/RedirectBanner";
+  pages\PublicMenu\base\x.jsx:103:import DishReviewsModal from "@/components/publicMenu/DishReviewsModal";
+  pages\PublicMenu\base\x.jsx:104:import ModeTabs from "@/components/publicMenu/refactor/ModeTabs";
+> pages\PublicMenu\base\x.jsx:105:import CategoryChips from "@/components/publicMenu/refactor/CategoryChips";
+  pages\PublicMenu\base\x.jsx:106:import HallVerifyBlock from "@/components/publicMenu/refactor/HallVerifyBlock";
+  pages\PublicMenu\base\x.jsx:107:import ErrorState from "@/components/publicMenu/refactor/ErrorState";
+  pages\PublicMenu\base\x.jsx:108:import EmptyMenuState from "@/components/publicMenu/refactor/EmptyMenuState";
+  pages\PublicMenu\base\x.jsx:109:import CheckoutView from "@/components/publicMenu/views/CheckoutView";
+  pages\PublicMenu\base\x.jsx:110:import { useCurrency } from "@/components/publicMenu/refactor/hooks/useCurrency";
+  pages\PublicMenu\base\x.jsx:111:import { useHallTable } from "@/components/publicMenu/refactor/hooks/useHallTable";
+  pages\PublicMenu\base\x.jsx:142:  try {
+  pages\PublicMenu\base\x.jsx:143:    const parsed = new URL(url, window.location.origin);
+  pages\PublicMenu\base\x.jsx:144:    return allowed.includes(parsed.protocol);
+> pages\PublicMenu\base\x.jsx:145:  } catch {
+  pages\PublicMenu\base\x.jsx:146:    return false;
+  pages\PublicMenu\base\x.jsx:147:  }
+  pages\PublicMenu\base\x.jsx:148:};
+  pages\PublicMenu\base\x.jsx:149:
+  pages\PublicMenu\base\x.jsx:150:function getContactIcon(type) {
+codex
+I’ve narrowed it to the high-signal parts of `x.jsx`: the partner fetch path, the category chip prop handoff, and a few page-local regressions still present in production code. I’m pulling exact line slices now so the findings file can stay tight and line-specific.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=3034; $end=3056; for($i=$start;$i -le $end;$i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=1322; $end=1347; for($i=$start;$i -le $end;$i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=3178; $end=3189; for($i=$start;$i -le $end;$i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=2060; $end=2068; for($i=$start;$i -le $end;$i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=1519; $end=1532; for($i=$start;$i -le $end;$i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=2310; $end=2316; for($i=$start;$i -le $end;$i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-review succeeded in 16.42s:
+3178:
+3179:      {/* Category chips */}
+3180:      {view === "menu" && sortedCategories.length > 1 && (
+3181:        <CategoryChips
+3182:          sortedCategories={sortedCategories}
+3183:          activeCategoryKey={activeCategoryKey}
+3184:          onCategoryClick={handleCategoryClick}
+3185:          getCategoryName={getCategoryName}
+3186:          chipRefs={chipRefs}
+3187:          t={t}
+3188:          activeColor="#B5543A"
+3189:        />
+ succeeded in 16.70s:
+1322:  const { data: partner, isLoading: loadingPartner } = useQuery({
+1323:    queryKey: ["publicPartner", partnerParamRaw],
+1324:    enabled: !!partnerParamRaw,
+1325:    retry: shouldRetry,
+1326:    queryFn: async () => {
+1327:      const p = partnerParamRaw;
+1328:      if (!p) return null;
+1329:
+1330:      const byIdFirst = looksLikePartnerId(p);
+1331:
+1332:      try {
+1333:        const res = await base44.entities.Partner.filter(byIdFirst ? { id: p } : { slug: p });
+1334:        if (res?.[0]) return res[0];
+1335:      } catch (e) {
+1336:        // Partner primary lookup failed â€” silent in prod
+1337:      }
+1338:
+1339:      try {
+1340:        const res2 = await base44.entities.Partner.filter(byIdFirst ? { slug: p } : { id: p });
+1341:        return res2?.[0] || null;
+ succeeded in 16.48s:
+2060:      setHasRatedInSession(true);
+2061:      
+2062:      // Refresh ratings
+2063:      queryClient.invalidateQueries({ queryKey: ["dishFeedbacksRecent", partnerId] });
+2064:      
+2065:    } catch (err) {
+2066:      console.error('Failed to save rating:', err);
+2067:      toast.error(t('error.save_failed'), { id: 'mm1' });
+2068:      // BUG-PM-028: Roll back draft rating so user can retry
+ succeeded in 16.43s:
+1519:
+1520:  // Helper for saving table selection (used by help requests and other features)
+1521:  const saveTableSelection = (partnerId, tableId) => {
+1522:    if (!partnerId || !tableId) return;
+1523:    try {
+1524:      const key = `menuApp_table_${partnerId}`;
+1525:      localStorage.setItem(
+1526:        key,
+1527:        JSON.stringify({ partnerId, tableId, timestamp: Date.now() })
+1528:      );
+1529:    } catch (e) {
+1530:      console.error("Failed to save table", e);
+1531:    }
+1532:  };
+ succeeded in 16.49s:
+2310:    }
+2311:  }, [currentTableId]);
+2312:
+2313:  // Debug hook kept as no-op to maintain hook order (BUG-PM-040: removed prod logging)
+2314:  useEffect(() => {}, []);
+2315:
+2316:  // P0-7: Removed handleTableSelection - no dropdown
+ succeeded in 17.93s:
+3034:
+3035:  if (!partner) {
+3036:    return (
+3037:      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+3038:        <Card className="w-full max-w-md text-center p-6">
+3039:          <p className="text-slate-500">{t('error.partner_not_found')}</p>
+3040:        </Card>
+3041:      </div>
+3042:    );
+3043:  }
+3044:
+3045:  // P1-5: Error UI for failed requests
+3046:  if ((dishesError || categoriesError) && !isRateLimitError(dishesError) && !isRateLimitError(categoriesError)) {
+3047:    return (
+3048:      <ErrorState
+3049:        onRetry={() => window.location.reload()}
+3050:        t={t}
+3051:      />
+3052:    );
+3053:  }
+codex
+I’ve got the main findings. I’m checking one more error path in the embedded order-status screen to avoid missing another “real backend error shown as not found” case in the same file.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=892; $end=907; for($i=$start;$i -le $end;$i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=980; $end=1065; for($i=$start;$i -le $end;$i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'orderError|not_found|check_link|ErrorState|invalid_link' -Context 2,4" in C:/Dev/menuapp-code-review succeeded in 9.87s:
+892:    isLoading: loadingOrder,
+893:    error: orderError,
+894:    refetch: refetchOrder,
+895:  } = useQuery({
+896:    queryKey: ["orderByToken", token],
+897:    enabled: !!token && OS_TOKEN_RE.test(token),
+898:    retry: 1,
+899:    staleTime: OS_POLL_INTERVAL_MS,
+900:    queryFn: async () => {
+901:      const orders = await base44.entities.Order.filter({ public_token: token });
+902:      if (!orders || orders.length === 0) return null;
+903:      return orders[0];
+904:    },
+905:  });
+906:
+907:  const order = orderData || null;
+ succeeded in 9.59s:
+980:  }, [lastUpdated, isTerminal]);
+981:
+982:  const formatPrice = (amount) => {
+983:    if (amount == null) return "";
+984:    const currency = partner?.currency || "";
+985:    const symbol = partner?.currency_symbol || currency;
+986:    const num = Number(amount);
+987:    if (isNaN(num)) return String(amount);
+988:    const formatted = num.toLocaleString();
+989:    return symbol ? `${formatted} ${symbol}` : formatted;
+990:  };
+991:
+992:  const itemsTotal = useMemo(() => {
+993:    return orderItems.reduce((sum, item) => {
+994:      const lineTotal = Number(item.line_total) || (Number(item.dish_price) * Number(item.quantity)) || 0;
+995:      return sum + lineTotal;
+996:    }, 0);
+997:  }, [orderItems]);
+998:
+999:  const displayTotal = order?.total_amount != null ? order.total_amount : itemsTotal;
+ succeeded in 8.60s:
+
+  pages\PublicMenu\base\x.jsx:105:import CategoryChips from "@/components/publicMenu/refactor/CategoryChips";
+  pages\PublicMenu\base\x.jsx:106:import HallVerifyBlock from "@/components/publicMenu/refactor/HallVerifyBlock";
+> pages\PublicMenu\base\x.jsx:107:import ErrorState from "@/components/publicMenu/refactor/ErrorState";
+  pages\PublicMenu\base\x.jsx:108:import EmptyMenuState from "@/components/publicMenu/refactor/EmptyMenuState";
+  pages\PublicMenu\base\x.jsx:109:import CheckoutView from "@/components/publicMenu/views/CheckoutView";
+  pages\PublicMenu\base\x.jsx:110:import { useCurrency } from "@/components/publicMenu/refactor/hooks/useCurrency";
+  pages\PublicMenu\base\x.jsx:111:import { useHallTable } from "@/components/publicMenu/refactor/hooks/useHallTable";
+  pages\PublicMenu\base\x.jsx:340:  "order_status.step_ready": "Готов",
+  pages\PublicMenu\base\x.jsx:341:  "order_status.no_token": "Ссылка на заказ отсутствует",
+> pages\PublicMenu\base\x.jsx:342:  "order_status.check_link": "Проверьте ссылку и попробуйте снова",
+  pages\PublicMenu\base\x.jsx:343:  "order_status.back_to_menu": "Вернуться в меню",
+> pages\PublicMenu\base\x.jsx:344:  "order_status.not_found": "Заказ не найден",
+  pages\PublicMenu\base\x.jsx:345:  "order_status.expired": "Заказ устарел",
+  pages\PublicMenu\base\x.jsx:346:  "order_status.order_number": "Заказ",
+  pages\PublicMenu\base\x.jsx:347:  "order_status.last_updated": "Обновлено",
+  pages\PublicMenu\base\x.jsx:348:  "order_status.just_now": "только что",
+  pages\PublicMenu\base\x.jsx:368:  "hall.verify.online_benefits": "Бонусы и скидки за онлайн-заказы",
+  pages\PublicMenu\base\x.jsx:369:  // Errors
+> pages\PublicMenu\base\x.jsx:370:  "error.invalid_link": "Неверная ссылка",
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'toast\\.(success|error|info)\\(' -Context 0,2" in C:/Dev/menuapp-code-review succeeded in 9.82s:
+
+> pages\PublicMenu\base\x.jsx:1495:      toast.error(t('error.invalid_link'), { id: 'mm1' });
+  pages\PublicMenu\base\x.jsx:1496:      return;
+  pages\PublicMenu\base\x.jsx:1497:    }
+> pages\PublicMenu\base\x.jsx:2057:      toast.success(t('review.thanks'), { id: 'mm1' });
+  pages\PublicMenu\base\x.jsx:2058:      
+  pages\PublicMenu\base\x.jsx:2059:      // Track that user has rated in this session
+> pages\PublicMenu\base\x.jsx:2067:      toast.error(t('error.save_failed'), { id: 'mm1' });
+  pages\PublicMenu\base\x.jsx:2068:      // BUG-PM-028: Roll back draft rating so user can retry
+  pages\PublicMenu\base\x.jsx:2069:      updateDraftRating(itemId, 0);
+> pages\PublicMenu\base\x.jsx:2260:        toast.info(t('cart.items_removed_mode_switch', { count: removed }), { 
+duration: 3000 });
+  pages\PublicMenu\base\x.jsx:2261:      }
+  pages\PublicMenu\base\x.jsx:2262:      return filtered;
+> pages\PublicMenu\base\x.jsx:2288:    toast.success(t('cart.item_added'), { id: 'cart-add', duration: 2000 });
+  pages\PublicMenu\base\x.jsx:2289:  };
+  pages\PublicMenu\base\x.jsx:2290:
+> pages\PublicMenu\base\x.jsx:2446:          toast.error(t('loyalty.insufficient_points'), { id: 'mm1' });
+  pages\PublicMenu\base\x.jsx:2447:          return false;
+  pages\PublicMenu\base\x.jsx:2448:        }
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/base/x.jsx -Pattern '\"toast\\.error\"|\"toast\\.saved\"|guest\\.name_saved|cart\\.items_removed_mode_switch|cart\\.confirm_table\\.|common\\.loading' -Context 0,0" in C:/Dev/menuapp-code-review succeeded in 11.40s:
+
+pages\PublicMenu\base\x.jsx:442:  "guest.name_saved": "Имя сохранено",
+pages\PublicMenu\base\x.jsx:444:  "toast.error": "Ошибка",
+pages\PublicMenu\base\x.jsx:445:  "common.loading": "Загрузка...",
+pages\PublicMenu\base\x.jsx:509:  "cart.items_removed_mode_switch": "Убрано {count} блюд, недоступных в этом режиме",
+pages\PublicMenu\base\x.jsx:511:  "cart.confirm_table.title": "Подтвердите стол",
+pages\PublicMenu\base\x.jsx:512:  "cart.confirm_table.subtitle": "Чтобы отправить заказ официанту",
+pages\PublicMenu\base\x.jsx:513:  "cart.confirm_table.benefit_loyalty": "По онлайн-заказу вы получите бонусы / скидку",
+pages\PublicMenu\base\x.jsx:514:  "cart.confirm_table.benefit_default": "Так официант быстрее найдёт ваш заказ",
+pages\PublicMenu\base\x.jsx:515:  "cart.confirm_table.submit": "Подтвердить и отправить",
+pages\PublicMenu\base\x.jsx:516:  "cart.confirm_table.change": "Не тот стол? Изменить",
+pages\PublicMenu\base\x.jsx:2119:            ? tr("common.loading", "Загрузка...")
+pages\PublicMenu\base\x.jsx:2260:        toast.info(t('cart.items_removed_mode_switch', { count: removed }), { 
+duration: 3000 });
+pages\PublicMenu\base\x.jsx:2972:      toast.success(t('guest.name_saved'), { id: 'mm1' });
+pages\PublicMenu\base\x.jsx:3390:              toast(tr('cart.confirm_table.dismissed', 'Для отправки заказа нужно 
+подтвердить стол'), { id: 'table-dismiss' });
+pages\PublicMenu\base\x.jsx:3399:              {t('cart.confirm_table.title')}
+pages\PublicMenu\base\x.jsx:3402:              {t('cart.confirm_table.subtitle')}
+pages\PublicMenu\base\x.jsx:3406:                ? t('cart.confirm_table.benefit_loyalty')
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/base/x.jsx -Pattern '\"cart\\.confirm_table\\.dismissed\"'" in C:/Dev/menuapp-code-review succeeded in 4.20s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=1490; $end=1505; for($i=$start;$i -le $end;$i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-review succeeded in 3.24s:
+1490:
+1491:  // Contact link click handler (SEC-021: XSS protection + noopener)
+1492:  const handleContactClick = (link) => {
+1493:    const url = String(link.url || "");
+1494:    if (!isSafeUrl(url)) {
+1495:      toast.error(t('error.invalid_link'), { id: 'mm1' });
+1496:      return;
+1497:    }
+1498:    if (url.startsWith("tel:") || url.startsWith("mailto:")) {
+1499:      window.location.href = url;
+1500:    } else {
+1501:      window.open(url, "_blank", "noopener,noreferrer");
+1502:    }
+1503:  };
+1504:
+1505:  // Hall table verification hook
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=2089; $end=2098; for($i=$start;$i -le $end;$i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-review succeeded in 2.11s:
+2089:
+2090:  // Just-in-time: auto-submit after table verification via confirmation sheet
+2091:  useEffect(() => {
+2092:    if (pendingSubmitRef.current && isTableVerified && currentTableId) {
+2093:      pendingSubmitRef.current = false;
+2094:      setShowTableConfirmSheet(false);
+2095:      // Slight delay to let state propagate
+2096:      setTimeout(() => handleSubmitOrder(), 100);
+2097:    }
+2098:  }, [isTableVerified, currentTableId]);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'setTimeout\\(' -Context 2,2" in C:/Dev/menuapp-code-review succeeded in 3.15s:
+
+  pages\PublicMenu\base\x.jsx:1894:        });
+  pages\PublicMenu\base\x.jsx:1895:
+> pages\PublicMenu\base\x.jsx:1896:        const timerId = setTimeout(() => setRedirectBanner(null), 5000);
+  pages\PublicMenu\base\x.jsx:1897:        return () => clearTimeout(timerId);
+  pages\PublicMenu\base\x.jsx:1898:      }
+  pages\PublicMenu\base\x.jsx:2083:  useEffect(() => {
+  pages\PublicMenu\base\x.jsx:2084:    if (!isTableVerified || tableSession) return;
+> pages\PublicMenu\base\x.jsx:2085:    const timer = setTimeout(() => setSessionCheckTimedOut(true), 3000);
+  pages\PublicMenu\base\x.jsx:2086:    return () => clearTimeout(timer);
+  pages\PublicMenu\base\x.jsx:2087:  }, [isTableVerified, tableSession]);
+  pages\PublicMenu\base\x.jsx:2094:      setShowTableConfirmSheet(false);
+  pages\PublicMenu\base\x.jsx:2095:      // Slight delay to let state propagate
+> pages\PublicMenu\base\x.jsx:2096:      setTimeout(() => handleSubmitOrder(), 100);
+  pages\PublicMenu\base\x.jsx:2097:    }
+  pages\PublicMenu\base\x.jsx:2098:  }, [isTableVerified, currentTableId]);
+  pages\PublicMenu\base\x.jsx:2225:    else sectionRefs.current[key]?.scrollIntoView({ behavior: "smooth", block: 
+"start" });
+  pages\PublicMenu\base\x.jsx:2226:
+> pages\PublicMenu\base\x.jsx:2227:    setTimeout(() => {
+codex
+I’m validating the context files against the code before I write the report. The key question is whether PM-062 is actually still in page scope or already known to live in the imported `CategoryChips` component.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'BUG-PM-062|Partner lookup hides backend failures|BUG-PM-070|CategoryChips ignores activeColor prop' -Context 1,4" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/README.md -Pattern 'BUG-PM-040|BUG-PM-041|BUG-PM-042|BUG-PM-043|BUG-PM-044|BUG-PM-045|BUG-PM-046|BUG-PM-047|active' -Context 0,2" in C:/Dev/menuapp-code-review succeeded in 4.31s:
+
+  pages\PublicMenu\BUGS.md:63:
+> pages\PublicMenu\BUGS.md:64:### BUG-PM-062: CategoryChips ignores activeColor prop — needs B44 prompt (P3)
+  pages\PublicMenu\BUGS.md:65:- **Приоритет:** P3
+  pages\PublicMenu\BUGS.md:66:- **Когда:** S153 (consensus chain publicmenu-260321-093745)
+  pages\PublicMenu\BUGS.md:67:- **Файл:** @/components/publicMenu/refactor/CategoryChips (imported component, NOT page 
+code)
+  pages\PublicMenu\BUGS.md:68:- **Симптом:** Active chip still renders indigo despite `activeColor="#B5543A"` prop 
+passed in x.jsx:3182. CC grep confirmed zero indigo in all page files — issue is inside imported component.
+  pages\PublicMenu\BUGS.md:85:
+> pages\PublicMenu\BUGS.md:86:### BUG-PM-064: Partner lookup hides backend failures (P1)
+  pages\PublicMenu\BUGS.md:87:- **Приоритет:** P1
+  pages\PublicMenu\BUGS.md:88:- **Когда:** S153 (Codex review, chain publicmenu-260321-110752)
+  pages\PublicMenu\BUGS.md:89:- **Файл:** x.jsx
+  pages\PublicMenu\BUGS.md:90:- **Симптом:** Partner query catches all errors and shows "restaurant not found" even 
+for network failures.
+  pages\PublicMenu\BUGS.md:111:
+> pages\PublicMenu\BUGS.md:112:### BUG-PM-070: Partner lookup hides backend failures as "not found" (P1)
+  pages\PublicMenu\BUGS.md:113:- **Приоритет:** P1
+  pages\PublicMenu\BUGS.md:114:- **Когда:** S154 (Codex review, chain publicmenu-260321-140331, Finding #4 — SKIPPED 
+ succeeded in 4.41s:
+
+> pages\PublicMenu\README.md:24:8 новых багов найдено в S119 CC review (BUG-PM-040 -- BUG-PM-047): 2x P0 + 1x P1 + 4x 
+P2 + 1x P3.
+  pages\PublicMenu\README.md:25:Итого активных: 22. Подробности в BUGS.md.
+  pages\PublicMenu\README.md:26:
+> pages\PublicMenu\README.md:35:- BUG-PM-040 (P0): Loyalty points debited before order creation — no rollback on 
+failure
+> pages\PublicMenu\README.md:36:- BUG-PM-041 (P0): Polling timer leak in useTableSession after cleanup
+> pages\PublicMenu\README.md:37:- BUG-PM-042 (P1): isBillOnCooldown crashes without try/catch in restricted 
+environments
+> pages\PublicMenu\README.md:38:- BUG-PM-043 (P2): formatOrderTime + OrderStatusScreen hardcode ru-RU locale
+> pages\PublicMenu\README.md:39:- BUG-PM-044 (P2): loyalty_redeem_rate falsy-coalescing shows wrong value for rate=0
+> pages\PublicMenu\README.md:40:- BUG-PM-045 (P2): console.log left in production order submission
+> pages\PublicMenu\README.md:41:- BUG-PM-046 (P2): Redirect banner setTimeout not cleaned up on unmount
+> pages\PublicMenu\README.md:42:- BUG-PM-047 (P3): Multiple interactive elements missing aria-label
+  pages\PublicMenu\README.md:43:
+  pages\PublicMenu\README.md:44:### Session 116 — 12 мар 2026
+> pages\PublicMenu\README.md:60:- BUG-PM-034: Cart drawer setActiveSnapPoint теперь блокирует закрытие во время 
+отправки заказа (добавлен !isSubmitting guard, симметрично с checkout drawer)
+  pages\PublicMenu\README.md:61:
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'console\\.error\\(' | ForEach-Object { '{0}:{1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Dev/menuapp-code-review succeeded in 1.56s:
+1530:console.error("Failed to save table", e);
+2066:console.error('Failed to save rating:', err);
+2159:console.error("Failed to init guest code", e);
+2408:console.error("Rate limit check failed", e);
+2512:console.error('Post-create loyalty side effect failed:', sideEffectErr);
+2543:console.error('Post-create earn points failed:', earnErr);
+2547:try { await base44.entities.Partner.update(partner.id, updatedCounters); } catch (e) { console.error('Partner counter update failed:', e); }
+2887:console.error('Post-create loyalty side effect failed:', sideEffectErr);
+2918:console.error('Post-create earn points failed:', earnErr);
+2948:console.error(err);
+2974:console.error('Failed to update guest name:', err);
+3005:console.error('Failed to request bill:', err);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'console\\.(log|warn)\\(' | ForEach-Object { '{0}:{1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Dev/menuapp-code-review succeeded in 1.52s:
+
+codex
+The findings are settled. I’m checking whether the output files already exist so I can write them cleanly without reading anything beyond the requested scope and the required output paths.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pipeline/chain-state/publicmenu-260321-173134-codex-findings.md' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pages/PublicMenu/commands_2026-03-21.log' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pages/PublicMenu/review_2026-03-21.md' in C:/Dev/menuapp-code-review succeeded in 1.80s:
+True
+ succeeded in 1.81s:
+True
+ succeeded in 1.89s:
+False
+codex
+I’m writing the requested findings file now, plus page-local copies with a chain suffix so I don’t overwrite the existing same-date review artifacts already in `pages/PublicMenu/`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'New-Item -ItemType Directory -Force -Path pipeline/chain-state | Out-Null' in C:/Dev/menuapp-code-review succeeded in 7.80s:
+
+file update
+A C:/Dev/menuapp-code-review\pipeline/chain-state/publicmenu-260321-173134-codex-findings.md
+# Codex Writer Findings — PublicMenu
+Chain: publicmenu-260321-173134
+
+## Findings
+1. [P3] PM-062 is outside `x.jsx` page code — `x.jsx` already passes `activeColor="#B5543A"` into `<CategoryChips />` at `x.jsx:3181-3188`, and `BUGS.md:64-68` already documents that the imported `CategoryChips` component ignores that prop. Another page-only patch here will be a no-op, so the active chip will stay indigo. FIX: change the active-state styling inside `@/components/publicMenu/refactor/CategoryChips` (B44/component prompt), not in `x.jsx`.
+2. [P1] Partner lookup hides real backend failures as “restaurant not found” — the partner query in `x.jsx:1322-1345` catches both lookup attempts and returns `null`, then the page renders `t('error.partner_not_found')` at `x.jsx:3035-3040`. Network/API failures are therefore misreported as a bad QR link. FIX: let transport/backend errors reach React Query, keep “not found” only for an empty successful lookup, and render retryable error UI for query errors.
+3. [P1] Order-status screen collapses fetch failures into “check the link” — `OrderStatusScreen` exposes `orderError` from React Query at `x.jsx:892-905`, but the render path merges `orderError || !order` into the same not-found state at `x.jsx:1030-1040`. A temporary backend failure tells the guest the token/link is invalid. FIX: split `orderError` from `!order`; show a retryable fetch-error state for query failures and reserve `order_status.not_found` for a successful empty lookup.
+4. [P2] Production `console.error` calls remain in guest flows — `x.jsx` still logs directly to the console in multiple runtime paths (`x.jsx:1530, 2066, 2159, 2408, 2512, 2543, 2547, 2887, 2918, 2948, 2974, 3005`). This leaves internal failure detail in production and repeats a class of issue already called out in `README.md:40`. FIX: remove direct console logging from page code or replace it with a centralized telemetry/logger path that is safe for production.
+5. [P3] No-op hook left in production as a hook-order placeholder — `useEffect(() => {}, [])` at `x.jsx:2313-2314` has no behavior and encodes a React anti-pattern instead of fixing structure. It adds noise and makes future hook-order regressions easier to hide. FIX: delete the placeholder effect; if hook ordering was previously conditional, move the branching into child components or unconditional hooks with real logic.
+
+## Summary
+Total: 5 findings (0 P0, 2 P1, 1 P2, 2 P3)
+
+## Prompt Clarity
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — `pages/PublicMenu/base/*.jsx` matches multiple files, but the prompt also says “ONLY these 3 files” and the task context points specifically to `x.jsx`.
+- Missing context (what info would have helped): It would help to say explicitly whether already-tracked bugs from `BUGS.md` should be re-reported when still present in `x.jsx`, or whether only newly observed issues should be listed.
+- Scope questions (anything you weren't sure if it's in scope): The prompt says “Find ALL bugs” but the embedded task context is a single-fix PM-062 scope lock. It was also unclear whether an out-of-file root cause (`CategoryChips`) should be reported when the page file already passes the prop correctly.
+A C:/Dev/menuapp-code-review\pages/PublicMenu/commands_2026-03-21_publicmenu-260321-173134.log
+Get-ChildItem -Name pages/PublicMenu/base/*.jsx  # timed out (10s)
+Get-Content -Raw pages/PublicMenu/README.md  # timed out (10s)
+Get-Content -Raw pages/PublicMenu/BUGS.md  # timed out (10s)
+Get-ChildItem -Name pages/PublicMenu/base/*.jsx
+Get-Content -Raw pages/PublicMenu/README.md
+Get-Content -Raw pages/PublicMenu/BUGS.md
+Get-Content -Raw pages/PublicMenu/base/x.jsx
+Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'useQuery\(|partner_not_found|catch \{|console\.|dangerouslySetInnerHTML|createObjectURL|CategoryChips|activeColor|bg-indigo|aria-label|placeholder=|useEffect\(|useMemo\(' -Context 3,6
+$lines = Get-Content pages/PublicMenu/base/x.jsx; $patterns = 'useQuery\(','partner_not_found','catch {','console\\\\.','dangerouslySetInnerHTML','createObjectURL','CategoryChips','activeColor','bg-indigo','aria-label','placeholder=','useEffect\\(','useMemo\\('; for ($i=0; $i -lt $lines.Length; $i++) { foreach ($p in $patterns) { if ($lines[$i] -match $p) { '{0}:{1}' -f ($i+1), $lines[$i]; break } } }
+$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=1322; $end=1347; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=3034; $end=3056; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=3178; $end=3189; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=1519; $end=1532; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=2060; $end=2068; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=2310; $end=2316; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=892; $end=907; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'orderError|not_found|check_link|ErrorState|invalid_link' -Context 2,4
+$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=980; $end=1065; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'toast\.(success|error|info)\(' -Context 0,2
+Select-String -Path pages/PublicMenu/base/x.jsx -Pattern '"toast\.error"|"toast\.saved"|guest\.name_saved|cart\.items_removed_mode_switch|cart\.confirm_table\.|common\.loading' -Context 0,0
+Select-String -Path pages/PublicMenu/base/x.jsx -Pattern '"cart\.confirm_table\.dismissed"'
+$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=1490; $end=1505; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=2089; $end=2098; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'setTimeout\(' -Context 2,2
+Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'BUG-PM-062|Partner lookup hides backend failures|BUG-PM-070|CategoryChips ignores activeColor prop' -Context 1,4
+Select-String -Path pages/PublicMenu/README.md -Pattern 'BUG-PM-040|BUG-PM-041|BUG-PM-042|BUG-PM-043|BUG-PM-044|BUG-PM-045|BUG-PM-046|BUG-PM-047|active' -Context 0,2
+Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'console\.error\(' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
+Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'console\.(log|warn)\(' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
+New-Item -ItemType Directory -Force -Path pipeline/chain-state | Out-Null
+A C:/Dev/menuapp-code-review\pages/PublicMenu/review_2026-03-21_publicmenu-260321-173134.md
+# Codex Writer Findings — PublicMenu
+Chain: publicmenu-260321-173134
+
+## Findings
+1. [P3] PM-062 is outside `x.jsx` page code — `x.jsx` already passes `activeColor="#B5543A"` into `<CategoryChips />` at `x.jsx:3181-3188`, and `BUGS.md:64-68` already documents that the imported `CategoryChips` component ignores that prop. Another page-only patch here will be a no-op, so the active chip will stay indigo. FIX: change the active-state styling inside `@/components/publicMenu/refactor/CategoryChips` (B44/component prompt), not in `x.jsx`.
+2. [P1] Partner lookup hides real backend failures as “restaurant not found” — the partner query in `x.jsx:1322-1345` catches both lookup attempts and returns `null`, then the page renders `t('error.partner_not_found')` at `x.jsx:3035-3040`. Network/API failures are therefore misreported as a bad QR link. FIX: let transport/backend errors reach React Query, keep “not found” only for an empty successful lookup, and render retryable error UI for query errors.
+3. [P1] Order-status screen collapses fetch failures into “check the link” — `OrderStatusScreen` exposes `orderError` from React Query at `x.jsx:892-905`, but the render path merges `orderError || !order` into the same not-found state at `x.jsx:1030-1040`. A temporary backend failure tells the guest the token/link is invalid. FIX: split `orderError` from `!order`; show a retryable fetch-error state for query failures and reserve `order_status.not_found` for a successful empty lookup.
+4. [P2] Production `console.error` calls remain in guest flows — `x.jsx` still logs directly to the console in multiple runtime paths (`x.jsx:1530, 2066, 2159, 2408, 2512, 2543, 2547, 2887, 2918, 2948, 2974, 3005`). This leaves internal failure detail in production and repeats a class of issue already called out in `README.md:40`. FIX: remove direct console logging from page code or replace it with a centralized telemetry/logger path that is safe for production.
+5. [P3] No-op hook left in production as a hook-order placeholder — `useEffect(() => {}, [])` at `x.jsx:2313-2314` has no behavior and encodes a React anti-pattern instead of fixing structure. It adds noise and makes future hook-order regressions easier to hide. FIX: delete the placeholder effect; if hook ordering was previously conditional, move the branching into child components or unconditional hooks with real logic.
+
+## Summary
+Total: 5 findings (0 P0, 2 P1, 1 P2, 2 P3)
+
+## Prompt Clarity
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — `pages/PublicMenu/base/*.jsx` matches multiple files, but the prompt also says “ONLY these 3 files” and the task context points specifically to `x.jsx`.
+- Missing context (what info would have helped): It would help to say explicitly whether already-tracked bugs from `BUGS.md` should be re-reported when still present in `x.jsx`, or whether only newly observed issues should be listed.
+- Scope questions (anything you weren't sure if it's in scope): The prompt says “Find ALL bugs” but the embedded task context is a single-fix PM-062 scope lock. It was also unclear whether an out-of-file root cause (`CategoryChips`) should be reported when the page file already passes the prop correctly.
+apply_patch(auto_approved=true) exited 0 in 289ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260321-173134-codex-findings.md
+A pages/PublicMenu/review_2026-03-21_publicmenu-260321-173134.md
+A pages/PublicMenu/commands_2026-03-21_publicmenu-260321-173134.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-21_publicmenu-260321-173134.log b/pages/PublicMenu/commands_2026-03-21_publicmenu-260321-173134.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..088e72e5f78b48de787e7729f8c27a313085987a
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-21_publicmenu-260321-173134.log
+@@ -0,0 +1,29 @@
++Get-ChildItem -Name pages/PublicMenu/base/*.jsx  # timed out (10s)
++Get-Content -Raw pages/PublicMenu/README.md  # timed out (10s)
++Get-Content -Raw pages/PublicMenu/BUGS.md  # timed out (10s)
++Get-ChildItem -Name pages/PublicMenu/base/*.jsx
++Get-Content -Raw pages/PublicMenu/README.md
++Get-Content -Raw pages/PublicMenu/BUGS.md
++Get-Content -Raw pages/PublicMenu/base/x.jsx
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'useQuery\(|partner_not_found|catch \{|console\.|dangerouslySetInnerHTML|createObjectURL|CategoryChips|activeColor|bg-indigo|aria-label|placeholder=|useEffect\(|useMemo\(' -Context 3,6
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $patterns = 'useQuery\(','partner_not_found','catch {','console\\\\.','dangerouslySetInnerHTML','createObjectURL','CategoryChips','activeColor','bg-indigo','aria-label','placeholder=','useEffect\\(','useMemo\\('; for ($i=0; $i -lt $lines.Length; $i++) { foreach ($p in $patterns) { if ($lines[$i] -match $p) { '{0}:{1}' -f ($i+1), $lines[$i]; break } } }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=1322; $end=1347; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=3034; $end=3056; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=3178; $end=3189; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=1519; $end=1532; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=2060; $end=2068; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=2310; $end=2316; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=892; $end=907; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'orderError|not_found|check_link|ErrorState|invalid_link' -Context 2,4
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=980; $end=1065; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'toast\.(success|error|info)\(' -Context 0,2
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern '"toast\.error"|"toast\.saved"|guest\.name_saved|cart\.items_removed_mode_switch|cart\.confirm_table\.|common\.loading' -Context 0,0
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern '"cart\.confirm_table\.dismissed"'
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=1490; $end=1505; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=2089; $end=2098; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'setTimeout\(' -Context 2,2
++Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'BUG-PM-062|Partner lookup hides backend failures|BUG-PM-070|CategoryChips ignores activeColor prop' -Context 1,4
++Select-String -Path pages/PublicMenu/README.md -Pattern 'BUG-PM-040|BUG-PM-041|BUG-PM-042|BUG-PM-043|BUG-PM-044|BUG-PM-045|BUG-PM-046|BUG-PM-047|active' -Context 0,2
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'console\.error\(' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'console\.(log|warn)\(' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++New-Item -ItemType Directory -Force -Path pipeline/chain-state | Out-Null
+diff --git a/pages/PublicMenu/review_2026-03-21_publicmenu-260321-173134.md b/pages/PublicMenu/review_2026-03-21_publicmenu-260321-173134.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..db09e4ae8106ea92777fdb01212d4f40cc0f27b2
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-21_publicmenu-260321-173134.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-173134
++
++## Findings
++1. [P3] PM-062 is outside `x.jsx` page code — `x.jsx` already passes `activeColor="#B5543A"` into `<CategoryChips />` at `x.jsx:3181-3188`, and `BUGS.md:64-68` already documents that the imported `CategoryChips` component ignores that prop. Another page-only patch here will be a no-op, so the active chip will stay indigo. FIX: change the active-state styling inside `@/components/publicMenu/refactor/CategoryChips` (B44/component prompt), not in `x.jsx`.
++2. [P1] Partner lookup hides real backend failures as “restaurant not found” — the partner query in `x.jsx:1322-1345` catches both lookup attempts and returns `null`, then the page renders `t('error.partner_not_found')` at `x.jsx:3035-3040`. Network/API failures are therefore misreported as a bad QR link. FIX: let transport/backend errors reach React Query, keep “not found” only for an empty successful lookup, and render retryable error UI for query errors.
++3. [P1] Order-status screen collapses fetch failures into “check the link” — `OrderStatusScreen` exposes `orderError` from React Query at `x.jsx:892-905`, but the render path merges `orderError || !order` into the same not-found state at `x.jsx:1030-1040`. A temporary backend failure tells the guest the token/link is invalid. FIX: split `orderError` from `!order`; show a retryable fetch-error state for query failures and reserve `order_status.not_found` for a successful empty lookup.
++4. [P2] Production `console.error` calls remain in guest flows — `x.jsx` still logs directly to the console in multiple runtime paths (`x.jsx:1530, 2066, 2159, 2408, 2512, 2543, 2547, 2887, 2918, 2948, 2974, 3005`). This leaves internal failure detail in production and repeats a class of issue already called out in `README.md:40`. FIX: remove direct console logging from page code or replace it with a centralized telemetry/logger path that is safe for production.
++5. [P3] No-op hook left in production as a hook-order placeholder — `useEffect(() => {}, [])` at `x.jsx:2313-2314` has no behavior and encodes a React anti-pattern instead of fixing structure. It adds noise and makes future hook-order regressions easier to hide. FIX: delete the placeholder effect; if hook ordering was previously conditional, move the branching into child components or unconditional hooks with real logic.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 1 P2, 2 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — `pages/PublicMenu/base/*.jsx` matches multiple files, but the prompt also says “ONLY these 3 files” and the task context points specifically to `x.jsx`.
++- Missing context (what info would have helped): It would help to say explicitly whether already-tracked bugs from `BUGS.md` should be re-reported when still present in `x.jsx`, or whether only newly observed issues should be listed.
++- Scope questions (anything you weren't sure if it's in scope): The prompt says “Find ALL bugs” but the embedded task context is a single-fix PM-062 scope lock. It was also unclear whether an out-of-file root cause (`CategoryChips`) should be reported when the page file already passes the prop correctly.
+diff --git a/pipeline/chain-state/publicmenu-260321-173134-codex-findings.md b/pipeline/chain-state/publicmenu-260321-173134-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..db09e4ae8106ea92777fdb01212d4f40cc0f27b2
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260321-173134-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-173134
++
++## Findings
++1. [P3] PM-062 is outside `x.jsx` page code — `x.jsx` already passes `activeColor="#B5543A"` into `<CategoryChips />` at `x.jsx:3181-3188`, and `BUGS.md:64-68` already documents that the imported `CategoryChips` component ignores that prop. Another page-only patch here will be a no-op, so the active chip will stay indigo. FIX: change the active-state styling inside `@/components/publicMenu/refactor/CategoryChips` (B44/component prompt), not in `x.jsx`.
++2. [P1] Partner lookup hides real backend failures as “restaurant not found” — the partner query in `x.jsx:1322-1345` catches both lookup attempts and returns `null`, then the page renders `t('error.partner_not_found')` at `x.jsx:3035-3040`. Network/API failures are therefore misreported as a bad QR link. FIX: let transport/backend errors reach React Query, keep “not found” only for an empty successful lookup, and render retryable error UI for query errors.
++3. [P1] Order-status screen collapses fetch failures into “check the link” — `OrderStatusScreen` exposes `orderError` from React Query at `x.jsx:892-905`, but the render path merges `orderError || !order` into the same not-found state at `x.jsx:1030-1040`. A temporary backend failure tells the guest the token/link is invalid. FIX: split `orderError` from `!order`; show a retryable fetch-error state for query failures and reserve `order_status.not_found` for a successful empty lookup.
++4. [P2] Production `console.error` calls remain in guest flows — `x.jsx` still logs directly to the console in multiple runtime paths (`x.jsx:1530, 2066, 2159, 2408, 2512, 2543, 2547, 2887, 2918, 2948, 2974, 3005`). This leaves internal failure detail in production and repeats a class of issue already called out in `README.md:40`. FIX: remove direct console logging from page code or replace it with a centralized telemetry/logger path that is safe for production.
++5. [P3] No-op hook left in production as a hook-order placeholder — `useEffect(() => {}, [])` at `x.jsx:2313-2314` has no behavior and encodes a React anti-pattern instead of fixing structure. It adds noise and makes future hook-order regressions easier to hide. FIX: delete the placeholder effect; if hook ordering was previously conditional, move the branching into child components or unconditional hooks with real logic.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 1 P2, 2 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — `pages/PublicMenu/base/*.jsx` matches multiple files, but the prompt also says “ONLY these 3 files” and the task context points specifically to `x.jsx`.
++- Missing context (what info would have helped): It would help to say explicitly whether already-tracked bugs from `BUGS.md` should be re-reported when still present in `x.jsx`, or whether only newly observed issues should be listed.
++- Scope questions (anything you weren't sure if it's in scope): The prompt says “Find ALL bugs” but the embedded task context is a single-fix PM-062 scope lock. It was also unclear whether an out-of-file root cause (`CategoryChips`) should be reported when the page file already passes the prop correctly.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-21_publicmenu-260321-173134.log b/pages/PublicMenu/commands_2026-03-21_publicmenu-260321-173134.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..088e72e5f78b48de787e7729f8c27a313085987a
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-21_publicmenu-260321-173134.log
+@@ -0,0 +1,29 @@
++Get-ChildItem -Name pages/PublicMenu/base/*.jsx  # timed out (10s)
++Get-Content -Raw pages/PublicMenu/README.md  # timed out (10s)
++Get-Content -Raw pages/PublicMenu/BUGS.md  # timed out (10s)
++Get-ChildItem -Name pages/PublicMenu/base/*.jsx
++Get-Content -Raw pages/PublicMenu/README.md
++Get-Content -Raw pages/PublicMenu/BUGS.md
++Get-Content -Raw pages/PublicMenu/base/x.jsx
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'useQuery\(|partner_not_found|catch \{|console\.|dangerouslySetInnerHTML|createObjectURL|CategoryChips|activeColor|bg-indigo|aria-label|placeholder=|useEffect\(|useMemo\(' -Context 3,6
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $patterns = 'useQuery\(','partner_not_found','catch {','console\\\\.','dangerouslySetInnerHTML','createObjectURL','CategoryChips','activeColor','bg-indigo','aria-label','placeholder=','useEffect\\(','useMemo\\('; for ($i=0; $i -lt $lines.Length; $i++) { foreach ($p in $patterns) { if ($lines[$i] -match $p) { '{0}:{1}' -f ($i+1), $lines[$i]; break } } }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=1322; $end=1347; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=3034; $end=3056; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=3178; $end=3189; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=1519; $end=1532; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=2060; $end=2068; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=2310; $end=2316; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=892; $end=907; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'orderError|not_found|check_link|ErrorState|invalid_link' -Context 2,4
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=980; $end=1065; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'toast\.(success|error|info)\(' -Context 0,2
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern '"toast\.error"|"toast\.saved"|guest\.name_saved|cart\.items_removed_mode_switch|cart\.confirm_table\.|common\.loading' -Context 0,0
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern '"cart\.confirm_table\.dismissed"'
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=1490; $end=1505; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=2089; $end=2098; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'setTimeout\(' -Context 2,2
++Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'BUG-PM-062|Partner lookup hides backend failures|BUG-PM-070|CategoryChips ignores activeColor prop' -Context 1,4
++Select-String -Path pages/PublicMenu/README.md -Pattern 'BUG-PM-040|BUG-PM-041|BUG-PM-042|BUG-PM-043|BUG-PM-044|BUG-PM-045|BUG-PM-046|BUG-PM-047|active' -Context 0,2
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'console\.error\(' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'console\.(log|warn)\(' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++New-Item -ItemType Directory -Force -Path pipeline/chain-state | Out-Null
+diff --git a/pages/PublicMenu/review_2026-03-21_publicmenu-260321-173134.md b/pages/PublicMenu/review_2026-03-21_publicmenu-260321-173134.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..db09e4ae8106ea92777fdb01212d4f40cc0f27b2
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-21_publicmenu-260321-173134.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-173134
++
++## Findings
++1. [P3] PM-062 is outside `x.jsx` page code — `x.jsx` already passes `activeColor="#B5543A"` into `<CategoryChips />` at `x.jsx:3181-3188`, and `BUGS.md:64-68` already documents that the imported `CategoryChips` component ignores that prop. Another page-only patch here will be a no-op, so the active chip will stay indigo. FIX: change the active-state styling inside `@/components/publicMenu/refactor/CategoryChips` (B44/component prompt), not in `x.jsx`.
++2. [P1] Partner lookup hides real backend failures as “restaurant not found” — the partner query in `x.jsx:1322-1345` catches both lookup attempts and returns `null`, then the page renders `t('error.partner_not_found')` at `x.jsx:3035-3040`. Network/API failures are therefore misreported as a bad QR link. FIX: let transport/backend errors reach React Query, keep “not found” only for an empty successful lookup, and render retryable error UI for query errors.
++3. [P1] Order-status screen collapses fetch failures into “check the link” — `OrderStatusScreen` exposes `orderError` from React Query at `x.jsx:892-905`, but the render path merges `orderError || !order` into the same not-found state at `x.jsx:1030-1040`. A temporary backend failure tells the guest the token/link is invalid. FIX: split `orderError` from `!order`; show a retryable fetch-error state for query failures and reserve `order_status.not_found` for a successful empty lookup.
++4. [P2] Production `console.error` calls remain in guest flows — `x.jsx` still logs directly to the console in multiple runtime paths (`x.jsx:1530, 2066, 2159, 2408, 2512, 2543, 2547, 2887, 2918, 2948, 2974, 3005`). This leaves internal failure detail in production and repeats a class of issue already called out in `README.md:40`. FIX: remove direct console logging from page code or replace it with a centralized telemetry/logger path that is safe for production.
++5. [P3] No-op hook left in production as a hook-order placeholder — `useEffect(() => {}, [])` at `x.jsx:2313-2314` has no behavior and encodes a React anti-pattern instead of fixing structure. It adds noise and makes future hook-order regressions easier to hide. FIX: delete the placeholder effect; if hook ordering was previously conditional, move the branching into child components or unconditional hooks with real logic.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 1 P2, 2 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — `pages/PublicMenu/base/*.jsx` matches multiple files, but the prompt also says “ONLY these 3 files” and the task context points specifically to `x.jsx`.
++- Missing context (what info would have helped): It would help to say explicitly whether already-tracked bugs from `BUGS.md` should be re-reported when still present in `x.jsx`, or whether only newly observed issues should be listed.
++- Scope questions (anything you weren't sure if it's in scope): The prompt says “Find ALL bugs” but the embedded task context is a single-fix PM-062 scope lock. It was also unclear whether an out-of-file root cause (`CategoryChips`) should be reported when the page file already passes the prop correctly.
+diff --git a/pipeline/chain-state/publicmenu-260321-173134-codex-findings.md b/pipeline/chain-state/publicmenu-260321-173134-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..db09e4ae8106ea92777fdb01212d4f40cc0f27b2
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260321-173134-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-173134
++
++## Findings
++1. [P3] PM-062 is outside `x.jsx` page code — `x.jsx` already passes `activeColor="#B5543A"` into `<CategoryChips />` at `x.jsx:3181-3188`, and `BUGS.md:64-68` already documents that the imported `CategoryChips` component ignores that prop. Another page-only patch here will be a no-op, so the active chip will stay indigo. FIX: change the active-state styling inside `@/components/publicMenu/refactor/CategoryChips` (B44/component prompt), not in `x.jsx`.
++2. [P1] Partner lookup hides real backend failures as “restaurant not found” — the partner query in `x.jsx:1322-1345` catches both lookup attempts and returns `null`, then the page renders `t('error.partner_not_found')` at `x.jsx:3035-3040`. Network/API failures are therefore misreported as a bad QR link. FIX: let transport/backend errors reach React Query, keep “not found” only for an empty successful lookup, and render retryable error UI for query errors.
++3. [P1] Order-status screen collapses fetch failures into “check the link” — `OrderStatusScreen` exposes `orderError` from React Query at `x.jsx:892-905`, but the render path merges `orderError || !order` into the same not-found state at `x.jsx:1030-1040`. A temporary backend failure tells the guest the token/link is invalid. FIX: split `orderError` from `!order`; show a retryable fetch-error state for query failures and reserve `order_status.not_found` for a successful empty lookup.
++4. [P2] Production `console.error` calls remain in guest flows — `x.jsx` still logs directly to the console in multiple runtime paths (`x.jsx:1530, 2066, 2159, 2408, 2512, 2543, 2547, 2887, 2918, 2948, 2974, 3005`). This leaves internal failure detail in production and repeats a class of issue already called out in `README.md:40`. FIX: remove direct console logging from page code or replace it with a centralized telemetry/logger path that is safe for production.
++5. [P3] No-op hook left in production as a hook-order placeholder — `useEffect(() => {}, [])` at `x.jsx:2313-2314` has no behavior and encodes a React anti-pattern instead of fixing structure. It adds noise and makes future hook-order regressions easier to hide. FIX: delete the placeholder effect; if hook ordering was previously conditional, move the branching into child components or unconditional hooks with real logic.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 1 P2, 2 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — `pages/PublicMenu/base/*.jsx` matches multiple files, but the prompt also says “ONLY these 3 files” and the task context points specifically to `x.jsx`.
++- Missing context (what info would have helped): It would help to say explicitly whether already-tracked bugs from `BUGS.md` should be re-reported when still present in `x.jsx`, or whether only newly observed issues should be listed.
++- Scope questions (anything you weren't sure if it's in scope): The prompt says “Find ALL bugs” but the embedded task context is a single-fix PM-062 scope lock. It was also unclear whether an out-of-file root cause (`CategoryChips`) should be reported when the page file already passes the prop correctly.
+
+codex
+Findings were written to [publicmenu-260321-173134-codex-findings.md](C:/Dev/menuapp-code-review/pipeline/chain-state/publicmenu-260321-173134-codex-findings.md).
+
+High-signal result: 5 findings total. The main ones are two P1 error-handling bugs in [x.jsx](C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx): partner lookup swallows backend failures and shows “restaurant not found”, and the embedded order-status view does the same with “check the link”. I also documented that PM-062 is not fixable in `x.jsx` because the page already passes `activeColor="#B5543A"` to `CategoryChips`; the remaining indigo state lives in the imported component, which matches [BUGS.md](C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md).
+
+I also saved page-local copies to [review_2026-03-21_publicmenu-260321-173134.md](C:/Dev/menuapp-code-review/pages/PublicMenu/review_2026-03-21_publicmenu-260321-173134.md) and [commands_2026-03-21_publicmenu-260321-173134.log](C:/Dev/menuapp-code-review/pages/PublicMenu/commands_2026-03-21_publicmenu-260321-173134.log). The plain dated `review_2026-03-21.md` and `commands_2026-03-21.log` already existed, so I did not overwrite them. No fixes were applied.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-21_publicmenu-260321-173134.log b/pages/PublicMenu/commands_2026-03-21_publicmenu-260321-173134.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..088e72e5f78b48de787e7729f8c27a313085987a
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-21_publicmenu-260321-173134.log
+@@ -0,0 +1,29 @@
++Get-ChildItem -Name pages/PublicMenu/base/*.jsx  # timed out (10s)
++Get-Content -Raw pages/PublicMenu/README.md  # timed out (10s)
++Get-Content -Raw pages/PublicMenu/BUGS.md  # timed out (10s)
++Get-ChildItem -Name pages/PublicMenu/base/*.jsx
++Get-Content -Raw pages/PublicMenu/README.md
++Get-Content -Raw pages/PublicMenu/BUGS.md
++Get-Content -Raw pages/PublicMenu/base/x.jsx
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'useQuery\(|partner_not_found|catch \{|console\.|dangerouslySetInnerHTML|createObjectURL|CategoryChips|activeColor|bg-indigo|aria-label|placeholder=|useEffect\(|useMemo\(' -Context 3,6
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $patterns = 'useQuery\(','partner_not_found','catch {','console\\\\.','dangerouslySetInnerHTML','createObjectURL','CategoryChips','activeColor','bg-indigo','aria-label','placeholder=','useEffect\\(','useMemo\\('; for ($i=0; $i -lt $lines.Length; $i++) { foreach ($p in $patterns) { if ($lines[$i] -match $p) { '{0}:{1}' -f ($i+1), $lines[$i]; break } } }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=1322; $end=1347; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=3034; $end=3056; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=3178; $end=3189; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=1519; $end=1532; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=2060; $end=2068; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=2310; $end=2316; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=892; $end=907; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'orderError|not_found|check_link|ErrorState|invalid_link' -Context 2,4
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=980; $end=1065; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'toast\.(success|error|info)\(' -Context 0,2
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern '"toast\.error"|"toast\.saved"|guest\.name_saved|cart\.items_removed_mode_switch|cart\.confirm_table\.|common\.loading' -Context 0,0
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern '"cart\.confirm_table\.dismissed"'
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=1490; $end=1505; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/base/x.jsx; $start=2089; $end=2098; for($i=$start;$i -le $end;$i++){ '{0}:{1}' -f $i,$lines[$i-1] }
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'setTimeout\(' -Context 2,2
++Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'BUG-PM-062|Partner lookup hides backend failures|BUG-PM-070|CategoryChips ignores activeColor prop' -Context 1,4
++Select-String -Path pages/PublicMenu/README.md -Pattern 'BUG-PM-040|BUG-PM-041|BUG-PM-042|BUG-PM-043|BUG-PM-044|BUG-PM-045|BUG-PM-046|BUG-PM-047|active' -Context 0,2
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'console\.error\(' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/base/x.jsx -Pattern 'console\.(log|warn)\(' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++New-Item -ItemType Directory -Force -Path pipeline/chain-state | Out-Null
+diff --git a/pages/PublicMenu/review_2026-03-21_publicmenu-260321-173134.md b/pages/PublicMenu/review_2026-03-21_publicmenu-260321-173134.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..db09e4ae8106ea92777fdb01212d4f40cc0f27b2
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-21_publicmenu-260321-173134.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-173134
++
++## Findings
++1. [P3] PM-062 is outside `x.jsx` page code — `x.jsx` already passes `activeColor="#B5543A"` into `<CategoryChips />` at `x.jsx:3181-3188`, and `BUGS.md:64-68` already documents that the imported `CategoryChips` component ignores that prop. Another page-only patch here will be a no-op, so the active chip will stay indigo. FIX: change the active-state styling inside `@/components/publicMenu/refactor/CategoryChips` (B44/component prompt), not in `x.jsx`.
++2. [P1] Partner lookup hides real backend failures as “restaurant not found” — the partner query in `x.jsx:1322-1345` catches both lookup attempts and returns `null`, then the page renders `t('error.partner_not_found')` at `x.jsx:3035-3040`. Network/API failures are therefore misreported as a bad QR link. FIX: let transport/backend errors reach React Query, keep “not found” only for an empty successful lookup, and render retryable error UI for query errors.
++3. [P1] Order-status screen collapses fetch failures into “check the link” — `OrderStatusScreen` exposes `orderError` from React Query at `x.jsx:892-905`, but the render path merges `orderError || !order` into the same not-found state at `x.jsx:1030-1040`. A temporary backend failure tells the guest the token/link is invalid. FIX: split `orderError` from `!order`; show a retryable fetch-error state for query failures and reserve `order_status.not_found` for a successful empty lookup.
++4. [P2] Production `console.error` calls remain in guest flows — `x.jsx` still logs directly to the console in multiple runtime paths (`x.jsx:1530, 2066, 2159, 2408, 2512, 2543, 2547, 2887, 2918, 2948, 2974, 3005`). This leaves internal failure detail in production and repeats a class of issue already called out in `README.md:40`. FIX: remove direct console logging from page code or replace it with a centralized telemetry/logger path that is safe for production.
++5. [P3] No-op hook left in production as a hook-order placeholder — `useEffect(() => {}, [])` at `x.jsx:2313-2314` has no behavior and encodes a React anti-pattern instead of fixing structure. It adds noise and makes future hook-order regressions easier to hide. FIX: delete the placeholder effect; if hook ordering was previously conditional, move the branching into child components or unconditional hooks with real logic.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 1 P2, 2 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — `pages/PublicMenu/base/*.jsx` matches multiple files, but the prompt also says “ONLY these 3 files” and the task context points specifically to `x.jsx`.
++- Missing context (what info would have helped): It would help to say explicitly whether already-tracked bugs from `BUGS.md` should be re-reported when still present in `x.jsx`, or whether only newly observed issues should be listed.
++- Scope questions (anything you weren't sure if it's in scope): The prompt says “Find ALL bugs” but the embedded task context is a single-fix PM-062 scope lock. It was also unclear whether an out-of-file root cause (`CategoryChips`) should be reported when the page file already passes the prop correctly.
+diff --git a/pipeline/chain-state/publicmenu-260321-173134-codex-findings.md b/pipeline/chain-state/publicmenu-260321-173134-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..db09e4ae8106ea92777fdb01212d4f40cc0f27b2
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260321-173134-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-173134
++
++## Findings
++1. [P3] PM-062 is outside `x.jsx` page code — `x.jsx` already passes `activeColor="#B5543A"` into `<CategoryChips />` at `x.jsx:3181-3188`, and `BUGS.md:64-68` already documents that the imported `CategoryChips` component ignores that prop. Another page-only patch here will be a no-op, so the active chip will stay indigo. FIX: change the active-state styling inside `@/components/publicMenu/refactor/CategoryChips` (B44/component prompt), not in `x.jsx`.
++2. [P1] Partner lookup hides real backend failures as “restaurant not found” — the partner query in `x.jsx:1322-1345` catches both lookup attempts and returns `null`, then the page renders `t('error.partner_not_found')` at `x.jsx:3035-3040`. Network/API failures are therefore misreported as a bad QR link. FIX: let transport/backend errors reach React Query, keep “not found” only for an empty successful lookup, and render retryable error UI for query errors.
++3. [P1] Order-status screen collapses fetch failures into “check the link” — `OrderStatusScreen` exposes `orderError` from React Query at `x.jsx:892-905`, but the render path merges `orderError || !order` into the same not-found state at `x.jsx:1030-1040`. A temporary backend failure tells the guest the token/link is invalid. FIX: split `orderError` from `!order`; show a retryable fetch-error state for query failures and reserve `order_status.not_found` for a successful empty lookup.
++4. [P2] Production `console.error` calls remain in guest flows — `x.jsx` still logs directly to the console in multiple runtime paths (`x.jsx:1530, 2066, 2159, 2408, 2512, 2543, 2547, 2887, 2918, 2948, 2974, 3005`). This leaves internal failure detail in production and repeats a class of issue already called out in `README.md:40`. FIX: remove direct console logging from page code or replace it with a centralized telemetry/logger path that is safe for production.
++5. [P3] No-op hook left in production as a hook-order placeholder — `useEffect(() => {}, [])` at `x.jsx:2313-2314` has no behavior and encodes a React anti-pattern instead of fixing structure. It adds noise and makes future hook-order regressions easier to hide. FIX: delete the placeholder effect; if hook ordering was previously conditional, move the branching into child components or unconditional hooks with real logic.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 1 P2, 2 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — `pages/PublicMenu/base/*.jsx` matches multiple files, but the prompt also says “ONLY these 3 files” and the task context points specifically to `x.jsx`.
++- Missing context (what info would have helped): It would help to say explicitly whether already-tracked bugs from `BUGS.md` should be re-reported when still present in `x.jsx`, or whether only newly observed issues should be listed.
++- Scope questions (anything you weren't sure if it's in scope): The prompt says “Find ALL bugs” but the embedded task context is a single-fix PM-062 scope lock. It was also unclear whether an out-of-file root cause (`CategoryChips`) should be reported when the page file already passes the prop correctly.
+
+tokens used
+140 199
+Findings were written to [publicmenu-260321-173134-codex-findings.md](C:/Dev/menuapp-code-review/pipeline/chain-state/publicmenu-260321-173134-codex-findings.md).
+
+High-signal result: 5 findings total. The main ones are two P1 error-handling bugs in [x.jsx](C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx): partner lookup swallows backend failures and shows “restaurant not found”, and the embedded order-status view does the same with “check the link”. I also documented that PM-062 is not fixable in `x.jsx` because the page already passes `activeColor="#B5543A"` to `CategoryChips`; the remaining indigo state lives in the imported component, which matches [BUGS.md](C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md).
+
+I also saved page-local copies to [review_2026-03-21_publicmenu-260321-173134.md](C:/Dev/menuapp-code-review/pages/PublicMenu/review_2026-03-21_publicmenu-260321-173134.md) and [commands_2026-03-21_publicmenu-260321-173134.log](C:/Dev/menuapp-code-review/pages/PublicMenu/commands_2026-03-21_publicmenu-260321-173134.log). The plain dated `review_2026-03-21.md` and `commands_2026-03-21.log` already existed, so I did not overwrite them. No fixes were applied.

@@ -1,0 +1,1066 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d44e0-0daf-7381-8f58-ef547cb75ee5
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Help Drawer Phase 1 — Ticket Board Architecture (#214) ## Контекст Help Drawer («Нужна помощь?») — компонент в x.jsx. Сейчас: карточки меняют цвет при pending, cardActionModal для повторных нажатий. Цель: переход на ticket board архитектуру (help-drawer.md v5.1). **Ключевые UX-документы:** `ux-concepts/HelpDrawer/help-drawer.md` v5.1, `GPT_HelpDrawer_UX_S209.md`, `GPT_HelpDrawer_Remind_S210.md` **Grep-подсказки (x.jsx):** - requestStates: ~line 1636 - HELP_COOLDOWN_SECONDS: ~line 1640 - hasLoadedHelpStatesRef: ~line 1645 - handleCardTap: ~line 1720 - handleUndo: ~line 1760 - cardActionModal: ~line 4080 - HD-08 summary block: ~line 3916 - Cards grid: ~line 3927 - Undo toast: ~line 4033 --- ## SCOPE LOCK **Файл:** ТОЛЬКО `pages/PublicMenu/x.jsx` **Компонент:** ТОЛЬКО Help Drawer (openHelpDrawer / HelpDrawerContent / handleCardTap / requestStates и связанные функции) **НЕ трогать:** PublicMenu основной UI, MenuView, CartView, StickyCartBar, любые другие компоненты --- ## FROZEN UX (DO NOT CHANGE) Следующие элементы уже работают и протестированы — **не изменять**: - **HD-06:** Undo toast 5 сек после тапа (снизу drawer: «Позвали официанта · Отменить (4с)») - **HD-07:** FAB badge на кнопке «Нужна помощь?» — dot/цифра при активных запросах - **HD-10:** `hasLoadedHelpStatesRef` guard — защита от race condition localStorage (KB-095 S208) - **HD-05:** localStorage ключ `helpdrawer_{partnerId}_{venueId}_{tableId}_{tableSessionId}` - **PM-125:** overlay stack порядок (Help Drawer поверх остального) - **DrawerContent:** НЕ добавлять `relative` класс на DrawerContent (KB-096/vaul breakage) E3 FROZEN UX grep verification (выполнить ПОСЛЕ всех изменений): ``` grep -n "hasLoadedHelpStatesRef" pages/PublicMenu/x.jsx # должен быть grep -n "helpdrawer_" pages/PublicMenu/x.jsx # должен быть grep -n "handleUndo" pages/PublicMenu/x.jsx # должен быть grep -n "cardActionModal" pages/PublicMenu/x.jsx # должен ОТСУТСТВОВАТЬ (Fix 1 удаляет) grep -n "HD-08" pages/PublicMenu/x.jsx # должен ОТСУТСТВОВАТЬ (Fix 1 удаляет) ``` --- ## Fixes ### Fix 1 — ARCHITECTURE: Ticket board + always-idle cards [CRITICAL] **Удалить:** - HD-08 summary block (~line 3916–3926): весь блок `{activeRequests.length >= 2 && <div>Активные запросы...</div>}` - cardActionModal (~line 4080–4130): весь modal с кнопками «Напомнить» / «Уже помогли» / «Закрыть» **Добавить — Раздел 1 «Мои запросы»** (ticket board, показывать только если есть активные запросы): ```jsx {activeRequests.length > 0 && ( <div className="mb-4"> <div className="flex items-center justify-between mb-2"> <span className="text-sm font-semibold text-gray-700">Мои запросы</span> <span className="text-xs text-gray-400">{activeRequests.length} активных</span> </div> {/* Строки тикетов — см. Fix 2 для структуры данных, Fix 3/4/6 для поведения */} {ticketBoardRows} {/* Fix 5: anxiety copy */} <p className="text-xs text-gray-400 mt-1">Статус обновляется автоматически</p> </div> )} ``` **Изменить карточки** (раздел «Отправить ещё»): - Карточки (Позвать, Счёт, Салфетки, Меню, Другое) — **всегда в idle состоянии** - Убрать любую логику изменения цвета/иконки карточки при `status === 'pending'` или `status === 'repeat'` - Заголовок «Отправить ещё» показывать только если есть раздел «Мои запросы» (т.е. activeRequests.length > 0) **Зависимость:** Fix 1 зависит от Fix 2 (новая структура requestStates нужна для ticketBoardRows). --- ### Fix 2 — STATE MODEL: Расширить requestStates [CRITICAL] **Текущая структура:** `requestStates[type] = { status, sentAt, message }` **Новая структура для стандартных типов:** ```js requestStates[type] = { status, // 'idle' | 'sending' | 'sent' | 'remind_available' | 'resolved' sentAt, // timestamp исходной отправки — НИКОГДА не меняется lastReminderAt, // timestamp последнего напоминания (null если не было) reminderCount, // число напоминаний (0 по умолчанию) remindCooldownUntil, // timestamp до которого кнопка «Напомнить» disabled (null если доступна) message, // для 'другое' } ``` **Для типа `other`** — изменить на массив записей: ```js requestStates['other'] = [ { id: uuid, status, sentAt, lastReminderAt, reminderCount, remindCooldownUntil, message }, ... ] ``` Каждый тап «Другое» + «Отправить» = новая запись в массиве. **Таймер отображения** (в компоненте строки тикета): - До 10 мин: «Только что» / «X мин назад» - После 10 мин: «Ждёте X мин» - Если `reminderCount > 0`: вторая строка «X напоминаний · последнее Y мин назад» - `sentAt` — основа таймера, не меняется при remind **setInterval** обновление каждые 30 сек (уже есть — проверить что считает от `sentAt`, не `lastReminderAt`). --- ### Fix 3 — SMART REDIRECT: Повторный тап на карточку [CRITICAL] **Текущее поведение:** повторный тап открывает cardActionModal. **Новое поведение:** если `requestStates[type].status` не 'idle' (уже есть активный запрос): ```js // Вместо открытия modal: 1. Скролл к разделу «Мои запросы» (scrollIntoView({ behavior: 'smooth' })) 2. Amber highlight строки тикета 1.5 сек (className добавить/убрать через setTimeout) 3. Toast снизу: «Запрос уже отправлен — смотри выше» ``` **НЕ показывать cardActionModal** — он удаляется в Fix 1. Реализовать через `useRef` на секцию «Мои запросы» + добавить `ticketRef` на каждую строку тикета. --- ### Fix 4 — ANTI-SPAM: Кнопка «Напомнить» с cooldown [IMPORTANT] В `handleRemind(type)`: ```js const handleRemind = (type) => { const REMIND_COOLDOWN_MS = 40_000; // 40 сек const now = Date.now(); setRequestStates(prev => { const current = prev[type]; // Обновить lastReminderAt, reminderCount, remindCooldownUntil return { ...prev, [type]: { ...current, lastReminderAt: now, reminderCount: (current.reminderCount || 0) + 1, remindCooldownUntil: now + REMIND_COOLDOWN_MS, } }; }); // Отправить сервисный запрос (аналог handleCardTap но без undo) // ... }; ``` **Кнопка «Напомнить» в строке тикета:** - Если `remindCooldownUntil > Date.now()`: disabled + текст «Повторить через MM:SS» (countdown) - Если cooldown истёк: активна, текст «Напомнить» - Countdown обновляется тем же setInterval что и таймер (каждые 30 сек достаточно) **Зависимость:** Fix 4 зависит от Fix 2 (поле `remindCooldownUntil` в state). --- ### Fix 5 — ANXIETY COPY: «Статус обновляется автоматически» [IMPORTANT] Добавить под разделом «Мои запросы» (если есть хотя бы 1 активный запрос): ```jsx <p className="text-xs text-gray-400 mt-1 text-center"> Статус обновляется автоматически </p> ``` Цель: снизить тревожность гостя при ожидании. Не показывать при 0 активных запросах. --- ### Fix 6 — COLLAPSE: Порог 4+, сортировка по старым [IMPORTANT] **Текущий порог collapse:** 3+ → **изменить на 4+**. **Логика:** - До 3 запросов включительно: показывать все строки - 4+ запросов: показывать первые 2, ниже коллапс «Ещё N запросов» **Сортировка строк тикетов:** по `sentAt` ascending (самые старые сверху — гость видит что ждал дольше всего). --- ### Fix 7 — PAID GATE: Free-план блокирует help drawer [NICE-TO-HAVE] В начале `handleCardTap(type)`, перед любой логикой: ```js if (partner?.plan === 'Free') { // показать toast toast({ title: t('helpDrawer.featureUnavailable') || 'Функция недоступна', description: t('helpDrawer.upgradePlan') || 'Эта функция не активирована для вашего заведения', duration: 3000, }); return; } ``` **Только если** поле `partner.plan` существует в текущем коде (grep проверить: `partner?.plan` или `partner.plan`). Если не существует — пропустить Fix 7 и записать в findings. --- ## ⚠️ Fix Dependencies ``` Fix 1 (архитектура) → требует Fix 2 (state model готов) Fix 3 (redirect) → требует Fix 1 (cardActionModal удалён) Fix 4 (antispam) → требует Fix 2 (remindCooldownUntil в state) Fix 5 (anxiety copy) → независим, добавить в Fix 1 блок Fix 6 (collapse) → независим Fix 7 (paid gate) → независим, первая строка handleCardTap ``` Рекомендуемый порядок реализации: Fix 2 → Fix 1 → Fix 3 → Fix 4 → Fix 5 → Fix 6 → Fix 7 --- ## MOBILE-FIRST CHECK После реализации проверить: - [ ] Раздел «Мои запросы» умещается в viewport 375px без горизонтального скролла - [ ] Кнопки «Напомнить» и «Уже помогли» min-h-[44px] (touch target) - [ ] Строки тикетов не перекрывают раздел «Отправить ещё» при 3+ запросах - [ ] Amber highlight виден на светлом фоне (bg-amber-50 или border-amber-300) - [ ] Countdown «Повторить через MM:SS» не обрезается в 320px viewport --- ## Regression Check Проверить после всех изменений: 1. HD-06 undo toast — всё ещё работает при первом тапе карточки 2. HD-07 FAB badge — обновляется при добавлении/удалении тикетов 3. localStorage restore — `hasLoadedHelpStatesRef` guard не сломан 4. «Другое» форма — inline, не modal, черновик сохраняется 5. x.jsx line count = исходный ± разумное изменение (не обрезан) === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/PublicMenu/x.jsx` within the page folder only, plus `README.md` and `BUGS.md` there for context. I’ll inspect the Help Drawer sections tied to the listed fixes, then write the findings file and the required review artifacts without touching code.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '(Get-Item pages/PublicMenu/x.jsx).FullName' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 10.54s:
+
+ exited 124 in 10.80s:
+
+codex
+The direct file checks timed out, so I’m retrying with longer reads and narrower commands on the same page folder. After that I’ll pull just the Help Drawer ranges needed for the fix list.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Path pages/PublicMenu | Select-Object -ExpandProperty Name' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Resolve-Path pages/PublicMenu/x.jsx | Select-Object -ExpandProperty Path' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 23.51s:
+components
+versions
+260320-01 useTableSession RELEASE.jsx
+260323-03 CheckoutView RELEASE.jsx
+260327-01 ModeTabs RELEASE.jsx
+260329-01 MenuView RELEASE.jsx
+260329-01 StickyCartBar RELEASE.jsx
+260330-02 CartView RELEASE.jsx
+260330-09 PublicMenu x RELEASE.jsx
+260331-01 PublicMenu x RELEASE.jsx
+ACCEPTANCE_CRITERIA_PHASE1.md
+BUGS.md
+CartView.jsx
+CartView.jsx.bak
+CartView.jsx.bak2
+CheckoutView.jsx
+COPY_SPEC.md
+i18n_DrawerUX_S79.csv
+i18n_WorkingHours_S79.csv
+MenuView.jsx
+ succeeded in 24.03s:
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/x.jsx'; (Get-Content "'$p | Select-Object -Skip 1600 -First 260)' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/x.jsx'; (Get-Content "'$p | Select-Object -Skip 3880 -First 280)' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/BUGS.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/README.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 25.28s:
+  // Set language from URL param or partner default
+  useEffect(() => {
+    if (!partner) return;
+    
+    const partnerDefault = partner.default_language || "RU";
+    const enabledLangs = Array.isArray(partner.enabled_languages) && partner.enabled_languages.length > 0
+      ? partner.enabled_languages
+      : [partnerDefault];
+    
+    if (langParam && enabledLangs.includes(langParam)) {
+      if (lang !== langParam) setLang(langParam);
+    } else if (!enabledLangs.includes(lang)) {
+      setLang(partnerDefault);
+    }
+  }, [partner?.id, partner?.default_language, langParam]);
+  // P0-7: Removed hallTableSelectEnabled - no dropdown
+
+  // P0-1: Table verified ONLY when actually resolved or verified by code input
+  // Removed hasTableInUrl from condition - URL param alone doesn't mean verified
+  const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
+ succeeded in 26.65s:
+            onOpen={openHelpDrawer}
+            t={t}
+          />
+          {/* HD-07: Badge showing active request count */}
+          {activeRequestCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-[#B5543A] text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-medium pointer-events-none z-10">
+              {activeRequestCount}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* PM-125: Help as Bottom Drawer (replaces HelpModal Dialog) */}
+      <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
+        <DrawerContent className="max-h-[85vh] rounded-t-2xl flex flex-col">
+          <div className="relative">
+            <button
+              onClick={closeHelpDrawer}
+              className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 z-10"
+              aria-label={t('common.close', 'Ð—Ð°ÐºÑ€Ñ‹Ñ‚ÑŒ')}
+ succeeded in 24.70s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 29.70s:
+---
+version: "41.0"
+updated: "2026-03-30"
+session: 205
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*9 active bugs remaining (0x P0, 4x P1, 4x P2, 0x P3, 1x suggestion).*
+
+### BUG-PM-132: List mode stepper buttons use w-9 h-9 (36px) instead of w-11 h-11 (44px) (P2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P2
+- **ÐšÐ¾Ð³Ð´Ð°:** S177 (found by Codex in chain 74b9, confirmed by CC)
+codex
+I’ve got the core Help Drawer block. Next I’m checking the exact in-file symbols tied to Fixes 1-7 so the report stays limited to the requested scope and calls out only what’s actually missing in this page.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/x.jsx'; (Get-Content "'$p | Select-Object -Skip 3980 -First 140)' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/x.jsx'; (Get-Content "'$p | Select-Object -Skip 1850 -First 120)' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'requestStates|handleCardTap|handleUndo|cardActionModal|pendingRequests|activeRequestCount|remind|collapse|partner\\?\\.plan|partner\\.plan|helpdrawer_|hasLoadedHelpStatesRef|setInterval|sentAt|lastReminderAt|reminderCount|remindCooldownUntil' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 14.68s:
+                    className={`relative col-span-2 rounded-xl border min-h-[48px] flex flex-row items-center justify-center gap-2 ${
+                      otherStatus === 'pending' ? 'bg-[#F5E6E0] border-[#E8CFC7]' :
+                      otherStatus === 'sending' ? 'bg-slate-50 border-slate-200' :
+                      otherStatus === 'repeat' ? 'bg-white border-amber-300' :
+                      'bg-white border-slate-200 active:border-blue-400 active:bg-blue-50'
+                    } disabled:cursor-not-allowed`}
+                  >
+                    {otherStatus === 'sending' ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                    ) : (
+                      <span className="text-xl">{'\u270F\uFE0F'}</span>
+                    )}
+                    <span className="text-sm font-medium text-slate-700">
+                      {otherStatus === 'sending' ? t('help.sending', 'ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð»ÑÐµÐ¼...') :
+                       otherStatus === 'repeat' ? t('help.remind_staff', 'ÐÐ°Ð¿Ð¾Ð¼Ð½Ð¸Ñ‚ÑŒ Ð¿ÐµÑ€ÑÐ¾Ð½Ð°Ð»Ñƒ') :
+                       otherStatus === 'pending' && otherSt?.message
+                         ? `âœ“ "${otherSt.message.slice(0, 25)}${otherSt.message.length > 25 ? '...' : ''}"` :
+                       otherStatus === 'pending' ? t('help.other', 'Ð”Ñ€ÑƒÐ³Ð¾Ðµ') :
+                       t('help.other', 'Ð”Ñ€ÑƒÐ³Ð¾Ðµ')}
+                    </span>
+ succeeded in 15.03s:
+  useEffect(() => {
+    if (!currentTableId || !hasLoadedHelpStatesRef.current) return; // HD-10: skip until load completes
+    const key = `helpdrawer_${currentTableId}`;
+    const persistable = {};
+    for (const [type, state] of Object.entries(requestStates)) {
+      if (state.status === 'pending' || state.status === 'repeat') {
+        persistable[type] = state;
+      }
+    }
+    if (Object.keys(persistable).length === 0) {
+      localStorage.removeItem(key);
+    } else {
+      localStorage.setItem(key, JSON.stringify(persistable));
+    }
+  }, [requestStates, currentTableId]);
+
+  // PM-125: Cart-to-help sequencing â€” close cart first, 300ms delay, then open help
+  const handleHelpFromCart = useCallback(() => {
+    popOverlay('cart');
+    setDrawerMode(null);
+ succeeded in 13.48s:
+959:const id = setInterval(async () => {
+978:const id = setInterval(tick, 1000);
+1663:const [requestStates, setRequestStates] = useState({});
+1664:const hasLoadedHelpStatesRef = useRef(false); // HD-10: prevent save effect from wiping localStorage before load
+1665:// HD-05: Load requestStates from localStorage on mount (restore badge + card state after refresh)
+1669:const key = `helpdrawer_${currentTableId}`;
+1671:if (!stored) { hasLoadedHelpStatesRef.current = true; return; }
+1677:if ((state.status === 'pending' || state.status === 'repeat') && state.sentAt) {
+1678:const elapsed = now - state.sentAt;
+1681:? { status: 'repeat', sentAt: state.sentAt }
+1687:setRequestStates(updated);
+1690:hasLoadedHelpStatesRef.current = true;
+1692:const [cardActionModal, setCardActionModal] = useState(null); // HD-01v3: null or card type string
+1693:// Structure: { call_waiter: { status: 'idle'|'sending'|'pending'|'repeat'|'resolved', sentAt: timestamp, message?: string }, ... }
+1700:const getRelativeTime = useCallback((sentAtMs) => {
+1701:const seconds = Math.floor((Date.now() - sentAtMs) / 1000);
+1707:const activeRequestCount = useMemo(() =>
+1708:Object.values(requestStates).filter(s => s.status === 'pending' || s.status === 'sending').length,
+1709:[requestStates]);
+1712:const pendingRequests = useMemo(() =>
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'scrollIntoView|ticketBoard|ticketRef|amber|highlight|resolved|activeRequests|showMore|Ещё .*запросов|handleRemind|Напомнить|Уже помогли|Мои запросы|Отправить ещё|Статус обновляется автоматически' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/README.md -Encoding UTF8' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'help.comment_placeholder_other|help.featureUnavailable|helpDrawer.featureUnavailable|helpDrawer.upgradePlan|featureUnavailable|upgradePlan' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 14.67s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu — README
+
+Страница публичного меню ресторана (`/x`). Гость сканирует QR-код, видит меню,
+добавляет блюда, оформляет заказ. Работает в трёх режимах: зал, самовывоз, доставка.
+
+## Текущий RELEASE
+
+| Файл | RELEASE | Дата | Сессия |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 мар 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 мар 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 мар 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 мар 2026 | S68 |
+
+ succeeded in 15.44s:
+409:"error.send.subtitle": "Попробуйте отправить ещё раз",
+1562:resolvedTable,
+1618:// P0-1: Table verified ONLY when actually resolved or verified by code input
+1620:const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
+1630:// P0-2: currentTableId only from resolved table or code verification
+1631:const currentTableId = resolvedTable?.id || verifiedTableId || null;
+1634:const currentTable = resolvedTable || verifiedTable || null;
+1693:// Structure: { call_waiter: { status: 'idle'|'sending'|'pending'|'repeat'|'resolved', sentAt: timestamp, message?: string }, ... }
+2518:if (chip) chip.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
+2525:if (key === "all") listTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+2526:else sectionRefs.current[key]?.scrollIntoView({ behavior: "smooth", block: "start" });
+2731:el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+3550:resolvedTable={resolvedTable}
+3946:status === 'repeat' ? 'bg-white border-amber-300' :
+3959:status === 'repeat' ? t('help.remind_staff', 'Напомнить персоналу') :
+3984:otherStatus === 'repeat' ? 'bg-white border-amber-300' :
+3995:otherStatus === 'repeat' ? t('help.remind_staff', 'Напомнить персоналу') :
+4037:<button onClick={handleUndo} className="text-amber-300 font-medium ml-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
+4104:{t('help.remind_staff', 'Напомнить персоналу')}
+ succeeded in 14.99s:
+4027:placeholder={t('help.comment_placeholder_other', 'Например: детский стул, приборы, убрать со стола')}
+codex
+I’ve confirmed the file still contains the pre-ticket-board implementation. I’m pulling numbered excerpts now so the findings can point to exact lines for each requested fix and stay scoped to Help Drawer only.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/x.jsx'; "'$start=1660; $count=210; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '"'{0}:{1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/x.jsx'; "'$start=3910; $count=220; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '"'{0}:{1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 10.80s:
+1660:  }), [t]);
+1661:  const HELP_CHIPS = useMemo(() => ['Ð”ÐµÑ‚ÑÐºÐ¸Ð¹ ÑÑ‚ÑƒÐ»', 'ÐŸÑ€Ð¸Ð±Ð¾Ñ€Ñ‹', 'Ð¡Ð¾ÑƒÑ', 'Ð£Ð±Ñ€Ð°Ñ‚ÑŒ ÑÐ¾ ÑÑ‚Ð¾Ð»Ð°', 'Ð’Ð¾Ð´Ð°'], []);
+1662:
+1663:  const [requestStates, setRequestStates] = useState({});
+1664:  const hasLoadedHelpStatesRef = useRef(false); // HD-10: prevent save effect from wiping localStorage before load
+1665:  // HD-05: Load requestStates from localStorage on mount (restore badge + card state after refresh)
+1666:  useEffect(() => {
+1667:    if (!currentTableId) return;
+1668:    try {
+1669:      const key = `helpdrawer_${currentTableId}`;
+1670:      const stored = localStorage.getItem(key);
+1671:      if (!stored) { hasLoadedHelpStatesRef.current = true; return; }
+1672:      const parsed = JSON.parse(stored);
+1673:      const now = Date.now();
+1674:      const updated = {};
+1675:      for (const [type, state] of Object.entries(parsed)) {
+1676:        const cooldownMs = (HELP_COOLDOWN_SECONDS[type] || 120) * 1000;
+1677:        if ((state.status === 'pending' || state.status === 'repeat') && state.sentAt) {
+1678:          const elapsed = now - state.sentAt;
+1679:          if (elapsed < cooldownMs + 60000) {
+ succeeded in 10.85s:
+3910:            {currentTable && (
+3911:              <div className="flex items-center justify-center gap-2 text-sm text-slate-600">
+3912:                <MapPin className="w-4 h-4" />
+3913:                <span>{currentTable?.name || currentTable?.code}</span>
+3914:              </div>
+3915:            )}
+3916:            {/* HD-08: Active requests summary block */}
+3917:            {pendingRequests.length >= 2 && (
+3918:              <div className="bg-[#F5E6E0] text-slate-700 text-sm rounded-lg p-3 space-y-1">
+3919:                <div className="font-medium">ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹Ðµ Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹ Â· {pendingRequests.length}</div>
+3920:                {pendingRequests.map(({ type, sentAt, message }) => (
+3921:                  <div key={type} className="text-slate-600">
+3922:                    {HELP_CARD_LABELS[type] || type}{message ? ` "${message.slice(0, 30)}${message.length > 30 ? '...' : ''}"` : ''} Â· {getRelativeTime(sentAt)}
+3923:                  </div>
+3924:                ))}
+3925:              </div>
+3926:            )}
+3927:            {/* HD-01: Per-card state help cards */}
+3928:            <div className="grid grid-cols-2 gap-3">
+3929:              {[
+codex
+The review itself is complete. I’m writing three artifacts now: the requested pipeline findings file, a same-day page-level review copy, and the command log required by this repo’s review workflow.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pipeline/chain-state' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.59s:
+True
+ succeeded in 2.59s:
+True
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-31.log
+Get-ChildItem -Name pages/PublicMenu
+(Get-Item pages/PublicMenu/x.jsx).FullName
+Get-ChildItem -Path pages/PublicMenu | Select-Object -ExpandProperty Name
+Resolve-Path pages/PublicMenu/x.jsx | Select-Object -ExpandProperty Path
+Get-Content pages/PublicMenu/README.md
+Get-Content pages/PublicMenu/BUGS.md
+$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1600 -First 260)
+$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3880 -First 280)
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'requestStates|handleCardTap|handleUndo|cardActionModal|pendingRequests|activeRequestCount|remind|collapse|partner\?\.plan|partner\.plan|helpdrawer_|hasLoadedHelpStatesRef|setInterval|sentAt|lastReminderAt|reminderCount|remindCooldownUntil' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1850 -First 120)
+$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3980 -First 140)
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'scrollIntoView|ticketBoard|ticketRef|amber|highlight|resolved|activeRequests|showMore|Ещё .*запросов|handleRemind|Напомнить|Уже помогли|Мои запросы|Отправить ещё|Статус обновляется автоматически' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'help.comment_placeholder_other|help.featureUnavailable|helpDrawer.featureUnavailable|helpDrawer.upgradePlan|featureUnavailable|upgradePlan' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+Get-Content pages/PublicMenu/README.md -Encoding UTF8
+$p='pages/PublicMenu/x.jsx'; $start=1660; $count=210; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
+$p='pages/PublicMenu/x.jsx'; $start=3910; $count=220; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
+Test-Path pipeline/chain-state
+Test-Path pages/PublicMenu
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
+
+## Findings
+1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
+2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
+3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
+4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
+5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
+6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
+7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
+
+## Summary
+Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none
+- Scope questions (anything you weren't sure if it's in scope): none
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-31.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
+
+Scope reviewed: `pages/PublicMenu/x.jsx` Help Drawer only, plus `pages/PublicMenu/README.md` and `pages/PublicMenu/BUGS.md` for page context.
+
+## Findings
+1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
+2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
+3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
+4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
+5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
+6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
+7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
+
+## Summary
+Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none
+- Scope questions (anything you weren't sure if it's in scope): none
+apply_patch(auto_approved=true) exited 0 in 268ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+A pages/PublicMenu/review_2026-03-31.md
+A pages/PublicMenu/commands_2026-03-31.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-31.log b/pages/PublicMenu/commands_2026-03-31.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..d0183a99761df4d778373949c5fc9de8d669ea7f
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-31.log
+@@ -0,0 +1,18 @@
++Get-ChildItem -Name pages/PublicMenu
++(Get-Item pages/PublicMenu/x.jsx).FullName
++Get-ChildItem -Path pages/PublicMenu | Select-Object -ExpandProperty Name
++Resolve-Path pages/PublicMenu/x.jsx | Select-Object -ExpandProperty Path
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1600 -First 260)
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3880 -First 280)
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'requestStates|handleCardTap|handleUndo|cardActionModal|pendingRequests|activeRequestCount|remind|collapse|partner\?\.plan|partner\.plan|helpdrawer_|hasLoadedHelpStatesRef|setInterval|sentAt|lastReminderAt|reminderCount|remindCooldownUntil' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1850 -First 120)
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3980 -First 140)
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'scrollIntoView|ticketBoard|ticketRef|amber|highlight|resolved|activeRequests|showMore|Ещё .*запросов|handleRemind|Напомнить|Уже помогли|Мои запросы|Отправить ещё|Статус обновляется автоматически' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'help.comment_placeholder_other|help.featureUnavailable|helpDrawer.featureUnavailable|helpDrawer.upgradePlan|featureUnavailable|upgradePlan' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Get-Content pages/PublicMenu/README.md -Encoding UTF8
++$p='pages/PublicMenu/x.jsx'; $start=1660; $count=210; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++$p='pages/PublicMenu/x.jsx'; $start=3910; $count=220; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++Test-Path pipeline/chain-state
++Test-Path pages/PublicMenu
+diff --git a/pages/PublicMenu/review_2026-03-31.md b/pages/PublicMenu/review_2026-03-31.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..301fb780e2f53f87bbeea70e8b76a8894a268e15
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-31.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
++
++Scope reviewed: `pages/PublicMenu/x.jsx` Help Drawer only, plus `pages/PublicMenu/README.md` and `pages/PublicMenu/BUGS.md` for page context.
++
++## Findings
++1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
++2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
++3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
++4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
++5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
++6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
++7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
++
++## Summary
++Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+diff --git a/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md b/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec12d9e8013428686571cbb6f2baca696919796d
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
++
++## Findings
++1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
++2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
++3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
++4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
++5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
++6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
++7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
++
++## Summary
++Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-31.log b/pages/PublicMenu/commands_2026-03-31.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..d0183a99761df4d778373949c5fc9de8d669ea7f
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-31.log
+@@ -0,0 +1,18 @@
++Get-ChildItem -Name pages/PublicMenu
++(Get-Item pages/PublicMenu/x.jsx).FullName
++Get-ChildItem -Path pages/PublicMenu | Select-Object -ExpandProperty Name
++Resolve-Path pages/PublicMenu/x.jsx | Select-Object -ExpandProperty Path
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1600 -First 260)
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3880 -First 280)
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'requestStates|handleCardTap|handleUndo|cardActionModal|pendingRequests|activeRequestCount|remind|collapse|partner\?\.plan|partner\.plan|helpdrawer_|hasLoadedHelpStatesRef|setInterval|sentAt|lastReminderAt|reminderCount|remindCooldownUntil' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1850 -First 120)
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3980 -First 140)
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'scrollIntoView|ticketBoard|ticketRef|amber|highlight|resolved|activeRequests|showMore|Ещё .*запросов|handleRemind|Напомнить|Уже помогли|Мои запросы|Отправить ещё|Статус обновляется автоматически' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'help.comment_placeholder_other|help.featureUnavailable|helpDrawer.featureUnavailable|helpDrawer.upgradePlan|featureUnavailable|upgradePlan' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Get-Content pages/PublicMenu/README.md -Encoding UTF8
++$p='pages/PublicMenu/x.jsx'; $start=1660; $count=210; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++$p='pages/PublicMenu/x.jsx'; $start=3910; $count=220; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++Test-Path pipeline/chain-state
++Test-Path pages/PublicMenu
+diff --git a/pages/PublicMenu/review_2026-03-31.md b/pages/PublicMenu/review_2026-03-31.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..301fb780e2f53f87bbeea70e8b76a8894a268e15
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-31.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
++
++Scope reviewed: `pages/PublicMenu/x.jsx` Help Drawer only, plus `pages/PublicMenu/README.md` and `pages/PublicMenu/BUGS.md` for page context.
++
++## Findings
++1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
++2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
++3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
++4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
++5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
++6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
++7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
++
++## Summary
++Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+diff --git a/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md b/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec12d9e8013428686571cbb6f2baca696919796d
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
++
++## Findings
++1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
++2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
++3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
++4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
++5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
++6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
++7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
++
++## Summary
++Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+
+codex
+The files are written. I’m doing a quick read-back on the saved findings and command log so the handoff is clean and the pipeline path has the expected content.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/commands_2026-03-31.log' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/review_2026-03-31.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.92s:
+Get-ChildItem -Name pages/PublicMenu
+(Get-Item pages/PublicMenu/x.jsx).FullName
+Get-ChildItem -Path pages/PublicMenu | Select-Object -ExpandProperty Name
+Resolve-Path pages/PublicMenu/x.jsx | Select-Object -ExpandProperty Path
+Get-Content pages/PublicMenu/README.md
+Get-Content pages/PublicMenu/BUGS.md
+$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1600 -First 260)
+$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3880 -First 280)
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'requestStates|handleCardTap|handleUndo|cardActionModal|pendingRequests|activeRequestCount|remind|collapse|partner\?\.plan|partner\.plan|helpdrawer_|hasLoadedHelpStatesRef|setInterval|sentAt|lastReminderAt|reminderCount|remindCooldownUntil' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1850 -First 120)
+$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3980 -First 140)
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'scrollIntoView|ticketBoard|ticketRef|amber|highlight|resolved|activeRequests|showMore|Ð•Ñ‰Ñ‘ .*Ð·Ð°Ð¿Ñ€Ð¾ÑÐ¾Ð²|handleRemind|ÐÐ°Ð¿Ð¾Ð¼Ð½Ð¸Ñ‚ÑŒ|Ð£Ð¶Ðµ Ð¿Ð¾Ð¼Ð¾Ð³Ð»Ð¸|ÐœÐ¾Ð¸ Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹|ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ ÐµÑ‰Ñ‘|Ð¡Ñ‚Ð°Ñ‚ÑƒÑ Ð¾Ð±Ð½Ð¾Ð²Ð»ÑÐµÑ‚ÑÑ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'help.comment_placeholder_other|help.featureUnavailable|helpDrawer.featureUnavailable|helpDrawer.upgradePlan|featureUnavailable|upgradePlan' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+Get-Content pages/PublicMenu/README.md -Encoding UTF8
+$p='pages/PublicMenu/x.jsx'; $start=1660; $count=210; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
+$p='pages/PublicMenu/x.jsx'; $start=3910; $count=220; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
+Test-Path pipeline/chain-state
+Test-Path pages/PublicMenu
+ succeeded in 2.96s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260331-221017-8992
+
+## Findings
+1. [P1] Fix 1 â€” legacy summary/modal architecture is still in place â€” `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `ÐœÐ¾Ð¸ Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹` ticket-board section and no conditional `ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ ÐµÑ‰Ñ‘` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `ÐœÐ¾Ð¸ Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
+2. [P1] Fix 2 â€” `requestStates` is still the old flat model and cannot support ticket rows/reminders â€” `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats â€œjust now / X min agoâ€. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
+3. [P1] Fix 3 â€” repeated taps still open the action modal instead of redirecting to a ticket row â€” `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no â€œÐ—Ð°Ð¿Ñ€Ð¾Ñ ÑƒÐ¶Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½ â€” ÑÐ¼Ð¾Ñ‚Ñ€Ð¸ Ð²Ñ‹ÑˆÐµâ€ toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `ÐœÐ¾Ð¸ Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹` row via refs, flash that row for 1.5s, and show the bottom toast.
+4. [P1] Fix 4 â€” reminder flow has no dedicated anti-spam cooldown or countdown state â€” there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled â€œÐŸÐ¾Ð²Ñ‚Ð¾Ñ€Ð¸Ñ‚ÑŒ Ñ‡ÐµÑ€ÐµÐ· MM:SSâ€ button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
+5. [P2] Fix 5 â€” the required anxiety-reducing copy is missing â€” there is no `Ð¡Ñ‚Ð°Ñ‚ÑƒÑ Ð¾Ð±Ð½Ð¾Ð²Ð»ÑÐµÑ‚ÑÑ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `ÐœÐ¾Ð¸ Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹` section, render the centered helper copy only when at least one active request exists.
+6. [P2] Fix 6 â€” ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold â€” `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or â€œÐ•Ñ‰Ñ‘ N Ð·Ð°Ð¿Ñ€Ð¾ÑÐ¾Ð²â€ UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
+7. [P3] Fix 7 â€” Free-plan gate is blocked by missing `partner.plan` usage in this file â€” `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
+
+## Summary
+Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY â€” do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none
+- Scope questions (anything you weren't sure if it's in scope): none
+ succeeded in 2.96s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260331-221017-8992
+
+Scope reviewed: `pages/PublicMenu/x.jsx` Help Drawer only, plus `pages/PublicMenu/README.md` and `pages/PublicMenu/BUGS.md` for page context.
+
+## Findings
+1. [P1] Fix 1 â€” legacy summary/modal architecture is still in place â€” `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `ÐœÐ¾Ð¸ Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹` ticket-board section and no conditional `ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ ÐµÑ‰Ñ‘` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `ÐœÐ¾Ð¸ Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
+2. [P1] Fix 2 â€” `requestStates` is still the old flat model and cannot support ticket rows/reminders â€” `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats â€œjust now / X min agoâ€. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
+3. [P1] Fix 3 â€” repeated taps still open the action modal instead of redirecting to a ticket row â€” `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no â€œÐ—Ð°Ð¿Ñ€Ð¾Ñ ÑƒÐ¶Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½ â€” ÑÐ¼Ð¾Ñ‚Ñ€Ð¸ Ð²Ñ‹ÑˆÐµâ€ toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `ÐœÐ¾Ð¸ Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹` row via refs, flash that row for 1.5s, and show the bottom toast.
+4. [P1] Fix 4 â€” reminder flow has no dedicated anti-spam cooldown or countdown state â€” there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled â€œÐŸÐ¾Ð²Ñ‚Ð¾Ñ€Ð¸Ñ‚ÑŒ Ñ‡ÐµÑ€ÐµÐ· MM:SSâ€ button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
+5. [P2] Fix 5 â€” the required anxiety-reducing copy is missing â€” there is no `Ð¡Ñ‚Ð°Ñ‚ÑƒÑ Ð¾Ð±Ð½Ð¾Ð²Ð»ÑÐµÑ‚ÑÑ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `ÐœÐ¾Ð¸ Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹` section, render the centered helper copy only when at least one active request exists.
+6. [P2] Fix 6 â€” ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold â€” `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or â€œÐ•Ñ‰Ñ‘ N Ð·Ð°Ð¿Ñ€Ð¾ÑÐ¾Ð²â€ UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
+7. [P3] Fix 7 â€” Free-plan gate is blocked by missing `partner.plan` usage in this file â€” `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
+
+## Summary
+Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY â€” do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-31.log b/pages/PublicMenu/commands_2026-03-31.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..d0183a99761df4d778373949c5fc9de8d669ea7f
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-31.log
+@@ -0,0 +1,18 @@
++Get-ChildItem -Name pages/PublicMenu
++(Get-Item pages/PublicMenu/x.jsx).FullName
++Get-ChildItem -Path pages/PublicMenu | Select-Object -ExpandProperty Name
++Resolve-Path pages/PublicMenu/x.jsx | Select-Object -ExpandProperty Path
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1600 -First 260)
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3880 -First 280)
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'requestStates|handleCardTap|handleUndo|cardActionModal|pendingRequests|activeRequestCount|remind|collapse|partner\?\.plan|partner\.plan|helpdrawer_|hasLoadedHelpStatesRef|setInterval|sentAt|lastReminderAt|reminderCount|remindCooldownUntil' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1850 -First 120)
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3980 -First 140)
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'scrollIntoView|ticketBoard|ticketRef|amber|highlight|resolved|activeRequests|showMore|Ещё .*запросов|handleRemind|Напомнить|Уже помогли|Мои запросы|Отправить ещё|Статус обновляется автоматически' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'help.comment_placeholder_other|help.featureUnavailable|helpDrawer.featureUnavailable|helpDrawer.upgradePlan|featureUnavailable|upgradePlan' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Get-Content pages/PublicMenu/README.md -Encoding UTF8
++$p='pages/PublicMenu/x.jsx'; $start=1660; $count=210; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++$p='pages/PublicMenu/x.jsx'; $start=3910; $count=220; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++Test-Path pipeline/chain-state
++Test-Path pages/PublicMenu
+diff --git a/pages/PublicMenu/review_2026-03-31.md b/pages/PublicMenu/review_2026-03-31.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..301fb780e2f53f87bbeea70e8b76a8894a268e15
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-31.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
++
++Scope reviewed: `pages/PublicMenu/x.jsx` Help Drawer only, plus `pages/PublicMenu/README.md` and `pages/PublicMenu/BUGS.md` for page context.
++
++## Findings
++1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
++2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
++3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
++4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
++5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
++6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
++7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
++
++## Summary
++Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+diff --git a/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md b/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec12d9e8013428686571cbb6f2baca696919796d
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
++
++## Findings
++1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
++2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
++3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
++4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
++5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
++6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
++7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
++
++## Summary
++Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+
+codex
+The file contents are there. The default shell view mangled Cyrillic on read-back, so I’m doing one UTF-8 check before closing to make sure the saved report text itself is intact.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/review_2026-03-31.md -Encoding UTF8' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md -Encoding UTF8' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 6.49s:
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
+
+Scope reviewed: `pages/PublicMenu/x.jsx` Help Drawer only, plus `pages/PublicMenu/README.md` and `pages/PublicMenu/BUGS.md` for page context.
+
+## Findings
+1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
+2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
+3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
+4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
+5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
+6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
+7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
+
+## Summary
+Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none
+ succeeded in 6.49s:
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
+
+## Findings
+1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
+2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
+3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
+4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
+5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
+6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
+7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
+
+## Summary
+Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none
+- Scope questions (anything you weren't sure if it's in scope): none
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-31.log b/pages/PublicMenu/commands_2026-03-31.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..d0183a99761df4d778373949c5fc9de8d669ea7f
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-31.log
+@@ -0,0 +1,18 @@
++Get-ChildItem -Name pages/PublicMenu
++(Get-Item pages/PublicMenu/x.jsx).FullName
++Get-ChildItem -Path pages/PublicMenu | Select-Object -ExpandProperty Name
++Resolve-Path pages/PublicMenu/x.jsx | Select-Object -ExpandProperty Path
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1600 -First 260)
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3880 -First 280)
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'requestStates|handleCardTap|handleUndo|cardActionModal|pendingRequests|activeRequestCount|remind|collapse|partner\?\.plan|partner\.plan|helpdrawer_|hasLoadedHelpStatesRef|setInterval|sentAt|lastReminderAt|reminderCount|remindCooldownUntil' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1850 -First 120)
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3980 -First 140)
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'scrollIntoView|ticketBoard|ticketRef|amber|highlight|resolved|activeRequests|showMore|Ещё .*запросов|handleRemind|Напомнить|Уже помогли|Мои запросы|Отправить ещё|Статус обновляется автоматически' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'help.comment_placeholder_other|help.featureUnavailable|helpDrawer.featureUnavailable|helpDrawer.upgradePlan|featureUnavailable|upgradePlan' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Get-Content pages/PublicMenu/README.md -Encoding UTF8
++$p='pages/PublicMenu/x.jsx'; $start=1660; $count=210; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++$p='pages/PublicMenu/x.jsx'; $start=3910; $count=220; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++Test-Path pipeline/chain-state
++Test-Path pages/PublicMenu
+diff --git a/pages/PublicMenu/review_2026-03-31.md b/pages/PublicMenu/review_2026-03-31.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..301fb780e2f53f87bbeea70e8b76a8894a268e15
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-31.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
++
++Scope reviewed: `pages/PublicMenu/x.jsx` Help Drawer only, plus `pages/PublicMenu/README.md` and `pages/PublicMenu/BUGS.md` for page context.
++
++## Findings
++1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
++2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
++3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
++4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
++5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
++6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
++7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
++
++## Summary
++Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+diff --git a/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md b/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec12d9e8013428686571cbb6f2baca696919796d
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
++
++## Findings
++1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
++2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
++3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
++4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
++5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
++6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
++7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
++
++## Summary
++Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+
+codex
+I added two final verification reads after creating the log, so I’m appending those as well. That keeps the command log complete instead of “complete up to write time.”
+file update
+M C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-31.log
+@@ -18 +18,6 @@
+ Test-Path pages/PublicMenu
++Get-Content pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
++Get-Content pages/PublicMenu/review_2026-03-31.md
++Get-Content pages/PublicMenu/commands_2026-03-31.log
++Get-Content pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md -Encoding UTF8
++Get-Content pages/PublicMenu/review_2026-03-31.md -Encoding UTF8
+apply_patch(auto_approved=true) exited 0 in 210ms:
+Success. Updated the following files:
+M pages/PublicMenu/commands_2026-03-31.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-31.log b/pages/PublicMenu/commands_2026-03-31.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..8c8d6a594466fb4711f639e36fe99942edb2580c
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-31.log
+@@ -0,0 +1,23 @@
++Get-ChildItem -Name pages/PublicMenu
++(Get-Item pages/PublicMenu/x.jsx).FullName
++Get-ChildItem -Path pages/PublicMenu | Select-Object -ExpandProperty Name
++Resolve-Path pages/PublicMenu/x.jsx | Select-Object -ExpandProperty Path
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1600 -First 260)
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3880 -First 280)
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'requestStates|handleCardTap|handleUndo|cardActionModal|pendingRequests|activeRequestCount|remind|collapse|partner\?\.plan|partner\.plan|helpdrawer_|hasLoadedHelpStatesRef|setInterval|sentAt|lastReminderAt|reminderCount|remindCooldownUntil' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1850 -First 120)
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3980 -First 140)
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'scrollIntoView|ticketBoard|ticketRef|amber|highlight|resolved|activeRequests|showMore|Ещё .*запросов|handleRemind|Напомнить|Уже помогли|Мои запросы|Отправить ещё|Статус обновляется автоматически' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'help.comment_placeholder_other|help.featureUnavailable|helpDrawer.featureUnavailable|helpDrawer.upgradePlan|featureUnavailable|upgradePlan' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Get-Content pages/PublicMenu/README.md -Encoding UTF8
++$p='pages/PublicMenu/x.jsx'; $start=1660; $count=210; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++$p='pages/PublicMenu/x.jsx'; $start=3910; $count=220; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++Test-Path pipeline/chain-state
++Test-Path pages/PublicMenu
++Get-Content pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
++Get-Content pages/PublicMenu/review_2026-03-31.md
++Get-Content pages/PublicMenu/commands_2026-03-31.log
++Get-Content pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md -Encoding UTF8
++Get-Content pages/PublicMenu/review_2026-03-31.md -Encoding UTF8
+diff --git a/pages/PublicMenu/review_2026-03-31.md b/pages/PublicMenu/review_2026-03-31.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..301fb780e2f53f87bbeea70e8b76a8894a268e15
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-31.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
++
++Scope reviewed: `pages/PublicMenu/x.jsx` Help Drawer only, plus `pages/PublicMenu/README.md` and `pages/PublicMenu/BUGS.md` for page context.
++
++## Findings
++1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
++2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
++3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
++4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
++5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
++6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
++7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
++
++## Summary
++Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+diff --git a/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md b/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec12d9e8013428686571cbb6f2baca696919796d
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
++
++## Findings
++1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
++2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
++3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
++4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
++5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
++6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
++7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
++
++## Summary
++Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-31.log b/pages/PublicMenu/commands_2026-03-31.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..8c8d6a594466fb4711f639e36fe99942edb2580c
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-31.log
+@@ -0,0 +1,23 @@
++Get-ChildItem -Name pages/PublicMenu
++(Get-Item pages/PublicMenu/x.jsx).FullName
++Get-ChildItem -Path pages/PublicMenu | Select-Object -ExpandProperty Name
++Resolve-Path pages/PublicMenu/x.jsx | Select-Object -ExpandProperty Path
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1600 -First 260)
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3880 -First 280)
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'requestStates|handleCardTap|handleUndo|cardActionModal|pendingRequests|activeRequestCount|remind|collapse|partner\?\.plan|partner\.plan|helpdrawer_|hasLoadedHelpStatesRef|setInterval|sentAt|lastReminderAt|reminderCount|remindCooldownUntil' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1850 -First 120)
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3980 -First 140)
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'scrollIntoView|ticketBoard|ticketRef|amber|highlight|resolved|activeRequests|showMore|Ещё .*запросов|handleRemind|Напомнить|Уже помогли|Мои запросы|Отправить ещё|Статус обновляется автоматически' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'help.comment_placeholder_other|help.featureUnavailable|helpDrawer.featureUnavailable|helpDrawer.upgradePlan|featureUnavailable|upgradePlan' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Get-Content pages/PublicMenu/README.md -Encoding UTF8
++$p='pages/PublicMenu/x.jsx'; $start=1660; $count=210; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++$p='pages/PublicMenu/x.jsx'; $start=3910; $count=220; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++Test-Path pipeline/chain-state
++Test-Path pages/PublicMenu
++Get-Content pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
++Get-Content pages/PublicMenu/review_2026-03-31.md
++Get-Content pages/PublicMenu/commands_2026-03-31.log
++Get-Content pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md -Encoding UTF8
++Get-Content pages/PublicMenu/review_2026-03-31.md -Encoding UTF8
+diff --git a/pages/PublicMenu/review_2026-03-31.md b/pages/PublicMenu/review_2026-03-31.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..301fb780e2f53f87bbeea70e8b76a8894a268e15
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-31.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
++
++Scope reviewed: `pages/PublicMenu/x.jsx` Help Drawer only, plus `pages/PublicMenu/README.md` and `pages/PublicMenu/BUGS.md` for page context.
++
++## Findings
++1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
++2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
++3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
++4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
++5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
++6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
++7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
++
++## Summary
++Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+diff --git a/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md b/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec12d9e8013428686571cbb6f2baca696919796d
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
++
++## Findings
++1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
++2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
++3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
++4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
++5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
++6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
++7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
++
++## Summary
++Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+
+codex
+Findings are saved in [publicmenu-260331-221017-8992-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md). I kept scope limited to the Help Drawer fixes in [x.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) plus context from the page-folder README/BUGS.
+
+Result: 7 findings total. Fixes 1-4 are still missing in the current file, Fixes 5-6 are also not implemented, and Fix 7 is blocked because `partner.plan` is not referenced anywhere in this file. Repo-required copies were also saved to [review_2026-03-31.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-31.md) and [commands_2026-03-31.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-31.log).
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-31.log b/pages/PublicMenu/commands_2026-03-31.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..8c8d6a594466fb4711f639e36fe99942edb2580c
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-31.log
+@@ -0,0 +1,23 @@
++Get-ChildItem -Name pages/PublicMenu
++(Get-Item pages/PublicMenu/x.jsx).FullName
++Get-ChildItem -Path pages/PublicMenu | Select-Object -ExpandProperty Name
++Resolve-Path pages/PublicMenu/x.jsx | Select-Object -ExpandProperty Path
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1600 -First 260)
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3880 -First 280)
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'requestStates|handleCardTap|handleUndo|cardActionModal|pendingRequests|activeRequestCount|remind|collapse|partner\?\.plan|partner\.plan|helpdrawer_|hasLoadedHelpStatesRef|setInterval|sentAt|lastReminderAt|reminderCount|remindCooldownUntil' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 1850 -First 120)
++$p='pages/PublicMenu/x.jsx'; (Get-Content $p | Select-Object -Skip 3980 -First 140)
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'scrollIntoView|ticketBoard|ticketRef|amber|highlight|resolved|activeRequests|showMore|Ещё .*запросов|handleRemind|Напомнить|Уже помогли|Мои запросы|Отправить ещё|Статус обновляется автоматически' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'help.comment_placeholder_other|help.featureUnavailable|helpDrawer.featureUnavailable|helpDrawer.upgradePlan|featureUnavailable|upgradePlan' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Get-Content pages/PublicMenu/README.md -Encoding UTF8
++$p='pages/PublicMenu/x.jsx'; $start=1660; $count=210; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++$p='pages/PublicMenu/x.jsx'; $start=3910; $count=220; $i=$start; Get-Content $p | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++Test-Path pipeline/chain-state
++Test-Path pages/PublicMenu
++Get-Content pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
++Get-Content pages/PublicMenu/review_2026-03-31.md
++Get-Content pages/PublicMenu/commands_2026-03-31.log
++Get-Content pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md -Encoding UTF8
++Get-Content pages/PublicMenu/review_2026-03-31.md -Encoding UTF8
+diff --git a/pages/PublicMenu/review_2026-03-31.md b/pages/PublicMenu/review_2026-03-31.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..301fb780e2f53f87bbeea70e8b76a8894a268e15
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-31.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
++
++Scope reviewed: `pages/PublicMenu/x.jsx` Help Drawer only, plus `pages/PublicMenu/README.md` and `pages/PublicMenu/BUGS.md` for page context.
++
++## Findings
++1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
++2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
++3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
++4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
++5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
++6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
++7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
++
++## Summary
++Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+diff --git a/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md b/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec12d9e8013428686571cbb6f2baca696919796d
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260331-221017-8992
++
++## Findings
++1. [P1] Fix 1 — legacy summary/modal architecture is still in place — `pages/PublicMenu/x.jsx:3916-3926` still renders the old HD-08 summary block, `pages/PublicMenu/x.jsx:1692` keeps `cardActionModal`, and `pages/PublicMenu/x.jsx:3941-4002` still changes card color/icon/text for `pending`, `sending`, and `repeat`. There is no `Мои запросы` ticket-board section and no conditional `Отправить ещё` heading. FIX: remove `pendingRequests` summary + `cardActionModal`, render a `Мои запросы` ticket board from active requests, and keep the quick-action cards visually idle even when a request is active.
++2. [P1] Fix 2 — `requestStates` is still the old flat model and cannot support ticket rows/reminders — `pages/PublicMenu/x.jsx:1663-1693` documents and uses only `{ status, sentAt, message }`, `pages/PublicMenu/x.jsx:4064` stores `other` as a single object, and `pages/PublicMenu/x.jsx:1700-1704` only formats “just now / X min ago”. The required fields `lastReminderAt`, `reminderCount`, and `remindCooldownUntil` do not exist, and `other` cannot hold multiple concurrent tickets. FIX: expand the standard-type state shape to the new ticket model, store `other` as an array of ticket objects, and update the timer formatter to derive both wait time and reminder metadata from `sentAt` and `lastReminderAt`.
++3. [P1] Fix 3 — repeated taps still open the action modal instead of redirecting to a ticket row — `pages/PublicMenu/x.jsx:3941` sends pending cards to `setCardActionModal(card.id)`, and `pages/PublicMenu/x.jsx:4080-4129` renders the modal with remind/resolve actions. There is no help-board section ref, no per-ticket ref, no `scrollIntoView`, no temporary amber highlight, and no “Запрос уже отправлен — смотри выше” toast path. FIX: delete the modal flow and, in `handleCardTap`, redirect any non-idle request to the `Мои запросы` row via refs, flash that row for 1.5s, and show the bottom toast.
++4. [P1] Fix 4 — reminder flow has no dedicated anti-spam cooldown or countdown state — there is no `handleRemind` function in `x.jsx`, no `remindCooldownUntil` field in `requestStates`, and the only remind path is the old resend UX (`pages/PublicMenu/x.jsx:3959`, `pages/PublicMenu/x.jsx:3995`, `pages/PublicMenu/x.jsx:4100-4104`) that reuses `handleCardTap`. That means no 40s cooldown, no disabled “Повторить через MM:SS” button, and no `reminderCount` tracking. FIX: add `handleRemind(type)` that updates `lastReminderAt`, `reminderCount`, and `remindCooldownUntil`, send the reminder without the undo flow, and bind the row button text/disabled state to the shared timer tick.
++5. [P2] Fix 5 — the required anxiety-reducing copy is missing — there is no `Статус обновляется автоматически` text anywhere in the Help Drawer section, and the old summary block remains instead at `pages/PublicMenu/x.jsx:3916-3926`. FIX: under the new `Мои запросы` section, render the centered helper copy only when at least one active request exists.
++6. [P2] Fix 6 — ticket rows are neither sorted oldest-first nor collapsible at the 4+ threshold — `pages/PublicMenu/x.jsx:1712-1716` builds `pendingRequests` with a raw `Object.entries(...).filter(...)` and no `.sort((a, b) => a.sentAt - b.sentAt)`, and there is no collapse state or “Ещё N запросов” UI in the drawer render at `pages/PublicMenu/x.jsx:3916-4007`. FIX: sort ticket rows by ascending `sentAt`, show all rows for 1-3 active requests, and add the 4+ collapse behavior that keeps only the first two rows visible until expanded.
++7. [P3] Fix 7 — Free-plan gate is blocked by missing `partner.plan` usage in this file — `handleCardTap` at `pages/PublicMenu/x.jsx:1763-1779` starts directly with the undo/send flow, and `x.jsx` contains no `partner?.plan` or `partner.plan` reference at all. Per the task rule, this fix should be skipped if the field is not present in current code; in the current file, it is not present. FIX: confirm that PublicMenu receives a plan field on `partner`; if it does, add the early-return toast gate at the top of `handleCardTap`, otherwise drop Fix 7 from the implementation scope.
++
++## Summary
++Total: 7 findings (0 P0, 4 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+
+tokens used
+150 833
+Findings are saved in [publicmenu-260331-221017-8992-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260331-221017-8992-codex-findings.md). I kept scope limited to the Help Drawer fixes in [x.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) plus context from the page-folder README/BUGS.
+
+Result: 7 findings total. Fixes 1-4 are still missing in the current file, Fixes 5-6 are also not implemented, and Fix 7 is blocked because `partner.plan` is not referenced anywhere in this file. Repo-required copies were also saved to [review_2026-03-31.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-31.md) and [commands_2026-03-31.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-31.log).

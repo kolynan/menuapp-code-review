@@ -1,0 +1,97 @@
+---
+task_id: fix-guest-cart-ux-p0-s74
+type: bugfix
+priority: P0
+created: 2026-03-03
+session: S74
+budget: 12.00
+---
+
+# Task: Guest Cart UX — P0 Fixes (statuses, texts, drawer height, rating)
+
+## Git first
+```
+git add . && git commit -m "S74 pre-guest-cart-ux snapshot" && git push
+```
+
+## Context
+
+Guest ordering flow in `/x` (PublicMenu) has several UX bugs that break trust and clarity. This task fixes the guest-facing issues only. Staff-side and drawer redesign are separate tasks.
+
+UX research source: 4-round CC+GPT analysis in `outputs/ChatGPT_Response4_Tasks_S74.md` and `outputs/Claude_UX_Analysis_GuestCart_S74.md`.
+
+## Files to change
+
+| File | Action |
+|------|--------|
+| `menuapp-code-review/pages/PublicMenu/260303-05 CheckoutView RELEASE.jsx` | Edit |
+| `menuapp-code-review/pages/PublicMenu/260303-05 CartView RELEASE.jsx` | Edit |
+| `menuapp-code-review/pages/PublicMenu/PublicMenu README.md` | Update changelog |
+| `menuapp-code-review/pages/PublicMenu/BUGS.md` | Update fixed bugs |
+
+## What to fix
+
+### 1. BUG: "Заказ принят!" → "Заказ отправлен официанту" (P0)
+- After guest taps "Отправить официанту", the confirmation screen shows "Заказ принят!" — this is **wrong semantics**. The waiter has NOT yet accepted the order; it was only sent.
+- Change the confirmation text to: **"Заказ отправлен официанту"** (or use the existing i18n key if one exists — check `confirmation.*` namespace)
+- Subtext (new if doesn't exist): "Статус обновится, когда официант примет заказ"
+- **Do NOT change** the actual order status value in the database — only the display text on the confirmation screen.
+
+### 2. BUG: No visual status differentiation in "Мои заказы" (P1)
+- Currently all orders show a generic gray badge regardless of status.
+- Add colored badge + icon per order status in the guest's "Мои заказы" section:
+  - 🟡 Отправлен (status: "new" or equivalent — check actual status values)
+  - 🟢 Принят (status: "accepted" or equivalent)
+  - 🔵 Готовится (status: "preparing" or equivalent)
+  - ✅ Готов (status: "ready" or equivalent)
+- Use color only on the badge/icon; keep the rest of the card neutral.
+- If OrderStage or a status enum already exists in the codebase — use it; otherwise use string matching as fallback.
+- CC + Codex: **check what actual status string values come from the backend** before mapping.
+
+### 3. BUG: "#1313" session ID shown to guest (P2)
+- Guest sees "Вы: Гость 2 #1313" in the drawer header. The `#1313` is a session ID — meaningless to the guest.
+- Change to show only: **"Вы: Гость 2"** (or the displayName without the hash/ID).
+- The session ID can remain in `console.log` for debug purposes, but must NOT be visible in the UI.
+
+### 4. BUG: Rating/bonus banner shows before there is anything to rate (P1)
+- The yellow banner "За отзыв +10 баллов" appears immediately when opening the drawer, even if no order has been delivered yet.
+- **New trigger condition:** Show the rating prompt ONLY when:
+  - At least one order item has status ✅ "Готов" (ready), AND
+  - That item has NOT yet been rated
+- Before that condition is met: hide the banner completely (not even a muted version).
+- After rating: show inline confirmation **right next to the stars**: "Спасибо! +10Б начислено" — NOT a top banner.
+
+### 5. BUG: Drawer opens too high / wrong initial snap position (P0)
+- When the cart drawer opens, it appears at the wrong height — only the bottom portion is visible, missing the header and top content.
+- Fix: set the initial snap/height to **80–85% of viewport height** as the default open state.
+- Account for mobile browser safe area (bottom bar, address bar) — use CSS env(safe-area-inset-bottom) if available.
+- The header (Стол / Гость / ✕) must always be visible when drawer opens.
+
+### 6. i18n — do NOT invent new keys
+- If a translation key already exists for a phrase — use it.
+- If a new key is needed — add it to a list in the RELEASE notes (Arman will add via `/translationadmin` CSV, mode "Add only").
+- Do NOT hardcode Russian text strings directly if i18n is already in use in the component.
+
+## What NOT to do
+- Do NOT redesign the drawer sections/layout (that's a separate task: redesign-cart-drawer-v2-s74)
+- Do NOT change routing, auth, or layout
+- Do NOT modify database entities or field names
+- Do NOT touch StaffOrdersMobile (separate task)
+- Do NOT add payment or split-payment logic
+
+## Acceptance criteria
+- [ ] After sending order: guest sees "Отправлен официанту", not "Принят"
+- [ ] "Мои заказы" shows colored status badges (🟡🟢🔵✅)
+- [ ] Guest header shows "Вы: Гость 2" — no "#1313" visible
+- [ ] Rating hint appears ONLY when an order has status ✅ Готов and is unrated
+- [ ] After rating: "Спасибо/начислено" appears inline next to stars (not top banner)
+- [ ] Drawer opens at ~80% height, header is visible
+- [ ] No console errors
+- [ ] Mobile 320px — layout intact, no overflow
+
+## Output
+- RELEASE: `260303-NN CartView RELEASE.jsx` and/or `260303-NN CheckoutView RELEASE.jsx` (whichever files were changed)
+- Updated `PublicMenu README.md` with UX changelog entry
+- Updated `BUGS.md` with fixed bugs
+- List of any NEW i18n keys needed (for Arman to add via translationadmin)
+- CC + Codex both review before RELEASE

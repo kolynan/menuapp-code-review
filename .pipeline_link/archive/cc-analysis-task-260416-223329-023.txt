@@ -1,0 +1,68 @@
+CC Reviewer Analysis Summary — task-260416-223329-023
+Chain: pssk-cv-b2-260416-v12-260416-223329-f82f (step 1/1, reviewers group)
+Target: pipeline/drafts/pssk-cv-b2-v12.md (1113 lines, 4 Fix blocks)
+
+=== VERDICT ===
+NEEDS REVISION — Fix 2 rated 2/5 (CRITICAL TDZ blocker).
+
+=== KEY FINDINGS ===
+10 issues total: 1 CRITICAL, 5 MEDIUM, 4 LOW.
+
+CRITICAL (Issue #1):
+  Fix 2 Step 2.1 TDZ ReferenceError. The v12 changelog introduced a call to
+  isCancelledOrder(o) inside statusBuckets useMemo at line 456, but Fix 1
+  Step 1.1 places the isCancelledOrder helper at line ~524 (between lines
+  523 and 525). Since useMemo invokes its callback synchronously during
+  render, line 456 runs before line 524 has declared the helper → first-
+  render crash. Ironically v11 fixed this exact class of bug for Fix 3
+  (tableIsClosed placement) but v12 reintroduced it for Fix 2. The inline
+  comment "// defined in Fix 1 above" is factually wrong — isCancelledOrder
+  is declared BELOW statusBuckets in the file.
+
+  Minimum fix: move isCancelledOrder helper declaration BEFORE statusBuckets
+  useMemo (insert at ~line 455 instead of ~line 524). Update downstream
+  line-number estimates in Fix 3 Step 3.2 and Fix 4 Step 4.1 accordingly.
+
+MEDIUM:
+  #2 — ESLint react-hooks/exhaustive-deps warning for isCancelledOrder
+       omitted from 4 useMemo deps arrays (safe logically, noisy in CI).
+  #3 — Fix 1 intra-step line drift: Step 1.1 adds ~42 lines, so Step 1.2
+       literal line numbers 787-807 shift to 829-849. No disclaimer given.
+  #4 — currentTable scope at Step 3.1 insertion (line 114) not grep-verified.
+  #5 — onClose / setView props annotated (prop line 72 / 22) but not
+       grep-verified in Preparation.
+  #6 — Regression check lacks a first-render smoke-test that would catch #1.
+
+LOW:
+  #7  — wc -l "~1227 (±5)" too tight given recent auto-commits on main.
+  #8  — .working file cleanup not automated; risk of accidental git add.
+  #9  — Step 3.4 useEffect omits setTerminalDismissed from deps (stable by
+        React convention but lint-risk in strict configs).
+  #10 — 11 new tr() keys listed as NON-MANDATORY (acceptable per v10 decision).
+
+=== FIX RATINGS ===
+  Fix 1 Header + Rendered-Data         → 4/5  Minor issues (line drift, lint)
+  Fix 2 Ожидает bucket                 → 2/5  MAJOR — TDZ blocker
+  Fix 3 Terminal screen                → 4/5  Minor (currentTable scope)
+  Fix 4 Self-first Стол                → 4/5  Minor (inherits lint risk)
+
+=== STRENGTHS ===
+- Excellent version changelog (v5→v12) with explicit reasoning per change.
+- FROZEN UX table with anchored decision IDs (R1, R2, R4, CV-*, V4).
+- Per-step grep verification commands.
+- Fix 3 TDZ reasoning (v11) is exemplary — same rigor needed for Fix 2.
+- Comprehensive AC checklists and explicit НЕ делать negative-space rules.
+
+=== WEAKNESSES ===
+- Fix 2 TDZ (see CRITICAL) — prompt's own comment misleads the writer.
+- Inconsistent line-drift disclaimers: Fix 2/3/4 have them, Fix 1 does not.
+- Several prop/scope assumptions (currentTable, onClose, setView) not grep-
+  verified in Preparation.
+
+=== RECOMMENDATION ===
+Do NOT execute v12 as-is. Author should produce v13 with Fix 1 Step 1.1
+relocation of isCancelledOrder helper above statusBuckets (~line 455) and
+add Step 1.2 / 1.3 line-drift disclaimer. All other issues are MEDIUM/LOW
+polish and can be addressed in v13 or accepted with documented risk.
+
+Findings file: pipeline/chain-state/pssk-cv-b2-260416-v12-260416-223329-f82f-cc-findings.md

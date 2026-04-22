@@ -1,0 +1,339 @@
+---
+page: CartView
+ws: WS-CV
+budget: 10
+agent: cc+codex
+chain_template: discussion-cc-codex
+session: 273
+created: 2026-04-14
+---
+
+# ПССК: CartView Batch B2 — CTA Unification + Auto-scroll + Bug Fixes (CV-BUG-03/04, CV-70/71/72/73/76)
+
+## Review task
+
+Review the DRAFT КС-prompt below. **Do NOT implement any code.**
+
+Find: gaps in Fix descriptions, missing grep verifications, ambiguous formulations, missing FROZEN UX, edge cases, potential regressions.
+
+Reply format:
+```
+Fix N: [OK / ISSUE] — [comment]
+```
+Add a `## ⛔ Prompt Clarity` score (1–5) at the end.
+
+---
+
+## OUT OF SCOPE (этот батч)
+
+- **CV-BUG-02** (ввод кода стола — лишняя кнопка + преждевременная валидация): находится в отдельном компоненте, не в cartview.jsx. Нужен отдельный quick-fix батч — определить файл компонента при следующей сессии.
+- **CV-BUG-01** persist (4-state machine, useTableSession overhaul): отдельный батч CV-B3. Final Spec: `ux-concepts/CartView/CV-BUG-01_Final_Spec_S271.md`
+- Таб-структура «Стол» (CV-14..CV-22): батч CV-B1 (зависит от других задач)
+- Rating flow States C/C2/C3/D (CV-TODO-01): батч CV-B3
+
+---
+
+## DRAFT КС-промпт (внутри — для ревью)
+
+```
+---
+page: CartView
+ws: WS-CV
+budget: 14
+agent: cc+codex
+chain_template: consensus-with-discussion-v2
+---
+
+# CartView Batch B2 — CTA Unification + Auto-scroll + Bug Fixes
+
+## Context
+
+Target file: `pages/CartView/cartview.jsx`
+Run `wc -l pages/CartView/cartview.jsx` first — verify ~1192 lines (post-CV-A RELEASE 260414-00, commit 7889cdd).
+
+Reference documents (read before starting):
+- `ux-concepts/CartView/CV-BUG-01_Final_Spec_S271.md` — persist spec (context only, do NOT implement)
+- `DECISIONS_INDEX.md §2` — CV-70..CV-80 FROZEN UX
+- `menuapp-code-review/pages/CartView/BUGS.md` — bug catalogue
+- `ux-concepts/CartView/260408-05 CartView Drawer Mockup v9 S244.html` — **CONTEXT FILE**: current drawer UI reference. If text description conflicts with mockup layout → mockup wins.
+
+---
+
+## ⛔ FROZEN UX — НЕ МЕНЯТЬ (LOCKED decisions)
+
+These are decided and approved — implement EXACTLY as specified, do NOT deviate:
+
+| Decision | Rule |
+|----------|------|
+| CV-70 | CTA always primary filled. (a) cart non-empty → «Отправить официанту». (b) cart empty + active/delivered → «Вернуться в меню». (c) all delivered + rating pending → «Оценить блюда и получить бонусы». |
+| CV-71 | Success screen: 1 primary sticky CTA «Вернуться в меню» (safe-area + thin divider). «Мои заказы» = tertiary text-link inside content. No outline buttons on success screen. |
+| CV-72/73 | On add_to_cart_auto_open: jump-scroll (NOT smooth) to «В корзине» section header + pulse animation 0.8–1.2s on the new item row. Guardrails: ONLY on add_to_cart_auto_open trigger, NOT on manual open / restore / success. «В работе» section does NOT collapse. |
+| CV-74 | 4-state session restore (S-loading / S-restored / S-failed-network / S-lost) — do NOT implement in this batch. Handled in CV-B3. |
+| CV-75 | Kill-during-submit banner — do NOT implement in this batch. Handled in CV-B3. |
+| CV-76 | Double-tap submit prevention: on first tap → button disabled + label «Отправляем…», subsequent taps ignored until server response. |
+| CV-77 | Event priority in drawer: (1) submit/restore error → (2) «Заказ готов» → (3) session restored banner → (4) non-critical. Reference only, do NOT implement stacking logic in this batch. |
+| CV-78 | Footer height stability: sticky zone has equal vertical mass in all states. No height jumps between states. |
+| CV-79 | Banner vs Toast: banner = restore/kill/network. Toast = «Добавлено», «Заказ готов», polling error. Reference only. |
+| CV-80 | Polling gating: starts only after initial restore. Reference only, do NOT touch polling in this batch. |
+
+---
+
+## Fix 1 — CV-BUG-03 (P1) [MUST-FIX]: Drawer opens scrolled past header after add-to-cart
+
+### Сейчас
+After adding an item to cart with the drawer already partially scrolled, the drawer opens (or re-opens) at the current scroll position — header «Ваш заказ», «Выдано» section, and section labels are not visible. User must manually scroll up.
+
+### Должно быть
+On drawer open triggered by add_to_cart_auto_open: drawer container scrolls to top (scrollTop = 0) BEFORE the content is rendered or IMMEDIATELY on open, so the header is visible.
+
+Note: Fix 4 (CV-72/73) further refines this to jump-scroll to «В корзине» section specifically. Fix 1 = baseline scroll-to-top as safety net for all open triggers. Fix 4 = targeted scroll for add_to_cart_auto_open.
+
+### НЕ должно быть
+- Smooth scroll (jumps only)
+- Scroll animation on close
+- Changing scroll position on manual tap of the drawer handle
+
+### Файл и локация
+`pages/CartView/cartview.jsx` — find the drawer open handler / useEffect that runs on `isOpen` becoming true. Likely near `scrollable.scrollTop = 0` pattern (pre-CV-A: line ~185). Verify exact location with:
+```
+grep -n "scrollTop\|scrollTo\|isOpen\|drawerOpen\|onOpen" pages/CartView/cartview.jsx | head -20
+```
+
+### Проверка
+1. Scroll drawer down past «В корзине» section
+2. Close drawer, add another item → drawer reopens
+3. Expected: drawer content starts from top (header visible)
+
+---
+
+## Fix 2 — CV-BUG-04 (P1) [MUST-FIX]: Chip «Оценить (N)» does not auto-expand collapsed «Выдано» section
+
+### Сейчас
+«Выдано (4)» section is collapsed. User taps orange chip «Оценить (4)». Result: ratingMode becomes true, chip label changes to «Готово» + «Режим оценки» label appears — but «Выдано» section STAYS collapsed. Stars are not visible. User has no feedback that anything happened.
+
+### Должно быть
+On tap of «Оценить (N)» chip:
+1. `ratingMode = true` (existing)
+2. `deliveredExpanded = true` (NEW — force-expand the section)
+
+Both must happen in the same event handler / setState call.
+
+### НЕ должно быть
+- Auto-collapsing «Выдано» when ratingMode becomes false (preserve user's manual expand state)
+- Any scroll-to animation for this fix (Fix 4 handles scrolling separately)
+- Changing the chip tap logic for any other chip
+
+### Файл и локация
+`pages/CartView/cartview.jsx` — find the chip tap handler for «Оценить (N)». Verify location:
+```
+grep -n "ratingMode\|setRatingMode\|Оценить\|rating.*chip\|chip.*rating" pages/CartView/cartview.jsx | head -20
+```
+Add `setDeliveredExpanded(true)` (or equivalent state setter) alongside the existing `setRatingMode(true)` call.
+
+Note: if the chip is rendered inside a collapsible section header that handles its own onClick → add `e.stopPropagation()` to prevent the parent collapse toggle from firing on the same tap.
+
+### Проверка
+1. Have delivered items, collapse «Выдано» section manually
+2. Tap orange chip «Оценить (N)»
+3. Expected: «Выдано» expands + stars visible + chip label = «Готово»
+
+---
+
+## Fix 3 — CV-70/71 (P1) [MUST-FIX]: CTA unification — 3-state logic + success screen sticky
+
+### Сейчас (CV-70)
+State B (cart empty, active/delivered orders exist): CTA = «Заказать ещё» outline button.
+State C (all delivered, rating pending): CTA = «Заказать ещё» outline (wrong per CV-70c).
+
+### Должно быть (CV-70)
+CTA is ALWAYS `primary filled`. Logic:
+```
+if (cartItems.length > 0)         → «Отправить официанту»   // State A
+else if (hasActiveOrDelivered)     → «Вернуться в меню»       // State B
+else if (allDelivered && ratingPending) → «Оценить блюда и получить бонусы»  // State C (CV-OBS-01)
+```
+i18n keys (use tr() with fallback):
+- `tr('cta.submit_order', 'Отправить официанту')`
+- `tr('cta.return_to_menu', 'Вернуться в меню')`
+- `tr('cta.rate_dishes', 'Оценить блюда и получить бонусы')`
+
+Remove: `tr('cart.order_more', 'Заказать ещё')` — this label is DELETED from UI per CV-70.
+
+Grep to find existing label:
+```
+grep -n "order_more\|Заказать ещё\|returnToMenu\|return.*menu" pages/CartView/cartview.jsx
+```
+Expected after fix: 0 occurrences of «Заказать ещё» label in rendered JSX (i18n key may remain for backward compat, but must not be rendered).
+
+### Должно быть (CV-71 — success screen)
+After successful order submit, the success screen shows:
+- 1 primary filled sticky CTA at bottom: «Вернуться в меню» (safe-area-aware, thin divider above)
+- «Мои заказы» as tertiary text-link INSIDE content (not a button in footer)
+- NO outline buttons on the success screen
+
+Grep to find current success screen:
+```
+grep -n "submitSuccess\|Заказ принят\|success.*screen\|order.*sent\|Мои заказы" pages/CartView/cartview.jsx | head -20
+```
+
+Sticky wrapper pattern (per STYLE_GUIDE.md):
+```jsx
+<div className="sticky bottom-0 bg-white border-t border-gray-100 pb-safe px-4 pt-3">
+  <button className="w-full h-[52px] rounded-xl bg-[primaryColor] text-white font-semibold">
+    {tr('cta.return_to_menu', 'Вернуться в меню')}
+  </button>
+</div>
+```
+
+### НЕ должно быть
+- Outline buttons in the footer for any state
+- «Заказать ещё» label appearing anywhere in rendered JSX
+- Footer height changing between states (see Fix 5 — CV-78)
+
+### Проверка
+1. Cart empty, active orders → CTA = primary «Вернуться в меню» (not outline «Заказать ещё»)
+2. Submit order → success screen → sticky «Вернуться в меню» + «Мои заказы» text-link inside content
+
+---
+
+## Fix 4 — CV-72/73 (P1) [MUST-FIX]: Auto-scroll to «В корзине» + pulse animation on add_to_cart_auto_open
+
+### Сейчас
+Drawer opens after add-to-cart but does not scroll to the «В корзине» section. New item is not highlighted.
+
+### Должно быть
+ONLY when drawer opens via `add_to_cart_auto_open` trigger (NOT manual tap, NOT restore, NOT success):
+1. Jump-scroll (instantaneous, NOT smooth) to «В корзине» section header ref
+2. New item row plays pulse animation (CSS `@keyframes pulse-highlight`) for 0.8–1.2s
+
+Implementation approach:
+- Add `cartSectionRef = useRef(null)` attached to «В корзине» section header
+- In `add_to_cart_auto_open` handler, after open: `cartSectionRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' })`
+- Pulse: new item gets a transient CSS class (e.g. `cart-item-new`) that triggers animation, removed after 1.2s via `setTimeout` + cleanup
+
+**PQ-101 requirement:** Any `setTimeout` for pulse cleanup MUST have `return () => clearTimeout(timer)` in useEffect. Place the cleanup useEffect immediately after the `add_to_cart_auto_open` handler — NOT inside a shared scroll useEffect.
+
+Guardrails (explicit — do NOT scroll in these cases):
+- `isOpen` becomes true via manual drawer handle tap
+- Restore flow (CV-74 — handled in CV-B3)
+- Success screen transition
+
+Grep to find existing open trigger:
+```
+grep -n "auto_open\|autoOpen\|add.*cart.*open\|openDrawer\|setIsOpen.*true" pages/CartView/cartview.jsx | head -20
+```
+
+### НЕ должно быть
+- Smooth scroll (`behavior: 'smooth'`)
+- «В работе» section collapsing (CV-72: stays expanded)
+- Scroll on manual open
+
+### Проверка
+1. Scroll drawer down, then add item from menu → drawer auto-opens, jumps to «В корзине» header, new item pulses briefly
+2. Manually open drawer → NO scroll
+
+---
+
+## Fix 5 — CV-76/78 (P1/P2) [MUST-FIX]: Double-tap prevention + footer height stability
+
+### CV-76: Double-tap submit prevention
+
+### Сейчас
+Multiple rapid taps on «Отправить официанту» can trigger multiple order submissions.
+
+### Должно быть
+On first tap of «Отправить официанту»:
+1. Button becomes `disabled`
+2. Label → `tr('cta.sending', 'Отправляем…')` (i18n key likely already exists — verify)
+3. Subsequent taps ignored until server response (success or error)
+4. On error: button re-enables, label reverts, error shown
+
+**PQ-100 requirement:** Submit state machine MUST include `error` phase. If using `submitPhase`:
+```
+type SubmitPhase = 'idle' | 'submitting' | 'success' | 'error'
+```
+`error` transition: button re-enables, `submitPhase → 'idle'` after delay (3s).
+
+Grep existing submit logic:
+```
+grep -n "isSubmitting\|submitPhase\|handleSubmit\|onSubmitOrder" pages/CartView/cartview.jsx | head -20
+```
+If `isSubmitting` prop already exists and covers this → mark `[VERIFY ONLY]` and confirm behaviour.
+
+### CV-78: Footer height stability
+
+### Сейчас
+Footer height changes between drawer states (taller in some, shorter in others) causing layout jump.
+
+### Должно быть
+Sticky footer zone has consistent vertical height across all states (State A, B, C). Use `min-height` on footer wrapper matching the tallest state, or ensure all CTAs use the same `h-[52px]` height + same padding.
+
+Grep:
+```
+grep -n "sticky.*bottom\|footer.*sticky\|pb-safe\|safe.*area" pages/CartView/cartview.jsx | head -10
+```
+
+### НЕ должно быть
+- Footer changing height between states
+- Different padding/margin across CTA variants
+
+### Проверка CV-76
+1. Tap «Отправить официанту» twice rapidly → only 1 order submitted, button disabled on first tap
+
+### Проверка CV-78
+1. Switch between State A (cart items) and State B (empty cart) — footer height stays identical
+
+---
+
+## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано выше
+
+- ONLY touch code from Fix 1–5 above.
+- Do NOT implement CV-BUG-01 persist (CV-B3), CV-BUG-02 (separate file), tab structure (CV-B1), rating flow states C/C2/C3/D (CV-B3).
+- Do NOT change: polling logic, session restore, useTableSession hooks, OrderItem loading.
+- FROZEN UX (CV-70..CV-80): implement EXACTLY as described. If you see a conflict → STOP and report.
+- All new user-visible strings MUST use `tr(key, fallback)`, NOT `t(key)`.
+- **i18n exception:** Fix 3 adds new tr() keys (`cta.return_to_menu`, `cta.rate_dishes`, `cta.sending`). If these keys are NOT yet in the existing i18n dictionary file → locate the dictionary via `grep -rn "cta\.submit_order\|return_to_menu\|rate_dishes" pages/ src/` and add the new keys there. This is the ONLY permitted change outside `cartview.jsx`.
+
+## Implementation Notes
+
+- File: `pages/CartView/cartview.jsx`
+- Verify line count first: `wc -l pages/CartView/cartview.jsx`
+- Context: post-CV-A RELEASE 260414-00 (commit 7889cdd, ~1192 lines)
+- All Fixes can be applied in one pass (no ordering dependencies between them, except Fix 1 + Fix 4 both touch scroll — coordinate so they don't conflict)
+---
+
+## MOBILE-FIRST CHECK (MANDATORY before commit)
+
+Verify at 375px viewport (or closest mobile simulation):
+1. Fix 3 (CV-71 success screen): sticky CTA «Вернуться в меню» is fully visible above iOS home indicator — `pb-safe` applied.
+2. Fix 5 (CV-78 footer height): footer stays the same height switching between State A (with cart items) and State B (empty cart) — no layout jump.
+3. Fix 4 (CV-72): jump-scroll on add_to_cart_auto_open brings «В корзине» header into view without clipping under any sticky top bar.
+4. Fix 2 (CV-BUG-04): pulse animation on new item row is visible on a 375px screen — item is not hidden behind fixed header.
+
+---
+
+## Regression Check (MANDATORY after implementation)
+
+Verify these existing behaviors are NOT broken:
+1. Manual drawer open (tap handle) — drawer still opens normally, NO auto-scroll.
+2. Success screen transition — «Мои заказы» link is still functional (not removed by Fix 3).
+3. «Выдано» section collapse toggle — still works manually after Fix 2 (ratingMode state change does not break toggle).
+4. Submit error path — after network error, CTA re-enables and label reverts (CV-76 error phase).
+5. «В работе» section — does NOT collapse when drawer auto-opens (CV-72 guardrail).
+
+---
+
+- git commit after all fixes: `git commit -m "CartView B2: CTA unify + auto-scroll + bug fixes (CV-70/71/72/73/76, CV-BUG-03/04)"`
+```
+
+---
+
+## Reviewer checklist (для CC+Codex)
+
+1. Все ли Fix-описания однозначны? Нет ли «решение на усмотрение имплементора»? (PQ-103)
+2. Grep-паттерны — покрывают ли все варианты? Нет ли ложных ожиданий «0 hits» при наличии OOS секций? (PQ-106)
+3. Fix 5 (CV-76): проверить — нет ли уже `isSubmitting` prop, который частично покрывает double-tap? (PQ-109)
+4. Fix 4 (CV-72/73): setTimeout cleanup указан (PQ-101)?
+5. Fix 3 (CV-70): «Заказать ещё» grep — нет ли i18n-key в OOS блоке Tab Стол? (PQ-106)
+6. FROZEN UX секция полная — CV-70..CV-80 все перечислены?
+7. Scope Lock достаточно жёсткий для 5 фиксов разного типа?

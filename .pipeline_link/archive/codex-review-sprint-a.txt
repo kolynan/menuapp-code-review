@@ -1,0 +1,241 @@
+## Codex Review: Sprint A
+## File: 260302-00 StaffOrdersMobile RELEASE.jsx (v3.0.0)
+## Reviewed: 2026-03-02
+## Scope: computeTableStatus, computeGroupCTA, OrderGroupCard v2, v2SortedGroups, TABLE_STATUS_STYLES/SORT_PRIORITY
+
+---
+
+### P0 Issues (crashes)
+
+**P0-1: Math.min(...[]) returns Infinity — safe but semantically wrong in v2SortedGroups sort**
+
+Location: v2SortedGroups useMemo, lines 2705-2706
+
+```js
+const ta = Math.min(...a.orders.map(o => safeParseDate(o.created_date).getTime()));
+const tb = Math.min(...b.orders.map(o => safeParseDate(o.created_date).getTime()));
+```
+
+If `a.orders` or `b.orders` is an empty array, `Math.min(...[])` returns `Infinity` (JavaScript spec).
+This does NOT crash the runtime — Infinity is a valid number and subtraction works.
+However, the sort result is semantically wrong: an empty-orders group would be treated as
+infinitely old, sorting it to the top. In practice finalGroups should never contain an empty
+group, but there is no guard here.
+
+Assessment: Not a hard crash, but a silent ordering bug if an empty group ever slips through.
+
+**No true P0 (crash) issues found in the reviewed Sprint A code.**
+
+---
+
+### P1 Issues (logic)
+
+**P1-1: BILL_REQUESTED is returned BEFORE the orders.length === 0 guard**
+
+Location: computeTableStatus, lines 659-666
+
+```js
+if (group.type === 'table') {
+  const hasBillRequest = (activeRequests || []).some(
+    r => getLinkId(r.table) === group.id && r.request_type === 'bill'
+  );
+  if (hasBillRequest) return 'BILL_REQUESTED';
+}
+
+if (orders.length === 0) return 'ALL_SERVED';  // ← checked AFTER bill request
+```
+
+If a table has a pending bill request but ALL its orders are cancelled (orders array is empty
+after the filter on line 656), the function still returns BILL_REQUESTED. This is arguably
+correct behaviour (the guest pressed the bill button and their orders are all cancelled or
+closed), but it produces a card with BILL_REQUESTED status and a "Закрыть стол" CTA for a
+group that has zero orders. The CTA handler (handleCTA) then tries:
+
+```js
+const sessionId = group.orders.length > 0 ? getLinkId(group.orders[0].table_session) : null;
+```
+
+`sessionId` will be null, causing the fallback to `onCloseAllOrders(group.orders)` with an
+empty array. Whether `onCloseAllOrders` handles an empty array safely depends on its
+implementation (not reviewed here). If it does not, this is a runtime error.
+
+Recommendation: Move the `orders.length === 0` check to BEFORE the BILL_REQUESTED check,
+OR explicitly handle the case in `handleCTA` where `cta.type === 'close_table'` and
+`group.orders.length === 0`.
+
+**P1-2: STALE detection calls Math.min on orders that already passed the allFree guard — but guard does not confirm orders is non-empty at that point**
+
+Location: computeTableStatus, lines 669-672
+
+```js
+const allFree = orders.every(o => !getLinkId(o.assignee));
+if (allFree) {
+  const oldest = Math.min(...orders.map(o => safeParseDate(o.created_date).getTime()));
+```
+
+`orders.length === 0` is checked on line 666 and returns early, so by the time we reach
+line 669 the array is guaranteed non-empty. This is safe and correctly sequenced.
+No issue here — noted for completeness.
+
+**P1-3: computeGroupCTA returns 'close_table' for STALE status without checking group.type**
+
+Location: computeGroupCTA, lines 694-695
+
+```js
+if (tableStatus === 'ALL_SERVED' || tableStatus === 'BILL_REQUESTED' || tableStatus === 'STALE') {
+  return { type: 'close_table', label: 'Закрыть стол' };
+}
+```
+
+STALE status applies when ALL orders have no assignee (unattended table). However, STALE
+can also theoretically apply to pickup/delivery groups (type !== 'table'), where "Закрыть
+стол" is semantically wrong (there is no "table" to close for a pickup order). The caller
+`handleCTA` only calls `onCloseTable` when `group.type === 'table'`, which is correct, but
+it falls through to `onCloseAllOrders(group.orders)` — again calling close-all on a pickup
+or delivery group that is merely unattended.
+
+In practice STALE is only reached when `allFree` is true (no assignee), and pickup/delivery
+orders should have assignees quickly. But if they do not, this produces a misleading "Закрыть
+стол" CTA label on a non-table group.
+
+Recommendation: In computeGroupCTA, guard the 'close_table' CTA label against group type:
+```js
+const ctaLabel = group.type === 'table' ? 'Закрыть стол' : 'Завершить заказ';
+return { type: 'close_table', label: ctaLabel };
+```
+
+**P1-4: v2SortedGroups useMemo dependency on getStatusConfig (a useCallback) re-runs on every render if stagesMap changes**
+
+Location: v2SortedGroups, line 2709
+
+```js
+}, [finalGroups, activeRequests, getStatusConfig]);
+```
+
+`getStatusConfig` is a `useCallback` with deps `[stagesMap, sortedStages]`. This is correct —
+when stages reload, `getStatusConfig` changes identity, which correctly invalidates the sort.
+No bug here; the dependency array is accurate.
+
+**P1-5: computeTableStatus re-runs inside v2SortedGroups sort for every pair comparison**
+
+Location: v2SortedGroups sort comparator, lines 2699-2700
+
+```js
+const statusA = computeTableStatus(a, activeRequests, getStatusConfig);
+const statusB = computeTableStatus(b, activeRequests, getStatusConfig);
+```
+
+For N groups, a sort calls the comparator O(N log N) times, and each call runs
+`computeTableStatus` twice. For small N (< 30 tables), this is fine. For large restaurants
+this redundantly recomputes the same group's status multiple times per sort pass.
+
+This is not a bug but a P2 performance concern. The fix is to pre-compute statuses in a Map
+before sorting. Noting here as P1 because it also runs `computeTableStatus` with potentially
+stale `activeRequests` captured in the useMemo closure if the useMemo dependency does not
+update synchronously (it does include `activeRequests`, so this is correctly captured).
+
+Assessment: No logic bug. Downgraded to P2.
+
+---
+
+### P2 Issues (quality)
+
+**P2-1: Math.min spread on potentially empty array in v2SortedGroups (see P0-1 above)**
+
+Location: lines 2705-2706
+
+```js
+const ta = Math.min(...a.orders.map(...));
+const tb = Math.min(...b.orders.map(...));
+```
+
+If either group has zero orders, returns Infinity (not a crash but incorrect sort ordering).
+Add a guard:
+```js
+const ta = a.orders.length ? Math.min(...a.orders.map(...)) : Infinity;
+const tb = b.orders.length ? Math.min(...b.orders.map(...)) : Infinity;
+```
+
+**P2-2: computeTableStatus called twice per group pair in v2SortedGroups comparator**
+
+Pre-compute a status Map before sorting to avoid O(N log N) repeated calls:
+```js
+const statusMap = new Map(finalGroups.map(g => [g.id, computeTableStatus(g, activeRequests, getStatusConfig)]));
+return [...finalGroups].sort((a, b) => {
+  const pa = TABLE_STATUS_SORT_PRIORITY[statusMap.get(a.id)] ?? 5;
+  const pb = TABLE_STATUS_SORT_PRIORITY[statusMap.get(b.id)] ?? 5;
+  ...
+});
+```
+
+**P2-3: useMemo dependency for `cta` in OrderGroupCard includes entire `group` object**
+
+Location: OrderGroupCard, lines 1281-1284
+
+```js
+const cta = useMemo(
+  () => computeGroupCTA(group, tableStatus, getStatusConfig, guestsMap),
+  [group, tableStatus, getStatusConfig, guestsMap]
+);
+```
+
+`group` is an object reference. Since `group` comes from a sorted array produced by
+`v2SortedGroups`, a new array is created on every sort, so each `group` reference may or
+may not be stable depending on how finalGroups builds its objects. If group references
+change on every polling tick, this useMemo never memoizes effectively.
+
+The existing code is not wrong — it will just recompute `cta` on every poll. For a CTA
+computation this is inexpensive. Low severity.
+
+**P2-4: TABLE_STATUS_STYLES does not have an entry for 'STALE' — but falls back to PREPARING**
+
+Location: line 1251
+
+```js
+const style = TABLE_STATUS_STYLES[tableStatus] || TABLE_STATUS_STYLES.PREPARING;
+```
+
+`TABLE_STATUS_STYLES` DOES include a STALE entry (lines 259-266 — red border, red badge).
+This fallback is correct for any unknown future status. No bug — correctly implemented.
+
+**P2-5: OrderGroupCard guestCountLabel pluralization is hardcoded Russian strings**
+
+Location: lines 1341-1345
+
+```js
+const guestCountLabel = (() => {
+  if (uniqueGuestCount === 1) return '1 гость';
+  if (uniqueGuestCount < 5) return `${uniqueGuestCount} гостя`;
+  return `${uniqueGuestCount} гостей`;
+})();
+```
+
+Per project Rule P1 (i18n required): all user-facing strings must use `t('key')` from
+`useI18n`. These hardcoded Russian strings violate the i18n rule. Same applies to
+orderCountLabel (lines 1346-1350) with "заказ", "заказа", "заказов".
+
+The CTA fallback labels in computeGroupCTA line 723 also contain hardcoded Russian:
+```js
+const actionText = config.actionLabel || (tableStatus === 'NEW' ? 'Принять' : 'Выдать');
+```
+And line 695: `label: 'Закрыть стол'`.
+
+These should use `t()` calls. Since computeGroupCTA is a module-level function (not a
+component), it would need to receive a `t` parameter, similar to the existing pattern of
+arrays/constants accepting a `t` parameter noted in the rules.
+
+---
+
+### Summary: 6 issues found
+
+| # | Priority | Issue |
+|---|----------|-------|
+| 1 | P1 | BILL_REQUESTED returned before orders.length===0 guard — may cause close_table CTA with empty orders array |
+| 2 | P1 | "Закрыть стол" CTA label applied to non-table groups in STALE status |
+| 3 | P2 | Math.min spread on potentially empty orders array in v2SortedGroups sort (returns Infinity, wrong sort order) |
+| 4 | P2 | computeTableStatus called O(N log N) times in sort — pre-compute Map for efficiency |
+| 5 | P2 | cta useMemo in OrderGroupCard depends on full group object — may not memoize effectively on polls |
+| 6 | P2 | Hardcoded Russian strings in guestCountLabel, orderCountLabel, and computeGroupCTA labels — i18n violation |
+
+**No P0 crashes found.**
+**Highest priority fix: P1-1 (empty orders + BILL_REQUESTED) and P1-3 (STALE CTA on non-table groups).**

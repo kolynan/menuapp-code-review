@@ -1,0 +1,325 @@
+## WS-SOM Independent Findings
+
+### Section 1 — SOM-BUG-S270-02 (close table -> Completed)
+
+1. `closeSession()` verbatim with line numbers:
+
+```js
+158:export async function closeSession(sessionId) {
+159:  await base44.entities.TableSession.update(sessionId, {
+160:    status: "closed",
+161:    closed_at: new Date().toISOString()
+162:  });
+163:
+164:  // S267: Bulk-close all non-cancelled orders in this session.
+165:  const sessionOrders = await base44.entities.Order.filter({ table_session: sessionId });
+166:  await Promise.all(
+167:    sessionOrders
+168:      .filter(o => o.status !== 'cancelled')
+169:      .map(o => base44.entities.Order.update(o.id, { status: 'closed' }))
+170:  );
+171:}
+```
+
+Confirmation: `closeSession()` does **not** touch `Table.status`. It updates `TableSession.status` and `Order.status` only. `rg -n 'Table\.update\(' .\components\sessionHelpers.js` returned no hits.
+
+2. Completed-tab filter logic in `260414-02 StaffOrdersMobile RELEASE.jsx`:
+
+`rg -n -C 2 completed ".\pages\StaffOrdersMobile\260414-02 StaffOrdersMobile RELEASE.jsx"`
+
+```js
+3053-
+3054-  // v2.7.1: Tabs and favorites filter state
+3055:  const [activeTab, setActiveTab] = useState('active'); // 'active' | 'completed'
+3056-  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
+```
+
+```js
+3826-  }, []);
+3827-
+3828:  // v2.7.1: Tab filtering (active vs completed)
+3829-  const filteredGroups = useMemo(() => {
+3830-    if (!orderGroups) return [];
+```
+
+```js
+3849-  // v2.7.1: Tab counts
+3850-  const tabCounts = useMemo(() => {
+3851:    if (!orderGroups) return { active: 0, completed: 0 };
+3852-    
+3853:    let active = 0, completed = 0;
+```
+
+```js
+4324-            </button>
+4325-            <button
+4326:              onClick={() => setActiveTab('completed')}
+4327-              className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+4328:                activeTab === 'completed'
+```
+
+`rg -n -C 2 closed ".\pages\StaffOrdersMobile\260414-02 StaffOrdersMobile RELEASE.jsx"`
+
+```js
+3838:      // S267: served-but-not-closed → stay in Active until closeSession
+3839-      const hasServedButNotClosed = group.orders.some(o => {
+3840-        const config = getStatusConfig(o);
+3841:        return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+3842-      });
+3843-      return activeTab === 'active'
+```
+
+```js
+3860-      const hasServedButNotClosed = group.orders.some(o => {
+3861-        const config = getStatusConfig(o);
+3862:        return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+3863-      });
+3864:      if (hasActiveOrder || hasActiveRequest || hasServedButNotClosed) active++; else completed++;
+```
+
+`rg -n archived ".\pages\StaffOrdersMobile\260414-02 StaffOrdersMobile RELEASE.jsx"` returned no hits.
+
+`rg -n 'Table\.status|table\.status|tableMap\[.*status|group\.[A-Za-z_]+\.status' ".\pages\StaffOrdersMobile\260414-02 StaffOrdersMobile RELEASE.jsx"` returned no hits.
+
+Key conclusion: this RELEASE file does **not** filter Completed by `Table.status`. It filters by `group.orders` and `activeRequests`.
+
+More important: the table can disappear before tab filtering, because grouping is built from `activeOrders`, which excludes closed orders.
+
+`rg -n -C 4 'Existing status filter \(unchanged\)|includes\(o\.status\)' ".\pages\StaffOrdersMobile\260414-02 StaffOrdersMobile RELEASE.jsx"`
+
+```js
+3575:      // Existing status filter (unchanged)
+3576-      const stageId = getLinkId(o.stage_id);
+3577-      if (stageId && stagesMap[stageId]) {
+3578-        const stage = stagesMap[stageId];
+3579-        if (stage.internal_code === 'finish') {
+3580:          return o.status !== 'closed' && o.status !== 'cancelled';
+3581-        }
+3582-        return true;
+3583-      }
+3584:      return ["new", "accepted", "in_progress", "ready"].includes(o.status);
+```
+
+`rg -n -C 6 'const orderGroups|visibleOrders|activeOrders = useMemo' ".\pages\StaffOrdersMobile\260414-02 StaffOrdersMobile RELEASE.jsx"`
+
+```js
+3715-  const visibleOrders = useMemo(() => {
+3716:    let r = applyChannels(roleFilteredOrders, selectedTypes);
+3733-    return r;
+3734-  }, [roleFilteredOrders, selectedTypes, assignFilters, sortMode, sortOrder, effectiveUserId, stagesMap]);
+3735-
+3736-  // v2.7.0: Order groups model (hall by table, pickup/delivery individual)
+3737:  const orderGroups = useMemo(() => {
+3743:    visibleOrders.forEach(o => {
+3785-    return groups;
+3786:  }, [visibleOrders, tableMap, isKitchen, activeRequests]);
+```
+
+So after `closeSession()` closes all session orders, the group can be removed upstream and never reach `filteredGroups()`. That is a stronger root cause than missing `Table.status`.
+
+3. Safer fix choice between A and B:
+
+- Between A and B, **A is safer for data integrity**.
+- Reason: `closeSession(sessionId)` is the domain-level close operation already mutating `TableSession` and `Order`. If table status must change, that responsibility belongs with the same domain action.
+- The current call-site does **not** actually have `tableId` in scope.
+
+`rg -n -C 4 "const handleCloseTableClick = useCallback|onCloseTable\(sessionId, identifier\)|setCloseTableConfirm\(|const handleCloseTable = \(|const confirmCloseTable = async" ".\pages\StaffOrdersMobile\260414-02 StaffOrdersMobile RELEASE.jsx"`
+
+```js
+2161:  const handleCloseTableClick = useCallback(() => {
+2162:    const sessionId = group.orders.map((order) => getLinkId(order.table_session)).find(Boolean);
+2163-    if (onCloseTable && sessionId) {
+2164:      onCloseTable(sessionId, identifier);
+```
+
+```js
+4136:  const handleCloseTable = (tableSessionField, tableName) => {
+4137-    const sessionId = getLinkId(tableSessionField);
+4138-    if (!sessionId) return;
+4139:    setCloseTableConfirm({ sessionId, tableName: tableName || 'стол' });
+```
+
+```js
+4143:  const confirmCloseTable = async () => {
+4144-    if (!closeTableConfirm) return;
+4145:    const { sessionId } = closeTableConfirm;
+4148:      await closeSession(sessionId);
+```
+
+- If A is used, `closeSession()` must first resolve `session.table`.
+- `getOrCreateSession()` shows the relation exists:
+
+```js
+69:export async function getOrCreateSession(tableId, partnerId) {
+70-  const sessions = await base44.entities.TableSession.filter({
+71:    table: tableId,
+79-  const newSession = await base44.entities.TableSession.create({
+80:    table: tableId,
+```
+
+- However, **neither A nor B alone fixes the visible SOM bug in this RELEASE file**, because closed orders are filtered out before the Active/Completed split.
+
+4. Regression risks:
+
+- `getOrCreateSession()` opens/creates `TableSession` rows with `table: tableId` at 69-83, but there is no matching `Table.update(... status: "open")`. A close-only table-status patch can leave tables stale on the next session.
+- `closeSession()` currently does `TableSession.update()` then `Promise.all(Order.update)` at 159-170. Adding `Table.update()` without coordinated error handling can desync `TableSession`, `Order`, and `Table`.
+- This RELEASE file does not consume `Table.status` anywhere. `tableMap` only stores `name` and `zone_name`:
+
+```js
+3369:  const { data: tables } = useQuery({
+3370-    queryKey: ["tables", partnerId],
+3371:    queryFn: () => (partnerId ? base44.entities.Table.filter({ partner: partnerId }) : base44.entities.Table.list()),
+3375:  const tableMap = useMemo(
+3376:    () => tables?.reduce((acc, t) => ({ ...acc, [t.id]: { name: t.name, zone_name: t.zone_name } }), {}) || {},
+```
+
+5. Manual test plan:
+
+1. Create a hall table with at least one served/finish-stage order and no active service requests; verify it is visible in Active before close.
+2. Trigger Close table; verify the table leaves Active and appears in Completed immediately, then still appears there after manual refresh/reopen.
+3. Start a new session/order on the same physical table; verify it returns to Active and no stale closed/completed state carries over.
+
+### Section 2 — SOM-BUG-S270-01 re-check (rate limit)
+
+1. Single-mutation handlers without `__batch` in the RELEASE file:
+
+| Line(s) | Handler / path | Evidence |
+|---|---|---|
+| 1609-1627 | `OrderCard.handleAction` | `updateStatusMutation.mutate({ id: order.id, payload })` without `__batch` |
+| 3108-3123 | `toggleFavorite` | `updateLinkMutation.mutate({ id: link.id, payload: { favorite_tables: next } })` |
+| 3133-3141 | `clearAllFavorites` | `updateLinkMutation.mutate({ id: link.id, payload: { favorite_tables: [] } })` |
+| 3173-3179 | bind-needed `useEffect` | `updateLinkMutation.mutate({ id: link.id, payload: { bound_device_id, ... } })` |
+| 3190-3195 | heartbeat `tick` | direct `base44.entities.StaffAccessLink.update(currentLinkId, { last_used_at })` |
+| 3215-3223 | last-active `useEffect` | direct `base44.entities.StaffAccessLink.update(link.id, { last_active_at })` |
+| 3247-3252 | invite-accept `useEffect` | direct `base44.entities.StaffAccessLink.update(link.id, { invited_user, invite_accepted_at })` |
+| 3261-3266 | `handleLogout` | `updateLinkMutation.mutate({ id: link.id, payload: { bound_device_id: null, bound_at: null } })` |
+| 4360 | `RequestCard.onAction` | `updateRequestMutation.mutate({ id: req.id, status: ... })` without `__batch` |
+| 4435 | `OrderGroupCard.onCloseRequest` | `updateRequestMutation.mutate({ id: reqId, status: newStatus, ...extraFields })` without `__batch` |
+
+Important negative finding: I found **no missing-`__batch` single path for `advanceMutation`** in the waiter group-card flow.
+
+`rg -n "advanceMutation\.mutate\(|advanceMutation\.mutateAsync\(|handleSingleAction|handleOrdersAction|updateStatusMutation\.mutate\(" ".\pages\StaffOrdersMobile\260414-02 StaffOrdersMobile RELEASE.jsx"`
+
+```js
+2002:  const handleSingleAction = useCallback((order, rowId) => handleOrdersAction([order], rowId), [handleOrdersAction]);
+1981:  const handleOrdersAction = useCallback(async (orders, rowId) => {
+1990:        return advanceMutation.mutateAsync({ id: order.id, payload, __batch: true });
+2235:                    <button type="button" onClick={() => handleSingleAction(row.order, row.id)} ...
+2274:          {buildAdvancePayload(order) && <button type="button" onClick={() => handleSingleAction(order)} ...
+```
+
+So the main waiter-order path already uses the batched protocol even for one order.
+
+2. Mutation-wrapper invalidation behavior:
+
+- `updateStatusMutation` at 1594-1606:
+
+```js
+1594:  const updateStatusMutation = useMutation({
+1595:    mutationFn: ({ id, payload }) => base44.entities.Order.update(id, payload),
+1606:    onSettled: () => queryClient.invalidateQueries({ queryKey: ["orders"] }),
+```
+
+This always invalidates `["orders"]` after a single mutation.
+
+- `advanceMutation` at 1904-1920:
+
+```js
+1904:  const advanceMutation = useMutation({
+1905:    mutationFn: ({ id, payload }) => base44.entities.Order.update(id, payload),
+1916:    onSettled: (_data, _err, vars) => {
+1917:      if (vars?.__batch) return;
+1918:      queryClient.invalidateQueries({ queryKey: ["orders"] });
+1919:      queryClient.invalidateQueries({ queryKey: ["servedOrders", group.id] });
+```
+
+In current waiter usage, wrapper invalidation is skipped because callers pass `__batch: true`, and the caller invalidates once after the batch at 1961-1962 or 1992-1993.
+
+- `updateLinkMutation` at 3087-3098:
+
+```js
+3087:  const updateLinkMutation = useMutation({
+3088:    mutationFn: ({ id, payload }) => base44.entities.StaffAccessLink.update(id, payload),
+3089:    onSuccess: (_data, vars) => {
+3095-      if (needRefetch) {
+3096:        queryClient.invalidateQueries({ queryKey: ["staffLink", token] });
+```
+
+This does **not** always invalidate; it invalidates only for selected payload keys.
+
+- `updateRequestMutation` at 3549-3551:
+
+```js
+3549:  const updateRequestMutation = useMutation({
+3550:    mutationFn: (payload) => { const { id, __batch, ...fields } = payload; return base44.entities.ServiceRequest.update(id, fields); },
+3551:    onSuccess: (_data, vars) => { if (vars?.__batch) return; queryClient.invalidateQueries({ queryKey: ["serviceRequests"] }); },
+```
+
+Current single waiter request actions at 4360 and 4435 do not set `__batch`, so each click invalidates `["serviceRequests"]` once.
+
+- Direct `base44.entities.*.update` calls:
+  - `StaffAccessLink.update(currentLinkId, { last_used_at })` at 3193-3195: no invalidate.
+  - `StaffAccessLink.update(link.id, { last_active_at })` at 3221-3223: no invalidate.
+  - `StaffAccessLink.update(link.id, { invited_user, invite_accepted_at })` at 3247-3252: manual invalidate of `["staffLink", token]`.
+  - `Order.update(o.id, { stage_id: finishStage.id })` inside `handleCloseAllOrders` at 4168-4171: one manual invalidate of `["orders"]` after the sequential batch.
+
+3. Minimal fix pattern, diagnostic only:
+
+```jsx
+const mutateOne = async (payload) => {
+  await mutation.mutateAsync({ ...payload, __batch: true });
+  queryClient.invalidateQueries({ queryKey: targetKey });
+};
+
+const mutateMany = async (items) => {
+  await runBatchSequential(items, (item) =>
+    mutation.mutateAsync({ ...item, __batch: true })
+  );
+  queryClient.invalidateQueries({ queryKey: targetKey });
+};
+```
+
+Safest direction: use one caller-owned invalidation pattern for both single and batch paths, instead of wrapper-invalidating singles while caller-invalidating batches.
+
+Diagnosis: the B1 rate-limit hypothesis is only **partly** supported. Waiter request singles do skip `__batch`, but waiter order singles already use the batched path. On file evidence alone, I do **not** see an `advanceMutation` invalidate storm for single waiter-order clicks in this RELEASE.
+
+More plausible pressure sources in this screen:
+
+- default polling every 5s:
+
+```js
+500:const POLLING_OPTIONS = [
+508:const DEFAULT_POLLING_INTERVAL = 5000;
+3485:  const effectivePollingInterval = rateLimitHit ? false : (pollingInterval === 0 ? false : pollingInterval);
+3498:    refetchInterval: effectivePollingInterval,
+3520:    refetchInterval: effectivePollingInterval,
+```
+
+- background `StaffAccessLink.update` writes at 3173-3258
+- extra notification-driven invalidate at 4058-4062:
+
+```js
+4058-    if (newOrderIds.length > 0) {
+4059-      const banner = buildBannerInfo(newOrderIds, 'new');
+4060-      pushNotify(`Новые: +${newOrderIds.length}`, newOrderIds, banner);
+4061-      // v3.6.0: Force refetch to ensure detail view gets fresh data immediately
+4062:      queryClient.invalidateQueries({ queryKey: ['orders'] });
+```
+
+### Section 3 — Prompt Clarity rating (1-5)
+
+4/5
+
+Ambiguities:
+
+- The B1 scope suggests the Completed tab likely filters by `Table.status`, but this RELEASE file does not read `Table.status`; the actual chain is `activeOrders -> roleFilteredOrders -> visibleOrders -> orderGroups -> filteredGroups`.
+- The B1 scope says line 4148 has `tableId` in scope, but the current close-table path only carries `sessionId` and a label.
+- "Single mutations" is ambiguous across waiter-order actions, waiter-request actions, kitchen-order actions, and background `StaffAccessLink` writes in the same file.
+
+### Section 4 — Out-of-scope risks
+
+- `activeOrders` at 3575-3584 drops fully closed orders before grouping, so Completed cannot represent fully closed hall tables without a broader model change.
+- `tableMap` at 3375-3376 strips table records down to `{ name, zone_name }`, so any future `Table.status`-based UI will silently have no data.
+- `closeSession()` still uses `Promise.all(Order.update)` at helper 165-170, which is a parallel-write hotspot in a screen already carrying 429 mitigations elsewhere.
+- Notification logic forces `invalidateQueries(['orders'])` at 4062 while orders are also polled every 5s at 3498.
+- There is a live `console.error("Error loading guests batch:", err);` at 3651.

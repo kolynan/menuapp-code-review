@@ -1,0 +1,1079 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d2097-bae9-7731-8cde-6f3d361e67ed
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260324-210501-4504 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Batch 9 Regressions — 3 Fixes (BACKLOG #149) Reference: `BUGS_MASTER.md`, `ux-concepts/ACCEPTANCE_CRITERIA_publicmenu.md`. **Production page.** Three regressions introduced by Batch 9 (chain 30fb, commit a28bde1). All in `pages/PublicMenu/x.jsx`. Must be fixed BEFORE Batch 10/11. ## CONTEXT Batch 9 introduced `pushOverlay`/`popOverlay` system (lines 1305-1316) for Android Back button handling across all drawers. The system uses `overlayStackRef`, `isPopStateClosingRef`, and `isProgrammaticCloseRef` guards. Three issues emerged during Android testing: 1. Table code drawer doesn't open (pushOverlay timing conflict with vaul Drawer) 2. Bell icon only visible in hall mode + verified table (too restrictive) 3. Help drawer missing close chevron ## TARGET FILES (modify) - `pages/PublicMenu/x.jsx` — all 3 fixes are in this file ## CONTEXT FILES (read-only) - `BUGS_MASTER.md` — bug reference - `pages/PublicMenu/CartView.jsx` — context only (bell + chevron style reference) --- ## Fix 1 — PM-128 (P2) [MUST-FIX]: Table code drawer doesn't open (regression) ### Currently When user taps "Отправить официанту" without a verified table code, the cart overlay darkens but the "Введите код стола" Bottom Sheet never appears. The drawer animation is disrupted. ### Root cause At lines 2749-2753 in `handleSubmitOrder`: ```js if (orderMode === "hall" && !isTableVerified) { pendingSubmitRef.current = true; pushOverlay('tableConfirm'); // line 2751 — pushes history state setShowTableConfirmSheet(true); // line 2752 — opens Drawer return; } ``` `pushOverlay` (line 1305-1308) calls `window.history.pushState()` synchronously. When called BEFORE `setShowTableConfirmSheet(true)`, the vaul Drawer library's internal animation gets disrupted because pushState triggers before the Drawer component mounts. ### Fix **Reverse the order**: set state FIRST, push overlay AFTER. Use `requestAnimationFrame` or a microtask to delay pushOverlay until after React renders the Drawer: ```js if (orderMode === "hall" && !isTableVerified) { pendingSubmitRef.current = true; setShowTableConfirmSheet(true); // open Drawer FIRST requestAnimationFrame(() => { pushOverlay('tableConfirm'); // push history AFTER Drawer mounts }); return; } ``` ⚠️ The `onOpenChange` callback of the TableConfirm Drawer (~line 3531-3542) already handles `popOverlay('tableConfirm')` on close — do NOT change that logic. ### Must NOT - Call `pushOverlay` before `setState` (current broken order) - Remove pushOverlay entirely (breaks Android Back for this drawer) - Change the popOverlay logic in the Drawer's onOpenChange handler ### Verification 1. Open cart with items → tap "Отправить официанту" without table code → "Введите код стола" BS slides up ✓ 2. Enter code and submit → BS closes, order proceeds ✓ 3. Press Android Back while BS is open → BS closes (not browser back) ✓ --- ## Fix 2 — PM-129 (P2) [MUST-FIX]: Bell icon not visible on main menu ### Currently Bell icon on main menu (line 3838) has condition: ```js {view === "menu" && orderMode === "hall" && isTableVerified && currentTableId && drawerMode !== 'cart' && ( ``` This requires `isTableVerified` which is `true` only AFTER user enters table code (line 1616: `const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode)`). So the bell is invisible until the user has already verified their table — but users need help BEFORE that (e.g., "where is my table code?"). ### Fix Replace the condition at line 3838 with: ```js {view === "menu" && isHallMode && drawerMode !== 'cart' && ( ``` Use `isHallMode` (already defined earlier in the component, truthy when `orderMode === "hall"`) instead of the full chain. Remove `isTableVerified && currentTableId` — the bell should be visible as soon as the user is in hall mode, even before table verification. The help drawer itself (lines 3650-3722) already handles the case when `currentTableId` is null — it shows table info only if `currentTable` exists (line 3657). ### Must NOT - Remove the bell icon entirely - Show bell in non-hall modes (delivery/takeaway don't need waiter help) - Change `isHallMode` definition (it's correct as-is) - Change help drawer content or submission logic ### Verification 1. Open menu in hall mode (no table code entered yet) → bell icon visible bottom-left ✓ 2. Tap bell → help drawer opens ✓ 3. Switch to delivery mode → bell not visible ✓ --- ## Fix 3 — PM-130 (P3) [MUST-FIX]: Help drawer missing close chevron ### Currently Help drawer (lines 3650-3722) has no ChevronDown close button. The only way to close is swiping down or tapping "Отмена". Other drawers (table code at lines 3546-3552, detail card) have a grey circle chevron in top-right corner. ### Fix Add ChevronDown button inside the help drawer, right after `<DrawerContent>` opens (after line 3651). Copy the exact style from the table code drawer chevron at lines 3546-3552: ```jsx <button onClick={closeHelpDrawer} className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 z-10" aria-label={t('common.close', 'Закрыть')} > <ChevronDown className="w-6 h-6" /> </button> ``` The `DrawerContent` at line 3651 must include `relative` in className (needed for `absolute` positioning of the chevron): ```jsx <DrawerContent className="max-h-[85vh] rounded-t-2xl relative"> ``` `closeHelpDrawer` is already defined (~line 1654) and handles `popOverlay('help')` + state cleanup. ### Must NOT - Create a new close handler (reuse existing `closeHelpDrawer`) - Change the chevron style (must match table code drawer exactly) - Add a custom drag handle (PM-099 FROZEN: no custom drag handles) - Modify any other drawer's chevron ### Verification 1. Open help drawer (via bell) → grey circle chevron visible top-right ✓ 2. Tap chevron → drawer closes ✓ 3. Style matches table code drawer chevron exactly ✓ --- ## ⛔ SCOPE LOCK Only change what is described in Fix 1–3. Do NOT: - Change dish card rendering, prices, steppers, or any MenuView content - Modify StickyCartBar appearance or behavior - Change order submission logic beyond the pushOverlay timing fix - Alter styles/layout of cart items list or checkout flow - Change detail card content, photo layout, or discount badge - Touch `pages/PublicMenu/CartView.jsx` (read-only context only) - Touch `pages/PublicMenu/MenuView.jsx` --- ## FROZEN UX (DO NOT CHANGE) These elements are ✅ Fixed+Tested. Do NOT regress them: **pages/PublicMenu/x.jsx:** - **PM-064/PM-071 ✅** — Table Confirmation BS opens when "Отправить официанту" tapped without verified table. Trigger: `!isTableVerified` check before `validate()`, z-index `z-[60]` on BS. - **PM-079 ✅** — Hidden text input in table code BS: `className="sr-only"` (~line 3409). Must stay. - **PM-088 ✅** — 4-cell digit input in table code BS accepts input and displays correctly (~line 3409). - **PM-090 ✅** — StickyCartBar "Оформить заказ" button uses `partner.primary_color` (not hardcoded). - **PM-099 ✅** — No custom drag handle in detail card drawer (was removed; do NOT add one back). - **PM-117 ✅** — Detail card photo: `aspect-square object-cover` layout. Do not change. - **PM-032 ✅** — Loyalty points deducted AFTER Order.create() succeeds (not before). - **PM-033 ✅** — localStorage access wrapped in try/catch (~lines 283–287). - **PM-126 ✅** — Android Back closes all 4 drawers via overlayStackRef + handlePopState. Do NOT remove or rewrite the overlay system — only fix timing in Fix 1. - **PM-125 ✅** — Help as Bottom Drawer (not Dialog). Bell in CartView closes cart → 300ms delay → help opens. - **#143 ✅** — Chevron ˅ on table code drawer (top-right, bg-gray-200, 44×44px). **pages/PublicMenu/CartView.jsx:** - **PM-031 ✅** — Cart cannot be closed during order submission (dismissible guard). - **PM-083 ✅** — Chevron ˅ on RIGHT side of table info card (non-sticky). - **PM-086 ✅** — Email bonus field removed from cart. - **PM-099 ✅** — No custom drag handle in CartView. --- ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Primary usage: customer phone at the table. Before committing, verify ALL changes at 375px viewport width: - [ ] Bell icon: visible on main menu, not overlapping other elements - [ ] Bell touch target ≥ 44×44px (min-w-[44px] min-h-[44px]) - [ ] Help drawer chevron: RIGHT-ALIGNED (top-right), visible above content - [ ] Help drawer: all option buttons visible and tappable at 375px - [ ] Table code BS: opens correctly, chevron still works - [ ] No duplicate visual indicators - [ ] Android Back closes correct drawer (simulate with browser back button) --- ## Implementation Notes - **pushOverlay timing (Fix 1):** The key insight is that vaul Drawer needs React state to render BEFORE pushState fires. `requestAnimationFrame` ensures Drawer mounts first. This is the same pattern as PM-107 fix (isProgrammaticCloseRef guard) — timing matters with history API + animated components. - **isHallMode (Fix 2):** Already exists in code, derived from `orderMode === "hall"`. Using it instead of the full condition chain simplifies the bell visibility logic. - **closeHelpDrawer (Fix 3):** Already defined and handles overlay cleanup. Just wire it to the new chevron button. - Git: `git add pages/PublicMenu/x.jsx && git commit -m "fix: PM-128+PM-129+PM-130 batch9 regressions" && git push` === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/PublicMenu/x.jsx` within the page-folder scope only. I’m reading the target file plus local context files in `pages/PublicMenu`, then I’ll write the findings file and the required review artifacts without touching the production code.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Date -Format yyyy-MM-dd' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu succeeded in 4.85s:
+components
+versions
+260320-01 useTableSession RELEASE.jsx
+260323-03 CheckoutView RELEASE.jsx
+260324-04 MenuView RELEASE.jsx
+260324-06 CartView RELEASE.jsx
+260324-06 x RELEASE.jsx
+ACCEPTANCE_CRITERIA_PHASE1.md
+BUGS.md
+CartView.jsx
+CheckoutView.jsx
+commands_2026-03-24.log
+COPY_SPEC.md
+i18n_DrawerUX_S79.csv
+i18n_WorkingHours_S79.csv
+MenuView.jsx
+ModeTabs.jsx
+PublicMenu README.md
+PublicMenu_BASE.txt
+README.md
+ succeeded in 5.14s:
+2026-03-24
+codex
+I’ve confirmed the page folder and I’m narrowing the read to the target file sections named in the task, plus local `README.md`, `BUGS.md`, and the read-only `CartView.jsx` reference. After that I’ll synthesize only Fix 1–3 and write the findings artifact.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'BUGS.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "(Get-Content 'x.jsx').Length" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu succeeded in 9.56s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 10.02s:
+3906
+ succeeded in 10.36s:
+---
+version: "35.0"
+updated: "2026-03-23"
+session: 168
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*8 active bugs remaining (0x P0, 4x P1, 3x P2, 0x P3, 1x suggestion).*
+
+### BUG-PM-056: Drawer layout not visit-state-driven (P1 â€” Batch 2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P1
+- **ÐšÐ¾Ð³Ð´Ð°:** S153 (consensus chain publicmenu-260321-093745)
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'x.jsx'; for ("'$i=3524; $i -le 3560; $i++) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'x.jsx'; for ("'$i=1298; $i -le 1318; $i++) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'x.jsx'; for ("'$i=1608; $i -le 1662; $i++) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'x.jsx'; for ("'$i=2742; $i -le 2760; $i++) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu exited 124 in 10.84s:
+
+ exited 124 in 11.06s:
+
+ exited 124 in 11.41s:
+
+ exited 124 in 11.82s:
+ 3525:           </div>
+ 3526:         </DrawerContent>
+ 3527:       </Drawer>
+ 3528: 
+ 3529:       {/* Just-in-time Table Confirmation Bottom Sheet (PM-064) */}
+ 3530:       {/* PM-071: z-[60] on DrawerContent ensures BS renders above cart Drawer (z-50) */}
+ 3531:       <Drawer
+ 3532:         open={showTableConfirmSheet}
+ 3533:         onOpenChange={(open) => {
+ 3534:           if (!open) {
+ 3535:             pendingSubmitRef.current = false;
+ 3536:             popOverlay('tableConfirm');
+codex
+I’ve got the page context. Next I’m checking the exact code paths the task cites so the review stays confined to Fix 1–3, with no repo-wide scanning or extra findings.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'x.jsx'; for ("'$i=2742; $i -le 2760; $i++) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'x.jsx'; for ("'$i=3524; $i -le 3560; $i++) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'x.jsx'; for ("'$i=1298; $i -le 1318; $i++) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'x.jsx'; for ("'$i=1608; $i -le 1662; $i++) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu succeeded in 10.32s:
+ 2743:     // CODE-024: protect from double-tap
+ 2744:     if (submitLockRef.current) return;
+ 2745: 
+ 2746:     // PM-071: Just-in-time table confirmation BEFORE validate(),
+ 2747:     // because validate() rejects hall submits when !currentTableId,
+ 2748:     // silently blocking the BS trigger.
+ 2749:     if (orderMode === "hall" && !isTableVerified) {
+ 2750:       pendingSubmitRef.current = true;
+ 2751:       pushOverlay('tableConfirm');
+ 2752:       setShowTableConfirmSheet(true);
+ 2753:       return;
+ 2754:     }
+ 2755: 
+ 2756:     if (!validate()) return;
+ 2757: 
+ 2758:     // Empty cart guard
+ 2759:     if (cart.length === 0) {
+ 2760:       toast.error(tr('cart.empty', 'ÐšÐ¾Ñ€Ð·Ð¸Ð½Ð° Ð¿ÑƒÑÑ‚Ð°'), { id: 'mm1' });
+ 2761:       return;
+ succeeded in 10.51s:
+ 3525:           </div>
+ 3526:         </DrawerContent>
+ 3527:       </Drawer>
+ 3528: 
+ 3529:       {/* Just-in-time Table Confirmation Bottom Sheet (PM-064) */}
+ 3530:       {/* PM-071: z-[60] on DrawerContent ensures BS renders above cart Drawer (z-50) */}
+ 3531:       <Drawer
+ 3532:         open={showTableConfirmSheet}
+ 3533:         onOpenChange={(open) => {
+ 3534:           if (!open) {
+ 3535:             pendingSubmitRef.current = false;
+ 3536:             popOverlay('tableConfirm');
+ 3537:             setShowTableConfirmSheet(false);
+ 3538:             if (!isTableVerified) {
+ 3539:               toast(tr('cart.confirm_table.dismissed', 'Ð”Ð»Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð·Ð°ÐºÐ°Ð·Ð° Ð½ÑƒÐ¶Ð½Ð¾ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ ÑÑ‚Ð¾Ð»'), { id: 'table-dismiss' });
+ 3540:             }
+ 3541:           }
+ 3542:         }}
+ 3543:       >
+ 3544:         <DrawerContent className="max-h-[85dvh] rounded-t-3xl z-[60] relative">
+ succeeded in 10.52s:
+ 1299: 
+ 1300:   // PM-105: Ref-based overlay stack for Android back button priority
+ 1301:   const overlayStackRef = useRef([]);
+ 1302:   const isPopStateClosingRef = useRef(false);
+ 1303:   const isProgrammaticCloseRef = useRef(false);
+ 1304: 
+ 1305:   const pushOverlay = useCallback((name) => {
+ 1306:     overlayStackRef.current = [...overlayStackRef.current.filter(n => n !== name), name];
+ 1307:     window.history.pushState({ sheet: name }, '');
+ 1308:   }, []);
+ 1309: 
+ 1310:   const popOverlay = useCallback((name) => {
+ 1311:     overlayStackRef.current = overlayStackRef.current.filter(n => n !== name);
+ 1312:     if (!isPopStateClosingRef.current) {
+ 1313:       isProgrammaticCloseRef.current = true;
+ 1314:       window.history.back();
+ 1315:     }
+ 1316:   }, []);
+ 1317:   
+ 1318:   const [activeCategoryKey, setActiveCategoryKey] = useState("all");
+ succeeded in 10.59s:
+ 1609:       setLang(partnerDefault);
+ 1610:     }
+ 1611:   }, [partner?.id, partner?.default_language, langParam]);
+ 1612:   // P0-7: Removed hallTableSelectEnabled - no dropdown
+ 1613: 
+ 1614:   // P0-1: Table verified ONLY when actually resolved or verified by code input
+ 1615:   // Removed hasTableInUrl from condition - URL param alone doesn't mean verified
+ 1616:   const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
+ 1617: 
+ 1618:   // Table code config (for Bottom Sheet â€” PM-064)
+ 1619:   const tableCodeLength = useMemo(() => {
+ 1620:     const n = Number(partner?.table_code_length);
+ 1621:     return (Number.isFinite(n) && n > 0) ? Math.max(3, Math.min(8, Math.round(n))) : 4;
+ 1622:   }, [partner?.table_code_length]);
+ 1623: 
+ 1624:   // P0-7: Removed activeTables query - no dropdown needed
+ 1625: 
+ 1626:   // P0-2: currentTableId only from resolved table or code verification
+ 1627:   const currentTableId = resolvedTable?.id || verifiedTableId || null;
+ 1628:   
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'x.jsx'; for ("'$i=3830; $i -le 3855; $i++) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'x.jsx'; for ("'$i=3646; $i -le 3728; $i++) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'CartView.jsx'; for ("'$i=1; $i -le 260; $i++) { if ($lines[$i-1] -match '"'bell|ChevronDown|help|close') { '{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu succeeded in 8.96s:
+    2: import { Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, Minus, Plus } from "lucide-react";
+   71:   onClose,
+  229:   // ===== P0 UX helpers =====
+ succeeded in 8.93s:
+ 3831:               </div>
+ 3832:             </div>
+ 3833:           )}
+ 3834:         </DrawerContent>
+ 3835:       </Drawer>
+ 3836: 
+ 3837:       {/* PM-127: Bell icon on main menu â€” opens help drawer directly */}
+ 3838:       {view === "menu" && orderMode === "hall" && isTableVerified && currentTableId && drawerMode !== 'cart' && (
+ 3839:         <button
+ 3840:           onClick={openHelpDrawer}
+ 3841:           className="fixed bottom-20 left-4 z-40 min-w-[44px] min-h-[44px] p-3 rounded-full bg-amber-50 text-amber-600 shadow-lg border border-amber-200 flex items-center justify-center"
+ 3842:           aria-label={t('help.call_waiter', 'ÐŸÐ¾Ð·Ð²Ð°Ñ‚ÑŒ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ð°')}
+ 3843:         >
+ 3844:           <Bell className="w-5 h-5" />
+ 3845:         </button>
+ 3846:       )}
+ 3847: 
+ 3848:       {/* Sticky cart bar - updated for TableSession */}
+ 3849:       {view === "menu" && (() => {
+ 3850:         // Hall mode: show if cart has items OR if there are past orders OR table activity
+ succeeded in 8.93s:
+ 3647:       )}
+ 3648: 
+ 3649:       {/* PM-125: Help as Bottom Drawer (replaces HelpModal Dialog) */}
+ 3650:       <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
+ 3651:         <DrawerContent className="max-h-[85vh] rounded-t-2xl">
+ 3652:           <DrawerHeader className="text-center pb-2">
+ 3653:             <DrawerTitle className="text-lg font-semibold text-slate-900">{t('help.modal_title', 'ÐÑƒÐ¶Ð½Ð° Ð¿Ð¾Ð¼Ð¾Ñ‰ÑŒ?')}</DrawerTitle>
+ 3654:             <p className="text-sm text-slate-500 mt-1">{t('help.modal_desc', 'Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ, Ñ‡ÐµÐ¼ Ð¼Ñ‹ Ð¼Ð¾Ð¶ÐµÐ¼ Ð¿Ð¾Ð¼Ð¾Ñ‡ÑŒ')}</p>
+ 3655:           </DrawerHeader>
+ 3656:           <div className="px-4 pb-6 space-y-4">
+ 3657:             {currentTable && (
+ 3658:               <div className="flex items-center justify-center gap-2 text-sm text-slate-600">
+ 3659:                 <MapPin className="w-4 h-4" />
+ 3660:                 <span>{currentTable?.name || currentTable?.code}</span>
+ 3661:               </div>
+ 3662:             )}
+ 3663:             {hasActiveRequest && (
+ 3664:               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2 text-sm text-blue-700">
+ 3665:                 <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse flex-shrink-0" />
+ 3666:                 {t('help.active_request', 'Ð£ Ð²Ð°Ñ ÑƒÐ¶Ðµ ÐµÑÑ‚ÑŒ Ð°ÐºÑ‚Ð¸Ð²Ð½Ñ‹Ð¹ Ð·Ð°Ð¿Ñ€Ð¾Ñ')}
+codex
+I’ve confirmed the three cited regressions are still present in `x.jsx`. I’m doing one narrow independent check against those exact snippets, then I’ll write the findings markdown plus the required local report and command log.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'x.jsx'; for ("'$i=1648; $i -le 1668; $i++) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Command codex | Select-Object -ExpandProperty Source' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.18s:
+ 1649:   const openHelpDrawer = useCallback(() => {
+ 1650:     setIsHelpModalOpen(true);
+ 1651:     pushOverlay('help');
+ 1652:   }, [pushOverlay]);
+ 1653: 
+ 1654:   const closeHelpDrawer = useCallback(() => {
+ 1655:     popOverlay('help');
+ 1656:     setIsHelpModalOpen(false);
+ 1657:   }, [popOverlay]);
+ 1658: 
+ 1659:   // PM-125: Cart-to-help sequencing â€” close cart first, 300ms delay, then open help
+ 1660:   const handleHelpFromCart = useCallback(() => {
+ 1661:     popOverlay('cart');
+ 1662:     setDrawerMode(null);
+ 1663:     setTimeout(() => {
+ 1664:       openHelpDrawer();
+ 1665:     }, 300);
+ 1666:   }, [popOverlay, openHelpDrawer]);
+ 1667: 
+ 1668:   // OrderStages for the partner (for stage_id assignment)
+ succeeded in 9.09s:
+C:\Users\ASUS\AppData\Roaming\npm\codex.ps1
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'x.jsx' -Pattern 'const isHallMode' | ForEach-Object { "'$_.LineNumber.ToString() + '"': ' + "'$_.Line }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu succeeded in 2.21s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'x.jsx' -Pattern 'isHallMode' | ForEach-Object { "'$_.LineNumber.ToString() + '"': ' + "'$_.Line }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu succeeded in 3.30s:
+1559:     isHallMode,
+1616:   const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
+2071:     isHallMode,
+2158:   const showCartButton = isHallMode && (isTableVerified || (cart?.length || 0) > 0);
+2233:     if (!isHallMode || !hallGuestCodeEnabled) return;
+2246:   }, [isHallMode, hallGuestCodeEnabled]);
+3311:           isHallMode={isHallMode}
+3851:         if (isHallMode && showCartButton) {
+3855:               isHallMode={true}
+3889:               isHallMode={false}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'x.jsx'; for ("'$i=1548; $i -le 1565; $i++) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu succeeded in 3.05s:
+ 1549:       window.location.href = url;
+ 1550:     } else {
+ 1551:       window.open(url, "_blank", "noopener,noreferrer");
+ 1552:     }
+ 1553:   };
+ 1554: 
+ 1555:   // Hall table verification hook
+ 1556:   const {
+ 1557:     tableCodeParam,
+ 1558:     resolvedTable,
+ 1559:     isHallMode,
+ 1560:     tableCodeInput,
+ 1561:     setTableCodeInput,
+ 1562:     isVerifyingCode,
+ 1563:     verifiedByCode,
+ 1564:     verifiedTableId,
+ 1565:     verifiedTable,
+ 1566:     codeVerificationError,
+codex
+The code check is complete: all three specified regressions are still present, and I’m at the reporting step. I’m verifying the output paths, then I’ll write the constrained findings and the required audit files.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pipeline/chain-state'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pages/PublicMenu/round1_2026-03-24.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 9.50s:
+False
+ succeeded in 9.82s:
+True
+ succeeded in 9.57s:
+False
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+Review only Fix 1, Fix 2, and Fix 3 for pages/PublicMenu/x.jsx. Do not report anything outside these three fixes.
+
+Return format:
+1. [P2/P3] ...
+2. ...
+Summary: ...
+
+Fix 1 expectation:
+- In handleSubmitOrder, when orderMode === \"hall\" and "'!isTableVerified, state must be set first, then pushOverlay('"'tableConfirm') must run after mount via requestAnimationFrame or microtask.
+- Do not change the existing Drawer onOpenChange popOverlay logic.
+
+Relevant code:
+1305: const pushOverlay = useCallback((name) => {
+1306:   overlayStackRef.current = [...overlayStackRef.current.filter(n => n "'!== name), name];
+1307:   window.history.pushState({ sheet: name }, '"'');
+1308: }, []);
+
+2749: if (orderMode === \"hall\" && "'!isTableVerified) {
+2750:   pendingSubmitRef.current = true;
+2751:   pushOverlay('"'tableConfirm');
+2752:   setShowTableConfirmSheet(true);
+2753:   return;
+2754: }
+
+3533: onOpenChange={(open) => {
+3534:   if ("'!open) {
+3535:     pendingSubmitRef.current = false;
+3536:     popOverlay('"'tableConfirm');
+3537:     setShowTableConfirmSheet(false);
+3538:   }
+3539: }}
+
+Fix 2 expectation:
+- Bell icon should be visible on main menu in hall mode even before table verification.
+- Condition should use isHallMode and drawerMode "'!== '"'cart', without requiring isTableVerified/currentTableId.
+
+Relevant code:
+1616: const isTableVerified = isHallMode && ("'!!resolvedTable?.id || verifiedByCode);
+3838: {view === "menu" && orderMode === "hall" && isTableVerified && currentTableId && drawerMode !== '"'cart' && (
+3839:   <button onClick={openHelpDrawer} ...>
+3840: )}
+
+Fix 3 expectation:
+- Help drawer needs a ChevronDown close button right after <DrawerContent> opens.
+- DrawerContent class must include relative.
+- Button must reuse closeHelpDrawer.
+
+Relevant code:
+1654: const closeHelpDrawer = useCallback(() => {
+1655:   popOverlay('help');
+1656:   setIsHelpModalOpen(false);
+1657: }, [popOverlay]);
+
+3650: <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if ("'!open) closeHelpDrawer(); }}>
+3651:   <DrawerContent className="max-h-[85vh] rounded-t-2xl">
+3652:     <DrawerHeader className="text-center pb-2">
+...
+3705:     <div className="flex gap-3">
+3706:       <Button variant="outline" className="flex-1 min-h-[44px]" onClick={closeHelpDrawer} ...>
+'"'@ | codex exec -" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 1 in 1.97s:
+WARNING: proceeding, even though we could not update PATH: Отказано в доступе. (os error 5)
+Error: Отказано в доступе. (os error 5)
+codex
+I’ve finished the scoped analysis and I’m writing three non-code artifacts now: the pipeline findings file the task asked for, a chain-specific review note in `pages/PublicMenu`, and a matching command log. I’m using chain-specific filenames in the page folder because same-day `review_2026-03-24.md` and `commands_2026-03-24.log` already exist, and I’m avoiding clobbering prior artifacts.
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md
+# Code Review Report: x.jsx
+
+## Summary
+Scoped review only for Batch 9 regressions Fix 1-3 in `pages/PublicMenu/x.jsx`, using `pages/PublicMenu/README.md`, `pages/PublicMenu/BUGS.md`, and local `pages/PublicMenu/CartView.jsx` as context. All three requested regressions are still present in the current file.
+
+## Findings
+1. [P2] Fix 1 not applied: table confirmation Bottom Sheet still pushes browser history before opening the Drawer. In [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2749), `pushOverlay('tableConfirm')` still precedes `setShowTableConfirmSheet(true)`, while `pushOverlay` itself mutates history synchronously at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1305). FIX: reverse the order and defer `pushOverlay('tableConfirm')` until after render; do not change the existing `onOpenChange` cleanup at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3533).
+2. [P2] Fix 2 not applied: the help bell remains gated behind table verification. The condition at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3838) still requires `isTableVerified && currentTableId`, so the bell is absent in hall mode before table verification. FIX: gate on `view === "menu" && isHallMode && drawerMode !== 'cart'` instead.
+3. [P3] Fix 3 not applied: the help drawer still lacks the top-right ChevronDown close control. [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3651) does not include `relative` on `DrawerContent`, and no chevron button using `closeHelpDrawer` is rendered inside the drawer. FIX: add `relative` and insert the same gray circular chevron button used by the table-code drawer.
+
+## Verification Notes
+- `TableConfirm` drawer close logic already pops overlay on close at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3533), so Fix 1 should stay limited to open timing.
+- `closeHelpDrawer` already exists at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1654), so Fix 3 only needs wiring plus positioning.
+- Independent `codex exec` review could not be completed in this environment: the CLI returned `os error 5` (`Access is denied`).
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-210501-4504
+
+## Findings
+1. [P2] Table confirmation drawer still opens in the broken history-first order — In [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2749), `handleSubmitOrder` still calls `pushOverlay('tableConfirm')` before `setShowTableConfirmSheet(true)`. Because `pushOverlay` immediately runs `window.history.pushState()` in [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1305), the Bottom Sheet is still mounted after the history mutation instead of before it, which matches the regression described in Fix 1. FIX: set `setShowTableConfirmSheet(true)` first, then defer `pushOverlay('tableConfirm')` with `requestAnimationFrame` or a microtask; keep the existing `onOpenChange` close/pop logic unchanged.
+2. [P2] Main-menu bell is still hidden until table verification succeeds — The bell render guard in [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3838) still requires `orderMode === "hall" && isTableVerified && currentTableId`, so users in hall mode cannot open help before they have already verified a table. That directly contradicts Fix 2. FIX: replace the condition with `view === "menu" && isHallMode && drawerMode !== 'cart' && (` and remove the `isTableVerified` / `currentTableId` requirements.
+3. [P3] Help drawer still has no top-right chevron close control — The help drawer markup in [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3650) still opens `<DrawerContent className="max-h-[85vh] rounded-t-2xl">` without `relative`, and there is no ChevronDown button wired to `closeHelpDrawer` after `DrawerContent` opens. Users are still limited to swipe-down or the footer cancel button, so Fix 3 is not applied. FIX: add `relative` to the help drawer `DrawerContent` and insert the same gray circular chevron button used by the table-code drawer, calling `closeHelpDrawer`.
+
+## Summary
+Total: 3 findings (0 P0, 0 P1, 2 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): The task references `BUGS_MASTER.md` and `ux-concepts/ACCEPTANCE_CRITERIA_publicmenu.md`, but the top-level scope restriction forbids reading outside the page folder. The inline fix descriptions were sufficient, so this did not block the review.
+- Scope questions (anything you weren't sure if it's in scope): The top-level instructions require reading only `README.md` and `BUGS.md` in the page folder, while the task context also lists `pages/PublicMenu/CartView.jsx` as read-only context. I treated `CartView.jsx` as optional local context and kept findings limited to Fix 1–3 in `x.jsx`.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log
+Get-ChildItem -Name
+Get-Date -Format yyyy-MM-dd
+(Get-Content 'x.jsx').Length
+Get-Content 'README.md'
+Get-Content 'BUGS.md'
+$lines = Get-Content 'x.jsx'; for ($i=1298; $i -le 1318; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+$lines = Get-Content 'x.jsx'; for ($i=1608; $i -le 1662; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+$lines = Get-Content 'x.jsx'; for ($i=2742; $i -le 2760; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+$lines = Get-Content 'x.jsx'; for ($i=3524; $i -le 3560; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+$lines = Get-Content 'x.jsx'; for ($i=1298; $i -le 1318; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+$lines = Get-Content 'x.jsx'; for ($i=1608; $i -le 1662; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+$lines = Get-Content 'x.jsx'; for ($i=2742; $i -le 2760; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+$lines = Get-Content 'x.jsx'; for ($i=3524; $i -le 3560; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+$lines = Get-Content 'x.jsx'; for ($i=3646; $i -le 3728; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+$lines = Get-Content 'x.jsx'; for ($i=3830; $i -le 3855; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+$lines = Get-Content 'CartView.jsx'; for ($i=1; $i -le 260; $i++) { if ($lines[$i-1] -match 'bell|ChevronDown|help|close') { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+Get-Command codex | Select-Object -ExpandProperty Source
+$lines = Get-Content 'x.jsx'; for ($i=1648; $i -le 1668; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+Select-String -Path 'x.jsx' -Pattern 'const isHallMode' | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line }
+Select-String -Path 'x.jsx' -Pattern 'isHallMode' | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line }
+$lines = Get-Content 'x.jsx'; for ($i=1548; $i -le 1565; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+Test-Path 'pipeline/chain-state'
+Test-Path 'pages/PublicMenu/round1_2026-03-24.md'
+Test-Path 'pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md'
+@'
+Review only Fix 1, Fix 2, and Fix 3 for pages/PublicMenu/x.jsx. Do not report anything outside these three fixes.
+
+Return format:
+1. [P2/P3] ...
+2. ...
+Summary: ...
+
+Fix 1 expectation:
+- In handleSubmitOrder, when orderMode === "hall" and !isTableVerified, state must be set first, then pushOverlay('tableConfirm') must run after mount via requestAnimationFrame or microtask.
+- Do not change the existing Drawer onOpenChange popOverlay logic.
+
+Relevant code:
+1305: const pushOverlay = useCallback((name) => {
+1306:   overlayStackRef.current = [...overlayStackRef.current.filter(n => n !== name), name];
+1307:   window.history.pushState({ sheet: name }, '');
+1308: }, []);
+
+2749: if (orderMode === "hall" && !isTableVerified) {
+2750:   pendingSubmitRef.current = true;
+2751:   pushOverlay('tableConfirm');
+2752:   setShowTableConfirmSheet(true);
+2753:   return;
+2754: }
+
+3533: onOpenChange={(open) => {
+3534:   if (!open) {
+3535:     pendingSubmitRef.current = false;
+3536:     popOverlay('tableConfirm');
+3537:     setShowTableConfirmSheet(false);
+3538:   }
+3539: }}
+
+Fix 2 expectation:
+- Bell icon should be visible on main menu in hall mode even before table verification.
+- Condition should use isHallMode and drawerMode !== 'cart', without requiring isTableVerified/currentTableId.
+
+Relevant code:
+1616: const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
+3838: {view === "menu" && orderMode === "hall" && isTableVerified && currentTableId && drawerMode !== 'cart' && (
+3839:   <button onClick={openHelpDrawer} ...>
+3840: )}
+
+Fix 3 expectation:
+- Help drawer needs a ChevronDown close button right after <DrawerContent> opens.
+- DrawerContent class must include relative.
+- Button must reuse closeHelpDrawer.
+
+Relevant code:
+1654: const closeHelpDrawer = useCallback(() => {
+1655:   popOverlay('help');
+1656:   setIsHelpModalOpen(false);
+1657: }, [popOverlay]);
+
+3650: <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
+3651:   <DrawerContent className="max-h-[85vh] rounded-t-2xl">
+3652:     <DrawerHeader className="text-center pb-2">
+...
+3705:     <div className="flex gap-3">
+3706:       <Button variant="outline" className="flex-1 min-h-[44px]" onClick={closeHelpDrawer} ...>
+'@ | codex exec -
+
+Result: failed with "Error: Отказано в доступе. (os error 5)"
+apply_patch(auto_approved=true) exited 0 in 303ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md
+A pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md
+A pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log b/pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..cb83c05d35a45dabd661f733d553be695c889bec
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log
+@@ -0,0 +1,87 @@
++Get-ChildItem -Name
++Get-Date -Format yyyy-MM-dd
++(Get-Content 'x.jsx').Length
++Get-Content 'README.md'
++Get-Content 'BUGS.md'
++$lines = Get-Content 'x.jsx'; for ($i=1298; $i -le 1318; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=1608; $i -le 1662; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=2742; $i -le 2760; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3524; $i -le 3560; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=1298; $i -le 1318; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=1608; $i -le 1662; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=2742; $i -le 2760; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3524; $i -le 3560; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3646; $i -le 3728; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3830; $i -le 3855; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'CartView.jsx'; for ($i=1; $i -le 260; $i++) { if ($lines[$i-1] -match 'bell|ChevronDown|help|close') { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Get-Command codex | Select-Object -ExpandProperty Source
++$lines = Get-Content 'x.jsx'; for ($i=1648; $i -le 1668; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++Select-String -Path 'x.jsx' -Pattern 'const isHallMode' | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line }
++Select-String -Path 'x.jsx' -Pattern 'isHallMode' | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line }
++$lines = Get-Content 'x.jsx'; for ($i=1548; $i -le 1565; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++Test-Path 'pipeline/chain-state'
++Test-Path 'pages/PublicMenu/round1_2026-03-24.md'
++Test-Path 'pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md'
++@'
++Review only Fix 1, Fix 2, and Fix 3 for pages/PublicMenu/x.jsx. Do not report anything outside these three fixes.
++
++Return format:
++1. [P2/P3] ...
++2. ...
++Summary: ...
++
++Fix 1 expectation:
++- In handleSubmitOrder, when orderMode === "hall" and !isTableVerified, state must be set first, then pushOverlay('tableConfirm') must run after mount via requestAnimationFrame or microtask.
++- Do not change the existing Drawer onOpenChange popOverlay logic.
++
++Relevant code:
++1305: const pushOverlay = useCallback((name) => {
++1306:   overlayStackRef.current = [...overlayStackRef.current.filter(n => n !== name), name];
++1307:   window.history.pushState({ sheet: name }, '');
++1308: }, []);
++
++2749: if (orderMode === "hall" && !isTableVerified) {
++2750:   pendingSubmitRef.current = true;
++2751:   pushOverlay('tableConfirm');
++2752:   setShowTableConfirmSheet(true);
++2753:   return;
++2754: }
++
++3533: onOpenChange={(open) => {
++3534:   if (!open) {
++3535:     pendingSubmitRef.current = false;
++3536:     popOverlay('tableConfirm');
++3537:     setShowTableConfirmSheet(false);
++3538:   }
++3539: }}
++
++Fix 2 expectation:
++- Bell icon should be visible on main menu in hall mode even before table verification.
++- Condition should use isHallMode and drawerMode !== 'cart', without requiring isTableVerified/currentTableId.
++
++Relevant code:
++1616: const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
++3838: {view === "menu" && orderMode === "hall" && isTableVerified && currentTableId && drawerMode !== 'cart' && (
++3839:   <button onClick={openHelpDrawer} ...>
++3840: )}
++
++Fix 3 expectation:
++- Help drawer needs a ChevronDown close button right after <DrawerContent> opens.
++- DrawerContent class must include relative.
++- Button must reuse closeHelpDrawer.
++
++Relevant code:
++1654: const closeHelpDrawer = useCallback(() => {
++1655:   popOverlay('help');
++1656:   setIsHelpModalOpen(false);
++1657: }, [popOverlay]);
++
++3650: <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
++3651:   <DrawerContent className="max-h-[85vh] rounded-t-2xl">
++3652:     <DrawerHeader className="text-center pb-2">
++...
++3705:     <div className="flex gap-3">
++3706:       <Button variant="outline" className="flex-1 min-h-[44px]" onClick={closeHelpDrawer} ...>
++'@ | codex exec -
++
++Result: failed with "Error: Отказано в доступе. (os error 5)"
+diff --git a/pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md b/pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b203c0512759eed9bbeec72c4c0edcea6e8d99ec
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md
+@@ -0,0 +1,14 @@
++# Code Review Report: x.jsx
++
++## Summary
++Scoped review only for Batch 9 regressions Fix 1-3 in `pages/PublicMenu/x.jsx`, using `pages/PublicMenu/README.md`, `pages/PublicMenu/BUGS.md`, and local `pages/PublicMenu/CartView.jsx` as context. All three requested regressions are still present in the current file.
++
++## Findings
++1. [P2] Fix 1 not applied: table confirmation Bottom Sheet still pushes browser history before opening the Drawer. In [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2749), `pushOverlay('tableConfirm')` still precedes `setShowTableConfirmSheet(true)`, while `pushOverlay` itself mutates history synchronously at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1305). FIX: reverse the order and defer `pushOverlay('tableConfirm')` until after render; do not change the existing `onOpenChange` cleanup at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3533).
++2. [P2] Fix 2 not applied: the help bell remains gated behind table verification. The condition at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3838) still requires `isTableVerified && currentTableId`, so the bell is absent in hall mode before table verification. FIX: gate on `view === "menu" && isHallMode && drawerMode !== 'cart'` instead.
++3. [P3] Fix 3 not applied: the help drawer still lacks the top-right ChevronDown close control. [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3651) does not include `relative` on `DrawerContent`, and no chevron button using `closeHelpDrawer` is rendered inside the drawer. FIX: add `relative` and insert the same gray circular chevron button used by the table-code drawer.
++
++## Verification Notes
++- `TableConfirm` drawer close logic already pops overlay on close at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3533), so Fix 1 should stay limited to open timing.
++- `closeHelpDrawer` already exists at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1654), so Fix 3 only needs wiring plus positioning.
++- Independent `codex exec` review could not be completed in this environment: the CLI returned `os error 5` (`Access is denied`).
+diff --git a/pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md b/pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f6db2151e33ee53dcfeed484839eb45a7c63847a
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-210501-4504
++
++## Findings
++1. [P2] Table confirmation drawer still opens in the broken history-first order — In [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2749), `handleSubmitOrder` still calls `pushOverlay('tableConfirm')` before `setShowTableConfirmSheet(true)`. Because `pushOverlay` immediately runs `window.history.pushState()` in [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1305), the Bottom Sheet is still mounted after the history mutation instead of before it, which matches the regression described in Fix 1. FIX: set `setShowTableConfirmSheet(true)` first, then defer `pushOverlay('tableConfirm')` with `requestAnimationFrame` or a microtask; keep the existing `onOpenChange` close/pop logic unchanged.
++2. [P2] Main-menu bell is still hidden until table verification succeeds — The bell render guard in [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3838) still requires `orderMode === "hall" && isTableVerified && currentTableId`, so users in hall mode cannot open help before they have already verified a table. That directly contradicts Fix 2. FIX: replace the condition with `view === "menu" && isHallMode && drawerMode !== 'cart' && (` and remove the `isTableVerified` / `currentTableId` requirements.
++3. [P3] Help drawer still has no top-right chevron close control — The help drawer markup in [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3650) still opens `<DrawerContent className="max-h-[85vh] rounded-t-2xl">` without `relative`, and there is no ChevronDown button wired to `closeHelpDrawer` after `DrawerContent` opens. Users are still limited to swipe-down or the footer cancel button, so Fix 3 is not applied. FIX: add `relative` to the help drawer `DrawerContent` and insert the same gray circular chevron button used by the table-code drawer, calling `closeHelpDrawer`.
++
++## Summary
++Total: 3 findings (0 P0, 0 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` and `ux-concepts/ACCEPTANCE_CRITERIA_publicmenu.md`, but the top-level scope restriction forbids reading outside the page folder. The inline fix descriptions were sufficient, so this did not block the review.
++- Scope questions (anything you weren't sure if it's in scope): The top-level instructions require reading only `README.md` and `BUGS.md` in the page folder, while the task context also lists `pages/PublicMenu/CartView.jsx` as read-only context. I treated `CartView.jsx` as optional local context and kept findings limited to Fix 1–3 in `x.jsx`.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log b/pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..cb83c05d35a45dabd661f733d553be695c889bec
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log
+@@ -0,0 +1,87 @@
++Get-ChildItem -Name
++Get-Date -Format yyyy-MM-dd
++(Get-Content 'x.jsx').Length
++Get-Content 'README.md'
++Get-Content 'BUGS.md'
++$lines = Get-Content 'x.jsx'; for ($i=1298; $i -le 1318; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=1608; $i -le 1662; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=2742; $i -le 2760; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3524; $i -le 3560; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=1298; $i -le 1318; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=1608; $i -le 1662; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=2742; $i -le 2760; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3524; $i -le 3560; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3646; $i -le 3728; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3830; $i -le 3855; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'CartView.jsx'; for ($i=1; $i -le 260; $i++) { if ($lines[$i-1] -match 'bell|ChevronDown|help|close') { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Get-Command codex | Select-Object -ExpandProperty Source
++$lines = Get-Content 'x.jsx'; for ($i=1648; $i -le 1668; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++Select-String -Path 'x.jsx' -Pattern 'const isHallMode' | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line }
++Select-String -Path 'x.jsx' -Pattern 'isHallMode' | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line }
++$lines = Get-Content 'x.jsx'; for ($i=1548; $i -le 1565; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++Test-Path 'pipeline/chain-state'
++Test-Path 'pages/PublicMenu/round1_2026-03-24.md'
++Test-Path 'pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md'
++@'
++Review only Fix 1, Fix 2, and Fix 3 for pages/PublicMenu/x.jsx. Do not report anything outside these three fixes.
++
++Return format:
++1. [P2/P3] ...
++2. ...
++Summary: ...
++
++Fix 1 expectation:
++- In handleSubmitOrder, when orderMode === "hall" and !isTableVerified, state must be set first, then pushOverlay('tableConfirm') must run after mount via requestAnimationFrame or microtask.
++- Do not change the existing Drawer onOpenChange popOverlay logic.
++
++Relevant code:
++1305: const pushOverlay = useCallback((name) => {
++1306:   overlayStackRef.current = [...overlayStackRef.current.filter(n => n !== name), name];
++1307:   window.history.pushState({ sheet: name }, '');
++1308: }, []);
++
++2749: if (orderMode === "hall" && !isTableVerified) {
++2750:   pendingSubmitRef.current = true;
++2751:   pushOverlay('tableConfirm');
++2752:   setShowTableConfirmSheet(true);
++2753:   return;
++2754: }
++
++3533: onOpenChange={(open) => {
++3534:   if (!open) {
++3535:     pendingSubmitRef.current = false;
++3536:     popOverlay('tableConfirm');
++3537:     setShowTableConfirmSheet(false);
++3538:   }
++3539: }}
++
++Fix 2 expectation:
++- Bell icon should be visible on main menu in hall mode even before table verification.
++- Condition should use isHallMode and drawerMode !== 'cart', without requiring isTableVerified/currentTableId.
++
++Relevant code:
++1616: const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
++3838: {view === "menu" && orderMode === "hall" && isTableVerified && currentTableId && drawerMode !== 'cart' && (
++3839:   <button onClick={openHelpDrawer} ...>
++3840: )}
++
++Fix 3 expectation:
++- Help drawer needs a ChevronDown close button right after <DrawerContent> opens.
++- DrawerContent class must include relative.
++- Button must reuse closeHelpDrawer.
++
++Relevant code:
++1654: const closeHelpDrawer = useCallback(() => {
++1655:   popOverlay('help');
++1656:   setIsHelpModalOpen(false);
++1657: }, [popOverlay]);
++
++3650: <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
++3651:   <DrawerContent className="max-h-[85vh] rounded-t-2xl">
++3652:     <DrawerHeader className="text-center pb-2">
++...
++3705:     <div className="flex gap-3">
++3706:       <Button variant="outline" className="flex-1 min-h-[44px]" onClick={closeHelpDrawer} ...>
++'@ | codex exec -
++
++Result: failed with "Error: Отказано в доступе. (os error 5)"
+diff --git a/pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md b/pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b203c0512759eed9bbeec72c4c0edcea6e8d99ec
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md
+@@ -0,0 +1,14 @@
++# Code Review Report: x.jsx
++
++## Summary
++Scoped review only for Batch 9 regressions Fix 1-3 in `pages/PublicMenu/x.jsx`, using `pages/PublicMenu/README.md`, `pages/PublicMenu/BUGS.md`, and local `pages/PublicMenu/CartView.jsx` as context. All three requested regressions are still present in the current file.
++
++## Findings
++1. [P2] Fix 1 not applied: table confirmation Bottom Sheet still pushes browser history before opening the Drawer. In [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2749), `pushOverlay('tableConfirm')` still precedes `setShowTableConfirmSheet(true)`, while `pushOverlay` itself mutates history synchronously at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1305). FIX: reverse the order and defer `pushOverlay('tableConfirm')` until after render; do not change the existing `onOpenChange` cleanup at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3533).
++2. [P2] Fix 2 not applied: the help bell remains gated behind table verification. The condition at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3838) still requires `isTableVerified && currentTableId`, so the bell is absent in hall mode before table verification. FIX: gate on `view === "menu" && isHallMode && drawerMode !== 'cart'` instead.
++3. [P3] Fix 3 not applied: the help drawer still lacks the top-right ChevronDown close control. [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3651) does not include `relative` on `DrawerContent`, and no chevron button using `closeHelpDrawer` is rendered inside the drawer. FIX: add `relative` and insert the same gray circular chevron button used by the table-code drawer.
++
++## Verification Notes
++- `TableConfirm` drawer close logic already pops overlay on close at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3533), so Fix 1 should stay limited to open timing.
++- `closeHelpDrawer` already exists at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1654), so Fix 3 only needs wiring plus positioning.
++- Independent `codex exec` review could not be completed in this environment: the CLI returned `os error 5` (`Access is denied`).
+diff --git a/pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md b/pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f6db2151e33ee53dcfeed484839eb45a7c63847a
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-210501-4504
++
++## Findings
++1. [P2] Table confirmation drawer still opens in the broken history-first order — In [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2749), `handleSubmitOrder` still calls `pushOverlay('tableConfirm')` before `setShowTableConfirmSheet(true)`. Because `pushOverlay` immediately runs `window.history.pushState()` in [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1305), the Bottom Sheet is still mounted after the history mutation instead of before it, which matches the regression described in Fix 1. FIX: set `setShowTableConfirmSheet(true)` first, then defer `pushOverlay('tableConfirm')` with `requestAnimationFrame` or a microtask; keep the existing `onOpenChange` close/pop logic unchanged.
++2. [P2] Main-menu bell is still hidden until table verification succeeds — The bell render guard in [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3838) still requires `orderMode === "hall" && isTableVerified && currentTableId`, so users in hall mode cannot open help before they have already verified a table. That directly contradicts Fix 2. FIX: replace the condition with `view === "menu" && isHallMode && drawerMode !== 'cart' && (` and remove the `isTableVerified` / `currentTableId` requirements.
++3. [P3] Help drawer still has no top-right chevron close control — The help drawer markup in [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3650) still opens `<DrawerContent className="max-h-[85vh] rounded-t-2xl">` without `relative`, and there is no ChevronDown button wired to `closeHelpDrawer` after `DrawerContent` opens. Users are still limited to swipe-down or the footer cancel button, so Fix 3 is not applied. FIX: add `relative` to the help drawer `DrawerContent` and insert the same gray circular chevron button used by the table-code drawer, calling `closeHelpDrawer`.
++
++## Summary
++Total: 3 findings (0 P0, 0 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` and `ux-concepts/ACCEPTANCE_CRITERIA_publicmenu.md`, but the top-level scope restriction forbids reading outside the page folder. The inline fix descriptions were sufficient, so this did not block the review.
++- Scope questions (anything you weren't sure if it's in scope): The top-level instructions require reading only `README.md` and `BUGS.md` in the page folder, while the task context also lists `pages/PublicMenu/CartView.jsx` as read-only context. I treated `CartView.jsx` as optional local context and kept findings limited to Fix 1–3 in `x.jsx`.
+
+codex
+The reporting files are written. I’m doing a quick existence check now; there’s no code change or test run in this task.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.85s:
+True
+ succeeded in 1.91s:
+True
+ succeeded in 1.90s:
+True
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log b/pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..cb83c05d35a45dabd661f733d553be695c889bec
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log
+@@ -0,0 +1,87 @@
++Get-ChildItem -Name
++Get-Date -Format yyyy-MM-dd
++(Get-Content 'x.jsx').Length
++Get-Content 'README.md'
++Get-Content 'BUGS.md'
++$lines = Get-Content 'x.jsx'; for ($i=1298; $i -le 1318; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=1608; $i -le 1662; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=2742; $i -le 2760; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3524; $i -le 3560; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=1298; $i -le 1318; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=1608; $i -le 1662; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=2742; $i -le 2760; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3524; $i -le 3560; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3646; $i -le 3728; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3830; $i -le 3855; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'CartView.jsx'; for ($i=1; $i -le 260; $i++) { if ($lines[$i-1] -match 'bell|ChevronDown|help|close') { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Get-Command codex | Select-Object -ExpandProperty Source
++$lines = Get-Content 'x.jsx'; for ($i=1648; $i -le 1668; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++Select-String -Path 'x.jsx' -Pattern 'const isHallMode' | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line }
++Select-String -Path 'x.jsx' -Pattern 'isHallMode' | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line }
++$lines = Get-Content 'x.jsx'; for ($i=1548; $i -le 1565; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++Test-Path 'pipeline/chain-state'
++Test-Path 'pages/PublicMenu/round1_2026-03-24.md'
++Test-Path 'pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md'
++@'
++Review only Fix 1, Fix 2, and Fix 3 for pages/PublicMenu/x.jsx. Do not report anything outside these three fixes.
++
++Return format:
++1. [P2/P3] ...
++2. ...
++Summary: ...
++
++Fix 1 expectation:
++- In handleSubmitOrder, when orderMode === "hall" and !isTableVerified, state must be set first, then pushOverlay('tableConfirm') must run after mount via requestAnimationFrame or microtask.
++- Do not change the existing Drawer onOpenChange popOverlay logic.
++
++Relevant code:
++1305: const pushOverlay = useCallback((name) => {
++1306:   overlayStackRef.current = [...overlayStackRef.current.filter(n => n !== name), name];
++1307:   window.history.pushState({ sheet: name }, '');
++1308: }, []);
++
++2749: if (orderMode === "hall" && !isTableVerified) {
++2750:   pendingSubmitRef.current = true;
++2751:   pushOverlay('tableConfirm');
++2752:   setShowTableConfirmSheet(true);
++2753:   return;
++2754: }
++
++3533: onOpenChange={(open) => {
++3534:   if (!open) {
++3535:     pendingSubmitRef.current = false;
++3536:     popOverlay('tableConfirm');
++3537:     setShowTableConfirmSheet(false);
++3538:   }
++3539: }}
++
++Fix 2 expectation:
++- Bell icon should be visible on main menu in hall mode even before table verification.
++- Condition should use isHallMode and drawerMode !== 'cart', without requiring isTableVerified/currentTableId.
++
++Relevant code:
++1616: const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
++3838: {view === "menu" && orderMode === "hall" && isTableVerified && currentTableId && drawerMode !== 'cart' && (
++3839:   <button onClick={openHelpDrawer} ...>
++3840: )}
++
++Fix 3 expectation:
++- Help drawer needs a ChevronDown close button right after <DrawerContent> opens.
++- DrawerContent class must include relative.
++- Button must reuse closeHelpDrawer.
++
++Relevant code:
++1654: const closeHelpDrawer = useCallback(() => {
++1655:   popOverlay('help');
++1656:   setIsHelpModalOpen(false);
++1657: }, [popOverlay]);
++
++3650: <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
++3651:   <DrawerContent className="max-h-[85vh] rounded-t-2xl">
++3652:     <DrawerHeader className="text-center pb-2">
++...
++3705:     <div className="flex gap-3">
++3706:       <Button variant="outline" className="flex-1 min-h-[44px]" onClick={closeHelpDrawer} ...>
++'@ | codex exec -
++
++Result: failed with "Error: Отказано в доступе. (os error 5)"
+diff --git a/pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md b/pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b203c0512759eed9bbeec72c4c0edcea6e8d99ec
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md
+@@ -0,0 +1,14 @@
++# Code Review Report: x.jsx
++
++## Summary
++Scoped review only for Batch 9 regressions Fix 1-3 in `pages/PublicMenu/x.jsx`, using `pages/PublicMenu/README.md`, `pages/PublicMenu/BUGS.md`, and local `pages/PublicMenu/CartView.jsx` as context. All three requested regressions are still present in the current file.
++
++## Findings
++1. [P2] Fix 1 not applied: table confirmation Bottom Sheet still pushes browser history before opening the Drawer. In [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2749), `pushOverlay('tableConfirm')` still precedes `setShowTableConfirmSheet(true)`, while `pushOverlay` itself mutates history synchronously at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1305). FIX: reverse the order and defer `pushOverlay('tableConfirm')` until after render; do not change the existing `onOpenChange` cleanup at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3533).
++2. [P2] Fix 2 not applied: the help bell remains gated behind table verification. The condition at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3838) still requires `isTableVerified && currentTableId`, so the bell is absent in hall mode before table verification. FIX: gate on `view === "menu" && isHallMode && drawerMode !== 'cart'` instead.
++3. [P3] Fix 3 not applied: the help drawer still lacks the top-right ChevronDown close control. [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3651) does not include `relative` on `DrawerContent`, and no chevron button using `closeHelpDrawer` is rendered inside the drawer. FIX: add `relative` and insert the same gray circular chevron button used by the table-code drawer.
++
++## Verification Notes
++- `TableConfirm` drawer close logic already pops overlay on close at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3533), so Fix 1 should stay limited to open timing.
++- `closeHelpDrawer` already exists at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1654), so Fix 3 only needs wiring plus positioning.
++- Independent `codex exec` review could not be completed in this environment: the CLI returned `os error 5` (`Access is denied`).
+diff --git a/pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md b/pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f6db2151e33ee53dcfeed484839eb45a7c63847a
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-210501-4504
++
++## Findings
++1. [P2] Table confirmation drawer still opens in the broken history-first order — In [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2749), `handleSubmitOrder` still calls `pushOverlay('tableConfirm')` before `setShowTableConfirmSheet(true)`. Because `pushOverlay` immediately runs `window.history.pushState()` in [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1305), the Bottom Sheet is still mounted after the history mutation instead of before it, which matches the regression described in Fix 1. FIX: set `setShowTableConfirmSheet(true)` first, then defer `pushOverlay('tableConfirm')` with `requestAnimationFrame` or a microtask; keep the existing `onOpenChange` close/pop logic unchanged.
++2. [P2] Main-menu bell is still hidden until table verification succeeds — The bell render guard in [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3838) still requires `orderMode === "hall" && isTableVerified && currentTableId`, so users in hall mode cannot open help before they have already verified a table. That directly contradicts Fix 2. FIX: replace the condition with `view === "menu" && isHallMode && drawerMode !== 'cart' && (` and remove the `isTableVerified` / `currentTableId` requirements.
++3. [P3] Help drawer still has no top-right chevron close control — The help drawer markup in [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3650) still opens `<DrawerContent className="max-h-[85vh] rounded-t-2xl">` without `relative`, and there is no ChevronDown button wired to `closeHelpDrawer` after `DrawerContent` opens. Users are still limited to swipe-down or the footer cancel button, so Fix 3 is not applied. FIX: add `relative` to the help drawer `DrawerContent` and insert the same gray circular chevron button used by the table-code drawer, calling `closeHelpDrawer`.
++
++## Summary
++Total: 3 findings (0 P0, 0 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` and `ux-concepts/ACCEPTANCE_CRITERIA_publicmenu.md`, but the top-level scope restriction forbids reading outside the page folder. The inline fix descriptions were sufficient, so this did not block the review.
++- Scope questions (anything you weren't sure if it's in scope): The top-level instructions require reading only `README.md` and `BUGS.md` in the page folder, while the task context also lists `pages/PublicMenu/CartView.jsx` as read-only context. I treated `CartView.jsx` as optional local context and kept findings limited to Fix 1–3 in `x.jsx`.
+
+codex
+Found 3 scoped findings, all within Fix 1–3 in [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx). Fix 1 is still broken because `pushOverlay('tableConfirm')` runs before `setShowTableConfirmSheet(true)` in [x.jsx#L2749](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2749) while `pushOverlay` mutates history synchronously in [x.jsx#L1305](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1305). Fix 2 is still broken because the bell is still gated by `isTableVerified && currentTableId` in [x.jsx#L3838](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3838). Fix 3 is still broken because the help drawer in [x.jsx#L3650](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3650) has no chevron button and its `DrawerContent` in [x.jsx#L3651](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3651) is not `relative`.
+
+The findings file is written to [publicmenu-260324-210501-4504-codex-findings.md](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md). I also saved a page-local report at [review_2026-03-24_publicmenu-260324-210501-4504.md](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md) and the command log at [commands_2026-03-24_publicmenu-260324-210501-4504.log](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log). No code changes were applied. Independent `codex exec` review could not run in this environment because the CLI returned `os error 5` (`Access is denied`).
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log b/pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..cb83c05d35a45dabd661f733d553be695c889bec
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log
+@@ -0,0 +1,87 @@
++Get-ChildItem -Name
++Get-Date -Format yyyy-MM-dd
++(Get-Content 'x.jsx').Length
++Get-Content 'README.md'
++Get-Content 'BUGS.md'
++$lines = Get-Content 'x.jsx'; for ($i=1298; $i -le 1318; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=1608; $i -le 1662; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=2742; $i -le 2760; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3524; $i -le 3560; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=1298; $i -le 1318; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=1608; $i -le 1662; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=2742; $i -le 2760; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3524; $i -le 3560; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3646; $i -le 3728; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'x.jsx'; for ($i=3830; $i -le 3855; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content 'CartView.jsx'; for ($i=1; $i -le 260; $i++) { if ($lines[$i-1] -match 'bell|ChevronDown|help|close') { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Get-Command codex | Select-Object -ExpandProperty Source
++$lines = Get-Content 'x.jsx'; for ($i=1648; $i -le 1668; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++Select-String -Path 'x.jsx' -Pattern 'const isHallMode' | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line }
++Select-String -Path 'x.jsx' -Pattern 'isHallMode' | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line }
++$lines = Get-Content 'x.jsx'; for ($i=1548; $i -le 1565; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++Test-Path 'pipeline/chain-state'
++Test-Path 'pages/PublicMenu/round1_2026-03-24.md'
++Test-Path 'pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md'
++@'
++Review only Fix 1, Fix 2, and Fix 3 for pages/PublicMenu/x.jsx. Do not report anything outside these three fixes.
++
++Return format:
++1. [P2/P3] ...
++2. ...
++Summary: ...
++
++Fix 1 expectation:
++- In handleSubmitOrder, when orderMode === "hall" and !isTableVerified, state must be set first, then pushOverlay('tableConfirm') must run after mount via requestAnimationFrame or microtask.
++- Do not change the existing Drawer onOpenChange popOverlay logic.
++
++Relevant code:
++1305: const pushOverlay = useCallback((name) => {
++1306:   overlayStackRef.current = [...overlayStackRef.current.filter(n => n !== name), name];
++1307:   window.history.pushState({ sheet: name }, '');
++1308: }, []);
++
++2749: if (orderMode === "hall" && !isTableVerified) {
++2750:   pendingSubmitRef.current = true;
++2751:   pushOverlay('tableConfirm');
++2752:   setShowTableConfirmSheet(true);
++2753:   return;
++2754: }
++
++3533: onOpenChange={(open) => {
++3534:   if (!open) {
++3535:     pendingSubmitRef.current = false;
++3536:     popOverlay('tableConfirm');
++3537:     setShowTableConfirmSheet(false);
++3538:   }
++3539: }}
++
++Fix 2 expectation:
++- Bell icon should be visible on main menu in hall mode even before table verification.
++- Condition should use isHallMode and drawerMode !== 'cart', without requiring isTableVerified/currentTableId.
++
++Relevant code:
++1616: const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
++3838: {view === "menu" && orderMode === "hall" && isTableVerified && currentTableId && drawerMode !== 'cart' && (
++3839:   <button onClick={openHelpDrawer} ...>
++3840: )}
++
++Fix 3 expectation:
++- Help drawer needs a ChevronDown close button right after <DrawerContent> opens.
++- DrawerContent class must include relative.
++- Button must reuse closeHelpDrawer.
++
++Relevant code:
++1654: const closeHelpDrawer = useCallback(() => {
++1655:   popOverlay('help');
++1656:   setIsHelpModalOpen(false);
++1657: }, [popOverlay]);
++
++3650: <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
++3651:   <DrawerContent className="max-h-[85vh] rounded-t-2xl">
++3652:     <DrawerHeader className="text-center pb-2">
++...
++3705:     <div className="flex gap-3">
++3706:       <Button variant="outline" className="flex-1 min-h-[44px]" onClick={closeHelpDrawer} ...>
++'@ | codex exec -
++
++Result: failed with "Error: Отказано в доступе. (os error 5)"
+diff --git a/pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md b/pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b203c0512759eed9bbeec72c4c0edcea6e8d99ec
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md
+@@ -0,0 +1,14 @@
++# Code Review Report: x.jsx
++
++## Summary
++Scoped review only for Batch 9 regressions Fix 1-3 in `pages/PublicMenu/x.jsx`, using `pages/PublicMenu/README.md`, `pages/PublicMenu/BUGS.md`, and local `pages/PublicMenu/CartView.jsx` as context. All three requested regressions are still present in the current file.
++
++## Findings
++1. [P2] Fix 1 not applied: table confirmation Bottom Sheet still pushes browser history before opening the Drawer. In [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2749), `pushOverlay('tableConfirm')` still precedes `setShowTableConfirmSheet(true)`, while `pushOverlay` itself mutates history synchronously at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1305). FIX: reverse the order and defer `pushOverlay('tableConfirm')` until after render; do not change the existing `onOpenChange` cleanup at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3533).
++2. [P2] Fix 2 not applied: the help bell remains gated behind table verification. The condition at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3838) still requires `isTableVerified && currentTableId`, so the bell is absent in hall mode before table verification. FIX: gate on `view === "menu" && isHallMode && drawerMode !== 'cart'` instead.
++3. [P3] Fix 3 not applied: the help drawer still lacks the top-right ChevronDown close control. [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3651) does not include `relative` on `DrawerContent`, and no chevron button using `closeHelpDrawer` is rendered inside the drawer. FIX: add `relative` and insert the same gray circular chevron button used by the table-code drawer.
++
++## Verification Notes
++- `TableConfirm` drawer close logic already pops overlay on close at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3533), so Fix 1 should stay limited to open timing.
++- `closeHelpDrawer` already exists at [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1654), so Fix 3 only needs wiring plus positioning.
++- Independent `codex exec` review could not be completed in this environment: the CLI returned `os error 5` (`Access is denied`).
+diff --git a/pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md b/pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f6db2151e33ee53dcfeed484839eb45a7c63847a
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-210501-4504
++
++## Findings
++1. [P2] Table confirmation drawer still opens in the broken history-first order — In [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2749), `handleSubmitOrder` still calls `pushOverlay('tableConfirm')` before `setShowTableConfirmSheet(true)`. Because `pushOverlay` immediately runs `window.history.pushState()` in [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1305), the Bottom Sheet is still mounted after the history mutation instead of before it, which matches the regression described in Fix 1. FIX: set `setShowTableConfirmSheet(true)` first, then defer `pushOverlay('tableConfirm')` with `requestAnimationFrame` or a microtask; keep the existing `onOpenChange` close/pop logic unchanged.
++2. [P2] Main-menu bell is still hidden until table verification succeeds — The bell render guard in [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3838) still requires `orderMode === "hall" && isTableVerified && currentTableId`, so users in hall mode cannot open help before they have already verified a table. That directly contradicts Fix 2. FIX: replace the condition with `view === "menu" && isHallMode && drawerMode !== 'cart' && (` and remove the `isTableVerified` / `currentTableId` requirements.
++3. [P3] Help drawer still has no top-right chevron close control — The help drawer markup in [`x.jsx`](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3650) still opens `<DrawerContent className="max-h-[85vh] rounded-t-2xl">` without `relative`, and there is no ChevronDown button wired to `closeHelpDrawer` after `DrawerContent` opens. Users are still limited to swipe-down or the footer cancel button, so Fix 3 is not applied. FIX: add `relative` to the help drawer `DrawerContent` and insert the same gray circular chevron button used by the table-code drawer, calling `closeHelpDrawer`.
++
++## Summary
++Total: 3 findings (0 P0, 0 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` and `ux-concepts/ACCEPTANCE_CRITERIA_publicmenu.md`, but the top-level scope restriction forbids reading outside the page folder. The inline fix descriptions were sufficient, so this did not block the review.
++- Scope questions (anything you weren't sure if it's in scope): The top-level instructions require reading only `README.md` and `BUGS.md` in the page folder, while the task context also lists `pages/PublicMenu/CartView.jsx` as read-only context. I treated `CartView.jsx` as optional local context and kept findings limited to Fix 1–3 in `x.jsx`.
+
+tokens used
+55 628
+Found 3 scoped findings, all within Fix 1–3 in [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx). Fix 1 is still broken because `pushOverlay('tableConfirm')` runs before `setShowTableConfirmSheet(true)` in [x.jsx#L2749](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L2749) while `pushOverlay` mutates history synchronously in [x.jsx#L1305](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1305). Fix 2 is still broken because the bell is still gated by `isTableVerified && currentTableId` in [x.jsx#L3838](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3838). Fix 3 is still broken because the help drawer in [x.jsx#L3650](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3650) has no chevron button and its `DrawerContent` in [x.jsx#L3651](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3651) is not `relative`.
+
+The findings file is written to [publicmenu-260324-210501-4504-codex-findings.md](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260324-210501-4504-codex-findings.md). I also saved a page-local report at [review_2026-03-24_publicmenu-260324-210501-4504.md](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-24_publicmenu-260324-210501-4504.md) and the command log at [commands_2026-03-24_publicmenu-260324-210501-4504.log](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-24_publicmenu-260324-210501-4504.log). No code changes were applied. Independent `codex exec` review could not run in this environment because the CLI returned `os error 5` (`Access is denied`).

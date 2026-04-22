@@ -1,0 +1,211 @@
+# PSSK Prompt Quality Review: CartView Drawer Redesign (Batch CV-A)
+# Reviewer: Claude Code (CC)
+# Task: pssk-review-cartview-260413
+# Date: 2026-04-13
+
+## Overall Assessment
+
+The prompt is well-structured and thorough for a complex architectural UI redesign.
+It correctly identifies scope boundaries, provides wireframes, references UX decisions,
+and includes safety guards (D7, D12, D15, D16, hook order, scope lock, regression checks).
+
+However, there are several issues ranging from incomplete state machine logic to
+missing edge cases and ambiguous references that could cause implementation errors.
+
+---
+
+## FINDINGS
+
+### [P0] Fix 3: Incomplete state machine — error path not handled
+- **Location:** Fix 3, State A2 submit-feedback
+- **Problem:** The prompt defines 3 phases: `idle | submitting | success`. But there is
+  NO error/failure phase. The prompt mentions `submitError` in the CTA render ternary
+  (`submitError ? tr('cart.submit.retry', 'Repeat')`) but never defines how `submitError`
+  is captured or set.
+- **Risk:** If `handleSubmitOrder` fails, `isSubmitting` goes false, the useEffect detects
+  `isSubmitting === false + submitPhase === 'submitting'` and transitions to `'success'` —
+  showing "Order sent" when it actually FAILED. This is a data integrity issue.
+- **Fix for prompt:** Add `'error'` to submitPhase enum. Specify: "Detect error via
+  `submitError` prop (if available) or via try/catch on handleSubmitOrder (if it returns
+  a promise). The useEffect must check: if isSubmitting went false AND no error -> success;
+  if isSubmitting went false AND error -> set submitPhase='error'."
+
+### [P0] Fix 3: setTimeout cleanup missing — React memory leak
+- **Location:** Fix 3, success->idle transition
+- **Problem:** The prompt says "setTimeout 1500ms -> setSubmitPhase('idle')" but never
+  mentions clearing the timeout on component unmount. If guest closes the drawer during
+  the 1.5s transition, the timeout fires on an unmounted component -> React state update
+  warning / memory leak.
+- **Fix for prompt:** Add: "Return a cleanup function from the useEffect that clears the
+  timeout: `return () => clearTimeout(timer);`"
+
+### [P1] Fix 1: "groups" object has 2 keys but prompt describes 3 visual groups
+- **Location:** Fix 1, code snippet for new bucket creation
+- **Problem:** The code shows `const groups = { served: [], in_progress: [] }` but the
+  visual design shows 3 groups: Served + In Progress + Cart ("В корзине"). Cart items
+  are local state (not orders), so they're NOT in the `groups` object. This is correct
+  architecturally, but the prompt doesn't explicitly say "Cart is separate from `groups`,
+  it comes from the existing `cart` state." An implementer might try to add cart items
+  into `groups.in_progress` or create a third key.
+- **Fix for prompt:** Add explicit note: "Cart items are NOT part of `groups`. They come
+  from the existing `cart` prop/state. The 3 visual groups use different data sources:
+  groups.served (orders), groups.in_progress (orders), cart (local items)."
+
+### [P1] Fix 1: getOrderStatus function fate unclear
+- **Location:** Fix 1, "Grep: `Отправлено` -> 4 matches to delete"
+- **Problem:** The prompt says to delete 4 occurrences of "Отправлено" but doesn't address
+  what happens to `getOrderStatus()` function overall. This function likely returns status
+  labels used for rendering per-item status indicators (colors, badges). If the function
+  is gutted but still called elsewhere, the code breaks.
+- **Fix for prompt:** Add: "After removing 5-status labels from getOrderStatus, verify
+  the function is either: (a) updated to return only 2 labels ('В работе'/'Выдано'),
+  or (b) removed entirely if no longer used. Grep `getOrderStatus` for all call sites."
+
+### [P1] Fix 4: Auto-collapse logic only handles initial state, not structural changes
+- **Location:** Fix 4, useEffect code snippet
+- **Problem:** The code `prev.served !== undefined ? prev.served : !otherGroupsExist`
+  only auto-sets when `prev.served` is undefined (first render). But the prompt ALSO
+  requires: "auto-set when groups change structurally (group appears/disappears)."
+  The provided code doesn't implement this second requirement.
+- **Fix for prompt:** Provide code that tracks previous group existence and detects
+  structural changes: "Add a ref to track previous group keys. When a group appears
+  or disappears (not just items changing within a group), reset auto-collapse. When
+  user manually toggles, set a `manualOverride` flag per group."
+
+### [P1] UX reference files don't exist in repository
+- **Location:** Context section — UX Reference
+- **Problem:** The prompt references:
+  - `ux-concepts/CartView/260408-00 CartView UX S246.md`
+  - `ux-concepts/CartView/260408-00 CartView Drawer Mockup S241.html`
+  - `menuapp-code-review/pages/PublicMenu/screenshots/current/`
+  These files do NOT exist in the repository. The `ux-concepts/CartView/` directory
+  doesn't exist at all. If the implementer tries to reference these for clarification,
+  they'll find nothing.
+- **Fix for prompt:** Either: (a) add the UX files to the repo before running the prompt,
+  or (b) inline the critical UX decisions into the prompt itself (which is partially done
+  via the v6.0 overrides list, but the HTML mockup structure is referenced heavily).
+
+### [P1] Fix 2: Header formula ambiguity — "N блюд" count definition
+- **Location:** Fix 2, header formula
+- **Problem:** "N блюд = total items across all groups (cart + active + served)."
+  Ambiguous: is this count of UNIQUE dishes or TOTAL quantity? If I order 3x Sushi,
+  is that 1 блюдо or 3 блюда? For money display this matters for user expectations.
+- **Fix for prompt:** Specify: "N = sum of all item quantities (not unique dish count).
+  3x Sushi = 3 блюда, not 1."
+
+### [P2] Fix 2: Grep patterns reference HTML mockup classes, not React code
+- **Location:** Fix 2, "Grep: orders-info|ordersSum|cnt.*plural"
+- **Problem:** `orders-info`, `footer-summary`, `footer-bonus` are CSS class names from
+  the HTML mockup, not necessarily present in CartView.jsx. React code likely uses
+  different variable/class names. The implementer will grep, find 0 matches, and be confused.
+- **Fix for prompt:** Grep for actual React identifiers. Before finalizing the prompt,
+  run the greps against CartView.jsx and use the ACTUAL matching strings.
+
+### [P2] Fix 3: Double-tap prevention mentioned but not specified
+- **Location:** Fix 3, verification step 2
+- **Problem:** "Double-tap -> only 1 order created" is listed as a verification step
+  but the prompt provides NO implementation guidance for preventing double submission.
+  Should the CTA be disabled during `submitting` phase? Should `handleSubmitOrder` be
+  guarded? The code snippet shows the button text changes but doesn't show `disabled` prop.
+- **Fix for prompt:** Add: "CTA button must have `disabled={submitPhase !== 'idle' || cart.length === 0}`
+  during submitting/success phases to prevent double-tap."
+
+### [P2] Fix 5: Bonus display data source unclear
+- **Location:** Fix 5, loyalty bonus in cart group
+- **Problem:** The prompt says to show `+{loyaltyPoints} бонусов` but doesn't specify
+  where `loyaltyPoints` comes from. Is it `earnedPoints`? Is it calculated from cart total?
+  The grep suggestion (`earnedPoints|loyalty_points|бонус`) is for finding existing code
+  but doesn't clarify which variable to use in the new location.
+- **Fix for prompt:** Specify the exact variable/prop name and calculation for bonus points
+  display in the cart group.
+
+### [P2] Fix 7: Guest name format inconsistency — (Гость 1) vs (Г1)
+- **Location:** Fix 7, wireframe vs mockup
+- **Problem:** The wireframe shows `Tulip (Г1)` but the HTML mockup shows `(Гость 1)`.
+  Which format should the implementer use? The abbreviated form saves space (important
+  for 320px mobile) but the full form is clearer.
+- **Fix for prompt:** Pick one format explicitly. Recommend: use existing
+  `getGuestDisplayName` output as-is, don't change it.
+
+### [P2] Missing edge case: Empty drawer state
+- **Location:** All fixes collectively
+- **Problem:** What if there are 0 orders AND 0 cart items? All 3 groups would be empty.
+  The prompt says "Empty groups hidden" (Fix 1) but doesn't specify what to show when
+  ALL groups are hidden. Should there be an empty state message? Or should this case
+  not occur (drawer shouldn't open when empty)?
+- **Fix for prompt:** Add: "If all groups are empty, show [empty state message] or
+  [drawer should not be openable when empty — verify StickyCartBar hides]."
+
+### [P2] D12 hook order: "comment out" creates permanent dead code
+- **Location:** Implementation Notes, D12
+- **Problem:** "Comment out with `// reserved -- hook order`, do NOT delete." This means
+  dead hooks accumulate permanently. After multiple batches, the file will have many
+  commented-out hooks that no one dares remove. A better approach: reuse hook slots
+  for new state (e.g., repurpose a removed bucket state hook for `submitPhase`).
+- **Fix for prompt:** Add: "Prefer REUSING dead hook slots for new state variables
+  (e.g., repurpose a removed useState for submitPhase) before commenting out. Only
+  comment out if no reuse is possible."
+
+### [P3] Regression check: Missing scroll/vaul behavior verification
+- **Location:** Regression Check section
+- **Problem:** The new group structure changes the DOM layout significantly. The vaul
+  drawer library depends on content height for snap points and scroll behavior.
+  The regression check doesn't verify that the drawer still scrolls correctly with
+  the new 3-group layout (especially when many items make content taller than viewport).
+- **Fix for prompt:** Add regression item: "Drawer scroll with many items (>10) — verify
+  vaul snap points and content scrolling work correctly with new group layout."
+
+### [P3] Fix 3: submitPhase not reset on drawer close/reopen
+- **Location:** Fix 3
+- **Problem:** If guest taps submit, closes drawer during "success" phase, then reopens
+  drawer — submitPhase may still be 'success' showing stale feedback. The prompt doesn't
+  address resetting submitPhase when the drawer closes.
+- **Fix for prompt:** Add: "Reset submitPhase to 'idle' when drawer closes (in the
+  existing onClose handler or via useEffect watching drawer open state)."
+
+### [P3] Scope lock mentions "Tab Стол" as Batch CV-B but Fix 4 references cart.length
+- **Location:** Fix 4 vs Scope Lock
+- **Problem:** Minor: Fix 4 uses `cart.length` in its auto-collapse logic. If Batch CV-B
+  changes how Tab Стол interacts with cart state, Fix 4's logic may need updating.
+  Not a bug now, but the prompt should note this dependency.
+- **Fix for prompt:** Add note in Fix 4: "This auto-collapse logic depends on cart state.
+  If Batch CV-B changes cart behavior, revisit this rule."
+
+---
+
+## VALIDATION ASSESSMENT
+
+The post-fix checks are **mostly sufficient** but have gaps:
+
+**Strong points:**
+- Grep-based verification for removed labels (Отправлено, Сумма заказа, К отправке, ИТОГО)
+- Frozen UX grep verification (isRatingMode, handleUpdateGuestName must survive)
+- Mobile-first checklist (touch targets, 320px, sticky footer)
+- Regression checklist covers major functionality
+
+**Gaps:**
+1. No verification that `getOrderStatus` still works or was properly updated
+2. No verification that submitPhase error path works (only tests happy path)
+3. No verification of empty drawer state
+4. No verification of scroll behavior with new layout
+5. No line-count check specified (F3 rule) — prompt should mandate wc -l before/after
+6. No verification that the header total (Fix 2) includes BOTH orders AND cart items
+   (could easily show only one or the other)
+
+---
+
+## SUMMARY
+
+| Priority | Count | Category |
+|----------|-------|----------|
+| P0       | 2     | Incomplete error handling in state machine, memory leak |
+| P1       | 5     | Data source confusion, missing function fate, broken greps, missing UX files |
+| P2       | 6     | Ambiguous specs, double-tap, dead code accumulation |
+| P3       | 3     | Minor edge cases and future-proofing |
+| **Total**| **16**| |
+
+**Verdict:** The prompt needs P0 fixes before execution. The state machine error path
+(Fix 3) is the highest risk — it will cause "success" feedback on failed submissions.
+The setTimeout leak is a standard React issue that should be in the prompt template.
+P1 issues should also be addressed to avoid implementer confusion, especially around
+getOrderStatus function fate and the non-existent UX reference files.

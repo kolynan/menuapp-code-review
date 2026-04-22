@@ -1,0 +1,36 @@
+# Codex Reviewer Findings — ПССК Prompt Quality Review
+Chain: publicmenu-260408-180348-1407
+
+## Issues Found
+1. [CRITICAL] `other` request error path is dropped by the new JSX — In the current `RELEASE` file, error handling is generic across `ticketRows`: the old board computes `errorCopy` for every row and renders `handleRetry(req)` for failed rows at [pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/260408-01%20PublicMenu%20x%20RELEASE.jsx#L5030) and [pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/260408-01%20PublicMenu%20x%20RELEASE.jsx#L5077). The prompt’s replacement only gives retry UI to the 6 fixed buttons; `other` rows are rendered in a separate orange list with timer + `✕` only. Because the prompt also hides the generic fallback when any `activeRequests` row has `errorKind`, a failed `other` request can end up with no visible retry path. PROMPT FIX: explicitly specify how failed `other` rows should render and retry, for example “if `row.errorKind`, render the same retry state used by fixed tiles and call `handleRetry(row)`.”
+
+2. [CRITICAL] Step 0 can overwrite the target file before any review of local drift — The prompt tells the agent to run `cp 'pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx' pages/PublicMenu/x.jsx` unconditionally. In this workspace, `x.jsx` is not byte-identical to the `RELEASE` file already, so this step would modify the target before implementation even starts. That is a prompt-level safety risk because it can silently discard unrelated local edits. PROMPT FIX: replace the unconditional copy with “diff `x.jsx` vs `RELEASE` first; if there is any nontrivial diff, stop and ask for confirmation; only normalize when the difference is limited to known corruption/newline drift.”
+
+3. [MEDIUM] Some verification anchors are already stale — The prompt says the `RELEASE` file has 5457 lines, but the actual file is 5458 lines in this workspace. It also says the regression grep should find “3 occurrences” of `<DrawerContent>`, but the source currently has 4 openings at lines 4763, 4858, 4975, and 5319. The third help drawer boundary is still correct, but the count-based validation text is inaccurate. PROMPT FIX: update the prompt to “the help drawer is the third `<DrawerContent>` block; the file currently contains 4 `<DrawerContent>` blocks total” and avoid hard-coding the full file line count as a correctness gate.
+
+4. [MEDIUM] `URGENCY_STYLES` placement instructions are contradictory — The prompt says “Add as module-level constant” but then says “Insert AFTER `SOS_BUTTONS`,” and `SOS_BUTTONS` itself depends on component-scope values `HELP_CARD_LABELS` / `HELP_CARD_SHORT_LABELS`. A literal reading can produce an invalid scope decision or at least hesitation. PROMPT FIX: separate the scopes explicitly:
+“Keep `SOS_BUTTONS` inside the component after `HELP_URGENCY_GROUP`. If desired, place `URGENCY_STYLES` at module scope above the component, or keep it next to `SOS_BUTTONS`; do not call it module-level if you want it inserted after `SOS_BUTTONS`.”
+
+5. [MEDIUM] The prompt assumes Unix shell utilities that do not exist in the current PowerShell environment — The instructions repeatedly use `grep` and `wc -l` for mandatory checks. In this repository’s PowerShell environment, `cp` exists, but `grep` and `wc` are not PowerShell aliases. That makes the prescribed validation steps unreliable as written. PROMPT FIX: make the checks shell-agnostic, for example “use `rg -n` / `rg -c` when available; on PowerShell use `Select-String` and `(Get-Content file).Count`.”
+
+6. [MEDIUM] Referenced UX source files are missing from the workspace — The prompt relies on `ux-concepts/HelpDrawer/260407-00 HelpDrawer UX S234 FINAL.md` and `ux-concepts/HelpDrawer/260407-01 SOS HelpDrawer Mockup S235.html`, but those paths do not exist in this repo. That matters because the prompt also defers important decisions to the UX docs, especially around layout and interaction rules. PROMPT FIX: either provide the actual existing paths, paste the relevant UX excerpts into the prompt, or remove the dependency on missing files.
+
+7. [MEDIUM] The prose says “6 buttons 3×2,” but the JSX snippet hardcodes `grid-cols-2` — That produces 2 columns by 3 rows, while “3×2” is usually read as 3 columns by 2 rows. This is exactly the kind of ambiguity that causes the agent to follow the code snippet while a reviewer follows the prose. PROMPT FIX: state the orientation explicitly: either “2 columns × 3 rows (`grid-cols-2`)" or “3 columns × 2 rows (`grid-cols-3`).”
+
+8. [MEDIUM] The mobile touch-target requirement is contradicted by the provided JSX — The prompt’s mandatory mobile check says touch targets should be `>= 44x44`, but the generated cancel buttons are `22x22`, and the parent active tile is intentionally a non-clickable `div`, so the effective cancel target remains 22x22. The prompt cannot truthfully pass its own check as written. PROMPT FIX: increase the cancel hit area to at least 44x44, or wrap the `✕` in a larger invisible hit target and document that as the required implementation.
+
+9. [MEDIUM] Post-fix validation is too manual and does not include a syntax/parsing gate — The task asks for a large JSX replacement, multiple hook edits, and deletion of several callbacks, but the checks are mostly grep-based plus manual UI assertions such as “verify at 375px,” “tap sends request,” and “error tile shows retry button.” There is no explicit parse/lint/build check, and no method is provided for producing the requested runtime states. PROMPT FIX: add a minimum syntax validation step for `x.jsx` and clearly mark which checks are automated vs manual. If the app cannot be run in the environment, say so and require only static validation plus a manual QA handoff checklist.
+
+## Summary
+Total: 9 issues (2 CRITICAL, 7 MEDIUM, 0 LOW)
+
+## Additional Risks
+- The prompt never states whether `other` rows should also show amber/red urgency styling. The supplied JSX keeps them permanently orange, which may conflict with the stated urgency model.
+- The prompt’s heavy reliance on exact line numbers is acceptable only if Step 0 truly normalizes the target file. If Step 0 is skipped for safety, several later “line ~N” instructions become fragile.
+- The current `x.jsx` file has EOF corruption/newline drift relative to the `RELEASE` file. A future prompt should explain whether normalization is expected to repair that specific condition.
+
+## Prompt Clarity (MANDATORY — do NOT skip)
+- Overall clarity: 3/5
+- What was most clear: The help-drawer replacement boundary and the required fix order are described concretely, and most symbol names / core line anchors do match the actual `RELEASE` file.
+- What was ambiguous or could cause hesitation: The scope of new constants, the intended grid orientation, the handling of `other`-row failures, and the shell commands to use in PowerShell.
+- Missing context: A valid UX reference source, a non-destructive normalization rule for `x.jsx`, and an explicit syntax/runtime verification plan that can actually be executed in this environment.

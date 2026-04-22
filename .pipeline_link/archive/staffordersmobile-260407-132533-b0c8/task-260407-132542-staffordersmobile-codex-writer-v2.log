@@ -1,0 +1,578 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d670c-435f-7ae3-9df8-15b325ebf56a
+--------
+user
+**MANDATORY FIRST STEP — run this before anything else:** ``` git fetch origin 2>/dev/null; git reset --hard origin/main ``` This ensures your working copy is in sync with the remote repository (prevents KB-095 stale-copy issue). --- Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/staffordersmobile-260407-132533-b0c8-codex-findings.md FORMAT: # Codex Writer Findings — StaffOrdersMobile Chain: staffordersmobile-260407-132533-b0c8 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # SOM Phase 1 Bug Fixes — КС Prompt ## Context Файл: `pages/StaffOrdersMobile/staffordersmobile.jsx` (**Production page**) RELEASE: `pages/StaffOrdersMobile/260406-01 StaffOrdersMobile RELEASE.jsx` (4389 строк) Задача: Исправить 5 UX-багов в компоненте OrderGroupCard (раскрытая карточка стола) Вес: L×5 | Бюджет: $12 | Модель: С5v2 **KB-095 guard (CRITICAL, выполнить ПЕРВЫМ):** ```bash expected=4389 actual=$(wc -l < "pages/StaffOrdersMobile/staffordersmobile.jsx") if [ "$actual" -lt "$expected" ]; then echo "KB-095 WARNING: file has $actual lines, expected $expected. Restoring from RELEASE..." cp "pages/StaffOrdersMobile/260406-01 StaffOrdersMobile RELEASE.jsx" "pages/StaffOrdersMobile/staffordersmobile.jsx" echo "KB-095: restored from RELEASE ($actual → $expected)" fi ``` --- ## ⚠️ КРИТИЧНО — 3 ПАРАЛЛЕЛЬНЫХ RENDER PATH В ФАЙЛЕ Файл содержит три независимых блока рендеринга для разных типов групп: - **legacy1** (~line 580): первый блок (доставка/самовывоз, старый стиль) - **legacy2** (~line 1190): второй блок (non-table группы, старый стиль) - **hall-mode** (~line 2175): блок для зальных столов ← **ВСЕ ПЯТЬ ФИКСОВ ПРИМЕНЯТЬ ТОЛЬКО ЗДЕСЬ** Для навигации к hall-mode: ```bash grep -n 'group\.type === "table" ?' pages/StaffOrdersMobile/staffordersmobile.jsx # Берём ТРЕТЬЕ совпадение — это вход в hall-mode render path ``` **Legacy paths НЕ трогать.** Они используют `renderLegacyOrderCard` и не имеют секций "Запросы/Новые/Готово". --- ## UX Reference UX-документ: `ux-concepts/StaffOrdersMobile/260406-00 StaffOrdersMobile UX S225 FINAL.md` (v2.6, 32 решения) Скриншоты: `menuapp-code-review/pages/StaffOrdersMobile/screenshots/current/` BACKLOG: #259 (SOM-S231-01), #251 (jump chips), #254 (toast position), #256 (close reasons), #255 (age urgency) --- ## FROZEN UX (DO NOT CHANGE) Следующие элементы НЕЛЬЗЯ трогать — реализованы и протестированы в RELEASE 260406-01: - Порядок секций: Запросы → Новые → В работе → Готово → Выдано → СЧЁТ → «Закрыть стол» - Bulk кнопки «Принять все (N)» и «Выдать все (N)» в заголовках секций - Per-item action кнопки на каждой строке блюда (Принять / Выдать / кастомный этап) - Двухшаговый flow запросов: [Принять] → [Выдать] - Staff pill после «Принять» в строке запроса - Collapse/expand анимация карточки (max-h-[3000px] transition) - Inline undo toast механизм — только позицию меняем (Fix 3), не механизм - Логика блокировки «Закрыть стол» — только добавляем scroll, не меняем условия - Секция СЧЁТ (billData) — только убрать из дублирующей карточки, не трогать основную - Компонент `renderLegacyOrderCard` — не трогать (используется в non-table groups) - Все изменения legacy1 и legacy2 path — НЕ ТРОГАТЬ --- ## Fix 1: Убрать дублирующую вложенную карточку стола (SOM-S231-01) ### Проблема При раскрытии карточки стола (tap → isExpanded=true) пользователь видит: - Внешний контейнер (заголовок): «22» badge + «Свернуть» + jump chips - Внутри expanded area: ЕЩЁ ОДНА карточка с «22» badge + «Свернуть» + те же chips Результат: визуальное дублирование заголовка стола. Баг SOM-S231-01. ### Wireframe (было → должно быть) ``` БЫЛО (expanded): ДОЛЖНО БЫТЬ (expanded): ┌────────────────────────────┐ ┌────────────────────────────┐ │ ⭐ [22] Зона A Свернуть │ │ ⭐ [22] Зона A Свернуть │ │ Новые 3 · 5 мин Готово 2 │ │ Новые 3 · 5 мин Готово 2 │ ├────────────────────────────┤ ├────────────────────────────┤ │ ┌──────────────────────┐ │ │ ЗАПРОСЫ (1) Принять │ │ │ ⭐ [22] Зона A Свн.│ │ │ [Салфетки] 4 мин │ │ │ Новые 3 · 5 мин .... │ │ ├────────────────────────────┤ │ │ Счёт · Итого 4200₸ │ │ │ НОВЫЕ (1 гость · 2 блюда) │ │ └──────────────────────┘ │ │ [Борщ ×1] Принять │ │ ЗАПРОСЫ (1) Принять │ └────────────────────────────┘ │ НОВЫЕ (1 гость · 2 блюда) │ └────────────────────────────┘ ``` ### Что менять Найти hall-mode expanded area (после третьего `group.type === "table" ?`). Внутри expanded content `<div className="... overflow-hidden transition-all ...">` найти: Grep в hall-mode path: ``` rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2 ``` ⚠️ Этот className присутствует в файле в 3 местах (legacy1, legacy2, hall-mode). Нужен ТОЛЬКО блок в hall-mode (третье совпадение, ~line 2180). **Удалить весь блок** `<div className="rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2">...</div>` в hall-mode path (третье совпадение). Блок содержит: Star/Lock icon, compactTableLabel badge, zone_name, collapse button, ownerHintVisible, hallSummaryItems chips, billData.total — всё это дублирование из header. После удаления первым элементом expanded area (после `<React.Fragment>`) должен быть conditionally rendered контент секций. *(если запросов нет — первым будет блок newOrders, если и их нет — inProgressSections и т.д.)* ### Проверка ```bash grep -c "rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2" "pages/StaffOrdersMobile/staffordersmobile.jsx" # ожидается: 2 (legacy1 и legacy2 остаются; hall-mode экземпляр удалён) ``` --- ## Fix 2: Jump chips → scrollIntoView при клике (#251, UX #26) ### Проблема Jump chips (Новые 3, Готово 2) в заголовке карточки — только информационные `<span>`. По клику ничего не происходит. UX #26 требует: клик → scroll к нужной секции внутри карточки. ### Wireframe ``` Заголовок карточки (всегда виден): ┌────────────────────────────────────────┐ │ ⭐ [22] [Новые 3 · 5м] [Готово 2 · 8м] Свернуть │ │ ↑ tappable → scroll to section │ │ ↑ e.stopPropagation() нужен! │ └────────────────────────────────────────┘ ``` ### Что менять **⚠️ Важно: chips находятся ВНУТРИ кликабельного header div (`onClick={onToggleExpand}`). Нажатие на chip должно скроллить секцию, но НЕ сворачивать/разворачивать карточку. Обязательно добавить `e.stopPropagation()` в onClick чипа.** **Шаг A — добавить refs на wrapper'ы секций.** Grep для поиска места объявления состояний компонента (добавить рядом с другими useRef): ``` const ownerHintTimerRef = useRef(null); ``` Добавить после: ```jsx const requestsSectionRef = useRef(null); const newSectionRef = useRef(null); const inProgressSectionRef = useRef(null); const readySectionRef = useRef(null); ``` **Шаг B — добавить единую функцию scroll (используется и в Fix 4).** После объявления refs: ```jsx const scrollToSection = useCallback((kind) => { const refMap = { requests: requestsSectionRef, new: newSectionRef, inProgress: inProgressSectionRef, ready: readySectionRef, }; const ref = refMap[kind]; if (ref?.current) { ref.current.scrollIntoView({ behavior: "smooth", block: "nearest" }); } }, []); ``` **Шаг C — прикрепить refs к секциям в hall-mode path (~line 2175+).** Найти секцию запросов в hall-mode: `tableRequests.length > 0 && <div>` → добавить `ref={requestsSectionRef}` к первому `<div>`. Найти секцию В РАБОТЕ: `inProgressSections.length > 0 && <div>` → добавить `ref={inProgressSectionRef}`. Найти секцию НОВЫЕ: `newOrders.length > 0 && <div>` → добавить `ref={newSectionRef}`. Найти секцию ГОТОВО: `readyOrders.length > 0 && <div>` → добавить `ref={readySectionRef}`. **Шаг D — обновить renderHallSummaryItem.** Grep: ``` const renderHallSummaryItem = useCallback((item) => { ``` Заменить `<span key={item.key} ...>` на: ```jsx <button type="button" key={item.key} onClick={(e) => { e.stopPropagation(); scrollToSection(item.kind); }} className={`inline-flex items-center gap-1.5 text-xs font-medium cursor-pointer active:opacity-70 ${getSummaryTone(item.kind, item.ageMin)}`} > ``` Закрывающий тег `</span>` → `</button>`. **⚠️ Dependency array**: Добавить `scrollToSection` к СУЩЕСТВУЮЩИМ зависимостям, не заменять весь массив. ### Проверка ```bash grep -c "scrollToSection" "pages/StaffOrdersMobile/staffordersmobile.jsx" # ожидается: ≥3 grep -c "stopPropagation" "pages/StaffOrdersMobile/staffordersmobile.jsx" # ожидается: ≥1 ``` --- ## Fix 3: Toast под кликнутой строкой, не под последней (#254, UX #23) ### Проблема После нажатия кнопки на строке блюда, undo toast появляется под ПОСЛЕДНЕЙ строкой заказа. UX #23: toast = под кликнутой строкой. ### Wireframe ``` БЫЛО: ДОЛЖНО БЫТЬ: [Борщ ×1] Принять [Борщ ×1] Принять [Котлета ×1] Принять [Отменить → 4с] ← toast сразу под [Стейк ×1] Принять [Котлета ×1] Принять [Отменить → 4с] ← toast [Стейк ×1] Принять ``` ### ⚠️ DISCOVERY STEP (обязательно перед реализацией) `setUndoToast` вызывается НЕ напрямую из кнопки — есть call chain. Перед реализацией: 1. Найти тело `handleSingleAction`: ```bash grep -n "const handleSingleAction\|function handleSingleAction" "pages/StaffOrdersMobile/staffordersmobile.jsx" ``` 2. Проследить полный path от `handleSingleAction` до `setUndoToast`: ```bash grep -n "setUndoToast(" "pages/StaffOrdersMobile/staffordersmobile.jsx" ``` 3. Найти ВСЕ call sites `handleSingleAction` (вдруг вызывается без `row.id` в других местах): ```bash grep -n "handleSingleAction(" "pages/StaffOrdersMobile/staffordersmobile.jsx" ``` 4. Обновить ВСЕ промежуточные функции в chain для передачи `rowId`. ### Что менять **Шаг A — обновить кнопку в renderHallRows.** Grep: `onClick={() => handleSingleAction(row.order)` → изменить на: ```jsx onClick={() => handleSingleAction(row.order, row.id)} ``` **Шаг B — обновить call chain.** Для каждой промежуточной функции между `handleSingleAction` и `setUndoToast`: - Добавить `rowId` как параметр - Передать дальше по chain В самом конце, где вызывается `setUndoToast({...})`: ```jsx setUndoToast({ ..., rowId }) ``` **Шаг C — обновить логику showToast в renderHallRows.** Grep: `const isLastOfOrder` → заменить обе строки: ```js const isLastOfOrder = ... const showToast = ... isLastOfOrder ... ``` На: ```js const showToast = undoToast && row.order?.id === undoToast.orderId && row.id === undoToast.rowId && !renderedToast.has(undoToast.orderId); if (showToast) renderedToast.add(undoToast.orderId); ``` Строку `const isLastOfOrder = ...` удалить. **⚠️ Dependency array renderHallRows**: добавить новые зависимости к СУЩЕСТВУЮЩИМ, не заменять весь массив. ### Проверка ```bash grep -c "rowId" "pages/StaffOrdersMobile/staffordersmobile.jsx" # ожидается: ≥3 ``` --- ## Fix 4: Причины блокировки «Закрыть стол» — tappable (#256, UX #29) ### Проблема `<p>` с причинами блокировки под кнопкой «Закрыть стол» — нетапабельный текст. UX #29: тап → scroll к нужной секции. ### Wireframe ``` БЫЛО: ДОЛЖНО БЫТЬ: [ ✕ Закрыть стол ] (серая) [ ✕ Закрыть стол ] (серая) Есть новые блюда [Есть новые блюда →] ← button → scroll к НОВЫЕ Есть блюда в работе [Есть блюда в работе →] ← scroll к В РАБОТЕ ``` ### Что менять **Использовать refs и `scrollToSection` из Fix 2** — все 4 refs уже объявлены. **Маппинг причин на scrollToSection kind:** ```js const reasonToKind = { [HALL_UI_TEXT.requestsBlocker]: "requests", [HALL_UI_TEXT.newBlocker]: "new", [HALL_UI_TEXT.inProgressBlocker]: "inProgress", [HALL_UI_TEXT.readyBlocker]: "ready", }; ``` ⚠️ Если причина не найдена в маппинге — показать как обычный `<p>`, не мёртвую кнопку. Grep: `closeDisabledReasons.map` — встречается в 3 местах. Менять только hall-mode (~line 2206). Текущий код: ```jsx {closeDisabledReasons.map((reason, i) => <p key={i} className="text-[10px] text-slate-400 text-center">{reason}</p>)} ``` Новый код: ```jsx {closeDisabledReasons.map((reason, i) => { const kind = reasonToKind[reason]; if (!kind) return <p key={i} className="text-[10px] text-slate-400 text-center">{reason}</p>; return ( <button key={i} type="button" onClick={() => scrollToSection(kind)} className="w-full text-[10px] text-slate-400 text-center min-h-[28px] active:text-slate-600" > {reason} › </button> ); })} ``` ### Проверка ```bash grep -c "reasonToKind" "pages/StaffOrdersMobile/staffordersmobile.jsx" # ожидается: ≥1 ``` --- ## Fix 5: Age urgency цветная полоска на строках блюд (#255, UX #13) ### Проблема Строки блюд в `renderHallRows` не показывают срочность по возрасту заказа. ### Wireframe ``` БЫЛО: ДОЛЖНО БЫТЬ: ┌──────────────────────────────┐ ┌──────────────────────────────┐ │ [Борщ ×1] Далее │ │ [Борщ ×1] Далее │ ← <10 мин: обычный ├──────────────────────────────┤ ├──────────────────────────────┤ │ [Котлета ×1] Далее │ │▌[Котлета ×1] Далее │ ← 10-14 мин: amber └──────────────────────────────┘ └──────────────────────────────┘ ┌──────────────────────────────┐ │▌[Стейк ×1] Далее │ ← ≥15 мин: red └──────────────────────────────┘ ``` ### ⚠️ DISCOVERY STEP Проверить что `overdueMinutes` доступен в scope `OrderGroupCard`: ```bash grep -n "overdueMinutes" "pages/StaffOrdersMobile/staffordersmobile.jsx" ``` Если найден — использовать. Если не найден — использовать `10` как fallback. ### Что менять Grep: `rows.map((row, idx) => {` → внутри `.map()` добавить расчёт urgency: ```js const ageMin = getAgeMinutes(row.order?.created_date); const overdueThreshold = overdueMinutes || 10; const urgencyClass = ageMin >= overdueThreshold + 5 ? "border-l-4 border-l-red-500" : ageMin >= overdueThreshold ? "border-l-4 border-l-amber-400" : ""; ``` Grep: `rounded-lg border ${palette.border} ${palette.bg} px-3 py-2` → добавить `${urgencyClass}`: ```jsx className={`rounded-lg border ${palette.border} ${palette.bg} px-3 py-2 ${urgencyClass}`} ``` `getAgeMinutes` — глобальная функция в файле (line ~366), вызывать напрямую. **⚠️ Dependency array renderHallRows**: добавить `overdueMinutes` к СУЩЕСТВУЮЩИМ зависимостям. ### Проверка ```bash grep -c "urgencyClass" "pages/StaffOrdersMobile/staffordersmobile.jsx" # ожидается: ≥2 ``` --- ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app (waiter tablet/phone). Verify at 375px width: - [ ] Jump chips (Fix 2): touch area ≥ 44px height — `min-h-[44px]` or adequate padding - [ ] Close table reason buttons (Fix 4): touch area ≥ 28px — `min-h-[28px]` already in prompt - [ ] Dish rows (Fix 5): urgency border-l-4 visible and not clipped - [ ] No duplicate visual headers when table expanded (Fix 1) - [ ] Expanded card still scrollable after section refs added (Fix 2) --- ## Regression Check (MANDATORY after implementation) Проверить что следующее ПРОДОЛЖАЕТ работать: - [ ] Tap на заголовок карточки стола → раскрывается/сворачивается (не должен срабатывать chip onClick) - [ ] «Принять все (N)» / «Выдать все (N)» bulk кнопки в заголовках секций работают - [ ] Одиночный тап на строку блюда → undo toast появляется (механизм работает) - [ ] «Закрыть стол» кнопка disabled и enabled states работают правильно - [ ] Legacy path карточки (delivery/online) рендерятся без изменений --- ## Post-fix Checks (ОБЯЗАТЕЛЬНО после всех изменений) 1. **KB-095 check (line count):** ```bash wc -l "pages/StaffOrdersMobile/staffordersmobile.jsx" ``` Ожидаемое: 4389 ± 50 строк. Если < 4300 — восстановить из RELEASE. 2. **Grep проверки:** ```bash # Fix 1: hall-mode inner card удалён (legacy1/2 остаются) grep -c "rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2" "pages/StaffOrdersMobile/staffordersmobile.jsx" # ожидается: 2 # Fix 2: scroll + stopPropagation grep -c "scrollToSection" "pages/StaffOrdersMobile/staffordersmobile.jsx" # ожидается: ≥3 grep -c "stopPropagation" "pages/StaffOrdersMobile/staffordersmobile.jsx" # ожидается: ≥1 # Fix 3: rowId добавлен grep -c "rowId" "pages/StaffOrdersMobile/staffordersmobile.jsx" # ожидается: ≥3 # Fix 4: reasonToKind добавлен grep -c "reasonToKind" "pages/StaffOrdersMobile/staffordersmobile.jsx" # ожидается: ≥1 # Fix 5: urgencyClass добавлен grep -c "urgencyClass" "pages/StaffOrdersMobile/staffordersmobile.jsx" # ожидается: ≥2 ``` 3. **FROZEN UX check:** ```bash grep -c "handleOrdersAction" "pages/StaffOrdersMobile/staffordersmobile.jsx" # ожидается: ≥2 grep -c "renderLegacyOrderCard" "pages/StaffOrdersMobile/staffordersmobile.jsx" # ожидается: ≥2 ``` === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/StaffOrdersMobile/staffordersmobile.jsx` within the page folder only, and I’m starting with the requested repo sync command before reading the target file and its local context files.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git fetch origin 2>$null; git reset --hard origin/main' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 37.96s:
+HEAD is now at befa1e0 fix(PublicMenu): split cart submission into N separate Orders (1 per cart line)
+codex
+The sync step completed. Next I’m reading only the `StaffOrdersMobile` page folder and the target file sections relevant to Fix 1-5, without searching outside that folder.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content BUGS.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content README.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Force' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile exited 1 in 59.45s:
+Get-Content : Cannot find path 'C:\Users\ASUS\Dev\Menu AI 
+Cowork\menuapp-code-review\pages\StaffOrdersMobile\README.md' because it does not exist.
+At line:2 char:1
++ Get-Content README.md
++ ~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (C:\Users\ASUS\D...obile\README.md:String) [Get-Content], ItemNotFoundEx 
+   ception
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+ succeeded in 52.85s:
+# StaffOrdersMobile Bug Tracker
+
+**Page:** `pages/StaffOrdersMobile/staffordersmobile.jsx`
+**Last updated:** 2026-04-06 (Chain c05c â€” SOM Section Rework: lifecycle order, active/passive, dual metric, 2-step requests, staff pill, inline toast, close-blocker, bulk requests)
+
+---
+
+## Fixed Bugs
+
+### SOM-KS1-P0-01 (P0) -- activeRequests filter excludes 'accepted' status
+- **Function:** activeRequests useMemo filter (line ~3310)
+- **Root cause:** Filter only included `["new", "in_progress"]` â€” accepted requests vanished from UI, making two-step flow impossible.
+- **Fix:** Changed to `!["done", "cancelled"].includes(r.status)` â€” now includes accepted requests.
+- **Chain:** staffordersmobile-260406-195641-c05c
+- **Status:** ðŸŸ¡ Fixed (pending test)
+
+### SOM-KS1-P0-02 (P0) -- updateRequestMutation only passes status, loses assignee
+- **Function:** updateRequestMutation mutationFn (line ~3315)
+- **Root cause:** Destructured only `{id, status}` â€” Accept step needed `assignee` + `assigned_at` fields.
+- **Fix:** Changed to spread all payload fields to update call.
+ succeeded in 57.08s:
+
+
+    Каталог: C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\StaffOrdersMobile
+
+
+Mode                 LastWriteTime         Length Name                                                                 
+----                 -------------         ------ ----                                                                 
+d-----          4/7/2026  12:20 PM                screenshots                                                          
+dar---          4/6/2026   9:46 PM                versions                                                             
+-a----          4/7/2026  11:31 AM         160079 260306-05 StaffOrdersMobile RELEASE.jsx                              
+-a----          4/7/2026  11:31 AM         216066 260405-00 StaffOrdersMobile RELEASE.jsx                              
+-a----          4/6/2026   9:46 PM         227839 260406-01 StaffOrdersMobile RELEASE.jsx                              
+-a----          3/2/2026  11:28 PM          27851 Audit_FunctionalMap_S70.md                                           
+-a----          4/6/2026   9:40 PM          27302 BUGS.md                                                              
+-a----          3/3/2026  12:26 AM          27883 DeepAnalysis_S70.md                                                  
+-a----          4/7/2026   1:28 PM           5299 review_initial_260224.md                                             
+-a----          3/6/2026   4:02 PM           7804 StaffOrdersMobile README.md                                          
+-a----          4/7/2026  11:31 AM         227839 staffordersmobile.jsx                                                
+-a----         2/24/2026   3:41 PM         115552 staffordersmobile_v1.0_BASE.jsx                                      
+-a----          3/2/2026   4:00 PM           5536 TEST_PLAN.md                                                         
+codex
+I’ve got the page folder inventory and bug tracker. The next pass is targeted: header duplication block, jump-chip wiring, undo-toast call chain, close-table reason rendering, and row urgency styling in `staffordersmobile.jsx`, plus the page README for any local conventions.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'staffordersmobile.jsx' -Pattern 'rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'StaffOrdersMobile README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'staffordersmobile.jsx' -Pattern 'group\\.type === \"table\" \\?'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "(Get-Content 'staffordersmobile.jsx' | Measure-Object -Line).Lines" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile succeeded in 1m 00s:
+---
+version: "4.0.1"
+updated: "2026-03-06"
+session: 90
+deployed: "2026-03-02 S69"
+---
+
+# StaffOrdersMobile â€” ÐœÐ¾Ð±Ð¸Ð»ÑŒÐ½Ñ‹Ð¹ Ð¸Ð½Ñ‚ÐµÑ€Ñ„ÐµÐ¹Ñ Ð¿ÐµÑ€ÑÐ¾Ð½Ð°Ð»Ð°
+
+## ÐžÐ¿Ð¸ÑÐ°Ð½Ð¸Ðµ
+ÐœÐ¾Ð±Ð¸Ð»ÑŒÐ½Ñ‹Ð¹ Ð¸Ð½Ñ‚ÐµÑ€Ñ„ÐµÐ¹Ñ Ð´Ð»Ñ Ð¿ÐµÑ€ÑÐ¾Ð½Ð°Ð»Ð° Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð°. ÐŸÑ€Ð¸Ñ‘Ð¼ Ð·Ð°ÐºÐ°Ð·Ð¾Ð², ÑÐ¼ÐµÐ½Ð° ÑÑ‚Ð°Ñ‚ÑƒÑÐ¾Ð², Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹ Ð¿Ð¾Ð¼Ð¾Ñ‰Ð¸, Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€Ð¾Ð²ÐºÐ° Ð¿Ð¾ ÑÑ‚Ð¾Ð»Ð°Ð¼. Ð¡Ð°Ð¼Ñ‹Ð¹ ÑÐ»Ð¾Ð¶Ð½Ñ‹Ð¹ Ñ„Ð°Ð¹Ð» Ð¿Ñ€Ð¾ÐµÐºÑ‚Ð° (v3.6.0 â€” stale data + close table confirm S74).
+
+**Route:** `/staffordersmobile`
+**Roles:** partner_manager, partner_staff, kitchen
+**Ð Ð°Ð·Ð¼ÐµÑ€:** ~3940 ÑÑ‚Ñ€Ð¾Ðº (v3.2.0)
+
+## ÐÑ€Ñ…Ð¸Ñ‚ÐµÐºÑ‚ÑƒÑ€Ð°
+
+### ÐšÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚Ñ‹ (14)
+- `StaffOrdersMobile` â€” Ð³Ð»Ð°Ð²Ð½Ñ‹Ð¹
+ succeeded in 57.91s:
+
+staffordersmobile.jsx:511:      <div className="px-4 pt-3 pb-3 cursor-pointer active:opacity-80" 
+onClick={onToggleExpand} role="button" aria-expanded={isExpanded} aria-label={group.type === "table" ? identifier : 
+`${identifier}: ${statusLabel}`}>
+staffordersmobile.jsx:512:        {group.type === "table" ? (
+staffordersmobile.jsx:582:          {group.type === "table" ? (
+staffordersmobile.jsx:1687:  const tableId = group.type === "table" ? group.id : null;
+staffordersmobile.jsx:1801:  const channelType = group.type === "table" ? "hall" : group.type;
+staffordersmobile.jsx:1816:  const statusLabel = group.type === "table" ? style.label : (group.orders[0] ? 
+getStatusConfig(group.orders[0]).label : "");
+staffordersmobile.jsx:2126:      <div className="px-4 pt-3 pb-3 cursor-pointer active:opacity-80" 
+onClick={onToggleExpand} role="button" aria-expanded={isExpanded} aria-label={group.type === "table" ? identifier : 
+`${identifier}: ${statusLabel}`}>
+staffordersmobile.jsx:2127:        {group.type === "table" ? (
+staffordersmobile.jsx:2178:          {group.type === "table" ? (
+
+
+ succeeded in 58.51s:
+4065
+ succeeded in 58.75s:
+
+staffordersmobile.jsx:584:              <div className="rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2">
+staffordersmobile.jsx:1196:              <div className="rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2">
+staffordersmobile.jsx:2180:              <div className="rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2">
+
+
+codex
+I’ve confirmed the file is still the unfixed 4065-line variant and the hall-mode duplicate header block is still present as a third match. I’m pulling the exact implementation snippets now to verify each requested fix without scanning unrelated parts of the file.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'staffordersmobile.jsx' -Pattern 'ownerHintTimerRef|renderHallSummaryItem|handleSingleAction|setUndoToast\\(|closeDisabledReasons\\.map|const isLastOfOrder|rows\\.map\\(\\(row, idx\\) => \\{|overdueMinutes' -Context 3,8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'staffordersmobile.jsx' | Select-Object -Skip 1750 -First 220" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'staffordersmobile.jsx' | Select-Object -Skip 2080 -First 340" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile succeeded in 22.63s:
+      queryKey: ["orderItems", order.id],
+      queryFn: () => base44.entities.OrderItem.filter({ order: order.id }),
+      staleTime: 60000,
+      retry: shouldRetry,
+      enabled: isExpanded && servedExpanded && group.type === "table",
+    })),
+  });
+
+  useEffect(() => () => ownerHintTimerRef.current && clearTimeout(ownerHintTimerRef.current), []);
+
+  useEffect(() => {
+    if (!inProgressExpanded) {
+      setExpandedSubGroups({});
+      return;
+    }
+    if (subGroups.length > 0) {
+      setExpandedSubGroups((prev) => (Object.keys(prev).length > 0 ? prev : { [subGroups[0].sid]: true }));
+    }
+  }, [inProgressExpanded, subGroups]);
+
+ succeeded in 21.90s:
+                </div>
+              </div>
+              {showToast && (
+                <div className="flex items-center justify-between bg-slate-800 text-white text-xs rounded-lg px-3 py-2">
+                  <span>{undoToast.label || HALL_UI_TEXT.undoLabel}</span>
+                  <button type="button" onClick={() => { if (undoToast.timerId) clearTimeout(undoToast.timerId); undoToast.onUndo(); setUndoToast(null); }} className="ml-3 font-semibold text-amber-300 underline min-h-[36px] flex items-center">{HALL_UI_TEXT.undo}</button>
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    );
+  }, [advanceMutation.isPending, handleSingleAction, undoToast, setUndoToast]);
+
+  const renderLegacyOrderCard = useCallback((order) => {
+    const config = getStatusConfig(order);
+    const actionMeta = getOrderActionMeta(order);
+    const orderItems = itemsByOrder[order.id] || [];
+    const badgeStyle = config.color ? { backgroundColor: `${config.color}20`, borderColor: config.color, color: config.color } : undefined;
+ succeeded in 24.43s:
+
+  staffordersmobile.jsx:534:              </div>
+  staffordersmobile.jsx:535:            )}
+  staffordersmobile.jsx:536:            {hallSummaryItems.length > 0 ? (
+> staffordersmobile.jsx:537:              <div className="flex flex-wrap items-center gap-x-3 
+gap-y-1">{hallSummaryItems.map(renderHallSummaryItem)}</div>
+  staffordersmobile.jsx:538:            ) : (
+  staffordersmobile.jsx:539:              <div className="text-xs text-slate-400">{HALL_UI_TEXT.noActions}</div>
+  staffordersmobile.jsx:540:            )}
+  staffordersmobile.jsx:541:          </div>
+  staffordersmobile.jsx:542:        ) : (
+  staffordersmobile.jsx:543:          <React.Fragment>
+  staffordersmobile.jsx:544:            <div className="flex items-start justify-between gap-2 mb-1">
+  staffordersmobile.jsx:545:              <span className="font-bold text-base leading-tight flex-1 min-w-0 
+text-slate-900 truncate">{identifier}</span>
+  staffordersmobile.jsx:591:                  <button type="button" onClick={onToggleExpand} className="text-xs 
+font-semibold text-slate-500 min-h-[36px]">{HALL_UI_TEXT.collapse}</button>
+  staffordersmobile.jsx:592:                </div>
+  staffordersmobile.jsx:593:                {ownerHintVisible && <div className="rounded-lg bg-slate-900 px-3 py-2 
+text-white"><div className="text-xs font-semibold">{HALL_UI_TEXT.otherTableTitle}</div><div className="text-[11px] 
+codex
+The hall-mode section confirms the duplicate inner card and the missing tap/scroll wiring. I’m checking the toast rendering path and exact absence of `scrollToSection`, `rowId`, `reasonToKind`, and `urgencyClass` now so the findings stay concrete and limited to the five requested fixes.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'staffordersmobile.jsx' | Select-Object -Skip 2032 -First 70" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'staffordersmobile.jsx' -Pattern 'handleSingleAction\\(' -Context 0,1" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "(Select-String -Path 'staffordersmobile.jsx' -Pattern 'scrollToSection').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'rowId').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'reasonToKind').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'urgencyClass').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2').Count" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'staffordersmobile.jsx' -Pattern 'scrollToSection|rowId|reasonToKind|urgencyClass|stopPropagation|handleSingleAction\\('" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile succeeded in 22.94s:
+0
+0
+0
+0
+3
+ succeeded in 23.59s:
+  const renderHallSummaryItem = useCallback((item) => {
+    const Icon = item.icon;
+    return (
+      <span key={item.key} className={`inline-flex items-center gap-1.5 text-xs font-medium ${getSummaryTone(item.kind, item.ageMin)}`}>
+        {Icon && <Icon className="w-3.5 h-3.5 shrink-0" />}
+        {item.label && <span>{item.label}</span>}
+        <span className="font-semibold text-slate-900">{item.count}</span>
+        <span className="text-slate-300">{'\u00B7'}</span>
+        <span>{formatCompactMinutes(item.ageMin)}</span>
+      </span>
+    );
+  }, [getSummaryTone]);
+
+  const renderHallRows = useCallback((rows, tone = "slate", readOnly = false) => {
+    const palette = {
+      blue: { bg: "bg-blue-50/80", border: "border-blue-200", button: "border-blue-200 bg-white text-blue-700" },
+      green: { bg: "bg-green-50/80", border: "border-green-200", button: "border-green-200 bg-white text-green-700" },
+      amber: { bg: "bg-amber-50/80", border: "border-amber-200", button: "border-amber-200 bg-white text-amber-700" },
+      slate: { bg: "bg-slate-50", border: "border-slate-200", button: "border-slate-200 bg-white text-slate-700" },
+    }[tone] || { bg: "bg-slate-50", border: "border-slate-200", button: "border-slate-200 bg-white text-slate-700" };
+ succeeded in 26.00s:
+
+> staffordersmobile.jsx:2077:                    <button type="button" onClick={() => handleSingleAction(row.order)} 
+disabled={advanceMutation.isPending || row.loading} className={`shrink-0 rounded-lg border px-3 py-2 text-xs 
+font-semibold min-h-[36px] active:scale-[0.98] disabled:opacity-60 ${row.willServe ? "border-green-200 bg-white 
+text-green-700" : row.actionLabel === HALL_UI_TEXT.accept ? "border-blue-200 bg-white text-blue-700" : 
+palette.button}`}>
+  staffordersmobile.jsx:2078:                      {advanceMutation.isPending ? <Loader2 className="w-3 h-3 
+animate-spin" /> : row.actionLabel}
+> staffordersmobile.jsx:2116:          {buildAdvancePayload(order) && <button type="button" onClick={() => 
+handleSingleAction(order)} disabled={advanceMutation.isPending} className="rounded-lg border border-slate-200 
+bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 min-h-[36px] active:scale-[0.98] 
+disabled:opacity-60">{advanceMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : actionLabel}</button>}
+  staffordersmobile.jsx:2117:        </div>
+
+
+ succeeded in 30.61s:
+
+staffordersmobile.jsx:559:                  {contactInfo.phone && <a href={`tel:${contactInfo.phone}`} 
+onClick={(event) => event.stopPropagation()} className="text-xs text-blue-600 
+shrink-0">+7{'\u2026'}{contactInfo.phone.slice(-4)}</a>}
+staffordersmobile.jsx:657:                              <button type="button" onClick={(event) => { 
+event.stopPropagation(); handleOrdersAction(section.orders); }} disabled={advanceMutation.isPending} 
+className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 min-h-[36px] 
+active:scale-[0.98] disabled:opacity-60">{section.bulkLabel}</button>
+staffordersmobile.jsx:730:                  {inProgressExpanded && <div className="space-y-3">{subGroups.map(({ sid, 
+orders, cfg }) => { const isSubExpanded = !!expandedSubGroups[sid]; const actionMeta = getOrderActionMeta(orders[0]); 
+const subGroupLabel = sid === "__null__" ? '\u0412 \u0420\u0410\u0411\u041E\u0422\u0415' : cfg.label; if 
+(subGroups.length === 1) return <div key={sid} className="space-y-2">{orders.map(renderLegacyOrderCard)}</div>; return 
+<div key={sid}><div className="flex items-center justify-between mb-1.5 cursor-pointer min-h-[44px]" onClick={() => 
+setExpandedSubGroups((prev) => ({ ...prev, [sid]: !prev[sid] }))}><div className="flex items-center 
+gap-2"><ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isSubExpanded ? "rotate-180" : ""}`} 
+/><span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">{`${subGroupLabel} 
+(${orders.length})`}</span></div><button type="button" onClick={(event) => { event.stopPropagation(); 
+handleOrdersAction(orders); }} disabled={advanceMutation.isPending} className="text-xs font-semibold text-amber-600 
+bg-amber-50 border border-amber-200 px-3 py-1 rounded min-h-[36px] active:scale-95 
+disabled:opacity-60">{actionMeta.bulkLabel}</button></div>{isSubExpanded && <div 
+codex
+The target issues are straightforward: all five requested fixes are still missing in the current `staffordersmobile.jsx`. I’m writing the findings file now, and I’ll also save the page-local report and command log required by the repo instructions.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Force 'pipeline/chain-state'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 50.27s:
+
+
+    Каталог: C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pipeline\chain-state
+
+
+Mode                 LastWriteTime         Length Name                                                                 
+----                 -------------         ------ ----                                                                 
+-a----          4/4/2026   6:04 AM           8551 partnerorderprocess-260404-060141-d4ba-codex-findings.md             
+-a----          4/4/2026   8:50 PM           9365 partnerorderprocess-260404-204226-0133-cc-findings.md                
+-a----          4/4/2026   8:58 PM           4432 partnerorderprocess-260404-204226-0133-codex-findings.md             
+-a----          4/4/2026   9:17 PM           3011 partnerorderprocess-260404-204226-0133-merge-report.md               
+-a----         3/22/2026  12:02 AM           6352 partnersettings-260321-235750-cc-findings.md                         
+-a----         3/22/2026  12:07 AM           3017 partnersettings-260321-235750-codex-findings.md                      
+-a----         3/22/2026  12:14 AM           4643 partnersettings-260321-235750-comparison.md                          
+-a----         3/22/2026  12:16 AM            306 partnersettings-260321-235750-discussion.md                          
+-a----         3/22/2026  12:20 AM           1856 partnersettings-260321-235750-merge-report.md                        
+-a----         3/23/2026   2:40 PM           9165 partnersettings-260323-142203-51fa-cc-findings.md                    
+-a----         3/23/2026   2:43 PM           2488 partnersettings-260323-142203-51fa-codex-findings.md                 
+-a----         3/23/2026   2:57 PM           6613 partnersettings-260323-142203-51fa-comparison.md                     
+-a----         3/23/2026   3:08 PM           2586 partnersettings-260323-142203-51fa-discussion.md                     
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/StaffOrdersMobile/commands_2026-04-07.log
+git fetch origin 2>$null; git reset --hard origin/main
+Get-ChildItem -Force
+Get-Content README.md
+Get-Content BUGS.md
+Get-Content 'StaffOrdersMobile README.md'
+(Get-Content 'staffordersmobile.jsx' | Measure-Object -Line).Lines
+Select-String -Path 'staffordersmobile.jsx' -Pattern 'group\.type === "table" \?'
+Select-String -Path 'staffordersmobile.jsx' -Pattern 'rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2'
+Get-Content 'staffordersmobile.jsx' | Select-Object -Skip 1750 -First 220
+Get-Content 'staffordersmobile.jsx' | Select-Object -Skip 2080 -First 340
+Select-String -Path 'staffordersmobile.jsx' -Pattern 'ownerHintTimerRef|renderHallSummaryItem|handleSingleAction|setUndoToast\(|closeDisabledReasons\.map|const isLastOfOrder|rows\.map\(\(row, idx\) => \{|overdueMinutes' -Context 3,8
+Get-Content 'staffordersmobile.jsx' | Select-Object -Skip 2032 -First 70
+Select-String -Path 'staffordersmobile.jsx' -Pattern 'scrollToSection|rowId|reasonToKind|urgencyClass|stopPropagation|handleSingleAction\('
+(Select-String -Path 'staffordersmobile.jsx' -Pattern 'scrollToSection').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'rowId').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'reasonToKind').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'urgencyClass').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2').Count
+Select-String -Path 'staffordersmobile.jsx' -Pattern 'handleSingleAction\(' -Context 0,1
+Get-ChildItem -Force 'pipeline/chain-state'
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/StaffOrdersMobile/review_2026-04-07.md
+# Codex Writer Findings — StaffOrdersMobile
+Chain: staffordersmobile-260407-132533-b0c8
+
+## Findings
+1. [P2] Duplicate expanded table header remains in hall-mode render path — `staffordersmobile.jsx:2180` still renders the extra `rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2` wrapper inside the expanded area, so an expanded table shows a second badge/zone/chips/collapse block before the real sections. FIX: Remove the third hall-mode instance of that wrapper block and let the expanded content start directly with the section list.
+2. [P1] Jump chips still collapse/expand the card instead of scrolling to sections — `renderHallSummaryItem` at `staffordersmobile.jsx:2033` still returns a passive `<span>`, there are 0 `scrollToSection` helpers/refs in the file, and the chips sit inside the clickable header at `staffordersmobile.jsx:2126`. Tapping a chip therefore bubbles into `onToggleExpand` instead of navigating, and the chip still lacks a button-sized touch target. FIX: Add the section refs plus shared `scrollToSection`, render each chip as a button with `e.stopPropagation()`, and give it a 44px tappable target.
+3. [P1] Undo toast is still anchored to the last row of an order — `startUndoWindow` at `staffordersmobile.jsx:1862` stores only `orderId`, `handleSingleAction` at `staffordersmobile.jsx:1907` accepts only `order`, and `renderHallRows` at `staffordersmobile.jsx:2059` still uses `isLastOfOrder` to decide where the toast appears. Serving from the first or middle dish row still places the undo toast under the last dish row of that order instead of the row that was tapped. FIX: Thread `rowId` through the action chain, save it in `setUndoToast`, and match `undoToast.rowId` in `renderHallRows` instead of using `isLastOfOrder`.
+4. [P2] Close-table blocker reasons are still dead text in hall mode — `closeDisabledReasons.map` at `staffordersmobile.jsx:2206` still renders plain `<p>` elements, and there is 0 `reasonToKind` mapping in the file. Staff can see the blocker messages but cannot tap them to jump to the blocking section. FIX: Map known blocker strings to section kinds and render those items as buttons that call `scrollToSection(kind)`, leaving plain text only for unknown reasons.
+5. [P2] Age urgency strip is still missing from hall dish rows — `renderHallRows` at `staffordersmobile.jsx:2059` still uses `className={`rounded-lg border ${palette.border} ${palette.bg} px-3 py-2`}` with no age-based modifier, and there is 0 `urgencyClass` usage in the file. Older dishes in New, In Progress, and Ready therefore render exactly like fresh ones, so the urgency cue from Fix 5 is absent. FIX: Compute `ageMin` from `row.order?.created_date`, derive amber/red `border-l-4` classes using `overdueMinutes || 10`, and append that class to the row wrapper.
+
+## Summary
+Total: 5 findings (0 P0, 2 P1, 3 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): The page folder contains `StaffOrdersMobile README.md`, not `README.md`; naming the exact file would remove that small lookup ambiguity.
+- Scope questions (anything you weren't sure if it's in scope): None.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/staffordersmobile-260407-132533-b0c8-codex-findings.md
+# Codex Writer Findings — StaffOrdersMobile
+Chain: staffordersmobile-260407-132533-b0c8
+
+## Findings
+1. [P2] Duplicate expanded table header remains in hall-mode render path — `staffordersmobile.jsx:2180` still renders the extra `rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2` wrapper inside the expanded area, so an expanded table shows a second badge/zone/chips/collapse block before the real sections. FIX: Remove the third hall-mode instance of that wrapper block and let the expanded content start directly with the section list.
+2. [P1] Jump chips still collapse/expand the card instead of scrolling to sections — `renderHallSummaryItem` at `staffordersmobile.jsx:2033` still returns a passive `<span>`, there are 0 `scrollToSection` helpers/refs in the file, and the chips sit inside the clickable header at `staffordersmobile.jsx:2126`. Tapping a chip therefore bubbles into `onToggleExpand` instead of navigating, and the chip still lacks a button-sized touch target. FIX: Add the section refs plus shared `scrollToSection`, render each chip as a button with `e.stopPropagation()`, and give it a 44px tappable target.
+3. [P1] Undo toast is still anchored to the last row of an order — `startUndoWindow` at `staffordersmobile.jsx:1862` stores only `orderId`, `handleSingleAction` at `staffordersmobile.jsx:1907` accepts only `order`, and `renderHallRows` at `staffordersmobile.jsx:2059` still uses `isLastOfOrder` to decide where the toast appears. Serving from the first or middle dish row still places the undo toast under the last dish row of that order instead of the row that was tapped. FIX: Thread `rowId` through the action chain, save it in `setUndoToast`, and match `undoToast.rowId` in `renderHallRows` instead of using `isLastOfOrder`.
+4. [P2] Close-table blocker reasons are still dead text in hall mode — `closeDisabledReasons.map` at `staffordersmobile.jsx:2206` still renders plain `<p>` elements, and there is 0 `reasonToKind` mapping in the file. Staff can see the blocker messages but cannot tap them to jump to the blocking section. FIX: Map known blocker strings to section kinds and render those items as buttons that call `scrollToSection(kind)`, leaving plain text only for unknown reasons.
+5. [P2] Age urgency strip is still missing from hall dish rows — `renderHallRows` at `staffordersmobile.jsx:2059` still uses `className={`rounded-lg border ${palette.border} ${palette.bg} px-3 py-2`}` with no age-based modifier, and there is 0 `urgencyClass` usage in the file. Older dishes in New, In Progress, and Ready therefore render exactly like fresh ones, so the urgency cue from Fix 5 is absent. FIX: Compute `ageMin` from `row.order?.created_date`, derive amber/red `border-l-4` classes using `overdueMinutes || 10`, and append that class to the row wrapper.
+
+## Summary
+Total: 5 findings (0 P0, 2 P1, 3 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): The page folder contains `StaffOrdersMobile README.md`, not `README.md`; naming the exact file would remove that small lookup ambiguity.
+- Scope questions (anything you weren't sure if it's in scope): None.
+apply_patch(auto_approved=true) exited 0 in 2.44s:
+Success. Updated the following files:
+A pipeline/chain-state/staffordersmobile-260407-132533-b0c8-codex-findings.md
+A pages/StaffOrdersMobile/review_2026-04-07.md
+A pages/StaffOrdersMobile/commands_2026-04-07.log
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-04-07.log b/pages/StaffOrdersMobile/commands_2026-04-07.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..ead3f61ff1dbc04849c995905bfeec21acba5e14
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-04-07.log
+@@ -0,0 +1,16 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Force
++Get-Content README.md
++Get-Content BUGS.md
++Get-Content 'StaffOrdersMobile README.md'
++(Get-Content 'staffordersmobile.jsx' | Measure-Object -Line).Lines
++Select-String -Path 'staffordersmobile.jsx' -Pattern 'group\.type === "table" \?'
++Select-String -Path 'staffordersmobile.jsx' -Pattern 'rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2'
++Get-Content 'staffordersmobile.jsx' | Select-Object -Skip 1750 -First 220
++Get-Content 'staffordersmobile.jsx' | Select-Object -Skip 2080 -First 340
++Select-String -Path 'staffordersmobile.jsx' -Pattern 'ownerHintTimerRef|renderHallSummaryItem|handleSingleAction|setUndoToast\(|closeDisabledReasons\.map|const isLastOfOrder|rows\.map\(\(row, idx\) => \{|overdueMinutes' -Context 3,8
++Get-Content 'staffordersmobile.jsx' | Select-Object -Skip 2032 -First 70
++Select-String -Path 'staffordersmobile.jsx' -Pattern 'scrollToSection|rowId|reasonToKind|urgencyClass|stopPropagation|handleSingleAction\('
++(Select-String -Path 'staffordersmobile.jsx' -Pattern 'scrollToSection').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'rowId').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'reasonToKind').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'urgencyClass').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2').Count
++Select-String -Path 'staffordersmobile.jsx' -Pattern 'handleSingleAction\(' -Context 0,1
++Get-ChildItem -Force 'pipeline/chain-state'
+diff --git a/pages/StaffOrdersMobile/review_2026-04-07.md b/pages/StaffOrdersMobile/review_2026-04-07.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..00f45eb9eec8647ee242eee2005cdddea401f006
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-04-07.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260407-132533-b0c8
++
++## Findings
++1. [P2] Duplicate expanded table header remains in hall-mode render path — `staffordersmobile.jsx:2180` still renders the extra `rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2` wrapper inside the expanded area, so an expanded table shows a second badge/zone/chips/collapse block before the real sections. FIX: Remove the third hall-mode instance of that wrapper block and let the expanded content start directly with the section list.
++2. [P1] Jump chips still collapse/expand the card instead of scrolling to sections — `renderHallSummaryItem` at `staffordersmobile.jsx:2033` still returns a passive `<span>`, there are 0 `scrollToSection` helpers/refs in the file, and the chips sit inside the clickable header at `staffordersmobile.jsx:2126`. Tapping a chip therefore bubbles into `onToggleExpand` instead of navigating, and the chip still lacks a button-sized touch target. FIX: Add the section refs plus shared `scrollToSection`, render each chip as a button with `e.stopPropagation()`, and give it a 44px tappable target.
++3. [P1] Undo toast is still anchored to the last row of an order — `startUndoWindow` at `staffordersmobile.jsx:1862` stores only `orderId`, `handleSingleAction` at `staffordersmobile.jsx:1907` accepts only `order`, and `renderHallRows` at `staffordersmobile.jsx:2059` still uses `isLastOfOrder` to decide where the toast appears. Serving from the first or middle dish row still places the undo toast under the last dish row of that order instead of the row that was tapped. FIX: Thread `rowId` through the action chain, save it in `setUndoToast`, and match `undoToast.rowId` in `renderHallRows` instead of using `isLastOfOrder`.
++4. [P2] Close-table blocker reasons are still dead text in hall mode — `closeDisabledReasons.map` at `staffordersmobile.jsx:2206` still renders plain `<p>` elements, and there is 0 `reasonToKind` mapping in the file. Staff can see the blocker messages but cannot tap them to jump to the blocking section. FIX: Map known blocker strings to section kinds and render those items as buttons that call `scrollToSection(kind)`, leaving plain text only for unknown reasons.
++5. [P2] Age urgency strip is still missing from hall dish rows — `renderHallRows` at `staffordersmobile.jsx:2059` still uses `className={`rounded-lg border ${palette.border} ${palette.bg} px-3 py-2`}` with no age-based modifier, and there is 0 `urgencyClass` usage in the file. Older dishes in New, In Progress, and Ready therefore render exactly like fresh ones, so the urgency cue from Fix 5 is absent. FIX: Compute `ageMin` from `row.order?.created_date`, derive amber/red `border-l-4` classes using `overdueMinutes || 10`, and append that class to the row wrapper.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 3 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): The page folder contains `StaffOrdersMobile README.md`, not `README.md`; naming the exact file would remove that small lookup ambiguity.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/staffordersmobile-260407-132533-b0c8-codex-findings.md b/pipeline/chain-state/staffordersmobile-260407-132533-b0c8-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..00f45eb9eec8647ee242eee2005cdddea401f006
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260407-132533-b0c8-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260407-132533-b0c8
++
++## Findings
++1. [P2] Duplicate expanded table header remains in hall-mode render path — `staffordersmobile.jsx:2180` still renders the extra `rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2` wrapper inside the expanded area, so an expanded table shows a second badge/zone/chips/collapse block before the real sections. FIX: Remove the third hall-mode instance of that wrapper block and let the expanded content start directly with the section list.
++2. [P1] Jump chips still collapse/expand the card instead of scrolling to sections — `renderHallSummaryItem` at `staffordersmobile.jsx:2033` still returns a passive `<span>`, there are 0 `scrollToSection` helpers/refs in the file, and the chips sit inside the clickable header at `staffordersmobile.jsx:2126`. Tapping a chip therefore bubbles into `onToggleExpand` instead of navigating, and the chip still lacks a button-sized touch target. FIX: Add the section refs plus shared `scrollToSection`, render each chip as a button with `e.stopPropagation()`, and give it a 44px tappable target.
++3. [P1] Undo toast is still anchored to the last row of an order — `startUndoWindow` at `staffordersmobile.jsx:1862` stores only `orderId`, `handleSingleAction` at `staffordersmobile.jsx:1907` accepts only `order`, and `renderHallRows` at `staffordersmobile.jsx:2059` still uses `isLastOfOrder` to decide where the toast appears. Serving from the first or middle dish row still places the undo toast under the last dish row of that order instead of the row that was tapped. FIX: Thread `rowId` through the action chain, save it in `setUndoToast`, and match `undoToast.rowId` in `renderHallRows` instead of using `isLastOfOrder`.
++4. [P2] Close-table blocker reasons are still dead text in hall mode — `closeDisabledReasons.map` at `staffordersmobile.jsx:2206` still renders plain `<p>` elements, and there is 0 `reasonToKind` mapping in the file. Staff can see the blocker messages but cannot tap them to jump to the blocking section. FIX: Map known blocker strings to section kinds and render those items as buttons that call `scrollToSection(kind)`, leaving plain text only for unknown reasons.
++5. [P2] Age urgency strip is still missing from hall dish rows — `renderHallRows` at `staffordersmobile.jsx:2059` still uses `className={`rounded-lg border ${palette.border} ${palette.bg} px-3 py-2`}` with no age-based modifier, and there is 0 `urgencyClass` usage in the file. Older dishes in New, In Progress, and Ready therefore render exactly like fresh ones, so the urgency cue from Fix 5 is absent. FIX: Compute `ageMin` from `row.order?.created_date`, derive amber/red `border-l-4` classes using `overdueMinutes || 10`, and append that class to the row wrapper.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 3 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): The page folder contains `StaffOrdersMobile README.md`, not `README.md`; naming the exact file would remove that small lookup ambiguity.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-04-07.log b/pages/StaffOrdersMobile/commands_2026-04-07.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..ead3f61ff1dbc04849c995905bfeec21acba5e14
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-04-07.log
+@@ -0,0 +1,16 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Force
++Get-Content README.md
++Get-Content BUGS.md
++Get-Content 'StaffOrdersMobile README.md'
++(Get-Content 'staffordersmobile.jsx' | Measure-Object -Line).Lines
++Select-String -Path 'staffordersmobile.jsx' -Pattern 'group\.type === "table" \?'
++Select-String -Path 'staffordersmobile.jsx' -Pattern 'rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2'
++Get-Content 'staffordersmobile.jsx' | Select-Object -Skip 1750 -First 220
++Get-Content 'staffordersmobile.jsx' | Select-Object -Skip 2080 -First 340
++Select-String -Path 'staffordersmobile.jsx' -Pattern 'ownerHintTimerRef|renderHallSummaryItem|handleSingleAction|setUndoToast\(|closeDisabledReasons\.map|const isLastOfOrder|rows\.map\(\(row, idx\) => \{|overdueMinutes' -Context 3,8
++Get-Content 'staffordersmobile.jsx' | Select-Object -Skip 2032 -First 70
++Select-String -Path 'staffordersmobile.jsx' -Pattern 'scrollToSection|rowId|reasonToKind|urgencyClass|stopPropagation|handleSingleAction\('
++(Select-String -Path 'staffordersmobile.jsx' -Pattern 'scrollToSection').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'rowId').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'reasonToKind').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'urgencyClass').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2').Count
++Select-String -Path 'staffordersmobile.jsx' -Pattern 'handleSingleAction\(' -Context 0,1
++Get-ChildItem -Force 'pipeline/chain-state'
+diff --git a/pages/StaffOrdersMobile/review_2026-04-07.md b/pages/StaffOrdersMobile/review_2026-04-07.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..00f45eb9eec8647ee242eee2005cdddea401f006
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-04-07.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260407-132533-b0c8
++
++## Findings
++1. [P2] Duplicate expanded table header remains in hall-mode render path — `staffordersmobile.jsx:2180` still renders the extra `rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2` wrapper inside the expanded area, so an expanded table shows a second badge/zone/chips/collapse block before the real sections. FIX: Remove the third hall-mode instance of that wrapper block and let the expanded content start directly with the section list.
++2. [P1] Jump chips still collapse/expand the card instead of scrolling to sections — `renderHallSummaryItem` at `staffordersmobile.jsx:2033` still returns a passive `<span>`, there are 0 `scrollToSection` helpers/refs in the file, and the chips sit inside the clickable header at `staffordersmobile.jsx:2126`. Tapping a chip therefore bubbles into `onToggleExpand` instead of navigating, and the chip still lacks a button-sized touch target. FIX: Add the section refs plus shared `scrollToSection`, render each chip as a button with `e.stopPropagation()`, and give it a 44px tappable target.
++3. [P1] Undo toast is still anchored to the last row of an order — `startUndoWindow` at `staffordersmobile.jsx:1862` stores only `orderId`, `handleSingleAction` at `staffordersmobile.jsx:1907` accepts only `order`, and `renderHallRows` at `staffordersmobile.jsx:2059` still uses `isLastOfOrder` to decide where the toast appears. Serving from the first or middle dish row still places the undo toast under the last dish row of that order instead of the row that was tapped. FIX: Thread `rowId` through the action chain, save it in `setUndoToast`, and match `undoToast.rowId` in `renderHallRows` instead of using `isLastOfOrder`.
++4. [P2] Close-table blocker reasons are still dead text in hall mode — `closeDisabledReasons.map` at `staffordersmobile.jsx:2206` still renders plain `<p>` elements, and there is 0 `reasonToKind` mapping in the file. Staff can see the blocker messages but cannot tap them to jump to the blocking section. FIX: Map known blocker strings to section kinds and render those items as buttons that call `scrollToSection(kind)`, leaving plain text only for unknown reasons.
++5. [P2] Age urgency strip is still missing from hall dish rows — `renderHallRows` at `staffordersmobile.jsx:2059` still uses `className={`rounded-lg border ${palette.border} ${palette.bg} px-3 py-2`}` with no age-based modifier, and there is 0 `urgencyClass` usage in the file. Older dishes in New, In Progress, and Ready therefore render exactly like fresh ones, so the urgency cue from Fix 5 is absent. FIX: Compute `ageMin` from `row.order?.created_date`, derive amber/red `border-l-4` classes using `overdueMinutes || 10`, and append that class to the row wrapper.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 3 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): The page folder contains `StaffOrdersMobile README.md`, not `README.md`; naming the exact file would remove that small lookup ambiguity.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/staffordersmobile-260407-132533-b0c8-codex-findings.md b/pipeline/chain-state/staffordersmobile-260407-132533-b0c8-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..00f45eb9eec8647ee242eee2005cdddea401f006
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260407-132533-b0c8-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260407-132533-b0c8
++
++## Findings
++1. [P2] Duplicate expanded table header remains in hall-mode render path — `staffordersmobile.jsx:2180` still renders the extra `rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2` wrapper inside the expanded area, so an expanded table shows a second badge/zone/chips/collapse block before the real sections. FIX: Remove the third hall-mode instance of that wrapper block and let the expanded content start directly with the section list.
++2. [P1] Jump chips still collapse/expand the card instead of scrolling to sections — `renderHallSummaryItem` at `staffordersmobile.jsx:2033` still returns a passive `<span>`, there are 0 `scrollToSection` helpers/refs in the file, and the chips sit inside the clickable header at `staffordersmobile.jsx:2126`. Tapping a chip therefore bubbles into `onToggleExpand` instead of navigating, and the chip still lacks a button-sized touch target. FIX: Add the section refs plus shared `scrollToSection`, render each chip as a button with `e.stopPropagation()`, and give it a 44px tappable target.
++3. [P1] Undo toast is still anchored to the last row of an order — `startUndoWindow` at `staffordersmobile.jsx:1862` stores only `orderId`, `handleSingleAction` at `staffordersmobile.jsx:1907` accepts only `order`, and `renderHallRows` at `staffordersmobile.jsx:2059` still uses `isLastOfOrder` to decide where the toast appears. Serving from the first or middle dish row still places the undo toast under the last dish row of that order instead of the row that was tapped. FIX: Thread `rowId` through the action chain, save it in `setUndoToast`, and match `undoToast.rowId` in `renderHallRows` instead of using `isLastOfOrder`.
++4. [P2] Close-table blocker reasons are still dead text in hall mode — `closeDisabledReasons.map` at `staffordersmobile.jsx:2206` still renders plain `<p>` elements, and there is 0 `reasonToKind` mapping in the file. Staff can see the blocker messages but cannot tap them to jump to the blocking section. FIX: Map known blocker strings to section kinds and render those items as buttons that call `scrollToSection(kind)`, leaving plain text only for unknown reasons.
++5. [P2] Age urgency strip is still missing from hall dish rows — `renderHallRows` at `staffordersmobile.jsx:2059` still uses `className={`rounded-lg border ${palette.border} ${palette.bg} px-3 py-2`}` with no age-based modifier, and there is 0 `urgencyClass` usage in the file. Older dishes in New, In Progress, and Ready therefore render exactly like fresh ones, so the urgency cue from Fix 5 is absent. FIX: Compute `ageMin` from `row.order?.created_date`, derive amber/red `border-l-4` classes using `overdueMinutes || 10`, and append that class to the row wrapper.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 3 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): The page folder contains `StaffOrdersMobile README.md`, not `README.md`; naming the exact file would remove that small lookup ambiguity.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+Saved the review to [staffordersmobile-260407-132533-b0c8-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/staffordersmobile-260407-132533-b0c8-codex-findings.md). I also saved the page-local copy at [review_2026-04-07.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/review_2026-04-07.md) and the command log at [commands_2026-04-07.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/commands_2026-04-07.log).
+
+Findings are limited to Fix 1-5 only. Summary: 5 findings total, with 2 P1 and 3 P2. The current `staffordersmobile.jsx` still has the duplicate hall-mode inner header, passive jump chips that bubble into card collapse instead of scrolling, undo toast placement tied to the last row of an order, non-tappable close-table blocker reasons, and no age-based urgency border on hall dish rows.
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-04-07.log b/pages/StaffOrdersMobile/commands_2026-04-07.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..ead3f61ff1dbc04849c995905bfeec21acba5e14
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-04-07.log
+@@ -0,0 +1,16 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Force
++Get-Content README.md
++Get-Content BUGS.md
++Get-Content 'StaffOrdersMobile README.md'
++(Get-Content 'staffordersmobile.jsx' | Measure-Object -Line).Lines
++Select-String -Path 'staffordersmobile.jsx' -Pattern 'group\.type === "table" \?'
++Select-String -Path 'staffordersmobile.jsx' -Pattern 'rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2'
++Get-Content 'staffordersmobile.jsx' | Select-Object -Skip 1750 -First 220
++Get-Content 'staffordersmobile.jsx' | Select-Object -Skip 2080 -First 340
++Select-String -Path 'staffordersmobile.jsx' -Pattern 'ownerHintTimerRef|renderHallSummaryItem|handleSingleAction|setUndoToast\(|closeDisabledReasons\.map|const isLastOfOrder|rows\.map\(\(row, idx\) => \{|overdueMinutes' -Context 3,8
++Get-Content 'staffordersmobile.jsx' | Select-Object -Skip 2032 -First 70
++Select-String -Path 'staffordersmobile.jsx' -Pattern 'scrollToSection|rowId|reasonToKind|urgencyClass|stopPropagation|handleSingleAction\('
++(Select-String -Path 'staffordersmobile.jsx' -Pattern 'scrollToSection').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'rowId').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'reasonToKind').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'urgencyClass').Count; (Select-String -Path 'staffordersmobile.jsx' -Pattern 'rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2').Count
++Select-String -Path 'staffordersmobile.jsx' -Pattern 'handleSingleAction\(' -Context 0,1
++Get-ChildItem -Force 'pipeline/chain-state'
+diff --git a/pages/StaffOrdersMobile/review_2026-04-07.md b/pages/StaffOrdersMobile/review_2026-04-07.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..00f45eb9eec8647ee242eee2005cdddea401f006
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-04-07.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260407-132533-b0c8
++
++## Findings
++1. [P2] Duplicate expanded table header remains in hall-mode render path — `staffordersmobile.jsx:2180` still renders the extra `rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2` wrapper inside the expanded area, so an expanded table shows a second badge/zone/chips/collapse block before the real sections. FIX: Remove the third hall-mode instance of that wrapper block and let the expanded content start directly with the section list.
++2. [P1] Jump chips still collapse/expand the card instead of scrolling to sections — `renderHallSummaryItem` at `staffordersmobile.jsx:2033` still returns a passive `<span>`, there are 0 `scrollToSection` helpers/refs in the file, and the chips sit inside the clickable header at `staffordersmobile.jsx:2126`. Tapping a chip therefore bubbles into `onToggleExpand` instead of navigating, and the chip still lacks a button-sized touch target. FIX: Add the section refs plus shared `scrollToSection`, render each chip as a button with `e.stopPropagation()`, and give it a 44px tappable target.
++3. [P1] Undo toast is still anchored to the last row of an order — `startUndoWindow` at `staffordersmobile.jsx:1862` stores only `orderId`, `handleSingleAction` at `staffordersmobile.jsx:1907` accepts only `order`, and `renderHallRows` at `staffordersmobile.jsx:2059` still uses `isLastOfOrder` to decide where the toast appears. Serving from the first or middle dish row still places the undo toast under the last dish row of that order instead of the row that was tapped. FIX: Thread `rowId` through the action chain, save it in `setUndoToast`, and match `undoToast.rowId` in `renderHallRows` instead of using `isLastOfOrder`.
++4. [P2] Close-table blocker reasons are still dead text in hall mode — `closeDisabledReasons.map` at `staffordersmobile.jsx:2206` still renders plain `<p>` elements, and there is 0 `reasonToKind` mapping in the file. Staff can see the blocker messages but cannot tap them to jump to the blocking section. FIX: Map known blocker strings to section kinds and render those items as buttons that call `scrollToSection(kind)`, leaving plain text only for unknown reasons.
++5. [P2] Age urgency strip is still missing from hall dish rows — `renderHallRows` at `staffordersmobile.jsx:2059` still uses `className={`rounded-lg border ${palette.border} ${palette.bg} px-3 py-2`}` with no age-based modifier, and there is 0 `urgencyClass` usage in the file. Older dishes in New, In Progress, and Ready therefore render exactly like fresh ones, so the urgency cue from Fix 5 is absent. FIX: Compute `ageMin` from `row.order?.created_date`, derive amber/red `border-l-4` classes using `overdueMinutes || 10`, and append that class to the row wrapper.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 3 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): The page folder contains `StaffOrdersMobile README.md`, not `README.md`; naming the exact file would remove that small lookup ambiguity.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/staffordersmobile-260407-132533-b0c8-codex-findings.md b/pipeline/chain-state/staffordersmobile-260407-132533-b0c8-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..00f45eb9eec8647ee242eee2005cdddea401f006
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260407-132533-b0c8-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260407-132533-b0c8
++
++## Findings
++1. [P2] Duplicate expanded table header remains in hall-mode render path — `staffordersmobile.jsx:2180` still renders the extra `rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2` wrapper inside the expanded area, so an expanded table shows a second badge/zone/chips/collapse block before the real sections. FIX: Remove the third hall-mode instance of that wrapper block and let the expanded content start directly with the section list.
++2. [P1] Jump chips still collapse/expand the card instead of scrolling to sections — `renderHallSummaryItem` at `staffordersmobile.jsx:2033` still returns a passive `<span>`, there are 0 `scrollToSection` helpers/refs in the file, and the chips sit inside the clickable header at `staffordersmobile.jsx:2126`. Tapping a chip therefore bubbles into `onToggleExpand` instead of navigating, and the chip still lacks a button-sized touch target. FIX: Add the section refs plus shared `scrollToSection`, render each chip as a button with `e.stopPropagation()`, and give it a 44px tappable target.
++3. [P1] Undo toast is still anchored to the last row of an order — `startUndoWindow` at `staffordersmobile.jsx:1862` stores only `orderId`, `handleSingleAction` at `staffordersmobile.jsx:1907` accepts only `order`, and `renderHallRows` at `staffordersmobile.jsx:2059` still uses `isLastOfOrder` to decide where the toast appears. Serving from the first or middle dish row still places the undo toast under the last dish row of that order instead of the row that was tapped. FIX: Thread `rowId` through the action chain, save it in `setUndoToast`, and match `undoToast.rowId` in `renderHallRows` instead of using `isLastOfOrder`.
++4. [P2] Close-table blocker reasons are still dead text in hall mode — `closeDisabledReasons.map` at `staffordersmobile.jsx:2206` still renders plain `<p>` elements, and there is 0 `reasonToKind` mapping in the file. Staff can see the blocker messages but cannot tap them to jump to the blocking section. FIX: Map known blocker strings to section kinds and render those items as buttons that call `scrollToSection(kind)`, leaving plain text only for unknown reasons.
++5. [P2] Age urgency strip is still missing from hall dish rows — `renderHallRows` at `staffordersmobile.jsx:2059` still uses `className={`rounded-lg border ${palette.border} ${palette.bg} px-3 py-2`}` with no age-based modifier, and there is 0 `urgencyClass` usage in the file. Older dishes in New, In Progress, and Ready therefore render exactly like fresh ones, so the urgency cue from Fix 5 is absent. FIX: Compute `ageMin` from `row.order?.created_date`, derive amber/red `border-l-4` classes using `overdueMinutes || 10`, and append that class to the row wrapper.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 3 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): The page folder contains `StaffOrdersMobile README.md`, not `README.md`; naming the exact file would remove that small lookup ambiguity.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+tokens used
+74 129
+Saved the review to [staffordersmobile-260407-132533-b0c8-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/staffordersmobile-260407-132533-b0c8-codex-findings.md). I also saved the page-local copy at [review_2026-04-07.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/review_2026-04-07.md) and the command log at [commands_2026-04-07.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/commands_2026-04-07.log).
+
+Findings are limited to Fix 1-5 only. Summary: 5 findings total, with 2 P1 and 3 P2. The current `staffordersmobile.jsx` still has the duplicate hall-mode inner header, passive jump chips that bubble into card collapse instead of scrolling, undo toast placement tied to the last row of an order, non-tappable close-table blocker reasons, and no age-based urgency border on hall dish rows.

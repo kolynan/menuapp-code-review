@@ -1,0 +1,897 @@
+---
+chain_template: pssk-review
+budget: 10
+code_file: menuapp-code-review/pages/PublicMenu/CartView.jsx
+ws: WS-CV
+type: ПССК
+---
+
+# ПССК CV-B2 — CartView Batch 2
+**Версия:** v4 | **Сессия:** S303 | **Дата:** 2026-04-16
+**Изменения v4 vs v3:** ВСЕ 13 findings из v3 пересмотра адресованы. Verified identifiers (`bucketDisplayNames` не `groupLabels`). Fix 2 через расширение `bucketOrder` массива (НЕ статический JSX-блок). Fix 3 wrap через early-return с безопасной точкой. Fix 3 data source = `sessionOrders.every(o.status === 'closed')` (verified, `currentTable.status` отсутствует). Fix 4 без изменения cascade `showTableOrdersSection` (self-block просто добавляется внутрь секции «Стол»). Кнопка Fix 3 — shadcn `<Button>`. Все placeholder'ы заменены concrete JSX. Orphan `submittedTableTotal` явно удалён.
+
+---
+
+## Context
+
+**File:** `menuapp-code-review/pages/PublicMenu/CartView.jsx`
+**Lines:** 1227 | **Last RELEASE commit:** `fa73c97` (RELEASE `260415-01 CartView RELEASE.jsx`)
+**UX Source of Truth:** `ux-concepts/CartView/260416-02 CartView Mockup v11 S302.html` (FROZEN v11)
+
+> ⚠️ **Note:** All FROZEN UX and spec content needed for review is provided **inline** in this file below. Do NOT attempt to read external files outside `menuapp-code-review/` — they are inaccessible in worktree.
+
+This prompt covers **4 Fix-blocks** for CartView Batch 2:
+- **Fix 1 [BUG at lines 787-807]:** Header attribution «Вы:»/«Стол:» + rendered-data invariant (R2, CV-NEW-01)
+- **Fix 2 [NEW CODE]:** ⏳ Ожидает bucket — pending pre-acceptance state (R1)
+- **Fix 3 [NEW CODE]:** ✦ Terminal screen «Спасибо за визит!» with durable persist (R4)
+- **Fix 4 [BUG at line 834]:** Self-first «Вы (Гость N)» в «Стол» (CV-NEW-03, CV-16/17)
+
+**Scope lock:** Only `pages/PublicMenu/CartView.jsx`. No changes to other files.
+
+---
+
+## ⛔ FROZEN UX — ОБЯЗАТЕЛЬНО К СОБЛЮДЕНИЮ (Rule 33)
+
+Следующие решения LOCKED. Нельзя оспаривать, изменять или предлагать альтернативы.
+(Source: DECISIONS_INDEX §2, content inlined here.)
+
+| ID | Решение |
+|----|---------|
+| **R1** | `'submitted'` статус → `⏳ Ожидает` (текст + иконка, НЕ иконка-only). `'accepted'/'ready'/'in_progress'` → `🔵 В работе` (уже так). «Ожидает» bucket — СНИЗУ «Мои» (ниже «В работе»). Badge «Ожидает» — ТОЛЬКО в табе «Стол» (per-item). В «Мои» — badge нет, достаточно amber bucket-заголовка. |
+| **R2** | Таб «Мои» header → `«Вы: X блюд · X ₸»`. Таб «Стол» header → `«Стол: X гостя · X блюд · X ₸»`. Сумма = from rendered-data (НЕ из `submittedTableTotal`). Количество блюд = сумма quantity (НЕ count заказов). |
+| **V4** | Standalone CTA «Попросить счёт» УБРАН. Footer «Стол»: «Вернуться в меню» (outline) + helper «Нужна помощь или счёт? Нажмите 🔔». |
+| **R4** | Terminal = единый экран «Спасибо за визит!» при закрытии стола. Durable persist `cv_terminal_dismissed_{tableId}` (localStorage). |
+| **CV-52** | «В работе»: calm bg, без stepper. «В корзине»: яркий, stepper видим. Badge «Отправлено» убран везде. |
+| **CV-50** | Деньги убраны из групп (В работе, В корзине, Выдано). Деньги ТОЛЬКО в header drawer. |
+| **CV-16/17** | Self-block «Вы (Гость N)» — первым в «Стол», expanded. Остальные гости — collapsed по умолчанию. |
+| **stale helper** | Helper «Проверяем подтверждение…» (`stale_pending`) — УБРАН (S302). НЕ восстанавливать. |
+
+---
+
+## Preparation
+
+```bash
+cp menuapp-code-review/pages/PublicMenu/CartView.jsx menuapp-code-review/pages/PublicMenu/CartView.jsx.working
+wc -l menuapp-code-review/pages/PublicMenu/CartView.jsx
+# Ожидаем: 1227 строк
+git -C menuapp-code-review log --oneline -1
+# Ожидаем: fa73c97 или новее
+```
+
+---
+
+## Verified Identifiers (grep before first Fix)
+
+Эти grep'ы обязательно выполнить ОДИН раз перед Fix 1 — они подтверждают что в коде используются ТЕ имена что в ПССК.
+
+```bash
+grep -n "bucketDisplayNames\|bucketOrder\|groupLabels" menuapp-code-review/pages/PublicMenu/CartView.jsx
+```
+Ожидаемый результат:
+- Hit `bucketDisplayNames`: строки **574**, **950**, **1023** (3 hits — определение + два использования)
+- Hit `bucketOrder`: строка **1005** (1 hit — определение массива)
+- Hit `groupLabels`: **0 hits** (этого идентификатора НЕ существует в файле; если хоть один hit — это ошибка, stop и сообщить)
+
+```bash
+grep -n "showTableOrdersSection\|otherGuestIdsFromOrders" menuapp-code-review/pages/PublicMenu/CartView.jsx
+```
+Ожидаемый результат:
+- `showTableOrdersSection`: строка **542** (определение) + строки **824**, **834**, **920**, **927**, **1075** (5 использований)
+- `otherGuestIdsFromOrders`: строка **510** (определение) + ≥6 использований внутри рендер-блока
+
+```bash
+grep -n "currentTable\." menuapp-code-review/pages/PublicMenu/CartView.jsx
+```
+Ожидаемый результат:
+- Строка **385**: `currentTable?.name || currentTable?.code` — только name/code usages
+- **`currentTable?.status` или `currentTable.status` — 0 hits** (поле status НЕ подтверждено на объекте `currentTable`, нельзя его использовать)
+
+---
+
+## Fix 1 — Header Attribution + Rendered-Data Invariant [BUG at lines 787-807]
+
+**Проблема:** Header использует `submittedTableTotal` (агрегат из строк 525-531) вместо суммы реально отрендеренных блюд. Нет атрибуции «Вы:»/«Стол:». [CV-NEW-01]
+
+### Верификация grep перед ревью
+```bash
+grep -n "submittedTableTotal\|Заказано на стол\|table_ordered\|ordersItemCount" menuapp-code-review/pages/PublicMenu/CartView.jsx
+```
+Ожидаем:
+- `line 525-531`: определение `submittedTableTotal` (useMemo агрегат)
+- `line 788`: начало условного блока header (`ordersSum > 0 || cart.length > 0 || (cartTab === 'table' && submittedTableTotal > 0)`)
+- `line 789-792`: `ordersItemCount` — сумма quantity, НЕ count заказов (важный образец)
+- `line 799`: текущий «Заказано на стол» render с `submittedTableTotal` — это баг (нет атрибуции, не из рендер-данных)
+
+### Текущий код (строки 787-807, точная копия)
+
+```jsx
+{/* CV-50: Dish count + total sum in drawer header (orders + cart) */}
+{(ordersSum > 0 || cart.length > 0 || (cartTab === 'table' && submittedTableTotal > 0)) && (() => {
+  const ordersItemCount = todayMyOrders.reduce((sum, o) => {
+    const items = itemsByOrder.get(o.id) || [];
+    return sum + items.reduce((s, it) => s + (it.quantity || 1), 0);
+  }, 0);
+  const cartItemCount = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
+  const totalDishCount = ordersItemCount + cartItemCount;
+  const headerTotal = ordersSum + (Number(cartTotalAmount) || 0);
+  return cartTab === 'table'
+    ? (
+      <div className="text-xs text-slate-500 mt-0.5">
+        {tr('cart.header.table_ordered', 'Заказано на стол')}: {formatPrice(parseFloat(Number(submittedTableTotal).toFixed(2)))}
+      </div>
+    )
+    : totalDishCount > 0 ? (
+      <div className="text-xs text-slate-500 mt-0.5">
+        {totalDishCount} {pluralizeRu(totalDishCount, tr('cart.header.dish_one', 'блюдо'), tr('cart.header.dish_few', 'блюда'), tr('cart.header.dish_many', 'блюд'))} · {formatPrice(parseFloat(headerTotal.toFixed(2)))}
+      </div>
+    ) : null;
+})()}
+```
+
+### Что нужно сделать
+
+**Шаг 1.1** — Добавить 3 `useMemo` для rendered-data агрегатов.
+
+Локация: сразу ПОСЛЕ `tableOrdersTotal` useMemo (строка 514-523) и ДО `submittedTableTotal` (строка 525). Т.е. новый блок вставляется между строками 523 и 525.
+
+Вставить:
+
+```jsx
+// Fix 1 (R2): rendered-data aggregates across ALL guests (self + others) for «Стол» header
+const renderedTableTotal = React.useMemo(() => {
+  let total = 0;
+  const allGuestIds = [...(myGuestId ? [myGuestId] : []), ...otherGuestIdsFromOrders];
+  allGuestIds.forEach((gid) => {
+    const orders = ordersByGuestId.get(gid) || [];
+    orders.forEach((o) => {
+      if ((o.status || '').toLowerCase() !== 'cancelled') {
+        total += Number(o.total_amount) || 0;
+      }
+    });
+  });
+  return parseFloat(total.toFixed(2));
+}, [ordersByGuestId, myGuestId, otherGuestIdsFromOrders]);
+
+// Fix 1 (R2): dish count = sum of item quantities (same semantics as ordersItemCount line 789-792)
+const renderedTableDishCount = React.useMemo(() => {
+  let count = 0;
+  const allGuestIds = [...(myGuestId ? [myGuestId] : []), ...otherGuestIdsFromOrders];
+  allGuestIds.forEach((gid) => {
+    const orders = ordersByGuestId.get(gid) || [];
+    orders.forEach((o) => {
+      if ((o.status || '').toLowerCase() === 'cancelled') return;
+      const items = itemsByOrder.get(o.id) || [];
+      count += items.reduce((s, it) => s + (it.quantity || 1), 0);
+    });
+  });
+  return count;
+}, [ordersByGuestId, myGuestId, otherGuestIdsFromOrders, itemsByOrder]);
+
+// Fix 1 (R2): guest count = self (if has orders) + others
+const renderedTableGuestCount = React.useMemo(() => {
+  const selfCount = myGuestId && ordersByGuestId.has(myGuestId) ? 1 : 0;
+  return selfCount + otherGuestIdsFromOrders.length;
+}, [myGuestId, ordersByGuestId, otherGuestIdsFromOrders]);
+```
+
+> ✅ **Verified identifiers:**
+> - `myGuestId` (line 508), `ordersByGuestId` (line 496), `otherGuestIdsFromOrders` (line 510), `itemsByOrder` (prop line 53). Все существуют.
+> - Функция `pluralizeRu` (line 299) — доступна в scope.
+
+**Шаг 1.2** — Заменить header render **(строки 787-807)** целиком на:
+
+```jsx
+{/* CV-50 + Fix 1 (R2): Dish count + total sum in drawer header — attributed «Вы:»/«Стол:», sum from rendered data */}
+{(ordersSum > 0 || cart.length > 0 || (cartTab === 'table' && renderedTableTotal > 0)) && (() => {
+  const ordersItemCount = todayMyOrders.reduce((sum, o) => {
+    const items = itemsByOrder.get(o.id) || [];
+    return sum + items.reduce((s, it) => s + (it.quantity || 1), 0);
+  }, 0);
+  const cartItemCount = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
+  const totalDishCount = ordersItemCount + cartItemCount;
+  const headerTotal = ordersSum + (Number(cartTotalAmount) || 0);
+  return cartTab === 'table'
+    ? (renderedTableTotal > 0 ? (
+        <div className="text-xs text-slate-500 mt-0.5">
+          {tr('cart.header.table_label', 'Стол')}: {renderedTableGuestCount}{' '}
+          {pluralizeRu(
+            renderedTableGuestCount,
+            tr('cart.header.guest_one', 'гость'),
+            tr('cart.header.guest_few', 'гостя'),
+            tr('cart.header.guest_many', 'гостей')
+          )}
+          {' · '}{renderedTableDishCount}{' '}
+          {pluralizeRu(
+            renderedTableDishCount,
+            tr('cart.header.dish_one', 'блюдо'),
+            tr('cart.header.dish_few', 'блюда'),
+            tr('cart.header.dish_many', 'блюд')
+          )}
+          {' · '}{formatPrice(parseFloat(Number(renderedTableTotal).toFixed(2)))}
+        </div>
+      ) : null)
+    : (totalDishCount > 0 ? (
+        <div className="text-xs text-slate-500 mt-0.5">
+          {tr('cart.header.you_label', 'Вы')}: {totalDishCount}{' '}
+          {pluralizeRu(
+            totalDishCount,
+            tr('cart.header.dish_one', 'блюдо'),
+            tr('cart.header.dish_few', 'блюда'),
+            tr('cart.header.dish_many', 'блюд')
+          )}
+          {' · '}{formatPrice(parseFloat(headerTotal.toFixed(2)))}
+        </div>
+      ) : null);
+})()}
+```
+
+**Шаг 1.3** — Удалить orphan `submittedTableTotal` определение (строки 525-531).
+
+После Fix 1 `submittedTableTotal` больше нигде не используется (перепроверить):
+
+```bash
+grep -n "submittedTableTotal" menuapp-code-review/pages/PublicMenu/CartView.jsx
+```
+Если единственный hit — определение на 525-531 — удалить эти 7 строк полностью. Если есть другие использования — оставить определение, НЕ удалять.
+
+> ⚠️ Важно: Reviewer —
+> 1. **Тот же тег**: `<div className="text-xs text-slate-500 mt-0.5">` (НЕ `<p>`, НЕ `text-sm`, НЕ `slate-600`).
+> 2. **Condition**: `renderedTableTotal > 0` (НЕ `submittedTableTotal > 0`).
+> 3. `pluralizeRu` уже есть (line 299).
+> 4. `formatPrice(parseFloat(Number(...).toFixed(2)))` — точно тот же паттерн что в существующем коде (line 799, 851, 874).
+
+**НЕ делать:**
+- ❌ Не менять `ordersItemCount`/`totalDishCount`/`headerTotal` для «Мои» (только добавить `«Вы:»` prefix).
+- ❌ Не использовать `.length || 1` для dish count — только sum quantities (R2 FROZEN).
+- ❌ Не оставлять неиспользуемый `submittedTableTotal` если grep подтверждает orphan.
+
+### Acceptance Criteria
+- [ ] Header «Мои»: `«Вы: X блюд · X ₸»` (pluralized + правильный тег `<div>`)
+- [ ] Header «Стол»: `«Стол: X гостя · X блюд · X ₸»` (pluralized)
+- [ ] Condition включает `renderedTableTotal > 0` вместо `submittedTableTotal > 0`
+- [ ] `renderedTableDishCount` = sum of `it.quantity` (НЕ `.length`)
+- [ ] `submittedTableTotal` определение удалено (если orphan)
+- [ ] Новые `<div>` используют className `text-xs text-slate-500 mt-0.5` (=existing)
+
+---
+
+## Fix 2 — ⏳ Ожидает Bucket [NEW CODE]
+
+**Задача:** Добавить третий bucket «Ожидает» (amber) для заказов в статусе `'submitted'` — до подтверждения официантом.
+
+### Верификация grep перед ревью
+```bash
+grep -n "statusBuckets\|bucketDisplayNames\|bucketOrder\|currentGroupKeys" menuapp-code-review/pages/PublicMenu/CartView.jsx
+```
+Ожидаем:
+- `line 456-467`: `statusBuckets` useMemo с `groups = { served: [], in_progress: [] }` — 2 группы, нет pending
+- `line 470-474`: `currentGroupKeys` — массив ключей `S`/`I`/`C` (served/in_progress/cart)
+- `line 574-577`: `bucketDisplayNames` (а НЕ `groupLabels`) — отображаемые названия bucket
+- `line 1005`: `const bucketOrder = ['served', 'in_progress'];` — массив порядка рендера (динамический `.map(...)` ниже на 1006-1071)
+- `line 1023`: `{bucketDisplayNames[key]} ({orders.length})` — шаблон заголовка bucket
+- `pending_unconfirmed` — 0 hits
+
+### Архитектура рендера (важно понять перед ревью)
+
+Текущая архитектура в блоке State B (обычный режим) — lines 1004-1071:
+```jsx
+const bucketOrder = ['served', 'in_progress'];
+return bucketOrder.map(key => {
+  const orders = statusBuckets[key];
+  if (orders.length === 0) return null;
+  const isExpanded = !!expandedStatuses[key];
+  const isServed = key === 'served';
+  // ... <Card>...</Card>
+});
+```
+
+Это — **динамический рендер через `.map()`**. Fix 2 расширяет `bucketOrder` новым ключом и `statusBuckets` новой группой. Статический JSX-блок добавлять **НЕ НУЖНО**.
+
+### Что нужно сделать
+
+**Шаг 2.0 (Pre-flight verify)** — подтвердить что статус `'submitted'` реально используется в заказах:
+
+```bash
+grep -n "'submitted'" menuapp-code-review/pages/PublicMenu/CartView.jsx
+```
+
+**Ожидаем:** ≥1 hit. На verify reference: line 528 (`o.status === 'submitted'` в filter для `submittedTableTotal`). Это подтверждает что `submitted` — легитимное значение `order.status` в этом коде → Fix 2 маппинг `rawStatus === 'submitted'` корректен.
+
+Если grep возвращает 0 hits — **ОСТАНОВИТЬСЯ**, сообщить Cowork: «статус `'submitted'` не найден в CartView.jsx, маппинг Fix 2 может быть неверным».
+
+**Шаг 2.1** — Обновить `statusBuckets` (строки 456-467) добавлением `pending_unconfirmed` группы:
+
+**Текущий код:**
+```jsx
+const statusBuckets = React.useMemo(() => {
+  const groups = { served: [], in_progress: [] };
+  todayMyOrders.forEach(o => {
+    const stageInfo = getOrderStatus(o);
+    const isServed = stageInfo?.internal_code === 'finish'
+      || (!stageInfo?.internal_code && ['served', 'completed'].includes((o.status || '').toLowerCase()));
+    const isCancelled = !stageInfo?.internal_code && (o.status || '').toLowerCase() === 'cancelled';
+    if (isServed) groups.served.push(o);
+    else if (!isCancelled) groups.in_progress.push(o);
+  });
+  return groups;
+}, [todayMyOrders, getOrderStatus]);
+```
+
+**Заменить на:**
+```jsx
+const statusBuckets = React.useMemo(() => {
+  const groups = { served: [], in_progress: [], pending_unconfirmed: [] };
+  todayMyOrders.forEach(o => {
+    const stageInfo = getOrderStatus(o);
+    const rawStatus = (o.status || '').toLowerCase();
+    const isServed = stageInfo?.internal_code === 'finish'
+      || (!stageInfo?.internal_code && ['served', 'completed'].includes(rawStatus));
+    const isCancelled = !stageInfo?.internal_code && rawStatus === 'cancelled';
+    // Fix 2 (R1): pending_unconfirmed = 'submitted' status (awaiting waiter confirmation).
+    // Priority: server-side stageInfo wins; only raw status === 'submitted' AND no stage info → pending.
+    const isPending = !stageInfo?.internal_code && rawStatus === 'submitted';
+
+    if (isServed) groups.served.push(o);
+    else if (isPending) groups.pending_unconfirmed.push(o);
+    else if (!isCancelled) groups.in_progress.push(o);
+  });
+  return groups;
+}, [todayMyOrders, getOrderStatus]);
+```
+
+**Шаг 2.2** — Обновить `currentGroupKeys` (строки 470-474) добавлением ключа `P`:
+
+**Текущий код:**
+```jsx
+const currentGroupKeys = [
+  statusBuckets.served.length > 0 ? 'S' : '',
+  statusBuckets.in_progress.length > 0 ? 'I' : '',
+  cart.length > 0 ? 'C' : ''
+].join('');
+```
+
+**Заменить на:**
+```jsx
+const currentGroupKeys = [
+  statusBuckets.served.length > 0 ? 'S' : '',
+  statusBuckets.in_progress.length > 0 ? 'I' : '',
+  statusBuckets.pending_unconfirmed.length > 0 ? 'P' : '', // Fix 2 (R1)
+  cart.length > 0 ? 'C' : ''
+].join('');
+```
+
+**Шаг 2.3** — Обновить `bucketDisplayNames` (строки 574-577) добавлением `pending_unconfirmed`:
+
+**Текущий код:**
+```jsx
+const bucketDisplayNames = {
+  served: tr('cart.group.served', 'Выдано'),
+  in_progress: tr('cart.group.in_progress', 'В работе'),
+};
+```
+
+**Заменить на:**
+```jsx
+const bucketDisplayNames = {
+  served: tr('cart.group.served', 'Выдано'),
+  in_progress: tr('cart.group.in_progress', 'В работе'),
+  pending_unconfirmed: tr('cart.group.pending', '⏳ Ожидает'), // Fix 2 (R1)
+};
+```
+
+> ⚠️ **КРИТИЧНО:** идентификатор = `bucketDisplayNames` (НЕ `groupLabels`). Grep выше подтверждает (line 574). Если reviewer видит `groupLabels` в v3/v4 — это ошибка, правильное имя `bucketDisplayNames`.
+
+**Шаг 2.4** — Обновить `bucketOrder` массив (строка 1005) — **добавить `pending_unconfirmed` в КОНЕЦ** (R1 FROZEN: «Ожидает» bucket снизу «Мои», ниже «В работе»):
+
+**Текущий код (line 1005):**
+```jsx
+const bucketOrder = ['served', 'in_progress'];
+```
+
+**Заменить на:**
+```jsx
+// Fix 2 (R1): Order = 'served' top (collapsed by default), 'in_progress' middle,
+// 'pending_unconfirmed' bottom (amber, below «В работе»).
+const bucketOrder = ['served', 'in_progress', 'pending_unconfirmed'];
+```
+
+> ✅ Что это даёт: динамический `.map(key => ...)` (lines 1006-1071) автоматически отрендерит новый `pending_unconfirmed` Card в том же паттерне что `served` и `in_progress`. Не нужно дублировать JSX-разметку.
+
+**Шаг 2.5** — Внутри `.map()` блока (lines 1006-1071) нужно добавить **amber стилизацию** заголовка для `pending_unconfirmed` bucket.
+
+Найти строки **1019-1024** (JSX внутри `.map`):
+```jsx
+<div className="flex items-center gap-2">
+  <span className="text-base font-semibold text-slate-800">
+    {bucketDisplayNames[key]} ({orders.length})
+  </span>
+```
+
+**Заменить на:**
+```jsx
+<div className="flex items-center gap-2">
+  <span className={`text-base font-semibold ${key === 'pending_unconfirmed' ? 'text-amber-600' : 'text-slate-800'}`}>
+    {bucketDisplayNames[key]} ({orders.length})
+  </span>
+```
+
+> ⚠️ Reviewer: Tailwind класс `text-amber-600` — существующий дефолтный класс (используется в CartView нигде, но валидный Tailwind utility). Согласуется с R1 «amber bucket-заголовок».
+
+**Шаг 2.6** — Badge «⏳ Ожидает» в табе «Стол» (per-item render, R1 FROZEN).
+
+Локация: строки **880-901** (existing render other-guests items). Нужно добавить per-item pending badge.
+
+**Текущий код (lines 880-901):**
+```jsx
+{guestOrders.map((order) => {
+  const items = itemsByOrder.get(order.id) || [];
+  const status = getSafeStatus(getOrderStatus(order));
+
+  if (items.length === 0) {
+    return (
+      <div key={order.id} className="flex justify-between items-center text-xs">
+        <span className="text-slate-600">
+          {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(parseFloat(Number(order.total_amount).toFixed(2)))}
+        </span>
+        <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
+      </div>
+    );
+  }
+
+  return items.map((item, idx) => (
+    <div key={`${order.id}-${idx}`} className="flex justify-between items-center text-xs">
+      <span className="text-slate-600">{item.dish_name} × {item.quantity}</span>
+      <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
+    </div>
+  ));
+})}
+```
+
+**Заменить на:**
+```jsx
+{guestOrders.map((order) => {
+  const items = itemsByOrder.get(order.id) || [];
+  const status = getSafeStatus(getOrderStatus(order));
+  // Fix 2 (R1): pending badge for 'submitted' orders — shown ONLY in Стол tab
+  const isOrderPending = (order.status || '').toLowerCase() === 'submitted';
+
+  if (items.length === 0) {
+    return (
+      <div key={order.id} className="flex justify-between items-center text-xs">
+        <span className="text-slate-600">
+          {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(parseFloat(Number(order.total_amount).toFixed(2)))}
+          {isOrderPending && (
+            <span className="ml-1 text-amber-600 font-medium">⏳ {tr('cart.order.pending_badge', 'Ожидает')}</span>
+          )}
+        </span>
+        <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
+      </div>
+    );
+  }
+
+  return items.map((item, idx) => (
+    <div key={`${order.id}-${idx}`} className="flex justify-between items-center text-xs">
+      <span className="text-slate-600">
+        {item.dish_name} × {item.quantity}
+        {isOrderPending && (
+          <span className="ml-1 text-amber-600 font-medium">⏳ {tr('cart.order.pending_badge', 'Ожидает')}</span>
+        )}
+      </span>
+      <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
+    </div>
+  ));
+})}
+```
+
+**НЕ делать:**
+- ❌ Не добавлять статический JSX-блок «Ожидает» в State B render — `.map(bucketOrder)` делает это автоматически.
+- ❌ Не добавлять badge «Ожидает» в таб «Мои» — только amber заголовок bucket (R1 FROZEN).
+- ❌ Не добавлять helper «Проверяем подтверждение…» / `stale_pending` (убран S302).
+- ❌ Не менять `getSafeStatus` для pending — bucket assignment через `statusBuckets`, не через `getSafeStatus`.
+
+### Acceptance Criteria
+- [ ] `statusBuckets` имеет 3 ключа: `served`, `in_progress`, `pending_unconfirmed`
+- [ ] Заказ со статусом `'submitted'` → в `pending_unconfirmed` bucket (не в `in_progress`)
+- [ ] `bucketOrder` = `['served', 'in_progress', 'pending_unconfirmed']` (pending снизу)
+- [ ] `bucketDisplayNames.pending_unconfirmed = '⏳ Ожидает'`
+- [ ] Заголовок pending bucket — `text-amber-600` (остальные bucket'ы — `text-slate-800`)
+- [ ] Badge «⏳ Ожидает» виден в «Стол» (per-item) при `status === 'submitted'`
+- [ ] НЕТ badge «Ожидает» в «Мои» (только amber заголовок)
+- [ ] `stale_pending` / «Проверяем подтверждение…» — НЕ добавлен
+
+---
+
+## Fix 3 — ✦ Terminal Screen «Спасибо за визит!» [NEW CODE]
+
+**Задача:** Добавить финальный экран при закрытии стола (когда SOM staff закрыл сессию) с durable persist.
+
+### Data source — verified
+
+`currentTable?.status` — **НЕ существует** как поле (grep `currentTable\.` подтверждает только `name`/`code` usages на line 385). Использовать **НЕЛЬЗЯ**.
+
+`tableSession` **не является prop** компонента CartView (grep prop list line 17-83 — нет `tableSession`). Добавить его — вне скоупа (требует правок в родительском `x.jsx`, нарушает scope lock).
+
+**Verified data source:** `sessionOrders` — массив всех заказов стола (prop line 59). Когда SOM staff закрывает стол через `closeSession()` (S286), **все заказы получают `status === 'closed'`**. Это проверяемый сигнал.
+
+Логика: `tableIsClosed = hasOrders && sessionOrders.every(o.status === 'closed')`.
+
+### Верификация grep перед ревью
+```bash
+grep -n "sessionOrders\|terminal\|cv_terminal_dismissed\|Спасибо" menuapp-code-review/pages/PublicMenu/CartView.jsx
+```
+Ожидаем:
+- `line 59`: `sessionOrders,` — prop существует
+- `line 526, 528`: `sessionOrders` используется в `submittedTableTotal` (подтверждает что массив заказов)
+- `line 848, 871`: `sessionOrders.length > 0` — паттерн проверки наличия заказов
+- `terminal`, `cv_terminal_dismissed`, `Спасибо` — 0 hits (не реализовано)
+
+### Что нужно сделать
+
+**Шаг 3.1** — Добавить durable persist state.
+
+Локация: вместе с другими useState. Вставить ПОСЛЕ строки 114 (`const [showPostRatingEmailSheet, setShowPostRatingEmailSheet] = React.useState(false);`):
+
+```jsx
+  // Fix 3 (R4): Terminal screen — durable dismissal by tableId (localStorage)
+  const [terminalDismissedForTable, setTerminalDismissedForTable] = React.useState(() => {
+    try {
+      return typeof localStorage !== 'undefined' ? (localStorage.getItem('cv_terminal_dismissed') || null) : null;
+    } catch { return null; }
+  });
+```
+
+**Шаг 3.2** — Вычислить условие показа terminal через `useMemo`.
+
+**Локация (MANDATORY grep для placement):**
+
+```bash
+grep -n "const ordersSum = React.useMemo" menuapp-code-review/pages/PublicMenu/CartView.jsx
+```
+
+**Ожидаем:** один hit на строке `~490`.
+
+**Точное место вставки:** НЕПОСРЕДСТВЕННО ПЕРЕД `const ordersSum = React.useMemo` (строка ~490) — это ПОСЛЕ всех useState блоков (включая новый из Шаг 3.1) и ПЕРЕД существующими useMemo. Такой порядок гарантирует:
+
+1. **Rules of Hooks стабилен**: `tableIsClosed` useMemo вызывается на каждом рендере в фиксированной позиции (после всех useState, перед всеми остальными useMemo) → нет TDZ crash, нет React warning «Rendered more hooks than previous render».
+2. **Dependencies доступны**: `sessionOrders` — это prop (line 59), уже в scope; `currentTableKey` — derived value ниже (не hook), не зависит от placement.
+
+⚠️ **НЕ** вставлять ПОСЛЕ `ordersSum` или ПОСЛЕ других useMemo — это изменит порядок hooks относительно существующего кода, что может сломать hooks ordering (если Fix 3 когда-то будет условно отключён).
+
+```jsx
+  // Fix 3 (R4): Table is closed when session has orders AND all orders are 'closed'
+  // (happens after SOM staff invokes closeSession — all orders get status='closed' atomically, S286 Б1).
+  const tableIsClosed = React.useMemo(() => {
+    if (!Array.isArray(sessionOrders) || sessionOrders.length === 0) return false;
+    return sessionOrders.every((o) => (o.status || '').toLowerCase() === 'closed');
+  }, [sessionOrders]);
+
+  const currentTableKey = currentTable?.id ? String(currentTable.id) : null;
+  const showTerminal = tableIsClosed && !!currentTableKey && terminalDismissedForTable !== currentTableKey;
+```
+
+> ⚠️ Reviewer: `currentTableKey` и `showTerminal` — **обычные derived values** (не hooks), вычисляются каждый рендер. `tableIsClosed` — `useMemo`, чтобы не пересчитывать `.every()` при каждом рендере.
+
+**Шаг 3.3** — Рендер Terminal screen через **early return** (безопасно: все hooks уже вызваны выше).
+
+Локация: найти строку **где начинается главный `return (`** (строка **738** ожидается — точнее grep для подтверждения):
+
+```bash
+grep -n "^  return (" menuapp-code-review/pages/PublicMenu/CartView.jsx
+```
+Ожидаем: один hit на строке `~738` (главный return).
+
+**Вставить ПРЯМО ПЕРЕД** главным `return (` (т.е. после последнего hook/derived value и до открывающей скобки JSX):
+
+```jsx
+  // Fix 3 (R4): Terminal screen — intercept before main render when table closed.
+  // All hooks above are called unconditionally; early return is safe here (Rules of Hooks OK).
+  if (showTerminal) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 py-12 text-center gap-5">
+        <div className="text-6xl" aria-hidden="true">✅</div>
+        <h2 className="text-xl font-semibold text-gray-900">
+          {tr('cart.terminal.title', 'Спасибо за визит!')}
+        </h2>
+        {ordersSum > 0 && (
+          <p className="text-gray-600 text-sm">
+            {tr('cart.terminal.your_total', 'Ваша сумма')}: {formatPrice(parseFloat(Number(ordersSum).toFixed(2)))}
+          </p>
+        )}
+        <Button
+          size="lg"
+          className="w-full min-h-[44px] text-white mt-2"
+          style={{ backgroundColor: primaryColor }}
+          onClick={() => {
+            setTerminalDismissedForTable(currentTableKey);
+            try {
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('cv_terminal_dismissed', currentTableKey);
+              }
+            } catch {}
+            if (typeof onClose === 'function') {
+              onClose();
+            } else {
+              setView('menu');
+            }
+          }}
+        >
+          {tr('cart.terminal.back_to_menu', 'Вернуться в меню')}
+        </Button>
+      </div>
+    );
+  }
+```
+
+> ✅ **Почему safe early return:** все `React.useState` / `React.useMemo` / `React.useEffect` вызовы в компоненте расположены ВЫШЕ главного return (lines 94-735 примерно). Вставляя early return ПЕРЕД главным `return (`, мы гарантируем что все hooks вызваны перед любым branching. Это соответствует Rules of Hooks.
+> ✅ **Кнопка** — shadcn `<Button>` с paттерном из lines 1215-1222 (size="lg", w-full min-h-[44px] text-white, style={{backgroundColor: primaryColor}}). Это **существующий паттерн** в файле для кнопки «Вернуться в меню» — переиспользуем его.
+> ✅ `primaryColor` (line 84), `onClose` (prop line 72), `setView` (prop line 22), `tr` (line 282), `formatPrice` (prop line 30), `ordersSum` (line 490) — всё доступно в scope.
+> ✅ `Button` импортирован на line 4 (`import { Button } from "@/components/ui/button"`).
+
+**Шаг 3.4** — Очистка dismissed ключа при смене стола.
+
+Если гость переходит на новый стол (`currentTable.id` меняется), ранее dismissed state должен сбрасываться. Но согласно R4 «durable persist» — это ПРАВИЛЬНО что новый столик покажет terminal заново. Текущая логика `terminalDismissedForTable !== currentTableKey` уже обеспечивает это: `dismissed` привязан к конкретному tableId, а при смене стола условие `!==` становится true и terminal снова показывается (если этот стол тоже закрыт).
+
+**НЕ нужно** добавлять useEffect для очистки — логика уже правильная через string-сравнение.
+
+**НЕ делать:**
+- ❌ Не использовать `currentTable?.status` — это поле не verified.
+- ❌ Не добавлять `tableSession` prop — нарушает scope lock.
+- ❌ Не показывать terminal и основной контент одновременно (early return делает это невозможным — это правильно).
+- ❌ Не добавлять счётчик обратного отсчёта (не в скоупе).
+- ❌ Не удалять основной `return (...)` блок — он должен оставаться после early return.
+
+### Acceptance Criteria
+- [ ] `tableIsClosed` true когда `sessionOrders.length > 0 && sessionOrders.every(o.status === 'closed')`
+- [ ] `showTerminal` = `tableIsClosed && !!currentTableKey && (dismissed !== currentTableKey)`
+- [ ] Early return РАСПОЛОЖЕН ПЕРЕД главным `return (` — после всех hooks
+- [ ] Terminal screen содержит: ✅ иконку, «Спасибо за визит!», сумму гостя (если `ordersSum > 0`), кнопку «Вернуться в меню»
+- [ ] Кнопка = shadcn `<Button size="lg">` (НЕ `<button className="btn btn-outline">`)
+- [ ] Кнопка использует `style={{backgroundColor: primaryColor}}` и `className="w-full min-h-[44px] text-white"` (= line 1217)
+- [ ] onClick — dismissed записывается в localStorage + вызывается `onClose()` или `setView('menu')`
+- [ ] При повторном открытии того же стола (`currentTable.id` = same) — экран НЕ показывается
+- [ ] При переходе на другой стол (другой `id`) — экран снова показывается (если тот стол тоже закрыт)
+- [ ] Основной `return (<div ...>)` блок ОСТАВЛЕН без изменений (только early return добавлен перед ним)
+
+---
+
+## Fix 4 — Self-first «Вы (Гость N)» в «Стол» [BUG at line 834]
+
+**Проблема:** В табе «Стол» свои заказы не показаны. `otherGuestIdsFromOrders` (line 510) исключает `myGuestId`, и рендер (lines 834-916) показывает только `otherGuestIdsFromOrders.map(...)`. [CV-NEW-03, CV-16/17]
+
+### Верификация grep перед ревью
+```bash
+grep -n "SECTION 5\|otherGuestsExpanded\|myGuestId\|ordersByGuestId" menuapp-code-review/pages/PublicMenu/CartView.jsx
+```
+Ожидаем:
+- `line 508`: `const myGuestId = currentGuest?.id ? String(currentGuest.id) : null`
+- `line 510-512`: `otherGuestIdsFromOrders` — filter исключает `myGuestId` (правильно, оставить как есть)
+- `line 533-540`: `getGuestLabelById(guestId)` — уже доступен
+- `line 833`: комментарий `{/* SECTION 5: TABLE ORDERS (other guests) — visible only in Стол tab */}`
+- `line 834`: `{showTableOrdersSection && cartTab === 'table' && (` — Card «Заказы стола»
+- `line 861`: `{otherGuestsExpanded && (...)}` — collapsed by default
+
+### Анализ cascade `showTableOrdersSection`
+
+Grep на line 824, 834, 920, 927, 1075 показывает 5 использований. Проверка:
+- **Line 824** (Tabs header): `{showTableOrdersSection && (<Tabs>...)` — показывает тумблер «Мои»/«Стол» ТОЛЬКО когда есть другие гости. Это правильно: если других нет, не нужны табы.
+- **Line 834** (Card «Заказы стола»): показывает карточку других гостей. Это правильно: без других гостей её быть не должно.
+- **Lines 920, 927, 1075** (State A empty, State D served+waiting, State B cart): `{(!showTableOrdersSection || cartTab === 'my') && ...}` — показывает содержимое «Мои» tab.
+
+**Вывод:** cascade уже корректный. Fix 4 **не должен** менять определение `showTableOrdersSection`. Single-guest сессия (нет других) → табов нет → нечего чинить.
+
+Проблема CV-NEW-03 возникает только в multi-guest сессиях (табы есть). Фикс = добавить self-block ВНУТРИ «Стол» tab, ПЕРЕД Card «Заказы стола» (line 834).
+
+### Что нужно сделать
+
+**Шаг 4.1** — Добавить Self-block Card ПЕРЕД строкой 833-834.
+
+Локация: между закрывающим `</Tabs>` Card (line 831) и комментарием `{/* SECTION 5: TABLE ORDERS (other guests) ... */}` (line 833). Т.е. вставить как новый блок между lines 831 и 833.
+
+Вставить:
+
+```jsx
+      {/* SECTION 4.5 (Fix 4, CV-16/17, CV-NEW-03): SELF BLOCK in Стол tab — own orders shown FIRST, expanded */}
+      {showTableOrdersSection && cartTab === 'table' && myGuestId && ordersByGuestId.has(myGuestId) && (() => {
+        const myOrdersInSession = ordersByGuestId.get(myGuestId) || [];
+        const selfTotal = myOrdersInSession.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+        return (
+          <Card className="mb-4">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-slate-500" />
+                  <span className="text-sm font-semibold text-slate-700">
+                    {tr('cart.table.you', 'Вы')} ({getGuestLabelById(myGuestId)})
+                  </span>
+                </div>
+                <span className="font-bold text-slate-700">
+                  {formatPrice(parseFloat(Number(selfTotal).toFixed(2)))}
+                </span>
+              </div>
+              {/* Self orders — always expanded (CV-16) */}
+              <div className="pl-2 border-l-2 border-slate-200 space-y-1">
+                {myOrdersInSession.map((order) => {
+                  const items = itemsByOrder.get(order.id) || [];
+                  const status = getSafeStatus(getOrderStatus(order));
+                  const isOrderPending = (order.status || '').toLowerCase() === 'submitted';
+
+                  if (items.length === 0) {
+                    return (
+                      <div key={order.id} className="flex justify-between items-center text-xs">
+                        <span className="text-slate-600">
+                          {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(parseFloat(Number(order.total_amount).toFixed(2)))}
+                          {isOrderPending && (
+                            <span className="ml-1 text-amber-600 font-medium">⏳ {tr('cart.order.pending_badge', 'Ожидает')}</span>
+                          )}
+                        </span>
+                        <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
+                      </div>
+                    );
+                  }
+
+                  return items.map((item, idx) => (
+                    <div key={`${order.id}-${idx}`} className="flex justify-between items-center text-xs">
+                      <span className="text-slate-600">
+                        {item.dish_name} × {item.quantity}
+                        {isOrderPending && (
+                          <span className="ml-1 text-amber-600 font-medium">⏳ {tr('cart.order.pending_badge', 'Ожидает')}</span>
+                        )}
+                      </span>
+                      <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
+                    </div>
+                  ));
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+```
+
+> ✅ **Verified identifiers & patterns:**
+> - `ordersByGuestId` (line 496), `myGuestId` (line 508), `getGuestLabelById` (line 533), `itemsByOrder` (prop line 53), `getOrderStatus` (prop line 54), `getSafeStatus` (line 309), `formatPrice` (prop line 30), `tr` (line 282), `Users` icon (import line 2), `Card`/`CardContent` (import line 3). Все существуют.
+> - JSX render блюд — **1:1 скопирован из существующего render для других гостей** (lines 880-901). Только guest-level wrapper заменён на self-wrapper с `Users`-иконкой и label «Вы (Гость N)».
+> - Fix 2 badge «⏳ Ожидает» применён идентично (per-item, в «Стол»).
+
+**Шаг 4.2** — НЕ менять определение `showTableOrdersSection` (line 542).
+
+Cascade-анализ выше подтверждает: текущая логика `otherGuestIdsFromOrders.length > 0` правильная. Fix 4 НЕ меняет эту строку.
+
+**Шаг 4.3** — НЕ менять Card «Заказы стола» (lines 834-916).
+
+Она продолжает рендериться как есть. Self-block — отдельная Card ПЕРЕД ней.
+
+**НЕ делать:**
+- ❌ Не добавлять self-block внутрь `otherGuestIdsFromOrders.map(...)`.
+- ❌ Не менять `otherGuestIdsFromOrders` filter (line 511 — правильный).
+- ❌ Не трогать `otherGuestsExpanded` toggle логику.
+- ❌ Не менять `showTableOrdersSection` определение и его 5 использований.
+
+### Acceptance Criteria
+- [ ] Новая Card «Вы (Гость N)» рендерится ПЕРЕД Card «Заказы стола» в табе «Стол»
+- [ ] Self-block виден только когда `cartTab === 'table' && showTableOrdersSection && myGuestId && ordersByGuestId.has(myGuestId)` (т.е. multi-guest + у меня есть заказы)
+- [ ] Self-block ВСЕГДА expanded (нет кнопки collapse)
+- [ ] Заголовок self-block = `«Вы (Гость N)»` через `getGuestLabelById(myGuestId)` (если guest в `sessionGuests` — покажется его имя)
+- [ ] Сумма в header self-block = `sum(order.total_amount)` для `myOrdersInSession`
+- [ ] Pending badge «⏳ Ожидает» появляется у submitted заказов self-block (в соответствии с Fix 2 R1)
+- [ ] `showTableOrdersSection` и его 5 использований НЕ затронуты
+- [ ] Card «Заказы стола» других гостей рендерится как раньше (collapsed by default, toggle `otherGuestsExpanded`)
+- [ ] `myGuestId` не появился в `otherGuestIdsFromOrders` (filter line 511 не изменён)
+
+---
+
+## MOBILE-FIRST CHECK (MANDATORY)
+
+Mobile-first restaurant app. Verify at **375px width**:
+- [ ] Fix 1: Header «Вы:»/«Стол:» text wraps gracefully (no overflow)
+- [ ] Fix 2: «Ожидает» bucket header amber text readable at 375px; badge «⏳ Ожидает» не ломает layout
+- [ ] Fix 3: Terminal «Спасибо за визит!» centered on small screen, кнопка full-width
+- [ ] Fix 4: Self-block Card не overflow horizontally; длинные dish_name wrap
+- [ ] Touch targets >= 44px (Fix 3 кнопка → size="lg" + min-h-[44px] ✅)
+- [ ] No new content below bottom sticky footer
+
+---
+
+## Regression Check (MANDATORY after fixes)
+
+Проверить что существующие функции НЕ сломаны:
+- [ ] Таб «Мои» открывается, блюда отображаются с bucket «В работе» / «Выдано»
+- [ ] Кнопка «Заказать ещё» (в footer «Мои») работает
+- [ ] Rating mode (state C/C2/C3) по-прежнему работает для «Выдано»
+- [ ] Таб «Стол» переключается, другие гости отображаются через `otherGuestsExpanded`
+- [ ] Header «Мои»: `totalDishCount` и `headerTotal` корректны (формула не затронута, добавлен только «Вы:» prefix)
+- [ ] Header «Стол»: новая формула (renderedTableTotal/Count/GuestCount) работает при 0, 1, 2+ гостях
+- [ ] `submittedTableTotal` удалён из кода (grep 0 hits) или оставлен если есть другие использования
+- [ ] Single-guest сессия: табов нет, только «Мои» контент (Fix 4 не сломал)
+- [ ] Multi-guest + self без заказов: табы есть, «Стол» показывает только других (self-block скрыт)
+- [ ] Multi-guest + self с заказами: «Стол» показывает self-block первым, потом «Заказы стола»
+- [ ] Terminal screen: показывается при all-orders-closed; исчезает при dismiss; re-appears при новом tableId
+
+---
+
+## Review Instructions
+
+Для каждого Fix:
+1. **Прочитать** указанные строки `Read ... --offset=X --limit=Y` (ТОЛЬКО относящиеся к Fix'у)
+2. **Выполнить** grep verification из секции Fix
+3. **Оценить** (1-5), указать точные строки для изменений
+4. **Флаги:** 🚨 BLOCKER | ⚠️ WARNING | ✅ APPROVED
+
+### Final Rating Table
+
+| Fix | CC Rating | Codex Rating | Verdict |
+|-----|-----------|--------------|---------|
+| Fix 1 Header+Invariant [BUG] | ? | ? | ? |
+| Fix 2 Ожидает bucket [NEW CODE] | ? | ? | ? |
+| Fix 3 Terminal screen [NEW CODE] | ? | ? | ? |
+| Fix 4 Self-first Стол [BUG] | ? | ? | ? |
+
+---
+
+## НЕ делать (scope lock)
+
+- ❌ Не менять sessionHelpers.js, partnertables.jsx или другие файлы
+- ❌ Не добавлять «Попросить счёт» standalone CTA (V4 FROZEN)
+- ❌ Не добавлять `stale_pending` / «Проверяем подтверждение…» (убран S302)
+- ❌ Не менять rating flow (states C/C2/C3) — не в скоупе
+- ❌ Не форсировать Math.round() на ценах для KZT/RUB (KB-167: by design)
+- ❌ Не менять `otherGuestsExpanded` логику / UI
+- ❌ Не добавлять `tableSession` prop или изменять `showTableOrdersSection` определение
+- ✅ **Exception — i18n dictionary:** 11 новых `tr()` ключей ДОЛЖНЫ быть добавлены в словарь проекта (полный список + детали ниже в §⚠️ i18n Exception). Без этого UI покажет сырые ключи вида `cart.group.pending` вместо «⏳ Ожидает».
+
+### ⚠️ i18n Exception (B8)
+
+Реализация добавит новые `tr()` ключи. КС для этого батча ОБЯЗАН добавить их в i18n dictionary.
+
+Новые ключи:
+```
+cart.header.you_label      → «Вы»
+cart.header.table_label    → «Стол»
+cart.header.guest_one      → «гость»
+cart.header.guest_few      → «гостя»
+cart.header.guest_many     → «гостей»
+cart.terminal.title        → «Спасибо за визит!»
+cart.terminal.your_total   → «Ваша сумма»
+cart.terminal.back_to_menu → «Вернуться в меню»
+cart.group.pending         → «⏳ Ожидает»
+cart.order.pending_badge   → «Ожидает»
+cart.table.you             → «Вы»
+```
+
+> i18n функция в файле: `const tr = (key, fallback)` (line 282). Использовать ТОЛЬКО `tr()`, НЕ `t()` или `trFormat()`.
+
+---
+
+## FROZEN UX Grep Verification (MANDATORY before commit)
+
+Выполнить после реализации, убедиться что FROZEN elements не затронуты:
+
+```bash
+# CV-52: только 2 base статуса guest-facing + новый pending
+grep -n "cart.group.in_progress\|cart.group.served\|cart.group.pending\|В работе\|Выдано" menuapp-code-review/pages/PublicMenu/CartView.jsx
+# Ожидаем: существующие строки ПЛЮС новый pending bucket
+
+# CV-50: деньги только в header, не в bucket-заголовках
+grep -n "formatPrice" menuapp-code-review/pages/PublicMenu/CartView.jsx | grep -iE "pending|in_progress|served"
+# Ожидаем: 0 hits (formatPrice не в bucket-заголовках)
+
+# V4: standalone «Попросить счёт» CTA не добавлен
+grep -n "Попросить счёт\|ask_bill\|request.*bill\|bill.*cta" menuapp-code-review/pages/PublicMenu/CartView.jsx
+# Ожидаем: 0 hits
+
+# stale_pending не восстановлен
+grep -n "stale_pending\|Проверяем подтверждение" menuapp-code-review/pages/PublicMenu/CartView.jsx
+# Ожидаем: 0 hits
+
+# Fix 3: правильный data source (не currentTable.status)
+grep -n "currentTable.status\|currentTable?.status" menuapp-code-review/pages/PublicMenu/CartView.jsx
+# Ожидаем: 0 hits
+
+# Fix 3: durable persist реализован
+grep -n "cv_terminal_dismissed\|terminalDismissedForTable\|showTerminal" menuapp-code-review/pages/PublicMenu/CartView.jsx
+# Ожидаем: ≥3 hits (useState, derived, условие показа)
+
+# Fix 2: правильный идентификатор bucketDisplayNames (не groupLabels)
+grep -n "groupLabels" menuapp-code-review/pages/PublicMenu/CartView.jsx
+# Ожидаем: 0 hits (этот идентификатор не существует — используется bucketDisplayNames)
+```

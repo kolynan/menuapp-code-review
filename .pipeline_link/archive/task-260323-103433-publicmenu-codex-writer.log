@@ -1,0 +1,775 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d1930-128f-7c60-b3da-c3ac18c64c3f
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260323-103001-4112-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260323-103001-4112 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Bugfix: PublicMenu x.jsx logic fixes — error paths, session, cooldown, timer (#70, #74, #73, #69, #75) Reference: `BUGS_MASTER.md`, `menuapp-code-review/pages/PublicMenu/`. **Production page** — `https://menu-app-mvp-49a4f5b2.base44.app/x?partner=69540a85f2492cff3e46a283&mode=hall&lang=RU` **Context:** Five M-weight logic bugs in x.jsx. Two are about error handling (PM-070, PM-074): currently backend failures and "not found" conditions result in identical UI, making retryable errors indistinguishable from permanent ones. PM-073 and PM-069 are about table session state. PM-075 is a React anti-pattern: untracked setTimeout. TARGET FILES (modify): - `pages/PublicMenu/x.jsx` CONTEXT FILES (read-only, do NOT modify): - `pages/PublicMenu/CartView.jsx` - `pages/PublicMenu/MenuView.jsx` - `pages/PublicMenu/useTableSession.jsx` **NOTE:** x.jsx is ~3500 lines. Each Fix section provides exact line numbers and grep hints. --- ## Fix 1 — PM-070 (P1) [MUST-FIX]: Partner lookup masks backend errors as "not found" ### Сейчас (текущее поведение) x.jsx partner useQuery (line ~1325) has two try/catch blocks. Both catch blocks return null on failure, including transient backend errors. The error UI (line ~3046) shows "Ресторан не найден" for ALL failure cases — including when the backend itself is down or the network fails. This means a user with a valid QR code but transient network error sees "Restaurant not found" and cannot retry — a dead end. ### Должно быть (ожидаемое поведение) Separate two failure paths: 1. **Genuine not-found**: both partner lookups return empty array (`res?.[0]` is null/undefined) → show existing "Ресторан не найден" UI. 2. **Backend/network failure**: a `catch` was triggered on BOTH lookups → show retryable error UI: "Не удалось загрузить меню. Проверьте соединение." + retry button (calls `refetch()`). Add a boolean flag (e.g. `partnerNetworkError`) to the query or via a `useState`: - If both lookups throw → set flag true → show retry UI. - If at least one returns null (no throw) → show "not found" UI. ### НЕ должно быть (анти-паттерны) - Do NOT change partner lookup logic (id-first, slug-fallback) — only error handling. - Do NOT show technical error messages. Keep user-facing text simple and non-technical. - Do NOT add console.error calls for production (see PM-076). - Do NOT remove the existing `shouldRetry` logic. ### Файл и локация `pages/PublicMenu/x.jsx` - Lines ~1325–1352: `useQuery` for partner, `queryFn` with two try/catch blocks. - Line ~3046: `<p className="text-slate-500">{t('error.partner_not_found')}</p>` — error UI. - Line ~3029: surrounding `if (!partner && !loadingPartner)` block — add `partnerNetworkError` branch here. Search: `queryKey: ["publicPartner"` to find the query. Search `partner_not_found` to find the error UI. ### Проверка (мини тест-кейс) 1. Backend failure (mock network error): retry button appears, not "not found". 2. Invalid partner ID: "Ресторан не найден" message appears (no retry button). --- ## Fix 2 — PM-074 (P1) [MUST-FIX]: OrderStatusScreen masks backend fetch errors as "not found" ### Сейчас (текущее поведение) In `OrderStatusScreen` component (~line 895), the query catches order fetch results. Line ~1033: `if (orderError || !order)` — BOTH backend failure AND "order not found" result in the same UI: `order_status.not_found` message. User with a valid order token but transient network error sees "Order not found" and cannot retry. ### Должно быть (ожидаемое поведение) Separate two paths: 1. `orderError` (query threw an exception / network failure) → show retryable UI: "Не удалось загрузить заказ. Проверьте соединение." + retry button (calls `refetchOrder()`). 2. `!order` (query succeeded but returned null — token invalid) → show existing "not found" UI. The condition `if (orderError || !order)` must be split into two separate `if` blocks. ### НЕ должно быть (анти-паттерны) - Do NOT change the order polling interval or retry logic. - Do NOT change the UI for the valid order flow. - Do NOT merge retry UI with the "expired" order UI (already separate at ~line 1050+). - Do NOT add console.error. ### Файл и локация `pages/PublicMenu/x.jsx` - Line ~900: `OrderStatusScreen` component, `useQuery` with `queryKey: ["orderByToken"`. - Line ~1033: `if (orderError || !order)` — SPLIT this condition into two separate ifs. Search: `orderError \|\| !order` to find the exact location. ### Проверка (мини тест-кейс) 1. Valid token + network error: shows retry button, NOT "not found". 2. Invalid/expired token (returns null): shows "not found" UI as before. --- ## Fix 3 — PM-073 (P2) [MUST-FIX]: useTableSession: restored guest loses table binding due to direct .id usage ### Сейчас (текущее поведение) In x.jsx ~line 2778, when creating a new guest after session restore failure: `const gid = String(guest?.id ?? guest?._id ?? "");` This correctly handles `_id` fallback. BUT in the "restore guest" path (~line 2756): `const gid = normalizeId(guest);` `normalizeId` (if defined) may not behave identically to `normalizeGuestId` from useTableSession. useTableSession.jsx uses `normalizeGuestId = (g) => String(g?.id ?? g?._id ?? "")`. The inconsistency means that a guest object returned with only `_id` (no `id`) might produce an empty string for `gid` in the restore path, causing `currentGuestIdRef.current = null`, which loses the table-session binding on page refresh. ### Должно быть (ожидаемое поведение) Both places that set `currentGuestIdRef.current = gid` (lines ~2758 and ~2778) must use the same normalization: `String(g?.id ?? g?._id ?? "")`. If `normalizeId` is a local function doing this correctly, verify it handles `_id` fallback. If not — replace with explicit `String(guest?.id ?? guest?._id ?? "")`. ### НЕ должно быть (анти-паттерны) - Do NOT change the overall guest restore or create flow. - Do NOT modify useTableSession.jsx. - Do NOT change any other uses of `normalizeId` in x.jsx. ### Файл и локация `pages/PublicMenu/x.jsx` - Line ~2756: `const gid = normalizeId(guest);` - Line ~2778: `const gid = String(guest?.id ?? guest?._id ?? "");` Both should use `String(g?.id ?? g?._id ?? "")` pattern. Search: `currentGuestIdRef.current = gid` to find both occurrences. Verify what `normalizeId` does. ### Проверка (мини тест-кейс) 1. Guest object with only `_id` (no `id`): `gid` must be non-empty string equal to `_id`. 2. `currentGuestIdRef.current` is not null after restore when guest has only `_id`. --- ## Fix 4 — PM-069 (P2) [MUST-FIX]: BS table code: no lockout countdown UI after wrong code attempts ### Сейчас (текущее поведение) The Bottom Sheet for table code verification shows "Неверный код" but: 1. Code input is NOT cleared after wrong entry (user must delete digits manually). 2. No lockout/cooldown countdown: `codeAttempts` and `codeLockedUntil` state is NOT accessible in x.jsx scope — it lives inside the BS component or useTableSession hook. After 3+ wrong attempts, there may be a lockout but no UI feedback showing "Заблокировано на 30 сек" etc. ### Должно быть (ожидаемое поведение) **Part A — Clear on wrong code (LMP: banking apps, Telegram):** After wrong code entry → auto-clear the 4-digit input fields after ~500ms. This lets the user immediately start retyping without deleting manually. **Part B — Lockout countdown display:** If `codeAttempts`, `codeLockedUntil`, or similar state already exists in the BS logic: Surface it to show user-visible message: "Попробуйте через 30 сек" (countdown). If state is not yet accessible from the BS render location in x.jsx, add a `codeLockedUntil` state in x.jsx scope and pass down to the BS component. NOTE: If Part B is too complex in scope (requires significant state refactor) — implement Part A only and note Part B as SKIPPED with explanation. ### НЕ должно быть (анти-паттерны) - Do NOT change the 4-cell visual layout (keep the 4 separate digit cells). - Do NOT change the "Неверный код" text itself. - Do NOT add animations that block the user from immediately retyping after clear. ### Файл и локация `pages/PublicMenu/x.jsx` - The BS for table code is around line ~3395–3470 (search `Введите код стола` or `showTableCodeSheet`). - Look for where wrong code is detected and "Неверный код" is displayed. - `codeAttempts` / `codeLockedUntil` — search these names to find where they live. ### Проверка (мини тест-кейс) 1. Enter wrong code → 4 cells clear automatically after ~500ms. 2. Enter wrong code 3+ times → lockout message appears with countdown (if Part B implemented). --- ## Fix 5 — PM-075 (P2) [MUST-FIX]: Auto-submit setTimeout without cleanup causes stale submit ### Сейчас (текущее поведение) x.jsx line ~2101: `setTimeout(() => handleSubmitOrder(), 100);` inside a `useEffect`. The timeout ID is NOT stored in a ref and NOT cleaned up on unmount. If the component re-renders or unmounts between the 100ms delay and execution, `handleSubmitOrder` fires on stale state — a React anti-pattern that can cause double-submit or errors. ### Должно быть (ожидаемое поведение) 1. Store the timeout ID in a ref: `const autoSubmitTimerRef = useRef(null);` 2. Before setting new timeout: `if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);` 3. Store the ID: `autoSubmitTimerRef.current = setTimeout(() => handleSubmitOrder(), 100);` 4. Add cleanup in the useEffect return: `return () => clearTimeout(autoSubmitTimerRef.current);` ### НЕ должно быть (анти-паттерны) - Do NOT change the 100ms delay value. - Do NOT change when the auto-submit triggers (condition: `pendingSubmitRef.current && isTableVerified && currentTableId`). - Do NOT change `handleSubmitOrder` function. ### Файл и локация `pages/PublicMenu/x.jsx` - Lines ~2097–2104: `useEffect` with `pendingSubmitRef.current` check and `setTimeout`. Search: `pendingSubmitRef.current && isTableVerified` to find exact location. ### Проверка (мини тест-кейс) 1. `autoSubmitTimerRef` exists as a ref. 2. The useEffect returns a cleanup function that calls `clearTimeout`. 3. No double-submit on rapid re-renders. --- ## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано выше - Modify ONLY: `pages/PublicMenu/x.jsx` - Do NOT touch: CartView.jsx, MenuView.jsx, CheckoutView.jsx, useTableSession.jsx - Do NOT fix bugs outside the 5 Fix sections above — even if you spot them. - Do NOT change routing, authentication, or any partner/order data fetching beyond what's described. - Extra findings = task FAILURE. ## Implementation Notes - File: `pages/PublicMenu/x.jsx` (~3500 lines) - НЕ ломать: table verification flow, cart submit, order status polling, guest session - Fix order: 5 → 1 → 2 → 3 → 4 (simplest first: PM-075 timer, PM-070/074 error paths, PM-073/069 state) - git add pages/PublicMenu/x.jsx && git commit -m "fix: partner/order error paths, guest id normalization, BS cooldown, timer cleanup" && git push ## MOBILE-FIRST CHECK (MANDATORY before commit) - [ ] BS table code: wrong code clears input → works on mobile viewport - [ ] Retry buttons: min-h-[44px] touch target - [ ] No new console.error calls added - [ ] Error messages legible at 375px width === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/PublicMenu/x.jsx` against the five scoped fixes, and I’ll only read the page folder files the task allowed plus `README.md`/`BUGS.md` for context. After that I’ll write the findings file in `pipeline/chain-state` and save the required review artifacts in `pages/PublicMenu/`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.37s:
+components
+versions
+260320-01 useTableSession RELEASE.jsx
+260323-02 CartView RELEASE.jsx
+260323-02 MenuView RELEASE.jsx
+260323-02 x RELEASE.jsx
+ACCEPTANCE_CRITERIA_PHASE1.md
+BUGS.md
+CartView.jsx
+CheckoutView.jsx
+commands_2026-03-23.log
+COPY_SPEC.md
+i18n_DrawerUX_S79.csv
+i18n_WorkingHours_S79.csv
+MenuView.jsx
+ModeTabs.jsx
+PublicMenu README.md
+PublicMenu_BASE.txt
+README.md
+review_2026-03-23.md
+codex
+Gathering the exact code slices now: the relevant query branches, order status branch, guest ID normalization, bottom-sheet code verification flow, and the auto-submit effect. I’m also checking the page-level `README.md` and `BUGS.md` for any scope constraints or known expectations.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/README.md -TotalCount 250' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/BUGS.md -TotalCount 250' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/useTableSession.jsx -Pattern 'normalizeGuestId|codeAttempts|codeLockedUntil' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'queryKey: \\[\"publicPartner\"|partner_not_found|queryKey: \\[\"orderByToken\"|orderError \\|\\| "'!order|currentGuestIdRef'"\\.current = gid|showTableCodeSheet|Введите код стола|codeAttempts|codeLockedUntil|pendingSubmitRef\\.current && isTableVerified|setTimeout\\(\\(\\) => handleSubmitOrder\\(\\), 100\\)|const normalizeId' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 10.94s:
+
+ exited 124 in 12.05s:
+
+ exited 124 in 12.15s:
+
+ exited 124 in 12.19s:
+
+codex
+The first pass timed out on PowerShell reads, so I’m switching to narrower file-local searches and shorter extracts. That keeps within the page-folder-only scope while avoiding a full scan of the large `x.jsx`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"publicPartner|partner_not_found|orderByToken|orderError \\|\\| "'!order|currentGuestIdRef'"\\.current = gid|showTableCodeSheet|Введите код стола|codeAttempts|codeLockedUntil|pendingSubmitRef\\.current && isTableVerified|handleSubmitOrder\\(\\), 100|const normalizeId\" pages/PublicMenu/x.jsx" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/README.md -First 120' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/BUGS.md -First 160' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n "normalizeGuestId|codeAttempts|codeLockedUntil" pages/PublicMenu/useTableSession.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 9.24s:
+---
+version: "30.0"
+updated: "2026-03-22"
+session: 161
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*13 active bugs remaining (0x P0, 7x P1, 4x P2, 1x P3, 1x suggestion).*
+
+### BUG-PM-056: Drawer layout not visit-state-driven (P1 â€” Batch 2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P1
+- **ÐšÐ¾Ð³Ð´Ð°:** S153 (consensus chain publicmenu-260321-093745)
+ succeeded in 9.21s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 13.28s:
+18:const normalizeGuestId = (g) => String(g?.id ?? g?._id ?? "");
+361:          guest = guests.find(g => normalizeGuestId(g) === sessionSavedGuestId) || null;
+366:          guest = guests.find(g => normalizeGuestId(g) === tableSavedGuestId) || null;
+371:          guest = guests.find(g => normalizeGuestId(g) === legacySavedGuestId) || null;
+440:          const guestId = normalizeGuestId(guest);
+527:            foundGuest = guests.find(g => normalizeGuestId(g) === sessionSavedId) || null;
+531:            foundGuest = guests.find(g => normalizeGuestId(g) === tableSavedId) || null;
+535:            foundGuest = guests.find(g => normalizeGuestId(g) === legacySavedId) || null;
+552:            currentGuestIdRef.current = normalizeGuestId(foundGuest);
+566:                currentGuestIdRef.current = normalizeGuestId(guest);
+568:                  saveGuestId(partner.id, sessionId, currentTableId, normalizeGuestId(guest));
+707:    const guestIdsFromGuests = (sessionGuests || []).map(g => normalizeGuestId(g));
+755:    const guestId = normalizeGuestId(currentGuest);
+762:    const myId = currentGuest ? normalizeGuestId(currentGuest) : null;
+764:      const guestId = normalizeGuestId(guest);
+780:    const myId = normalizeGuestId(currentGuest);
+ succeeded in 13.43s:
+384:  "error.partner_not_found": "Ресторан не найден",
+452:  "cart.enter_table_code_hint": "Введите код стола чтобы отправить заказ",
+470:  "cart.verify.enter_table_code": "Введите код стола",
+897:    queryKey: ["orderByToken", token],
+1033:  if (orderError || !order) {
+1325:    queryKey: ["publicPartner", partnerParamRaw],
+2097:    if (pendingSubmitRef.current && isTableVerified && currentTableId) {
+2101:      setTimeout(() => handleSubmitOrder(), 100);
+2555:      queryClient.setQueryData(["publicPartner", partnerParamRaw], (prev) =>
+2686:            const normalizeId = (g) => String(g?.id ?? g?._id ?? "");
+2758:              currentGuestIdRef.current = gid || null;
+2778:          currentGuestIdRef.current = gid || null;
+3046:          <p className="text-slate-500">{t('error.partner_not_found')}</p>
+3409:              {tr('cart.verify.enter_table_code', 'Введите код стола')}
+3448:                aria-label={tr('cart.verify.enter_table_code', 'Введите код стола')}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -C 25 \"queryKey: \\[\\\"orderByToken\\\"|orderError \\|\\| "'!order|expired" pages/PublicMenu/x.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -C 25 \"queryKey: \\[\\\"publicPartner\\\"|partner_not_found|"'!partner && !loadingPartner" pages/PublicMenu/x.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -C 20 \"const normalizeId|currentGuestIdRef\\.current = gid|saveGuestId\\(|guest\\?\\._id\" pages/PublicMenu/x.jsx" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -C 25 \"pendingSubmitRef\\.current && isTableVerified|setTimeout\\(\\(\\) => handleSubmitOrder\\(\\), 100\\)\" pages/PublicMenu/x.jsx" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 1 in 6.62s:
+rg: &&: Не удается найти указанный файл. (os error 2)
+rg: !loadingPartner pages/PublicMenu/x.jsx: Системе не удается найти указанный путь. (os error 3)
+ exited 1 in 6.73s:
+rg: \|\|: Синтаксическая ошибка в имени файла, имени папки или метке тома. (os error 123)
+rg: !order|expired pages/PublicMenu/x.jsx: Синтаксическая ошибка в имени файла, имени папки или метке тома. (os error 123)
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n -C 15 "normalizeGuestId|codeAttempts|codeLockedUntil|verifyTableCode|table code|locked" pages/PublicMenu/useTableSession.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.31s:
+2072-      toast.error(t('error.save_failed'), { id: 'mm1' });
+2073-      // BUG-PM-028: Roll back draft rating so user can retry
+2074-      updateDraftRating(itemId, 0);
+2075-    } finally {
+2076-      setRatingSavingByItemId(prev => ({ ...prev, [itemId]: false }));
+2077-    }
+2078-  };
+2079-
+2080-  // Show cart button in hall mode: always when table verified, or when cart has items (even before verification)
+2081-  // TASK-260201-01: StickyBar виден ВСЕГДА при верифицированном столе
+2082-  // Это решает проблему F5 — не нужно ждать восстановления session/orders
+2083-  const showCartButton = isHallMode && (isTableVerified || (cart?.length || 0) > 0);
+2084-
+2085-  // After F5, table is verified from localStorage but session data is still loading from server
+2086-  // Time-bounded: after 3s assume no session exists (prevents permanent "loading" for new visits)
+2087-  const [sessionCheckTimedOut, setSessionCheckTimedOut] = useState(false);
+2088-  useEffect(() => {
+2089-    if (!isTableVerified || tableSession) return;
+2090-    const timer = setTimeout(() => setSessionCheckTimedOut(true), 3000);
+2091-    return () => clearTimeout(timer);
+ succeeded in 9.04s:
+2666-          sessionIdRef.current = session?.id;
+2667-        }
+2668-
+2669-        // P0-2: Hard guard — reject order if no valid session
+2670-        if (!session?.id) {
+2671-          toast.error(t('error.session_expired'), { id: 'session-err' });
+2672-          submitLockRef.current = false;
+2673-          setIsSubmitting(false);
+2674-          return;
+2675-        }
+2676-
+2677-        // ============================================================
+2678-        // FIX-260131-07 FINAL: SAFEGUARD — try restore guest before creating new
+2679-        // This prevents "submit races restore" bug where guest is created
+2680-        // because currentGuest hasn't been set yet
+2681-        // ============================================================
+2682-        let guest = currentGuest;
+2683-
+2684-        if (!guest) {
+2685-          try {
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n -C 30 "Введите код стола|showTableCodeSheet|codeVerificationError|codeAttempts|codeLockedUntil|table code|verify" pages/PublicMenu/x.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.07s:
+3-import {
+4-  getSessionGuests,
+5-  getSessionOrders,
+6-  getDeviceId,
+7-  findGuestByDevice,
+8-  isSessionExpired,
+9-} from "@/components/sessionHelpers";
+10-
+11-// Persistence helpers (FIX-260131-01: session + guest, 8h TTL)
+12-const TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+13-
+14-// BUG-PM-004: TTL for optimistic data before server confirms
+15-const OPTIMISTIC_TTL_MS = 30000; // 30 seconds
+16-
+17-// FIX-260131-06: Normalize guest id (support both id and _id)
+18:const normalizeGuestId = (g) => String(g?.id ?? g?._id ?? "");
+19-
+20-// FIX-260131-07: Get menu_guest_code from localStorage
+21-const getMenuGuestCode = () => {
+22-  try {
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n -C 10 "order status|track|token|retry|partner_not_found|table code" pages/PublicMenu/MenuView.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n -C 10 "table code|codeAttempts|codeLockedUntil|codeVerificationError|verify" pages/PublicMenu/CartView.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 9.86s:
+335-  "order_status.status_ready": "Готов",
+336-  "order_status.status_served": "Выполнен",
+337-  "order_status.status_cancelled": "Отменён",
+338-  "order_status.step_received": "Получен",
+339-  "order_status.step_preparing": "Готовится",
+340-  "order_status.step_ready": "Готов",
+341-  "order_status.no_token": "Ссылка на заказ отсутствует",
+342-  "order_status.check_link": "Проверьте ссылку и попробуйте снова",
+343-  "order_status.back_to_menu": "Вернуться в меню",
+344-  "order_status.not_found": "Заказ не найден",
+345-  "order_status.expired": "Заказ устарел",
+346-  "order_status.order_number": "Заказ",
+347-  "order_status.last_updated": "Обновлено",
+348-  "order_status.just_now": "только что",
+349-  "order_status.seconds_ago": "{seconds} сек. назад",
+350-  "order_status.your_order": "Ваш заказ",
+351-  "order_status.total": "Итого",
+352-  "order_status.discount": "Скидка",
+353-  "order_status.questions": "Есть вопросы?",
+354-  "order_status.order_cancelled_info": "Заказ отменён",
+ exited 1 in 6.56s:
+
+ succeeded in 6.61s:
+67-  formatOrderTime,
+68-  handleRateDish,
+69-  ratingSavingByItemId,
+70-  // TASK-260203-01 P0: Drawer props
+71-  onClose,
+72-  onCallWaiter,
+73-  isTableVerified,
+74-  tableCodeInput,
+75-  setTableCodeInput,
+76-  isVerifyingCode,
+77:  verifyTableCode,
+78:  codeVerificationError,
+79-  hallGuestCodeEnabled,
+80-  guestCode,
+81-  showLoyaltySection,
+82-}) {
+83-  const primaryColor = partner?.primary_color || '#1A1A1A';
+84-
+85-  // ===== P0: Safe prop defaults (BUG-PM-023, BUG-PM-025) =====
+86-  const safeReviewedItems = reviewedItems || new Set();
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/x.jsx'; "'$c=Get-Content $p; for($i=1318; $i -le 1356; $i++){ if($i -le $c.Length){ '"'{0}:{1}' -f "'$i,$c[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/x.jsx'; "'$c=Get-Content $p; for($i=3026; $i -le 3056; $i++){ if($i -le $c.Length){ '"'{0}:{1}' -f "'$i,$c[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/x.jsx'; "'$c=Get-Content $p; for($i=890; $i -le 1062; $i++){ if($i -le $c.Length){ '"'{0}:{1}' -f "'$i,$c[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/CartView.jsx'; "'$c=Get-Content $p; for($i=95; $i -le 230; $i++){ if($i -le $c.Length){ '"'{0}:{1}' -f "'$i,$c[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.34s:
+890:
+891:  const {
+892:    data: orderData,
+893:    isLoading: loadingOrder,
+894:    error: orderError,
+895:    refetch: refetchOrder,
+896:  } = useQuery({
+897:    queryKey: ["orderByToken", token],
+898:    enabled: !!token && OS_TOKEN_RE.test(token),
+899:    retry: 1,
+900:    staleTime: OS_POLL_INTERVAL_MS,
+901:    queryFn: async () => {
+902:      const orders = await base44.entities.Order.filter({ public_token: token });
+903:      if (!orders || orders.length === 0) return null;
+904:      return orders[0];
+905:    },
+906:  });
+907:
+908:  const order = orderData || null;
+909:  const partnerId = order?.partner || knownPartnerId;
+ succeeded in 8.54s:
+3026:          <p className="text-slate-500 text-sm mt-2">
+3027:            {t('error.partner_hint')} <span className="font-mono">?partner=&lt;partner_id|slug&gt;</span>
+3028:          </p>
+3029:        </Card>
+3030:      </div>
+3031:    );
+3032:  }
+3033:
+3034:  if (loadingPartner) {
+3035:    return (
+3036:      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+3037:        <Loader2 className="w-8 h-8 animate-spin" style={{color: '#1A1A1A'}} />
+3038:      </div>
+3039:    );
+3040:  }
+3041:
+3042:  if (!partner) {
+3043:    return (
+3044:      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+3045:        <Card className="w-full max-w-md text-center p-6">
+ succeeded in 8.40s:
+95:  const [rewardEmailSubmitting, setRewardEmailSubmitting] = React.useState(false);
+96:  const [emailError, setEmailError] = React.useState('');
+97:
+98:  // ===== P0: Table-code verification UX (mask + auto-verify + cooldown) =====
+99:  const [infoModal, setInfoModal] = React.useState(null); // 'online' | 'tableCode' | null
+100:  const [codeAttempts, setCodeAttempts] = React.useState(0);
+101:  const [codeLockedUntil, setCodeLockedUntil] = React.useState(null); // timestamp ms
+102:  const [nowTs, setNowTs] = React.useState(() => Date.now());
+103:
+104:  const codeInputRef = React.useRef(null);
+105:  const lastVerifyCodeRef = React.useRef(null);
+106:  const countedErrorForCodeRef = React.useRef(null);
+107:  const lastSentVerifyCodeRef = React.useRef(null);
+108:  const rewardTimerRef = React.useRef(null);
+109:
+110:  // Cleanup reward-email timer on unmount (PM-S140-03)
+111:  React.useEffect(() => () => clearTimeout(rewardTimerRef.current), []);
+112:
+113:  // Partner-configurable settings (fallbacks until Base44 adds real fields)
+114:  const tableCodeLength = React.useMemo(() => {
+ succeeded in 8.67s:
+1318:
+1319:  // Rating flow state (TASK-260130-09)
+1320:  const [hasRatedInSession, setHasRatedInSession] = useState(false);
+1321:  const [ratingSavingByItemId, setRatingSavingByItemId] = useState({});
+1322:
+1323:  // Partner fetch (id or slug) - MUST BE FIRST before any partner dependencies
+1324:  const { data: partner, isLoading: loadingPartner } = useQuery({
+1325:    queryKey: ["publicPartner", partnerParamRaw],
+1326:    enabled: !!partnerParamRaw,
+1327:    retry: shouldRetry,
+1328:    queryFn: async () => {
+1329:      const p = partnerParamRaw;
+1330:      if (!p) return null;
+1331:
+1332:      const byIdFirst = looksLikePartnerId(p);
+1333:
+1334:      try {
+1335:        const res = await base44.entities.Partner.filter(byIdFirst ? { id: p } : { slug: p });
+1336:        if (res?.[0]) return res[0];
+1337:      } catch (e) {
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -C 8 \"codeSecondsLeft|isCodeLocked|setTableCodeInput\\(|codeVerificationError|cart.verify.locked|cart.verify.attempts|lastVerifyCodeRef|Неверный код\" pages/PublicMenu/CartView.jsx" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n -C 8 "codeVerificationError|verifyTableCode|tableCodeInput|setTableCodeInput|cart.verify.locked|codeSecondsLeft|isCodeLocked" pages/PublicMenu/MenuView.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 5.04s:
+70-  // TASK-260203-01 P0: Drawer props
+71-  onClose,
+72-  onCallWaiter,
+73-  isTableVerified,
+74-  tableCodeInput,
+75-  setTableCodeInput,
+76-  isVerifyingCode,
+77-  verifyTableCode,
+78:  codeVerificationError,
+79-  hallGuestCodeEnabled,
+80-  guestCode,
+81-  showLoyaltySection,
+82-}) {
+83-  const primaryColor = partner?.primary_color || '#1A1A1A';
+84-
+85-  // ===== P0: Safe prop defaults (BUG-PM-023, BUG-PM-025) =====
+86-  const safeReviewedItems = reviewedItems || new Set();
+--
+97-
+98-  // ===== P0: Table-code verification UX (mask + auto-verify + cooldown) =====
+ exited 1 in 5.21s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n -C 12 "cart.verify.locked|cart.verify.attempts|codeSecondsLeft|isCodeLocked|codeVerificationError" pages/PublicMenu/CartView.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.09s:
+66-  tableTotal,
+67-  formatOrderTime,
+68-  handleRateDish,
+69-  ratingSavingByItemId,
+70-  // TASK-260203-01 P0: Drawer props
+71-  onClose,
+72-  onCallWaiter,
+73-  isTableVerified,
+74-  tableCodeInput,
+75-  setTableCodeInput,
+76-  isVerifyingCode,
+77-  verifyTableCode,
+78:  codeVerificationError,
+79-  hallGuestCodeEnabled,
+80-  guestCode,
+81-  showLoyaltySection,
+82-}) {
+83-  const primaryColor = partner?.primary_color || '#1A1A1A';
+84-
+85-  // ===== P0: Safe prop defaults (BUG-PM-023, BUG-PM-025) =====
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -C 14 \"codeSecondsLeft|isCodeLocked|codeAttempts|codeVerificationError|verifyTableCode\\(\" pages/PublicMenu/CartView.jsx" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.93s:
+64-  getLinkId,
+65-  otherGuestsReviewableItems,
+66-  tableTotal,
+67-  formatOrderTime,
+68-  handleRateDish,
+69-  ratingSavingByItemId,
+70-  // TASK-260203-01 P0: Drawer props
+71-  onClose,
+72-  onCallWaiter,
+73-  isTableVerified,
+74-  tableCodeInput,
+75-  setTableCodeInput,
+76-  isVerifyingCode,
+77-  verifyTableCode,
+78:  codeVerificationError,
+79-  hallGuestCodeEnabled,
+80-  guestCode,
+81-  showLoyaltySection,
+82-}) {
+83-  const primaryColor = partner?.primary_color || '#1A1A1A';
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"setTableCodeInput\\(\" pages/PublicMenu/x.jsx" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"setTableCodeInput\\(\" pages/PublicMenu/CartView.jsx" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 6.31s:
+3444:                  if (typeof setTableCodeInput === 'function') setTableCodeInput(next);
+ exited 1 in 6.35s:
+
+codex
+I’ve got the core branches. One of the five requested fixes appears already correct in `x.jsx`, so I’m checking the surrounding context carefully before I write the findings file to avoid false positives.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -C 20 \"cart.verify.enter_table_code|tableCodeLength|Array\\.from\\(\\{ length: tableCodeLength \\}\\)|verifyTableCode|codeVerificationError|codeLockedUntil|codeAttempts\" pages/PublicMenu/CartView.jsx" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n -C 8 "tableCodeInput|codeVerificationError|verifyTableCode|codeLockedUntil|codeAttempts" pages/PublicMenu/useTableSession.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.68s:
+57-  sessionItems,
+58-  sessionOrders,
+59-  myBill,
+60-  reviewableItems,
+61-  openReviewDialog,
+62-  setOtherGuestsExpanded,
+63-  otherGuestsExpanded,
+64-  getLinkId,
+65-  otherGuestsReviewableItems,
+66-  tableTotal,
+67-  formatOrderTime,
+68-  handleRateDish,
+69-  ratingSavingByItemId,
+70-  // TASK-260203-01 P0: Drawer props
+71-  onClose,
+72-  onCallWaiter,
+73-  isTableVerified,
+74-  tableCodeInput,
+75-  setTableCodeInput,
+76-  isVerifyingCode,
+ exited 1 in 1.70s:
+
+codex
+The review is down to the write-out step. I’m saving the scoped findings now, plus a page-folder copy and command log, without touching `x.jsx` or the read-only context files.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pipeline/chain-state' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.45s:
+True
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-23_publicmenu-260323-103001-4112.log
+Get-ChildItem -Name pages/PublicMenu
+Get-Content pages/PublicMenu/README.md -TotalCount 250
+Get-Content pages/PublicMenu/BUGS.md -TotalCount 250
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'queryKey: \["publicPartner"|partner_not_found|queryKey: \["orderByToken"|orderError \|\| !order|currentGuestIdRef\.current = gid|showTableCodeSheet|Введите код стола|codeAttempts|codeLockedUntil|pendingSubmitRef\.current && isTableVerified|setTimeout\(\(\) => handleSubmitOrder\(\), 100\)|const normalizeId' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+Select-String -Path pages/PublicMenu/useTableSession.jsx -Pattern 'normalizeGuestId|codeAttempts|codeLockedUntil' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+rg -n "publicPartner|partner_not_found|orderByToken|orderError \|\| !order|currentGuestIdRef\.current = gid|showTableCodeSheet|Введите код стола|codeAttempts|codeLockedUntil|pendingSubmitRef\.current && isTableVerified|handleSubmitOrder\(\), 100|const normalizeId" pages/PublicMenu/x.jsx
+rg -n "normalizeGuestId|codeAttempts|codeLockedUntil" pages/PublicMenu/useTableSession.jsx
+Get-Content pages/PublicMenu/README.md -First 120
+Get-Content pages/PublicMenu/BUGS.md -First 160
+rg -n -C 25 "queryKey: \[\"publicPartner\"|partner_not_found|!partner && !loadingPartner" pages/PublicMenu/x.jsx
+rg -n -C 25 "queryKey: \[\"orderByToken\"|orderError \|\| !order|expired" pages/PublicMenu/x.jsx
+rg -n -C 20 "const normalizeId|currentGuestIdRef\.current = gid|saveGuestId\(|guest\?\._id" pages/PublicMenu/x.jsx
+rg -n -C 25 "pendingSubmitRef\.current && isTableVerified|setTimeout\(\(\) => handleSubmitOrder\(\), 100\)" pages/PublicMenu/x.jsx
+rg -n -C 30 "Введите код стола|showTableCodeSheet|codeVerificationError|codeAttempts|codeLockedUntil|table code|verify" pages/PublicMenu/x.jsx
+rg -n -C 15 "normalizeGuestId|codeAttempts|codeLockedUntil|verifyTableCode|table code|locked" pages/PublicMenu/useTableSession.jsx
+rg -n -C 10 "table code|codeAttempts|codeLockedUntil|codeVerificationError|verify" pages/PublicMenu/CartView.jsx
+rg -n -C 10 "order status|track|token|retry|partner_not_found|table code" pages/PublicMenu/MenuView.jsx
+$p='pages/PublicMenu/x.jsx'; $c=Get-Content $p; for($i=1318; $i -le 1356; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
+$p='pages/PublicMenu/x.jsx'; $c=Get-Content $p; for($i=3026; $i -le 3056; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
+$p='pages/PublicMenu/x.jsx'; $c=Get-Content $p; for($i=890; $i -le 1062; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
+$p='pages/PublicMenu/CartView.jsx'; $c=Get-Content $p; for($i=95; $i -le 230; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
+rg -n -C 8 "codeSecondsLeft|isCodeLocked|setTableCodeInput\(|codeVerificationError|cart.verify.locked|cart.verify.attempts|lastVerifyCodeRef|Неверный код" pages/PublicMenu/CartView.jsx
+rg -n -C 8 "codeVerificationError|verifyTableCode|tableCodeInput|setTableCodeInput|cart.verify.locked|codeSecondsLeft|isCodeLocked" pages/PublicMenu/MenuView.jsx
+rg -n "setTableCodeInput\(" pages/PublicMenu/x.jsx
+rg -n "setTableCodeInput\(" pages/PublicMenu/CartView.jsx
+rg -n -C 20 "cart.verify.enter_table_code|tableCodeLength|Array\.from\(\{ length: tableCodeLength \}\)|verifyTableCode|codeVerificationError|codeLockedUntil|codeAttempts" pages/PublicMenu/CartView.jsx
+rg -n -C 8 "tableCodeInput|codeVerificationError|verifyTableCode|codeLockedUntil|codeAttempts" pages/PublicMenu/useTableSession.jsx
+rg -n -C 12 "cart.verify.locked|cart.verify.attempts|codeSecondsLeft|isCodeLocked|codeVerificationError" pages/PublicMenu/CartView.jsx
+rg -n -C 14 "codeSecondsLeft|isCodeLocked|codeAttempts|codeVerificationError|verifyTableCode\(" pages/PublicMenu/CartView.jsx
+Test-Path pipeline/chain-state
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-23_publicmenu-260323-103001-4112.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-103001-4112
+
+## Findings
+1. [P1] Fix 1 / PM-070: Partner lookup still collapses backend failures into "restaurant not found" — `publicPartner` swallows both lookup exceptions and returns `null` from both catch blocks (`pages/PublicMenu/x.jsx:1324-1347`), while the render path only checks `!partner` and always shows `t('error.partner_not_found')` (`pages/PublicMenu/x.jsx:3042-3046`). A transient backend/network failure therefore lands on the permanent dead-end not-found card instead of a retryable state. FIX: Preserve whether both lookup attempts threw, expose that as `partnerNetworkError` plus `refetch`, and split the `!partner && !loadingPartner` UI into retryable network-error vs true not-found paths.
+2. [P1] Fix 2 / PM-074: OrderStatusScreen still treats fetch errors as invalid tokens — the order query returns `null` for a real not-found order (`pages/PublicMenu/x.jsx:897-905`), but the render logic combines `orderError` and `!order` in one branch (`pages/PublicMenu/x.jsx:1032-1043`). When the backend request fails, users with a valid tracking token still see the permanent `order_status.not_found` UI with no retry path. FIX: Split `if (orderError || !order)` into separate error and not-found branches; the error branch should show a retryable message/button wired to `refetchOrder()`, while the `!order` branch keeps the existing not-found UI.
+3. [P2] Fix 4 / PM-069: Bottom sheet still keeps the wrong code visible and exposes no lockout countdown — the sheet only renders `codeVerificationError` after a failed verify (`pages/PublicMenu/x.jsx:3450-3458`), and the hall-verification hook data pulled into `x.jsx` does not include `codeAttempts`, `codeLockedUntil`, or any countdown state (`pages/PublicMenu/x.jsx:1510-1523`). As a result, the wrong digits stay in the 4-cell input until the user deletes them manually, and repeated failures still give no "try again in N sec" feedback in the bottom sheet. FIX: Add a short failure-driven clear of `tableCodeInput` after a wrong code (~500ms), and surface `codeLockedUntil`/countdown state into `x.jsx` so the sheet can render the existing locked/cooldown message with remaining seconds.
+4. [P2] Fix 5 / PM-075: Auto-submit timeout is still untracked and never cleaned up — the verification effect schedules `setTimeout(() => handleSubmitOrder(), 100)` directly (`pages/PublicMenu/x.jsx:2096-2103`) and does not store or clear the timer on re-render/unmount. If the component unmounts or the verification state changes inside that 100ms window, the stale callback can still submit against outdated state or double-submit. FIX: Introduce `autoSubmitTimerRef`, clear any existing timer before scheduling, store the new timeout ID, and return a cleanup that clears it.
+
+## Summary
+Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none.
+- Missing context (what info would have helped): none.
+- Scope questions (anything you weren't sure if it's in scope): none.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260323-103001-4112-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-103001-4112
+
+## Findings
+1. [P1] Fix 1 / PM-070: Partner lookup still collapses backend failures into "restaurant not found" — `publicPartner` swallows both lookup exceptions and returns `null` from both catch blocks (`pages/PublicMenu/x.jsx:1324-1347`), while the render path only checks `!partner` and always shows `t('error.partner_not_found')` (`pages/PublicMenu/x.jsx:3042-3046`). A transient backend/network failure therefore lands on the permanent dead-end not-found card instead of a retryable state. FIX: Preserve whether both lookup attempts threw, expose that as `partnerNetworkError` plus `refetch`, and split the `!partner && !loadingPartner` UI into retryable network-error vs true not-found paths.
+2. [P1] Fix 2 / PM-074: OrderStatusScreen still treats fetch errors as invalid tokens — the order query returns `null` for a real not-found order (`pages/PublicMenu/x.jsx:897-905`), but the render logic combines `orderError` and `!order` in one branch (`pages/PublicMenu/x.jsx:1032-1043`). When the backend request fails, users with a valid tracking token still see the permanent `order_status.not_found` UI with no retry path. FIX: Split `if (orderError || !order)` into separate error and not-found branches; the error branch should show a retryable message/button wired to `refetchOrder()`, while the `!order` branch keeps the existing not-found UI.
+3. [P2] Fix 4 / PM-069: Bottom sheet still keeps the wrong code visible and exposes no lockout countdown — the sheet only renders `codeVerificationError` after a failed verify (`pages/PublicMenu/x.jsx:3450-3458`), and the hall-verification hook data pulled into `x.jsx` does not include `codeAttempts`, `codeLockedUntil`, or any countdown state (`pages/PublicMenu/x.jsx:1510-1523`). As a result, the wrong digits stay in the 4-cell input until the user deletes them manually, and repeated failures still give no "try again in N sec" feedback in the bottom sheet. FIX: Add a short failure-driven clear of `tableCodeInput` after a wrong code (~500ms), and surface `codeLockedUntil`/countdown state into `x.jsx` so the sheet can render the existing locked/cooldown message with remaining seconds.
+4. [P2] Fix 5 / PM-075: Auto-submit timeout is still untracked and never cleaned up — the verification effect schedules `setTimeout(() => handleSubmitOrder(), 100)` directly (`pages/PublicMenu/x.jsx:2096-2103`) and does not store or clear the timer on re-render/unmount. If the component unmounts or the verification state changes inside that 100ms window, the stale callback can still submit against outdated state or double-submit. FIX: Introduce `autoSubmitTimerRef`, clear any existing timer before scheduling, store the new timeout ID, and return a cleanup that clears it.
+
+## Summary
+Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none.
+- Missing context (what info would have helped): none.
+- Scope questions (anything you weren't sure if it's in scope): none.
+apply_patch(auto_approved=true) exited 0 in 263ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260323-103001-4112-codex-findings.md
+A pages/PublicMenu/review_2026-03-23_publicmenu-260323-103001-4112.md
+A pages/PublicMenu/commands_2026-03-23_publicmenu-260323-103001-4112.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-23_publicmenu-260323-103001-4112.log b/pages/PublicMenu/commands_2026-03-23_publicmenu-260323-103001-4112.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..4554bf16d24ef90062c5e41dfb5714acb26afb96
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-23_publicmenu-260323-103001-4112.log
+@@ -0,0 +1,30 @@
++Get-ChildItem -Name pages/PublicMenu
++Get-Content pages/PublicMenu/README.md -TotalCount 250
++Get-Content pages/PublicMenu/BUGS.md -TotalCount 250
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'queryKey: \["publicPartner"|partner_not_found|queryKey: \["orderByToken"|orderError \|\| !order|currentGuestIdRef\.current = gid|showTableCodeSheet|Введите код стола|codeAttempts|codeLockedUntil|pendingSubmitRef\.current && isTableVerified|setTimeout\(\(\) => handleSubmitOrder\(\), 100\)|const normalizeId' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/useTableSession.jsx -Pattern 'normalizeGuestId|codeAttempts|codeLockedUntil' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++rg -n "publicPartner|partner_not_found|orderByToken|orderError \|\| !order|currentGuestIdRef\.current = gid|showTableCodeSheet|Введите код стола|codeAttempts|codeLockedUntil|pendingSubmitRef\.current && isTableVerified|handleSubmitOrder\(\), 100|const normalizeId" pages/PublicMenu/x.jsx
++rg -n "normalizeGuestId|codeAttempts|codeLockedUntil" pages/PublicMenu/useTableSession.jsx
++Get-Content pages/PublicMenu/README.md -First 120
++Get-Content pages/PublicMenu/BUGS.md -First 160
++rg -n -C 25 "queryKey: \[\"publicPartner\"|partner_not_found|!partner && !loadingPartner" pages/PublicMenu/x.jsx
++rg -n -C 25 "queryKey: \[\"orderByToken\"|orderError \|\| !order|expired" pages/PublicMenu/x.jsx
++rg -n -C 20 "const normalizeId|currentGuestIdRef\.current = gid|saveGuestId\(|guest\?\._id" pages/PublicMenu/x.jsx
++rg -n -C 25 "pendingSubmitRef\.current && isTableVerified|setTimeout\(\(\) => handleSubmitOrder\(\), 100\)" pages/PublicMenu/x.jsx
++rg -n -C 30 "Введите код стола|showTableCodeSheet|codeVerificationError|codeAttempts|codeLockedUntil|table code|verify" pages/PublicMenu/x.jsx
++rg -n -C 15 "normalizeGuestId|codeAttempts|codeLockedUntil|verifyTableCode|table code|locked" pages/PublicMenu/useTableSession.jsx
++rg -n -C 10 "table code|codeAttempts|codeLockedUntil|codeVerificationError|verify" pages/PublicMenu/CartView.jsx
++rg -n -C 10 "order status|track|token|retry|partner_not_found|table code" pages/PublicMenu/MenuView.jsx
++$p='pages/PublicMenu/x.jsx'; $c=Get-Content $p; for($i=1318; $i -le 1356; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
++$p='pages/PublicMenu/x.jsx'; $c=Get-Content $p; for($i=3026; $i -le 3056; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
++$p='pages/PublicMenu/x.jsx'; $c=Get-Content $p; for($i=890; $i -le 1062; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
++$p='pages/PublicMenu/CartView.jsx'; $c=Get-Content $p; for($i=95; $i -le 230; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
++rg -n -C 8 "codeSecondsLeft|isCodeLocked|setTableCodeInput\(|codeVerificationError|cart.verify.locked|cart.verify.attempts|lastVerifyCodeRef|Неверный код" pages/PublicMenu/CartView.jsx
++rg -n -C 8 "codeVerificationError|verifyTableCode|tableCodeInput|setTableCodeInput|cart.verify.locked|codeSecondsLeft|isCodeLocked" pages/PublicMenu/MenuView.jsx
++rg -n "setTableCodeInput\(" pages/PublicMenu/x.jsx
++rg -n "setTableCodeInput\(" pages/PublicMenu/CartView.jsx
++rg -n -C 20 "cart.verify.enter_table_code|tableCodeLength|Array\.from\(\{ length: tableCodeLength \}\)|verifyTableCode|codeVerificationError|codeLockedUntil|codeAttempts" pages/PublicMenu/CartView.jsx
++rg -n -C 8 "tableCodeInput|codeVerificationError|verifyTableCode|codeLockedUntil|codeAttempts" pages/PublicMenu/useTableSession.jsx
++rg -n -C 12 "cart.verify.locked|cart.verify.attempts|codeSecondsLeft|isCodeLocked|codeVerificationError" pages/PublicMenu/CartView.jsx
++rg -n -C 14 "codeSecondsLeft|isCodeLocked|codeAttempts|codeVerificationError|verifyTableCode\(" pages/PublicMenu/CartView.jsx
++Test-Path pipeline/chain-state
+diff --git a/pages/PublicMenu/review_2026-03-23_publicmenu-260323-103001-4112.md b/pages/PublicMenu/review_2026-03-23_publicmenu-260323-103001-4112.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..745dce9d74daf26415bc4ec3b236f5b0dc0cad80
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-23_publicmenu-260323-103001-4112.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-103001-4112
++
++## Findings
++1. [P1] Fix 1 / PM-070: Partner lookup still collapses backend failures into "restaurant not found" — `publicPartner` swallows both lookup exceptions and returns `null` from both catch blocks (`pages/PublicMenu/x.jsx:1324-1347`), while the render path only checks `!partner` and always shows `t('error.partner_not_found')` (`pages/PublicMenu/x.jsx:3042-3046`). A transient backend/network failure therefore lands on the permanent dead-end not-found card instead of a retryable state. FIX: Preserve whether both lookup attempts threw, expose that as `partnerNetworkError` plus `refetch`, and split the `!partner && !loadingPartner` UI into retryable network-error vs true not-found paths.
++2. [P1] Fix 2 / PM-074: OrderStatusScreen still treats fetch errors as invalid tokens — the order query returns `null` for a real not-found order (`pages/PublicMenu/x.jsx:897-905`), but the render logic combines `orderError` and `!order` in one branch (`pages/PublicMenu/x.jsx:1032-1043`). When the backend request fails, users with a valid tracking token still see the permanent `order_status.not_found` UI with no retry path. FIX: Split `if (orderError || !order)` into separate error and not-found branches; the error branch should show a retryable message/button wired to `refetchOrder()`, while the `!order` branch keeps the existing not-found UI.
++3. [P2] Fix 4 / PM-069: Bottom sheet still keeps the wrong code visible and exposes no lockout countdown — the sheet only renders `codeVerificationError` after a failed verify (`pages/PublicMenu/x.jsx:3450-3458`), and the hall-verification hook data pulled into `x.jsx` does not include `codeAttempts`, `codeLockedUntil`, or any countdown state (`pages/PublicMenu/x.jsx:1510-1523`). As a result, the wrong digits stay in the 4-cell input until the user deletes them manually, and repeated failures still give no "try again in N sec" feedback in the bottom sheet. FIX: Add a short failure-driven clear of `tableCodeInput` after a wrong code (~500ms), and surface `codeLockedUntil`/countdown state into `x.jsx` so the sheet can render the existing locked/cooldown message with remaining seconds.
++4. [P2] Fix 5 / PM-075: Auto-submit timeout is still untracked and never cleaned up — the verification effect schedules `setTimeout(() => handleSubmitOrder(), 100)` directly (`pages/PublicMenu/x.jsx:2096-2103`) and does not store or clear the timer on re-render/unmount. If the component unmounts or the verification state changes inside that 100ms window, the stale callback can still submit against outdated state or double-submit. FIX: Introduce `autoSubmitTimerRef`, clear any existing timer before scheduling, store the new timeout ID, and return a cleanup that clears it.
++
++## Summary
++Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none.
++- Missing context (what info would have helped): none.
++- Scope questions (anything you weren't sure if it's in scope): none.
+diff --git a/pipeline/chain-state/publicmenu-260323-103001-4112-codex-findings.md b/pipeline/chain-state/publicmenu-260323-103001-4112-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..745dce9d74daf26415bc4ec3b236f5b0dc0cad80
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-103001-4112-codex-findings.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-103001-4112
++
++## Findings
++1. [P1] Fix 1 / PM-070: Partner lookup still collapses backend failures into "restaurant not found" — `publicPartner` swallows both lookup exceptions and returns `null` from both catch blocks (`pages/PublicMenu/x.jsx:1324-1347`), while the render path only checks `!partner` and always shows `t('error.partner_not_found')` (`pages/PublicMenu/x.jsx:3042-3046`). A transient backend/network failure therefore lands on the permanent dead-end not-found card instead of a retryable state. FIX: Preserve whether both lookup attempts threw, expose that as `partnerNetworkError` plus `refetch`, and split the `!partner && !loadingPartner` UI into retryable network-error vs true not-found paths.
++2. [P1] Fix 2 / PM-074: OrderStatusScreen still treats fetch errors as invalid tokens — the order query returns `null` for a real not-found order (`pages/PublicMenu/x.jsx:897-905`), but the render logic combines `orderError` and `!order` in one branch (`pages/PublicMenu/x.jsx:1032-1043`). When the backend request fails, users with a valid tracking token still see the permanent `order_status.not_found` UI with no retry path. FIX: Split `if (orderError || !order)` into separate error and not-found branches; the error branch should show a retryable message/button wired to `refetchOrder()`, while the `!order` branch keeps the existing not-found UI.
++3. [P2] Fix 4 / PM-069: Bottom sheet still keeps the wrong code visible and exposes no lockout countdown — the sheet only renders `codeVerificationError` after a failed verify (`pages/PublicMenu/x.jsx:3450-3458`), and the hall-verification hook data pulled into `x.jsx` does not include `codeAttempts`, `codeLockedUntil`, or any countdown state (`pages/PublicMenu/x.jsx:1510-1523`). As a result, the wrong digits stay in the 4-cell input until the user deletes them manually, and repeated failures still give no "try again in N sec" feedback in the bottom sheet. FIX: Add a short failure-driven clear of `tableCodeInput` after a wrong code (~500ms), and surface `codeLockedUntil`/countdown state into `x.jsx` so the sheet can render the existing locked/cooldown message with remaining seconds.
++4. [P2] Fix 5 / PM-075: Auto-submit timeout is still untracked and never cleaned up — the verification effect schedules `setTimeout(() => handleSubmitOrder(), 100)` directly (`pages/PublicMenu/x.jsx:2096-2103`) and does not store or clear the timer on re-render/unmount. If the component unmounts or the verification state changes inside that 100ms window, the stale callback can still submit against outdated state or double-submit. FIX: Introduce `autoSubmitTimerRef`, clear any existing timer before scheduling, store the new timeout ID, and return a cleanup that clears it.
++
++## Summary
++Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none.
++- Missing context (what info would have helped): none.
++- Scope questions (anything you weren't sure if it's in scope): none.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-23_publicmenu-260323-103001-4112.log b/pages/PublicMenu/commands_2026-03-23_publicmenu-260323-103001-4112.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..4554bf16d24ef90062c5e41dfb5714acb26afb96
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-23_publicmenu-260323-103001-4112.log
+@@ -0,0 +1,30 @@
++Get-ChildItem -Name pages/PublicMenu
++Get-Content pages/PublicMenu/README.md -TotalCount 250
++Get-Content pages/PublicMenu/BUGS.md -TotalCount 250
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'queryKey: \["publicPartner"|partner_not_found|queryKey: \["orderByToken"|orderError \|\| !order|currentGuestIdRef\.current = gid|showTableCodeSheet|Введите код стола|codeAttempts|codeLockedUntil|pendingSubmitRef\.current && isTableVerified|setTimeout\(\(\) => handleSubmitOrder\(\), 100\)|const normalizeId' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/useTableSession.jsx -Pattern 'normalizeGuestId|codeAttempts|codeLockedUntil' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++rg -n "publicPartner|partner_not_found|orderByToken|orderError \|\| !order|currentGuestIdRef\.current = gid|showTableCodeSheet|Введите код стола|codeAttempts|codeLockedUntil|pendingSubmitRef\.current && isTableVerified|handleSubmitOrder\(\), 100|const normalizeId" pages/PublicMenu/x.jsx
++rg -n "normalizeGuestId|codeAttempts|codeLockedUntil" pages/PublicMenu/useTableSession.jsx
++Get-Content pages/PublicMenu/README.md -First 120
++Get-Content pages/PublicMenu/BUGS.md -First 160
++rg -n -C 25 "queryKey: \[\"publicPartner\"|partner_not_found|!partner && !loadingPartner" pages/PublicMenu/x.jsx
++rg -n -C 25 "queryKey: \[\"orderByToken\"|orderError \|\| !order|expired" pages/PublicMenu/x.jsx
++rg -n -C 20 "const normalizeId|currentGuestIdRef\.current = gid|saveGuestId\(|guest\?\._id" pages/PublicMenu/x.jsx
++rg -n -C 25 "pendingSubmitRef\.current && isTableVerified|setTimeout\(\(\) => handleSubmitOrder\(\), 100\)" pages/PublicMenu/x.jsx
++rg -n -C 30 "Введите код стола|showTableCodeSheet|codeVerificationError|codeAttempts|codeLockedUntil|table code|verify" pages/PublicMenu/x.jsx
++rg -n -C 15 "normalizeGuestId|codeAttempts|codeLockedUntil|verifyTableCode|table code|locked" pages/PublicMenu/useTableSession.jsx
++rg -n -C 10 "table code|codeAttempts|codeLockedUntil|codeVerificationError|verify" pages/PublicMenu/CartView.jsx
++rg -n -C 10 "order status|track|token|retry|partner_not_found|table code" pages/PublicMenu/MenuView.jsx
++$p='pages/PublicMenu/x.jsx'; $c=Get-Content $p; for($i=1318; $i -le 1356; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
++$p='pages/PublicMenu/x.jsx'; $c=Get-Content $p; for($i=3026; $i -le 3056; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
++$p='pages/PublicMenu/x.jsx'; $c=Get-Content $p; for($i=890; $i -le 1062; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
++$p='pages/PublicMenu/CartView.jsx'; $c=Get-Content $p; for($i=95; $i -le 230; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
++rg -n -C 8 "codeSecondsLeft|isCodeLocked|setTableCodeInput\(|codeVerificationError|cart.verify.locked|cart.verify.attempts|lastVerifyCodeRef|Неверный код" pages/PublicMenu/CartView.jsx
++rg -n -C 8 "codeVerificationError|verifyTableCode|tableCodeInput|setTableCodeInput|cart.verify.locked|codeSecondsLeft|isCodeLocked" pages/PublicMenu/MenuView.jsx
++rg -n "setTableCodeInput\(" pages/PublicMenu/x.jsx
++rg -n "setTableCodeInput\(" pages/PublicMenu/CartView.jsx
++rg -n -C 20 "cart.verify.enter_table_code|tableCodeLength|Array\.from\(\{ length: tableCodeLength \}\)|verifyTableCode|codeVerificationError|codeLockedUntil|codeAttempts" pages/PublicMenu/CartView.jsx
++rg -n -C 8 "tableCodeInput|codeVerificationError|verifyTableCode|codeLockedUntil|codeAttempts" pages/PublicMenu/useTableSession.jsx
++rg -n -C 12 "cart.verify.locked|cart.verify.attempts|codeSecondsLeft|isCodeLocked|codeVerificationError" pages/PublicMenu/CartView.jsx
++rg -n -C 14 "codeSecondsLeft|isCodeLocked|codeAttempts|codeVerificationError|verifyTableCode\(" pages/PublicMenu/CartView.jsx
++Test-Path pipeline/chain-state
+diff --git a/pages/PublicMenu/review_2026-03-23_publicmenu-260323-103001-4112.md b/pages/PublicMenu/review_2026-03-23_publicmenu-260323-103001-4112.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..745dce9d74daf26415bc4ec3b236f5b0dc0cad80
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-23_publicmenu-260323-103001-4112.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-103001-4112
++
++## Findings
++1. [P1] Fix 1 / PM-070: Partner lookup still collapses backend failures into "restaurant not found" — `publicPartner` swallows both lookup exceptions and returns `null` from both catch blocks (`pages/PublicMenu/x.jsx:1324-1347`), while the render path only checks `!partner` and always shows `t('error.partner_not_found')` (`pages/PublicMenu/x.jsx:3042-3046`). A transient backend/network failure therefore lands on the permanent dead-end not-found card instead of a retryable state. FIX: Preserve whether both lookup attempts threw, expose that as `partnerNetworkError` plus `refetch`, and split the `!partner && !loadingPartner` UI into retryable network-error vs true not-found paths.
++2. [P1] Fix 2 / PM-074: OrderStatusScreen still treats fetch errors as invalid tokens — the order query returns `null` for a real not-found order (`pages/PublicMenu/x.jsx:897-905`), but the render logic combines `orderError` and `!order` in one branch (`pages/PublicMenu/x.jsx:1032-1043`). When the backend request fails, users with a valid tracking token still see the permanent `order_status.not_found` UI with no retry path. FIX: Split `if (orderError || !order)` into separate error and not-found branches; the error branch should show a retryable message/button wired to `refetchOrder()`, while the `!order` branch keeps the existing not-found UI.
++3. [P2] Fix 4 / PM-069: Bottom sheet still keeps the wrong code visible and exposes no lockout countdown — the sheet only renders `codeVerificationError` after a failed verify (`pages/PublicMenu/x.jsx:3450-3458`), and the hall-verification hook data pulled into `x.jsx` does not include `codeAttempts`, `codeLockedUntil`, or any countdown state (`pages/PublicMenu/x.jsx:1510-1523`). As a result, the wrong digits stay in the 4-cell input until the user deletes them manually, and repeated failures still give no "try again in N sec" feedback in the bottom sheet. FIX: Add a short failure-driven clear of `tableCodeInput` after a wrong code (~500ms), and surface `codeLockedUntil`/countdown state into `x.jsx` so the sheet can render the existing locked/cooldown message with remaining seconds.
++4. [P2] Fix 5 / PM-075: Auto-submit timeout is still untracked and never cleaned up — the verification effect schedules `setTimeout(() => handleSubmitOrder(), 100)` directly (`pages/PublicMenu/x.jsx:2096-2103`) and does not store or clear the timer on re-render/unmount. If the component unmounts or the verification state changes inside that 100ms window, the stale callback can still submit against outdated state or double-submit. FIX: Introduce `autoSubmitTimerRef`, clear any existing timer before scheduling, store the new timeout ID, and return a cleanup that clears it.
++
++## Summary
++Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none.
++- Missing context (what info would have helped): none.
++- Scope questions (anything you weren't sure if it's in scope): none.
+diff --git a/pipeline/chain-state/publicmenu-260323-103001-4112-codex-findings.md b/pipeline/chain-state/publicmenu-260323-103001-4112-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..745dce9d74daf26415bc4ec3b236f5b0dc0cad80
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-103001-4112-codex-findings.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-103001-4112
++
++## Findings
++1. [P1] Fix 1 / PM-070: Partner lookup still collapses backend failures into "restaurant not found" — `publicPartner` swallows both lookup exceptions and returns `null` from both catch blocks (`pages/PublicMenu/x.jsx:1324-1347`), while the render path only checks `!partner` and always shows `t('error.partner_not_found')` (`pages/PublicMenu/x.jsx:3042-3046`). A transient backend/network failure therefore lands on the permanent dead-end not-found card instead of a retryable state. FIX: Preserve whether both lookup attempts threw, expose that as `partnerNetworkError` plus `refetch`, and split the `!partner && !loadingPartner` UI into retryable network-error vs true not-found paths.
++2. [P1] Fix 2 / PM-074: OrderStatusScreen still treats fetch errors as invalid tokens — the order query returns `null` for a real not-found order (`pages/PublicMenu/x.jsx:897-905`), but the render logic combines `orderError` and `!order` in one branch (`pages/PublicMenu/x.jsx:1032-1043`). When the backend request fails, users with a valid tracking token still see the permanent `order_status.not_found` UI with no retry path. FIX: Split `if (orderError || !order)` into separate error and not-found branches; the error branch should show a retryable message/button wired to `refetchOrder()`, while the `!order` branch keeps the existing not-found UI.
++3. [P2] Fix 4 / PM-069: Bottom sheet still keeps the wrong code visible and exposes no lockout countdown — the sheet only renders `codeVerificationError` after a failed verify (`pages/PublicMenu/x.jsx:3450-3458`), and the hall-verification hook data pulled into `x.jsx` does not include `codeAttempts`, `codeLockedUntil`, or any countdown state (`pages/PublicMenu/x.jsx:1510-1523`). As a result, the wrong digits stay in the 4-cell input until the user deletes them manually, and repeated failures still give no "try again in N sec" feedback in the bottom sheet. FIX: Add a short failure-driven clear of `tableCodeInput` after a wrong code (~500ms), and surface `codeLockedUntil`/countdown state into `x.jsx` so the sheet can render the existing locked/cooldown message with remaining seconds.
++4. [P2] Fix 5 / PM-075: Auto-submit timeout is still untracked and never cleaned up — the verification effect schedules `setTimeout(() => handleSubmitOrder(), 100)` directly (`pages/PublicMenu/x.jsx:2096-2103`) and does not store or clear the timer on re-render/unmount. If the component unmounts or the verification state changes inside that 100ms window, the stale callback can still submit against outdated state or double-submit. FIX: Introduce `autoSubmitTimerRef`, clear any existing timer before scheduling, store the new timeout ID, and return a cleanup that clears it.
++
++## Summary
++Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none.
++- Missing context (what info would have helped): none.
++- Scope questions (anything you weren't sure if it's in scope): none.
+
+codex
+Findings are written to [publicmenu-260323-103001-4112-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-103001-4112-codex-findings.md). I recorded 4 in-scope issues: PM-070, PM-074, PM-069, and PM-075. PM-073 did not produce a finding because the restore path in `x.jsx` already normalizes `id ?? _id`.
+
+A page-folder copy is at [review_2026-03-23_publicmenu-260323-103001-4112.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23_publicmenu-260323-103001-4112.md), and the command log is at [commands_2026-03-23_publicmenu-260323-103001-4112.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23_publicmenu-260323-103001-4112.log). No code changes were applied.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-23_publicmenu-260323-103001-4112.log b/pages/PublicMenu/commands_2026-03-23_publicmenu-260323-103001-4112.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..4554bf16d24ef90062c5e41dfb5714acb26afb96
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-23_publicmenu-260323-103001-4112.log
+@@ -0,0 +1,30 @@
++Get-ChildItem -Name pages/PublicMenu
++Get-Content pages/PublicMenu/README.md -TotalCount 250
++Get-Content pages/PublicMenu/BUGS.md -TotalCount 250
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'queryKey: \["publicPartner"|partner_not_found|queryKey: \["orderByToken"|orderError \|\| !order|currentGuestIdRef\.current = gid|showTableCodeSheet|Введите код стола|codeAttempts|codeLockedUntil|pendingSubmitRef\.current && isTableVerified|setTimeout\(\(\) => handleSubmitOrder\(\), 100\)|const normalizeId' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/useTableSession.jsx -Pattern 'normalizeGuestId|codeAttempts|codeLockedUntil' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++rg -n "publicPartner|partner_not_found|orderByToken|orderError \|\| !order|currentGuestIdRef\.current = gid|showTableCodeSheet|Введите код стола|codeAttempts|codeLockedUntil|pendingSubmitRef\.current && isTableVerified|handleSubmitOrder\(\), 100|const normalizeId" pages/PublicMenu/x.jsx
++rg -n "normalizeGuestId|codeAttempts|codeLockedUntil" pages/PublicMenu/useTableSession.jsx
++Get-Content pages/PublicMenu/README.md -First 120
++Get-Content pages/PublicMenu/BUGS.md -First 160
++rg -n -C 25 "queryKey: \[\"publicPartner\"|partner_not_found|!partner && !loadingPartner" pages/PublicMenu/x.jsx
++rg -n -C 25 "queryKey: \[\"orderByToken\"|orderError \|\| !order|expired" pages/PublicMenu/x.jsx
++rg -n -C 20 "const normalizeId|currentGuestIdRef\.current = gid|saveGuestId\(|guest\?\._id" pages/PublicMenu/x.jsx
++rg -n -C 25 "pendingSubmitRef\.current && isTableVerified|setTimeout\(\(\) => handleSubmitOrder\(\), 100\)" pages/PublicMenu/x.jsx
++rg -n -C 30 "Введите код стола|showTableCodeSheet|codeVerificationError|codeAttempts|codeLockedUntil|table code|verify" pages/PublicMenu/x.jsx
++rg -n -C 15 "normalizeGuestId|codeAttempts|codeLockedUntil|verifyTableCode|table code|locked" pages/PublicMenu/useTableSession.jsx
++rg -n -C 10 "table code|codeAttempts|codeLockedUntil|codeVerificationError|verify" pages/PublicMenu/CartView.jsx
++rg -n -C 10 "order status|track|token|retry|partner_not_found|table code" pages/PublicMenu/MenuView.jsx
++$p='pages/PublicMenu/x.jsx'; $c=Get-Content $p; for($i=1318; $i -le 1356; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
++$p='pages/PublicMenu/x.jsx'; $c=Get-Content $p; for($i=3026; $i -le 3056; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
++$p='pages/PublicMenu/x.jsx'; $c=Get-Content $p; for($i=890; $i -le 1062; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
++$p='pages/PublicMenu/CartView.jsx'; $c=Get-Content $p; for($i=95; $i -le 230; $i++){ if($i -le $c.Length){ '{0}:{1}' -f $i,$c[$i-1] } }
++rg -n -C 8 "codeSecondsLeft|isCodeLocked|setTableCodeInput\(|codeVerificationError|cart.verify.locked|cart.verify.attempts|lastVerifyCodeRef|Неверный код" pages/PublicMenu/CartView.jsx
++rg -n -C 8 "codeVerificationError|verifyTableCode|tableCodeInput|setTableCodeInput|cart.verify.locked|codeSecondsLeft|isCodeLocked" pages/PublicMenu/MenuView.jsx
++rg -n "setTableCodeInput\(" pages/PublicMenu/x.jsx
++rg -n "setTableCodeInput\(" pages/PublicMenu/CartView.jsx
++rg -n -C 20 "cart.verify.enter_table_code|tableCodeLength|Array\.from\(\{ length: tableCodeLength \}\)|verifyTableCode|codeVerificationError|codeLockedUntil|codeAttempts" pages/PublicMenu/CartView.jsx
++rg -n -C 8 "tableCodeInput|codeVerificationError|verifyTableCode|codeLockedUntil|codeAttempts" pages/PublicMenu/useTableSession.jsx
++rg -n -C 12 "cart.verify.locked|cart.verify.attempts|codeSecondsLeft|isCodeLocked|codeVerificationError" pages/PublicMenu/CartView.jsx
++rg -n -C 14 "codeSecondsLeft|isCodeLocked|codeAttempts|codeVerificationError|verifyTableCode\(" pages/PublicMenu/CartView.jsx
++Test-Path pipeline/chain-state
+diff --git a/pages/PublicMenu/review_2026-03-23_publicmenu-260323-103001-4112.md b/pages/PublicMenu/review_2026-03-23_publicmenu-260323-103001-4112.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..745dce9d74daf26415bc4ec3b236f5b0dc0cad80
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-23_publicmenu-260323-103001-4112.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-103001-4112
++
++## Findings
++1. [P1] Fix 1 / PM-070: Partner lookup still collapses backend failures into "restaurant not found" — `publicPartner` swallows both lookup exceptions and returns `null` from both catch blocks (`pages/PublicMenu/x.jsx:1324-1347`), while the render path only checks `!partner` and always shows `t('error.partner_not_found')` (`pages/PublicMenu/x.jsx:3042-3046`). A transient backend/network failure therefore lands on the permanent dead-end not-found card instead of a retryable state. FIX: Preserve whether both lookup attempts threw, expose that as `partnerNetworkError` plus `refetch`, and split the `!partner && !loadingPartner` UI into retryable network-error vs true not-found paths.
++2. [P1] Fix 2 / PM-074: OrderStatusScreen still treats fetch errors as invalid tokens — the order query returns `null` for a real not-found order (`pages/PublicMenu/x.jsx:897-905`), but the render logic combines `orderError` and `!order` in one branch (`pages/PublicMenu/x.jsx:1032-1043`). When the backend request fails, users with a valid tracking token still see the permanent `order_status.not_found` UI with no retry path. FIX: Split `if (orderError || !order)` into separate error and not-found branches; the error branch should show a retryable message/button wired to `refetchOrder()`, while the `!order` branch keeps the existing not-found UI.
++3. [P2] Fix 4 / PM-069: Bottom sheet still keeps the wrong code visible and exposes no lockout countdown — the sheet only renders `codeVerificationError` after a failed verify (`pages/PublicMenu/x.jsx:3450-3458`), and the hall-verification hook data pulled into `x.jsx` does not include `codeAttempts`, `codeLockedUntil`, or any countdown state (`pages/PublicMenu/x.jsx:1510-1523`). As a result, the wrong digits stay in the 4-cell input until the user deletes them manually, and repeated failures still give no "try again in N sec" feedback in the bottom sheet. FIX: Add a short failure-driven clear of `tableCodeInput` after a wrong code (~500ms), and surface `codeLockedUntil`/countdown state into `x.jsx` so the sheet can render the existing locked/cooldown message with remaining seconds.
++4. [P2] Fix 5 / PM-075: Auto-submit timeout is still untracked and never cleaned up — the verification effect schedules `setTimeout(() => handleSubmitOrder(), 100)` directly (`pages/PublicMenu/x.jsx:2096-2103`) and does not store or clear the timer on re-render/unmount. If the component unmounts or the verification state changes inside that 100ms window, the stale callback can still submit against outdated state or double-submit. FIX: Introduce `autoSubmitTimerRef`, clear any existing timer before scheduling, store the new timeout ID, and return a cleanup that clears it.
++
++## Summary
++Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none.
++- Missing context (what info would have helped): none.
++- Scope questions (anything you weren't sure if it's in scope): none.
+diff --git a/pipeline/chain-state/publicmenu-260323-103001-4112-codex-findings.md b/pipeline/chain-state/publicmenu-260323-103001-4112-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..745dce9d74daf26415bc4ec3b236f5b0dc0cad80
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-103001-4112-codex-findings.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-103001-4112
++
++## Findings
++1. [P1] Fix 1 / PM-070: Partner lookup still collapses backend failures into "restaurant not found" — `publicPartner` swallows both lookup exceptions and returns `null` from both catch blocks (`pages/PublicMenu/x.jsx:1324-1347`), while the render path only checks `!partner` and always shows `t('error.partner_not_found')` (`pages/PublicMenu/x.jsx:3042-3046`). A transient backend/network failure therefore lands on the permanent dead-end not-found card instead of a retryable state. FIX: Preserve whether both lookup attempts threw, expose that as `partnerNetworkError` plus `refetch`, and split the `!partner && !loadingPartner` UI into retryable network-error vs true not-found paths.
++2. [P1] Fix 2 / PM-074: OrderStatusScreen still treats fetch errors as invalid tokens — the order query returns `null` for a real not-found order (`pages/PublicMenu/x.jsx:897-905`), but the render logic combines `orderError` and `!order` in one branch (`pages/PublicMenu/x.jsx:1032-1043`). When the backend request fails, users with a valid tracking token still see the permanent `order_status.not_found` UI with no retry path. FIX: Split `if (orderError || !order)` into separate error and not-found branches; the error branch should show a retryable message/button wired to `refetchOrder()`, while the `!order` branch keeps the existing not-found UI.
++3. [P2] Fix 4 / PM-069: Bottom sheet still keeps the wrong code visible and exposes no lockout countdown — the sheet only renders `codeVerificationError` after a failed verify (`pages/PublicMenu/x.jsx:3450-3458`), and the hall-verification hook data pulled into `x.jsx` does not include `codeAttempts`, `codeLockedUntil`, or any countdown state (`pages/PublicMenu/x.jsx:1510-1523`). As a result, the wrong digits stay in the 4-cell input until the user deletes them manually, and repeated failures still give no "try again in N sec" feedback in the bottom sheet. FIX: Add a short failure-driven clear of `tableCodeInput` after a wrong code (~500ms), and surface `codeLockedUntil`/countdown state into `x.jsx` so the sheet can render the existing locked/cooldown message with remaining seconds.
++4. [P2] Fix 5 / PM-075: Auto-submit timeout is still untracked and never cleaned up — the verification effect schedules `setTimeout(() => handleSubmitOrder(), 100)` directly (`pages/PublicMenu/x.jsx:2096-2103`) and does not store or clear the timer on re-render/unmount. If the component unmounts or the verification state changes inside that 100ms window, the stale callback can still submit against outdated state or double-submit. FIX: Introduce `autoSubmitTimerRef`, clear any existing timer before scheduling, store the new timeout ID, and return a cleanup that clears it.
++
++## Summary
++Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none.
++- Missing context (what info would have helped): none.
++- Scope questions (anything you weren't sure if it's in scope): none.
+
+tokens used
+63 187
+Findings are written to [publicmenu-260323-103001-4112-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-103001-4112-codex-findings.md). I recorded 4 in-scope issues: PM-070, PM-074, PM-069, and PM-075. PM-073 did not produce a finding because the restore path in `x.jsx` already normalizes `id ?? _id`.
+
+A page-folder copy is at [review_2026-03-23_publicmenu-260323-103001-4112.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23_publicmenu-260323-103001-4112.md), and the command log is at [commands_2026-03-23_publicmenu-260323-103001-4112.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23_publicmenu-260323-103001-4112.log). No code changes were applied.

@@ -1,0 +1,17 @@
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260329-121355-a291
+
+## Findings
+1. [P1] Fix 1 raw float is still passed into StickyCartBar totals - `pages/PublicMenu/x.jsx:2283-2287` still calls `formatPrice(myBill.total)` and `formatPrice(tableTotal)` directly, so hall-mode "Мой счёт" / "Заказы стола" can still expose JS precision artifacts like `189.039999...₸`. FIX: wrap both values with `parseFloat((value || 0).toFixed(2))` before passing them to `formatPrice()`.
+2. [P2] Fix 2 confirmation cleanup was not applied - `pages/PublicMenu/x.jsx:702-704` still renders the redundant `{tr("confirmation.your_order", "Ваш заказ")}` header, and `pages/PublicMenu/x.jsx:737-741` still renders the `guestLabel` line. The confirmation screen therefore still shows both elements the task asked to remove. FIX: delete the header `<p>` above the items list and remove the `{guestLabel && (...)}` block, while keeping the items list, total, buttons, and pickup/delivery `clientName`.
+3. [P3] Fix 3 whitespace gap below "Новый заказ" is still present in layout - `pages/PublicMenu/CartView.jsx:950` keeps the new-order card, then `pages/PublicMenu/CartView.jsx:999-1000` inserts an unconditional `h-20` spacer before the sticky footer at `pages/PublicMenu/CartView.jsx:1014`. With a one-item cart, that spacer still creates visible empty space above the submit button. FIX: remove or reduce the unconditional spacer for the cart-present state, or replace it with footer-safe padding that does not create a visible gap after the new-order card.
+4. [P2] Fix 4 list-mode card text is still clamped to two lines - `pages/PublicMenu/MenuView.jsx:94-96` still uses `line-clamp-2` for both the dish name and the description inside `renderListCard`, so list cards remain taller than the requested compact one-line layout. FIX: change both list-mode clamps to `line-clamp-1` and leave tile-mode and the detail drawer unchanged.
+5. [P3] Fix 5 StickyCartBar redesign is not implemented - `pages/PublicMenu/StickyCartBar.jsx:31-57` still renders a left icon block plus a separate right-side `<Button>`, so the whole bar is not one tappable surface. In the same component, `cartTotalItems`, `formattedCartTotal`, `formattedBillTotal`, `hallModeLabel`, and `showBillAmount` are accepted at `pages/PublicMenu/StickyCartBar.jsx:14-21` but not rendered, so the required single-row badge + centered label + right-aligned price layout cannot appear. FIX: make the entire bar a single clickable control wired to the existing handler, render the quantity badge on the left, the current label text in the center, and a non-truncating price + chevron on the right.
+
+## Summary
+Total: 5 findings (0 P0, 1 P1, 2 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 - the bug was described clearly, but the exact offending element was not pinpointed; the task only suggested likely spacing sources.
+- Missing context (what info would have helped): The task referenced `BUGS_MASTER.md`, `ux-concepts/cart-view.md`, and `DECISIONS_INDEX.md §2`, but the speed rule limited review to the page folder, so those references could not be consulted.
+- Scope questions (anything you weren't sure if it's in scope): The task listed `pages/PublicMenu/useTableSession.jsx` as a context file, while the speed rule said to read only the target files plus `README.md` / `BUGS.md`; I treated `useTableSession.jsx` as out of scope.

@@ -1,0 +1,1420 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d1c3c-274e-76c0-8295-590fb9d751ee
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260324-003211-6767 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # UX Batch 7 — PM-070 + PM-073 + PM-069 + PM-075 + PM-112: Resilience & UX Fixes Reference: `BUGS_MASTER.md` PM-070, PM-073, PM-069, PM-075, PM-112. All fixes are in `pages/PublicMenu/x.jsx`. --- ## Fix 1 — PM-070 (P1) [MUST-FIX]: Partner lookup swallows backend errors as "restaurant not found" ### Сейчас When looking up a partner/restaurant by QR code, any backend failure (network error, server 500, timeout) is caught and shown as "restaurant not found" — same as a genuinely invalid QR code. User cannot distinguish between a bad QR and a temporary backend outage. They may discard a valid QR thinking it's broken. Location: `x.jsx` around lines 1321 and 3029 — the partner lookup query catches all exceptions in one block. ### Должно быть Separate two error paths: 1. **partner_not_found** (404 / entity not found) → "Restaurant not found" message (current behavior — keep) 2. **transient_error** (network error, server 5xx, timeout) → Retryable UI: show "Connection error — tap to retry" with a retry button. Do NOT say "restaurant not found" for server errors. Logic: - If error has HTTP status 404 or the error message contains "not found" → path 1 - Otherwise (network error, 500, timeout, unknown) → path 2 (retryable) ### НЕ должно быть - Do NOT show "restaurant not found" for transient server errors - Do NOT remove the existing 404 / not-found handling - Do NOT add complex retry logic with intervals — a simple "Retry" button that re-triggers the lookup is sufficient ### Файл и локация File: `pages/PublicMenu/x.jsx` Look for: partner lookup query catch block(s) around lines 1321 and 3029. ### Проверка If backend returns 500 → user sees "Connection error" + retry button (not "restaurant not found"). If backend returns 404 → user sees "restaurant not found" (unchanged). --- ## Fix 2 — PM-073 (P2) [MUST-FIX]: useTableSession loses restored guest ID ### Сейчас In `useTableSession` hook (or inline in x.jsx), when restoring a guest session, `currentGuestIdRef.current` is set using `.id` property — but restored guests may only have `_id` (MongoDB style). So `currentGuestIdRef.current` becomes `undefined` for restored guests, causing session loss. ### Должно быть Use `normalizeGuestId(guest)` instead of `guest.id` when setting `currentGuestIdRef.current`. `normalizeGuestId` already handles both `.id` and `._id` cases — use it consistently. ### НЕ должно быть - Do NOT remove normalizeGuestId function - Do NOT change the normalizeGuestId implementation - Do NOT change other guest ID references that already use normalizeGuestId correctly ### Файл и локация File: `pages/PublicMenu/x.jsx` Look for: `currentGuestIdRef.current = ` assignment where `.id` is used instead of `normalizeGuestId()`. Search for: `currentGuestIdRef.current = guest.id` or similar patterns. ### Проверка Restore a guest session → `currentGuestIdRef.current` is not undefined → session restored correctly. --- ## Fix 3 — PM-069 (P2) [MUST-FIX]: Table code bottom sheet — no cooldown countdown display ### Сейчас The table code entry bottom sheet has lockout logic (after N wrong attempts, user is locked out for X minutes). But the lockout countdown timer is NOT shown to the user — they see a blank or generic error, not "Please wait 4:30 minutes". This is because `codeAttempts`, `codeLockedUntil`, `nowTs` state is not accessible in the bottom sheet component scope. ### Должно быть When the user is locked out (`codeLockedUntil > nowTs`): 1. Show remaining lockout time as a countdown: "Please wait MM:SS" 2. Disable the code input and submit button during lockout 3. Countdown updates every second (using `nowTs` which should tick every second) State needed in bottom sheet scope: `codeAttempts`, `codeLockedUntil`, `nowTs`. If these are defined in a parent scope but not passed down — pass them as props or lift the bottom sheet rendering to where the state is accessible. ### НЕ должно быть - Do NOT remove the existing lockout logic - Do NOT change the lockout duration or attempt limit values - Do NOT redesign the bottom sheet layout beyond adding the countdown display ### Файл и локация File: `pages/PublicMenu/x.jsx` Search for: `codeLockedUntil`, `codeAttempts`, `nowTs` state declarations — note where they are defined. Then find: the table code bottom sheet render — check if it has access to those state variables. Fix: either pass state as props, or restructure so the bottom sheet is rendered in the right scope. ### Проверка Enter wrong table code N times → see countdown "Please wait 4:30" that ticks down. Input disabled. --- ## Fix 4 — PM-075 (P2) [MUST-FIX]: Auto-submit after table verification — untracked setTimeout ### Сейчас After table verification, there is a `setTimeout(() => handleSubmitOrder(), 100)` call (around line 2091-2098) that auto-submits the order. This setTimeout is untracked — no ref stores the timer ID, and there is no cleanup in useEffect. This is a React anti-pattern: if the component re-renders or unmounts before the timeout fires, a stale submit may occur. ### Должно быть Store the timer ID in a `useRef` and clean it up: ```javascript const autoSubmitTimerRef = useRef(null); // When setting the timeout: autoSubmitTimerRef.current = setTimeout(() => handleSubmitOrder(), 100); // In a useEffect cleanup (or the appropriate cleanup location): return () => { if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current); }; ``` ### НЕ должно быть - Do NOT remove the auto-submit behavior itself — just make it safe - Do NOT change the 100ms delay - Do NOT change when/why auto-submit is triggered ### Файл и локация File: `pages/PublicMenu/x.jsx` Search for: `setTimeout(() => handleSubmitOrder` around line 2091-2098. ### Проверка Code inspection: setTimeout result is stored in a ref; cleanup exists in useEffect. --- ## Fix 5 — PM-112 (P3) [MUST-FIX]: Remove "Send" button from table code bottom sheet (auto-submit makes it redundant) ### Сейчас The table code bottom sheet has a "Send" / "Отправить" button. However, the code auto-submits when the last (4th) digit is entered. The button is therefore redundant and confusing — it implies the user needs to tap it, but the form already submitted. ### Должно быть Remove the "Send" / "Отправить" button from the table code bottom sheet entirely. Auto-submit on last digit entry remains (don't change that logic). ### НЕ должно быть - Do NOT remove auto-submit on last digit - Do NOT add any other submit mechanism to replace the button - Do NOT change the layout of the digit input cells ### Файл и локация File: `pages/PublicMenu/x.jsx` Search for: the "Отправить" button inside the table code bottom sheet component/render block. It should be a `<button>` with text "Отправить" or i18n key `"send"` / `"submit"`. ### Проверка Open table code bottom sheet → no "Отправить" button visible. Entering 4 digits still auto-submits. --- ## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано выше - Change ONLY the 5 items described in Fix 1–5. - Do NOT change: cart logic, menu display, order submission flow beyond Fix 1, partner settings, any other components. - Do NOT "improve" anything not listed above. - If you see another issue — skip it, note it in the report. ## Implementation Notes - File: `pages/PublicMenu/x.jsx` (all 5 fixes) - Fix 3 may require moving state or adding props — keep changes minimal, prefer passing props over large refactors - Fix 4: useRef pattern is standard React, safe to apply - git add pages/PublicMenu/x.jsx && git commit -m "fix(batch7-PM-070,073,069,075,112): error paths, guest id, lockout countdown, timer ref, remove send button" && git push === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/PublicMenu/x.jsx` against Fix 1-5 only. I’ll read that file plus `README.md` and `BUGS.md` in the same folder, then write the scoped findings to the required pipeline file and the page-local report/log files.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pages/PublicMenu/BUGS.md'; if ("'$?) { if (Test-Path '"'pages/PublicMenu/BUGS.md') { Get-Content 'pages/PublicMenu/BUGS.md' } }" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pages/PublicMenu/README.md'; if ("'$?) { if (Test-Path '"'pages/PublicMenu/README.md') { Get-Content 'pages/PublicMenu/README.md' } }" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'partner lookup|not found|normalizeGuestId|currentGuestIdRef\\.current\\s*=|codeLockedUntil|codeAttempts|nowTs|setTimeout\\(\\s*\\(\\)\\s*=>\\s*handleSubmitOrder|Отправить|send|submit' -Context 4,6" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 11.31s:
+
+ exited 124 in 11.52s:
+
+ exited 124 in 22.32s:
+
+codex
+The first pass timed out because the target file is large and the search/output was too broad. I’m switching to narrow, line-scoped reads against `x.jsx` and quick existence checks for `README.md`/`BUGS.md` in `pages/PublicMenu`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Item 'pages/PublicMenu/x.jsx' | Select-Object FullName,Length" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Item 'pages/PublicMenu/README.md' | Select-Object FullName,Length" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Item 'pages/PublicMenu/BUGS.md' | Select-Object FullName,Length" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 10.78s:
+
+ exited 124 in 10.87s:
+
+ exited 124 in 11.17s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Item 'pages/PublicMenu/BUGS.md' | Select-Object FullName,Length" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Item 'pages/PublicMenu/README.md' | Select-Object FullName,Length" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Item 'pages/PublicMenu/x.jsx' | Select-Object FullName,Length" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 9.64s:
+
+FullName                                                                                     Length
+--------                                                                                     ------
+C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\478440e539caf4bd\pages\PublicMenu\README.md   6998
+
+
+ succeeded in 9.93s:
+
+FullName                                                                      Length
+--------                                                                      ------
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md  59909
+
+
+ succeeded in 9.59s:
+
+FullName                                                                    Length
+--------                                                                    ------
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx 141401
+
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'currentGuestIdRef\\.current\\s*=|normalizeGuestId|codeLockedUntil|codeAttempts|nowTs|handleSubmitOrder\\(\\)|setTimeout\\(|Отправить|partner_not_found|restaurant not found|not found|retry|refetch|error' -Context 3,8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-070|PM-073|PM-069|PM-075|PM-112' -Context 2,8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.74s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 12.03s:
+
+  pages\PublicMenu\BUGS.md:84:- **Фикс:** If Arman decides to align with STYLE_GUIDE, change blue→amber for these 
+intermediate statuses.
+  pages\PublicMenu\BUGS.md:85:
+> pages\PublicMenu\BUGS.md:86:### BUG-PM-064: Partner lookup hides backend failures (P1) — FIXED S164 (as PM-070)
+> pages\PublicMenu\BUGS.md:87:- **Приоритет:** P1 — duplicate of PM-070, fixed in chain publicmenu-260323-112857-466b
+  pages\PublicMenu\BUGS.md:88:
+  pages\PublicMenu\BUGS.md:89:### BUG-PM-065: Hall StickyCartBar ignores visit lifecycle state (P1)
+  pages\PublicMenu\BUGS.md:90:- **Приоритет:** P1
+  pages\PublicMenu\BUGS.md:91:- **Когда:** S153 (Codex review, chain publicmenu-260321-110752)
+  pages\PublicMenu\BUGS.md:92:- **Файл:** x.jsx
+  pages\PublicMenu\BUGS.md:93:- **Симптом:** StickyCartBar doesn't inspect visit/session/bill/closed/paid state.
+  pages\PublicMenu\BUGS.md:94:- **Фикс:** Full lifecycle state detection.
+  pages\PublicMenu\BUGS.md:95:
+  pages\PublicMenu\BUGS.md:106:- **Симптом:** Parent doesn't track previous cart count for animation triggers.
+  pages\PublicMenu\BUGS.md:107:
+> pages\PublicMenu\BUGS.md:108:### BUG-PM-069-B: Bottom Sheet missing cooldown/lockout countdown display (P2)
+  pages\PublicMenu\BUGS.md:109:- **Приоритет:** P2
+  pages\PublicMenu\BUGS.md:110:- **Когда:** S153 (chain publicmenu-260321-140331), Part A fixed S164
+  pages\PublicMenu\BUGS.md:111:- **Файл:** x.jsx
+ succeeded in 12.82s:
+
+  pages\PublicMenu\x.jsx:103:import ModeTabs from "@/components/publicMenu/refactor/ModeTabs";
+  pages\PublicMenu\x.jsx:104:import CategoryChips from "@/components/publicMenu/refactor/CategoryChips";
+  pages\PublicMenu\x.jsx:105:import HallVerifyBlock from "@/components/publicMenu/refactor/HallVerifyBlock";
+> pages\PublicMenu\x.jsx:106:import ErrorState from "@/components/publicMenu/refactor/ErrorState";
+  pages\PublicMenu\x.jsx:107:import EmptyMenuState from "@/components/publicMenu/refactor/EmptyMenuState";
+  pages\PublicMenu\x.jsx:108:import CheckoutView from "@/components/publicMenu/views/CheckoutView";
+  pages\PublicMenu\x.jsx:109:import { useCurrency } from "@/components/publicMenu/refactor/hooks/useCurrency";
+  pages\PublicMenu\x.jsx:110:import { useHallTable } from "@/components/publicMenu/refactor/hooks/useHallTable";
+  pages\PublicMenu\x.jsx:111:import { useHelpRequests } from "@/components/publicMenu/refactor/hooks/useHelpRequests";
+  pages\PublicMenu\x.jsx:112:import { useLoyalty } from "@/components/publicMenu/refactor/hooks/useLoyalty";
+  pages\PublicMenu\x.jsx:113:import { useReviews } from "@/components/publicMenu/refactor/hooks/useReviews";
+  pages\PublicMenu\x.jsx:114:import { useTableSession } from "@/components/publicMenu/refactor/hooks/useTableSession";
+  pages\PublicMenu\x.jsx:127:  /^[0-9a-f]{24}$/i.test(String(value || "").trim());
+  pages\PublicMenu\x.jsx:128:
+  pages\PublicMenu\x.jsx:129:// P0-5: Rate limit detection
+> pages\PublicMenu\x.jsx:130:const isRateLimitError = (err) => {
+  pages\PublicMenu\x.jsx:131:  const msg = (err?.message || "").toLowerCase();
+  pages\PublicMenu\x.jsx:132:  return msg.includes("rate limit") || msg.includes("429");
+  pages\PublicMenu\x.jsx:133:};
+codex
+I have the relevant hotspots now. Next step is precise reads around the five fix locations to confirm whether each item is still broken in the current `x.jsx` or already covered.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'pages/PublicMenu/x.jsx'; "'$start=1360; $end=1388; for($i=$start;$i -le $end;$i++){ '"'{0,5}: {1}' -f "'$i, $lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'pages/PublicMenu/x.jsx'; "'$start=3130; $end=3155; for($i=$start;$i -le $end;$i++){ '"'{0,5}: {1}' -f "'$i, $lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'autoSubmitTimerRef|setTimeout\\(\\s*\\(\\)\\s*=>\\s*handleSubmitOrder\\(|currentGuestIdRef\\.current\\s*=\\s*guest\\.id|currentGuestIdRef\\.current\\s*=|normalizeGuestId|normalizeId\\s*=|codeLockedUntil|codeAttempts|nowTs' -Context 2,4" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.46s:
+ 1360:   const [billCooldown, setBillCooldown] = useState(false);
+ 1361: 
+ 1362:   // Rating flow state (TASK-260130-09)
+ 1363:   const [hasRatedInSession, setHasRatedInSession] = useState(false);
+ 1364:   const [ratingSavingByItemId, setRatingSavingByItemId] = useState({});
+ 1365: 
+ 1366:   // Partner fetch (id or slug) - MUST BE FIRST before any partner dependencies
+ 1367:   const { data: partner, isLoading: loadingPartner, error: partnerError, refetch: refetchPartner } = useQuery({
+ 1368:     queryKey: ["publicPartner", partnerParamRaw],
+ 1369:     enabled: !!partnerParamRaw,
+ 1370:     retry: shouldRetry,
+ 1371:     queryFn: async () => {
+ 1372:       const p = partnerParamRaw;
+ 1373:       if (!p) return null;
+ 1374: 
+ 1375:       const byIdFirst = looksLikePartnerId(p);
+ 1376: 
+ 1377:       try {
+ 1378:         const res = await base44.entities.Partner.filter(byIdFirst ? { id: p } : { slug: p });
+ 1379:         if (res?.[0]) return res[0];
+ succeeded in 11.46s:
+ 3130:       </div>
+ 3131:     );
+ 3132:   }
+ 3133: 
+ 3134:   if (partnerError) {
+ 3135:     return (
+ 3136:       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+ 3137:         <Card className="w-full max-w-md text-center p-6">
+ 3138:           <p className="text-slate-500">{t('error.network_error')}</p>
+ 3139:           <p className="text-sm text-slate-400 mt-2">{t('error.check_connection')}</p>
+ 3140:           <Button variant="outline" className="mt-4 min-h-[44px]" onClick={() => refetchPartner()}>
+ 3141:             {t('common.retry')}
+ 3142:           </Button>
+ 3143:         </Card>
+ 3144:       </div>
+ 3145:     );
+ 3146:   }
+ 3147: 
+ 3148:   if (!partner) {
+ 3149:     return (
+ succeeded in 10.93s:
+
+  pages\PublicMenu\x.jsx:1475:  const viewTransitionTimerRef = useRef(null);
+  pages\PublicMenu\x.jsx:1476:  const codeInputRef = useRef(null); // PM-088: ref for table code hidden input
+> pages\PublicMenu\x.jsx:1477:  const autoSubmitTimerRef = useRef(null); // PM-075: cleanup for auto-submit timeout
+  pages\PublicMenu\x.jsx:1478:
+  pages\PublicMenu\x.jsx:1479:  // Cleanup view transition timer on unmount
+  pages\PublicMenu\x.jsx:1480:  useEffect(() => {
+  pages\PublicMenu\x.jsx:1481:    return () => {
+  pages\PublicMenu\x.jsx:2151:      setShowTableConfirmSheet(false);
+  pages\PublicMenu\x.jsx:2152:      // Slight delay to let state propagate
+> pages\PublicMenu\x.jsx:2153:      if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+> pages\PublicMenu\x.jsx:2154:      autoSubmitTimerRef.current = setTimeout(() => handleSubmitOrder(), 100);
+  pages\PublicMenu\x.jsx:2155:    }
+  pages\PublicMenu\x.jsx:2156:    return () => {
+> pages\PublicMenu\x.jsx:2157:      if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+  pages\PublicMenu\x.jsx:2158:    };
+  pages\PublicMenu\x.jsx:2159:  }, [isTableVerified, currentTableId]);
+  pages\PublicMenu\x.jsx:2160:
+  pages\PublicMenu\x.jsx:2161:  // Hall StickyBar mode: определяем что показывать
+  pages\PublicMenu\x.jsx:2773:        // ============================================================
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'pages/PublicMenu/x.jsx'; "'$start=1560; $end=1645; for($i=$start;$i -le $end;$i++){ '"'{0,5}: {1}' -f "'$i, $lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'useHallTable\\(|codeAttempts|codeLockedUntil|nowTs|tableCodeInput|verifyTableCode|showTableConfirmSheet' -Context 2,6" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'pages/PublicMenu/x.jsx'; "'$start=3498; $end=3598; for($i=$start;$i -le $end;$i++){ '"'{0,5}: {1}' -f "'$i, $lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.55s:
+ 1560:     verifiedTableId,
+ 1561:     verifiedTable,
+ 1562:     codeVerificationError,
+ 1563:     verifyTableCode,
+ 1564:   } = useHallTable({ partner, location, orderMode, t });
+ 1565: 
+ 1566:   // Auto-clear code input after wrong entry (PM-069)
+ 1567:   useEffect(() => {
+ 1568:     if (codeVerificationError && !isVerifyingCode) {
+ 1569:       const timer = setTimeout(() => {
+ 1570:         if (typeof setTableCodeInput === 'function') setTableCodeInput('');
+ 1571:       }, 500);
+ 1572:       return () => clearTimeout(timer);
+ 1573:     }
+ 1574:   }, [codeVerificationError, isVerifyingCode]);
+ 1575: 
+ 1576:   // Helper for saving table selection (used by help requests and other features)
+ 1577:   const saveTableSelection = (partnerId, tableId) => {
+ 1578:     if (!partnerId || !tableId) return;
+ 1579:     try {
+ succeeded in 8.62s:
+ 3498: 
+ 3499:       {/* Just-in-time Table Confirmation Bottom Sheet (PM-064) */}
+ 3500:       {/* PM-071: z-[60] on DrawerContent ensures BS renders above cart Drawer (z-50) */}
+ 3501:       <Drawer
+ 3502:         open={showTableConfirmSheet}
+ 3503:         onOpenChange={(open) => {
+ 3504:           if (!open) {
+ 3505:             pendingSubmitRef.current = false;
+ 3506:             popOverlay('tableConfirm');
+ 3507:             setShowTableConfirmSheet(false);
+ 3508:             if (!isTableVerified) {
+ 3509:               toast(tr('cart.confirm_table.dismissed', 'Ð”Ð»Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð·Ð°ÐºÐ°Ð·Ð° Ð½ÑƒÐ¶Ð½Ð¾ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ ÑÑ‚Ð¾Ð»'), { id: 'table-dismiss' });
+ 3510:             }
+ 3511:           }
+ 3512:         }}
+ 3513:       >
+ 3514:         <DrawerContent className="max-h-[85dvh] rounded-t-3xl z-[60]">
+ 3515:           <DrawerHeader className="text-center pb-2">
+ 3516: 
+ 3517:             <DrawerTitle className="text-lg font-semibold text-slate-900">
+ succeeded in 9.21s:
+
+  pages\PublicMenu\x.jsx:1294:
+  pages\PublicMenu\x.jsx:1295:  // Just-in-time table confirmation (Batch A+5 Fix 1)
+> pages\PublicMenu\x.jsx:1296:  const [showTableConfirmSheet, setShowTableConfirmSheet] = useState(false);
+  pages\PublicMenu\x.jsx:1297:  const pendingSubmitRef = useRef(false);
+  pages\PublicMenu\x.jsx:1298:
+  pages\PublicMenu\x.jsx:1299:  // PM-105: Ref-based overlay stack for Android back button priority
+  pages\PublicMenu\x.jsx:1300:  const overlayStackRef = useRef([]);
+  pages\PublicMenu\x.jsx:1301:  const isPopStateClosingRef = useRef(false);
+  pages\PublicMenu\x.jsx:1302:  const isProgrammaticCloseRef = useRef(false);
+  pages\PublicMenu\x.jsx:1554:    resolvedTable,
+  pages\PublicMenu\x.jsx:1555:    isHallMode,
+> pages\PublicMenu\x.jsx:1556:    tableCodeInput,
+> pages\PublicMenu\x.jsx:1557:    setTableCodeInput,
+  pages\PublicMenu\x.jsx:1558:    isVerifyingCode,
+  pages\PublicMenu\x.jsx:1559:    verifiedByCode,
+  pages\PublicMenu\x.jsx:1560:    verifiedTableId,
+  pages\PublicMenu\x.jsx:1561:    verifiedTable,
+  pages\PublicMenu\x.jsx:1562:    codeVerificationError,
+> pages\PublicMenu\x.jsx:1563:    verifyTableCode,
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'normalizeGuestId|const normalizeId =|currentGuestIdRef\\.current\\s*=\\s*guest\\.id|currentGuestIdRef\\.current\\s*=' -Context 2,3" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'codeLockedUntil|codeAttempts|nowTs' -Context 2,3" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 5.36s:
+
+ succeeded in 5.37s:
+
+  pages\PublicMenu\x.jsx:2773:        // ============================================================
+  pages\PublicMenu\x.jsx:2774:        let guest = currentGuest;
+> pages\PublicMenu\x.jsx:2775:        const normalizeId = (g) => String(g?.id ?? g?._id ?? "");
+  pages\PublicMenu\x.jsx:2776:
+  pages\PublicMenu\x.jsx:2777:        if (!guest) {
+  pages\PublicMenu\x.jsx:2778:          try {
+  pages\PublicMenu\x.jsx:2848:              const gid = normalizeId(guest);
+  pages\PublicMenu\x.jsx:2849:              setCurrentGuest(guest);
+> pages\PublicMenu\x.jsx:2850:              currentGuestIdRef.current = gid || null;
+  pages\PublicMenu\x.jsx:2851:              if (gid) {
+  pages\PublicMenu\x.jsx:2852:                saveGuestId(partner.id, session.id, currentTableId, gid);
+  pages\PublicMenu\x.jsx:2853:              }
+  pages\PublicMenu\x.jsx:2868:          const gid = normalizeId(guest);
+  pages\PublicMenu\x.jsx:2869:          setCurrentGuest(guest);
+> pages\PublicMenu\x.jsx:2870:          currentGuestIdRef.current = gid || null;
+  pages\PublicMenu\x.jsx:2871:          setSessionGuests(prev => [...(Array.isArray(prev) ? prev : []), guest]);
+  pages\PublicMenu\x.jsx:2872:          // Save guest ID for persistence across refreshes
+  pages\PublicMenu\x.jsx:2873:          if (gid) {
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content '"'pages/PublicMenu/x.jsx'; "'$start=2138; $end=2160; for($i=$start;$i -le $end;$i++){ '"'{0,5}: {1}' -f "'$i, $lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.69s:
+ 2138:   const [sessionCheckTimedOut, setSessionCheckTimedOut] = useState(false);
+ 2139:   useEffect(() => {
+ 2140:     if (!isTableVerified || tableSession) return;
+ 2141:     const timer = setTimeout(() => setSessionCheckTimedOut(true), 3000);
+ 2142:     return () => clearTimeout(timer);
+ 2143:   }, [isTableVerified, tableSession]);
+ 2144:   const isSessionLoading = isTableVerified && !tableSession && !sessionCheckTimedOut;
+ 2145: 
+ 2146:   // Just-in-time: auto-submit after table verification via confirmation sheet
+ 2147:   useEffect(() => {
+ 2148:     if (pendingSubmitRef.current && isTableVerified && currentTableId) {
+ 2149:       pendingSubmitRef.current = false;
+ 2150:       popOverlay('tableConfirm');
+ 2151:       setShowTableConfirmSheet(false);
+ 2152:       // Slight delay to let state propagate
+ 2153:       if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+ 2154:       autoSubmitTimerRef.current = setTimeout(() => handleSubmitOrder(), 100);
+ 2155:     }
+ 2156:     return () => {
+ 2157:       if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+codex
+I’ve confirmed three active issues within the requested fix list: PM-070, PM-069, and PM-112. PM-073 and PM-075 appear already addressed in this `x.jsx`, so I’m writing a tight report with only those three findings and the mandatory prompt-clarity block.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "New-Item -ItemType Directory -Force 'pipeline/chain-state' | Out-Null" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.57s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pages/PublicMenu/review_2026-03-24.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pages/PublicMenu/commands_2026-03-24.log'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 17.61s:
+False
+ succeeded in 17.68s:
+True
+ succeeded in 17.80s:
+True
+codex
+I’m checking the existing dated report/log files before writing, so I don’t blindly overwrite unrelated work from the same day. After that I’ll patch them with this review’s scoped output.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -TotalCount 80" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/review_2026-03-24.md' -TotalCount 80" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 5.54s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260324-003210-36d5
+
+## Findings
+1. [P3] Fix 1: Detail photo is still a fixed-height rectangle, not a square â€” In [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3667) the image wrapper is `w-full h-48`, so the detail image depends on dialog width and cannot stay 1:1. This does not meet the required `aspect-square object-cover` contract. FIX: replace the top image container/classes in the detail dialog with a square aspect-ratio wrapper and keep the image as `object-cover`.
+2. [P2] Fix 2: Detail discount logic is wired to partner-level fields instead of item-level discount data â€” In [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3687) the dialog checks `partner?.discount_enabled` and `partner?.discount_percent`, and the file has no `original_price` usage at all. That means the required condition `detailDish.discount_enabled === true && detailDish.original_price` is not implemented, so discounted items can still render without the required discount UI. FIX: drive the detail-price branch from `detailDish.discount_enabled === true` plus `detailDish.original_price`, and compute the percent from `Math.round((1 - detailDish.price / detailDish.original_price) * 100)`.
+3. [P2] Fix 2: Detail card still misses the required discount badge and requested metadata order â€” The discount branch in [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3686) renders only discounted price plus strikethrough old price; there is no `-{percent}%` badge using `partner.discount_color`. Also the description is rendered earlier inside the header at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3680), before the price/reviews block, while the required order is name â†’ price row with badge â†’ reviews â†’ description. FIX: add the pill badge to the price row and move the description block below reviews without changing the Add to Cart button.
+4. [P3] Fix 3: List-mode stepper overlay is still anchored bottom-right instead of centered on the photo â€” In [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L151) the overlay wrapper remains `absolute bottom-1 right-1 z-10`. That matches the rejected partial state described in the task, not the required centered overlay. FIX: replace the positioning wrapper with `absolute inset-0 flex items-center justify-center` and keep the existing stepper/button behavior and styling.
+
+## Summary
+Total: 4 findings (0 P0, 0 P1, 2 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY â€” do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None required for this review.
+- Scope questions (anything you weren't sure if it's in scope): None.
+ succeeded in 5.56s:
+1. Get-ChildItem -Name
+2. Get-Content README.md (timed out)
+3. Get-Content BUGS.md (timed out)
+4. Get-Content x.jsx (timed out)
+5. Get-Content MenuView.jsx (timed out)
+6. Get-Item x.jsx, MenuView.jsx, README.md, BUGS.md | Select-Object Name,Length
+7. rg -n "renderListCard|discount_enabled|original_price|detail|modal|selectedItem|partner\.discount_color|aspect-square|bottom-2|right-2|inset-0|Add to Cart|add to cart" x.jsx MenuView.jsx (timed out)
+8. Select-String -Path BUGS.md -Pattern 'PM-117','PM-118','PM-115' -Context 2,8 (timed out)
+9. Get-Content README.md -TotalCount 220 (timed out)
+10. Select-String -Path x.jsx -Pattern 'discount_enabled','original_price','selectedItem','openItem','Modal','Dialog','sheet','drawer','price' (timed out)
+11. Select-String -Path MenuView.jsx -Pattern 'renderListCard','discount_enabled','original_price','partner.discount_color','bottom-','right-','inset-0','stepper','photo','image' (timed out)
+12. Get-Content README.md -Head 80 (timed out)
+13. Get-Content BUGS.md -Head 120 (timed out)
+14. Get-Content MenuView.jsx -Head 260 (timed out)
+15. cmd /c type README.md (timed out)
+16. cmd /c type MenuView.jsx (timed out)
+17. echo hi
+18. Get-Content README.md -Head 120
+19. Get-Content BUGS.md -Head 160
+20. Get-Content MenuView.jsx -Head 320
+codex
+I’m writing three artifacts now: the chain-specific pipeline findings file, an appended section in `pages/PublicMenu/review_2026-03-24.md`, and an appended section in `pages/PublicMenu/commands_2026-03-24.log` with every command from this run, including the timed-out probes.
+codex
+The append patch missed the exact existing tail because the file contains mojibake from prior runs. I’m reading the actual tail text and then I’ll apply a narrower patch that appends cleanly without disturbing the earlier content.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/review_2026-03-24.md' -Tail 20" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -Tail 10" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 6.40s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260324-003210-36d5
+
+## Findings
+1. [P3] Fix 1: Detail photo is still a fixed-height rectangle, not a square â€” In [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3667) the image wrapper is `w-full h-48`, so the detail image depends on dialog width and cannot stay 1:1. This does not meet the required `aspect-square object-cover` contract. FIX: replace the top image container/classes in the detail dialog with a square aspect-ratio wrapper and keep the image as `object-cover`.
+2. [P2] Fix 2: Detail discount logic is wired to partner-level fields instead of item-level discount data â€” In [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3687) the dialog checks `partner?.discount_enabled` and `partner?.discount_percent`, and the file has no `original_price` usage at all. That means the required condition `detailDish.discount_enabled === true && detailDish.original_price` is not implemented, so discounted items can still render without the required discount UI. FIX: drive the detail-price branch from `detailDish.discount_enabled === true` plus `detailDish.original_price`, and compute the percent from `Math.round((1 - detailDish.price / detailDish.original_price) * 100)`.
+3. [P2] Fix 2: Detail card still misses the required discount badge and requested metadata order â€” The discount branch in [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3686) renders only discounted price plus strikethrough old price; there is no `-{percent}%` badge using `partner.discount_color`. Also the description is rendered earlier inside the header at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3680), before the price/reviews block, while the required order is name â†’ price row with badge â†’ reviews â†’ description. FIX: add the pill badge to the price row and move the description block below reviews without changing the Add to Cart button.
+4. [P3] Fix 3: List-mode stepper overlay is still anchored bottom-right instead of centered on the photo â€” In [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L151) the overlay wrapper remains `absolute bottom-1 right-1 z-10`. That matches the rejected partial state described in the task, not the required centered overlay. FIX: replace the positioning wrapper with `absolute inset-0 flex items-center justify-center` and keep the existing stepper/button behavior and styling.
+
+## Summary
+Total: 4 findings (0 P0, 0 P1, 2 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY â€” do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None required for this review.
+- Scope questions (anything you weren't sure if it's in scope): None.
+ succeeded in 6.30s:
+18. Get-Content README.md -Head 120
+19. Get-Content BUGS.md -Head 160
+20. Get-Content MenuView.jsx -Head 320
+21. Select-String -Path x.jsx -Pattern 'selectedDish','selectedItem','item detail','DishRating','original_price','discount_enabled','Add to Cart','aspect-square','line-through','DrawerContent','DialogContent' -Context 3,8
+22. Select-String -Path x.jsx -Pattern 'formatPrice\(','partner\.discount_color','discount_percent','discount_enabled === true','onDishClick','setSelected','selected.*dish','selected.*item' -Context 2,6
+23. $c = Get-Content x.jsx; $c[3660..3718]
+24. $c = Get-Content MenuView.jsx; $c[110..190]
+25. Select-String -Path x.jsx,MenuView.jsx -Pattern 'original_price'
+26. $lines = Get-Content x.jsx; for ($i=3660; $i -le 3708; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+27. $lines = Get-Content MenuView.jsx; for ($i=130; $i -le 170; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+file update
+M C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-24.log
+@@ -27 +27,28 @@
+ 27. $lines = Get-Content MenuView.jsx; for ($i=130; $i -le 170; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++
++## publicmenu-260324-003211-6767
++
++1. Test-Path 'pages/PublicMenu/README.md'; if ($?) { if (Test-Path 'pages/PublicMenu/README.md') { Get-Content 'pages/PublicMenu/README.md' } }
++2. Test-Path 'pages/PublicMenu/BUGS.md'; if ($?) { if (Test-Path 'pages/PublicMenu/BUGS.md') { Get-Content 'pages/PublicMenu/BUGS.md' } }
++3. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'partner lookup|not found|normalizeGuestId|currentGuestIdRef\.current\s*=|codeLockedUntil|codeAttempts|nowTs|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder|Отправить|send|submit' -Context 4,6
++4. Get-Item 'pages/PublicMenu/README.md' | Select-Object FullName,Length
++5. Get-Item 'pages/PublicMenu/BUGS.md' | Select-Object FullName,Length
++6. Get-Item 'pages/PublicMenu/x.jsx' | Select-Object FullName,Length
++7. Get-Content 'pages/PublicMenu/README.md'
++8. Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-070|PM-073|PM-069|PM-075|PM-112' -Context 2,8
++9. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'currentGuestIdRef\.current\s*=|normalizeGuestId|codeLockedUntil|codeAttempts|nowTs|handleSubmitOrder\(\)|setTimeout\(|Отправить|partner_not_found|restaurant not found|not found|retry|refetch|error' -Context 3,8
++10. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1360; $end=1388; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++11. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3130; $end=3155; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++12. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'autoSubmitTimerRef|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder\(|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=|normalizeGuestId|normalizeId\s*=|codeLockedUntil|codeAttempts|nowTs' -Context 2,4
++13. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'useHallTable\(|codeAttempts|codeLockedUntil|nowTs|tableCodeInput|verifyTableCode|showTableConfirmSheet' -Context 2,6
++14. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3498; $end=3598; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++15. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1560; $end=1645; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++16. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'normalizeGuestId|const normalizeId =|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=' -Context 2,3
++17. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'codeLockedUntil|codeAttempts|nowTs' -Context 2,3
++18. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=2138; $end=2160; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++19. New-Item -ItemType Directory -Force 'pipeline/chain-state' | Out-Null
++20. Test-Path 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++21. Test-Path 'pages/PublicMenu/review_2026-03-24.md'
++22. Test-Path 'pages/PublicMenu/commands_2026-03-24.log'
++23. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -TotalCount 80
++24. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -TotalCount 80
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-003211-6767
+
+## Findings
+1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path — In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
+2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement — `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
+3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet — The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', 'Отправить')` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
+
+## Summary
+Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None required for this review.
+- Scope questions (anything you weren't sure if it's in scope): None.
+M C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-24.md
+@@ -16 +16,19 @@
+ - Scope questions (anything you weren't sure if it's in scope): None.
++
++---
++
++# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path â€” In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement â€” `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet â€” The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', 'ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ')` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY â€” do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+apply_patch(auto_approved=true) exited 0 in 320ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+M pages/PublicMenu/review_2026-03-24.md
+M pages/PublicMenu/commands_2026-03-24.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+index 8400ac2ad3ae7048a7d41f1da52f629e631c5caa..a6427c2eb46493cca66e7a6c55ba7543ef29c555
+--- a/pages/PublicMenu/commands_2026-03-24.log
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -25,3 +25,30 @@
+ 25. Select-String -Path x.jsx,MenuView.jsx -Pattern 'original_price'
+ 26. $lines = Get-Content x.jsx; for ($i=3660; $i -le 3708; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+ 27. $lines = Get-Content MenuView.jsx; for ($i=130; $i -le 170; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++
++## publicmenu-260324-003211-6767
++
++1. Test-Path 'pages/PublicMenu/README.md'; if ($?) { if (Test-Path 'pages/PublicMenu/README.md') { Get-Content 'pages/PublicMenu/README.md' } }
++2. Test-Path 'pages/PublicMenu/BUGS.md'; if ($?) { if (Test-Path 'pages/PublicMenu/BUGS.md') { Get-Content 'pages/PublicMenu/BUGS.md' } }
++3. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'partner lookup|not found|normalizeGuestId|currentGuestIdRef\.current\s*=|codeLockedUntil|codeAttempts|nowTs|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder|Отправить|send|submit' -Context 4,6
++4. Get-Item 'pages/PublicMenu/README.md' | Select-Object FullName,Length
++5. Get-Item 'pages/PublicMenu/BUGS.md' | Select-Object FullName,Length
++6. Get-Item 'pages/PublicMenu/x.jsx' | Select-Object FullName,Length
++7. Get-Content 'pages/PublicMenu/README.md'
++8. Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-070|PM-073|PM-069|PM-075|PM-112' -Context 2,8
++9. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'currentGuestIdRef\.current\s*=|normalizeGuestId|codeLockedUntil|codeAttempts|nowTs|handleSubmitOrder\(\)|setTimeout\(|Отправить|partner_not_found|restaurant not found|not found|retry|refetch|error' -Context 3,8
++10. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1360; $end=1388; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++11. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3130; $end=3155; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++12. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'autoSubmitTimerRef|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder\(|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=|normalizeGuestId|normalizeId\s*=|codeLockedUntil|codeAttempts|nowTs' -Context 2,4
++13. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'useHallTable\(|codeAttempts|codeLockedUntil|nowTs|tableCodeInput|verifyTableCode|showTableConfirmSheet' -Context 2,6
++14. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3498; $end=3598; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++15. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1560; $end=1645; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++16. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'normalizeGuestId|const normalizeId =|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=' -Context 2,3
++17. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'codeLockedUntil|codeAttempts|nowTs' -Context 2,3
++18. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=2138; $end=2160; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++19. New-Item -ItemType Directory -Force 'pipeline/chain-state' | Out-Null
++20. Test-Path 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++21. Test-Path 'pages/PublicMenu/review_2026-03-24.md'
++22. Test-Path 'pages/PublicMenu/commands_2026-03-24.log'
++23. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -TotalCount 80
++24. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -TotalCount 80
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+index 30a0734742b11d6392debfb794880c7309813bcd..3bb4c7c2f176af910b074238d32866407306dc91
+--- a/pages/PublicMenu/review_2026-03-24.md
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -14,3 +14,21 @@
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+ - Missing context (what info would have helped): None required for this review.
+ - Scope questions (anything you weren't sure if it's in scope): None.
++
++---
++
++# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path â€” In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement â€” `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet â€” The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', 'ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ')` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY â€” do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..a74b69830a1a1f69ef3424c093d9e2f233af4776
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path — In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement — `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet — The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', 'Отправить')` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+index 8400ac2ad3ae7048a7d41f1da52f629e631c5caa..a6427c2eb46493cca66e7a6c55ba7543ef29c555
+--- a/pages/PublicMenu/commands_2026-03-24.log
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -25,3 +25,30 @@
+ 25. Select-String -Path x.jsx,MenuView.jsx -Pattern 'original_price'
+ 26. $lines = Get-Content x.jsx; for ($i=3660; $i -le 3708; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+ 27. $lines = Get-Content MenuView.jsx; for ($i=130; $i -le 170; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++
++## publicmenu-260324-003211-6767
++
++1. Test-Path 'pages/PublicMenu/README.md'; if ($?) { if (Test-Path 'pages/PublicMenu/README.md') { Get-Content 'pages/PublicMenu/README.md' } }
++2. Test-Path 'pages/PublicMenu/BUGS.md'; if ($?) { if (Test-Path 'pages/PublicMenu/BUGS.md') { Get-Content 'pages/PublicMenu/BUGS.md' } }
++3. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'partner lookup|not found|normalizeGuestId|currentGuestIdRef\.current\s*=|codeLockedUntil|codeAttempts|nowTs|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder|Отправить|send|submit' -Context 4,6
++4. Get-Item 'pages/PublicMenu/README.md' | Select-Object FullName,Length
++5. Get-Item 'pages/PublicMenu/BUGS.md' | Select-Object FullName,Length
++6. Get-Item 'pages/PublicMenu/x.jsx' | Select-Object FullName,Length
++7. Get-Content 'pages/PublicMenu/README.md'
++8. Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-070|PM-073|PM-069|PM-075|PM-112' -Context 2,8
++9. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'currentGuestIdRef\.current\s*=|normalizeGuestId|codeLockedUntil|codeAttempts|nowTs|handleSubmitOrder\(\)|setTimeout\(|Отправить|partner_not_found|restaurant not found|not found|retry|refetch|error' -Context 3,8
++10. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1360; $end=1388; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++11. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3130; $end=3155; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++12. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'autoSubmitTimerRef|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder\(|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=|normalizeGuestId|normalizeId\s*=|codeLockedUntil|codeAttempts|nowTs' -Context 2,4
++13. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'useHallTable\(|codeAttempts|codeLockedUntil|nowTs|tableCodeInput|verifyTableCode|showTableConfirmSheet' -Context 2,6
++14. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3498; $end=3598; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++15. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1560; $end=1645; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++16. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'normalizeGuestId|const normalizeId =|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=' -Context 2,3
++17. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'codeLockedUntil|codeAttempts|nowTs' -Context 2,3
++18. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=2138; $end=2160; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++19. New-Item -ItemType Directory -Force 'pipeline/chain-state' | Out-Null
++20. Test-Path 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++21. Test-Path 'pages/PublicMenu/review_2026-03-24.md'
++22. Test-Path 'pages/PublicMenu/commands_2026-03-24.log'
++23. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -TotalCount 80
++24. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -TotalCount 80
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+index 30a0734742b11d6392debfb794880c7309813bcd..3bb4c7c2f176af910b074238d32866407306dc91
+--- a/pages/PublicMenu/review_2026-03-24.md
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -14,3 +14,21 @@
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+ - Missing context (what info would have helped): None required for this review.
+ - Scope questions (anything you weren't sure if it's in scope): None.
++
++---
++
++# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path â€” In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement â€” `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet â€” The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', 'ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ')` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY â€” do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..a74b69830a1a1f69ef3424c093d9e2f233af4776
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path — In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement — `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet — The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', 'Отправить')` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -Tail 30" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/review_2026-03-24.md' -Tail 22" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.79s:
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None required for this review.
+- Scope questions (anything you weren't sure if it's in scope): None.
+
+---
+
+# Codex Writer Findings Ã¢â‚¬â€ PublicMenu Chain: publicmenu-260324-003211-6767
+
+## Findings
+1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path Ã¢â‚¬â€ In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
+2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement Ã¢â‚¬â€ `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
+3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet Ã¢â‚¬â€ The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', 'ÃÅ¾Ã‘â€šÃÂ¿Ã‘â‚¬ÃÂ°ÃÂ²ÃÂ¸Ã‘â€šÃ‘Å’')` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
+
+## Summary
+Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY Ã¢â‚¬â€ do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+ succeeded in 1.89s:
+25. Select-String -Path x.jsx,MenuView.jsx -Pattern 'original_price'
+26. $lines = Get-Content x.jsx; for ($i=3660; $i -le 3708; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+27. $lines = Get-Content MenuView.jsx; for ($i=130; $i -le 170; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+
+## publicmenu-260324-003211-6767
+
+1. Test-Path 'pages/PublicMenu/README.md'; if ($?) { if (Test-Path 'pages/PublicMenu/README.md') { Get-Content 'pages/PublicMenu/README.md' } }
+2. Test-Path 'pages/PublicMenu/BUGS.md'; if ($?) { if (Test-Path 'pages/PublicMenu/BUGS.md') { Get-Content 'pages/PublicMenu/BUGS.md' } }
+3. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'partner lookup|not found|normalizeGuestId|currentGuestIdRef\.current\s*=|codeLockedUntil|codeAttempts|nowTs|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder|ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ|send|submit' -Context 4,6
+4. Get-Item 'pages/PublicMenu/README.md' | Select-Object FullName,Length
+5. Get-Item 'pages/PublicMenu/BUGS.md' | Select-Object FullName,Length
+6. Get-Item 'pages/PublicMenu/x.jsx' | Select-Object FullName,Length
+7. Get-Content 'pages/PublicMenu/README.md'
+8. Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-070|PM-073|PM-069|PM-075|PM-112' -Context 2,8
+9. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'currentGuestIdRef\.current\s*=|normalizeGuestId|codeLockedUntil|codeAttempts|nowTs|handleSubmitOrder\(\)|setTimeout\(|ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ|partner_not_found|restaurant not found|not found|retry|refetch|error' -Context 3,8
+10. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1360; $end=1388; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+11. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3130; $end=3155; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+12. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'autoSubmitTimerRef|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder\(|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=|normalizeGuestId|normalizeId\s*=|codeLockedUntil|codeAttempts|nowTs' -Context 2,4
+13. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'useHallTable\(|codeAttempts|codeLockedUntil|nowTs|tableCodeInput|verifyTableCode|showTableConfirmSheet' -Context 2,6
+14. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3498; $end=3598; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+ succeeded in 1.81s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260324-003211-6767
+
+## Findings
+1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path â€” In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
+2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement â€” `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
+3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet â€” The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', 'ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ')` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
+
+## Summary
+Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY â€” do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None required for this review.
+- Scope questions (anything you weren't sure if it's in scope): None.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+index 8400ac2ad3ae7048a7d41f1da52f629e631c5caa..a6427c2eb46493cca66e7a6c55ba7543ef29c555
+--- a/pages/PublicMenu/commands_2026-03-24.log
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -25,3 +25,30 @@
+ 25. Select-String -Path x.jsx,MenuView.jsx -Pattern 'original_price'
+ 26. $lines = Get-Content x.jsx; for ($i=3660; $i -le 3708; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+ 27. $lines = Get-Content MenuView.jsx; for ($i=130; $i -le 170; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++
++## publicmenu-260324-003211-6767
++
++1. Test-Path 'pages/PublicMenu/README.md'; if ($?) { if (Test-Path 'pages/PublicMenu/README.md') { Get-Content 'pages/PublicMenu/README.md' } }
++2. Test-Path 'pages/PublicMenu/BUGS.md'; if ($?) { if (Test-Path 'pages/PublicMenu/BUGS.md') { Get-Content 'pages/PublicMenu/BUGS.md' } }
++3. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'partner lookup|not found|normalizeGuestId|currentGuestIdRef\.current\s*=|codeLockedUntil|codeAttempts|nowTs|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder|Отправить|send|submit' -Context 4,6
++4. Get-Item 'pages/PublicMenu/README.md' | Select-Object FullName,Length
++5. Get-Item 'pages/PublicMenu/BUGS.md' | Select-Object FullName,Length
++6. Get-Item 'pages/PublicMenu/x.jsx' | Select-Object FullName,Length
++7. Get-Content 'pages/PublicMenu/README.md'
++8. Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-070|PM-073|PM-069|PM-075|PM-112' -Context 2,8
++9. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'currentGuestIdRef\.current\s*=|normalizeGuestId|codeLockedUntil|codeAttempts|nowTs|handleSubmitOrder\(\)|setTimeout\(|Отправить|partner_not_found|restaurant not found|not found|retry|refetch|error' -Context 3,8
++10. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1360; $end=1388; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++11. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3130; $end=3155; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++12. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'autoSubmitTimerRef|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder\(|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=|normalizeGuestId|normalizeId\s*=|codeLockedUntil|codeAttempts|nowTs' -Context 2,4
++13. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'useHallTable\(|codeAttempts|codeLockedUntil|nowTs|tableCodeInput|verifyTableCode|showTableConfirmSheet' -Context 2,6
++14. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3498; $end=3598; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++15. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1560; $end=1645; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++16. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'normalizeGuestId|const normalizeId =|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=' -Context 2,3
++17. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'codeLockedUntil|codeAttempts|nowTs' -Context 2,3
++18. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=2138; $end=2160; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++19. New-Item -ItemType Directory -Force 'pipeline/chain-state' | Out-Null
++20. Test-Path 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++21. Test-Path 'pages/PublicMenu/review_2026-03-24.md'
++22. Test-Path 'pages/PublicMenu/commands_2026-03-24.log'
++23. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -TotalCount 80
++24. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -TotalCount 80
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+index 30a0734742b11d6392debfb794880c7309813bcd..3bb4c7c2f176af910b074238d32866407306dc91
+--- a/pages/PublicMenu/review_2026-03-24.md
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -14,3 +14,21 @@
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+ - Missing context (what info would have helped): None required for this review.
+ - Scope questions (anything you weren't sure if it's in scope): None.
++
++---
++
++# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path â€” In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement â€” `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet â€” The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', 'ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ')` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY â€” do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..a74b69830a1a1f69ef3424c093d9e2f233af4776
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path — In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement — `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet — The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', 'Отправить')` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+The saved report is correct structurally, but PowerShell echoed the non-ASCII characters poorly. I’m normalizing just the new report text to ASCII so the saved findings stay readable regardless of console encoding.
+file update
+M C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+@@ -1,7 +1,7 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-003211-6767
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
+ 
+ ## Findings
+-1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path — In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
+-2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement — `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
+-3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet — The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', 'Отправить')` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
+ 
+@@ -10,3 +10,3 @@
+ 
+-## Prompt Clarity (MANDATORY — do NOT skip this section)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
+ - Overall clarity: 5
+M C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-24.md
+@@ -19,8 +19,8 @@
+ 
+-# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260324-003211-6767
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
+ 
+ ## Findings
+-1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path â€” In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
+-2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement â€” `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
+-3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet â€” The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', 'ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ')` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
+ 
+@@ -29,3 +29,3 @@
+ 
+-## Prompt Clarity (MANDATORY â€” do NOT skip this section)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
+ - Overall clarity: 5
+apply_patch(auto_approved=true) exited 0 in 264ms:
+Success. Updated the following files:
+M pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+M pages/PublicMenu/review_2026-03-24.md
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+index 8400ac2ad3ae7048a7d41f1da52f629e631c5caa..a6427c2eb46493cca66e7a6c55ba7543ef29c555
+--- a/pages/PublicMenu/commands_2026-03-24.log
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -25,3 +25,30 @@
+ 25. Select-String -Path x.jsx,MenuView.jsx -Pattern 'original_price'
+ 26. $lines = Get-Content x.jsx; for ($i=3660; $i -le 3708; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+ 27. $lines = Get-Content MenuView.jsx; for ($i=130; $i -le 170; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++
++## publicmenu-260324-003211-6767
++
++1. Test-Path 'pages/PublicMenu/README.md'; if ($?) { if (Test-Path 'pages/PublicMenu/README.md') { Get-Content 'pages/PublicMenu/README.md' } }
++2. Test-Path 'pages/PublicMenu/BUGS.md'; if ($?) { if (Test-Path 'pages/PublicMenu/BUGS.md') { Get-Content 'pages/PublicMenu/BUGS.md' } }
++3. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'partner lookup|not found|normalizeGuestId|currentGuestIdRef\.current\s*=|codeLockedUntil|codeAttempts|nowTs|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder|Отправить|send|submit' -Context 4,6
++4. Get-Item 'pages/PublicMenu/README.md' | Select-Object FullName,Length
++5. Get-Item 'pages/PublicMenu/BUGS.md' | Select-Object FullName,Length
++6. Get-Item 'pages/PublicMenu/x.jsx' | Select-Object FullName,Length
++7. Get-Content 'pages/PublicMenu/README.md'
++8. Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-070|PM-073|PM-069|PM-075|PM-112' -Context 2,8
++9. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'currentGuestIdRef\.current\s*=|normalizeGuestId|codeLockedUntil|codeAttempts|nowTs|handleSubmitOrder\(\)|setTimeout\(|Отправить|partner_not_found|restaurant not found|not found|retry|refetch|error' -Context 3,8
++10. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1360; $end=1388; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++11. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3130; $end=3155; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++12. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'autoSubmitTimerRef|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder\(|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=|normalizeGuestId|normalizeId\s*=|codeLockedUntil|codeAttempts|nowTs' -Context 2,4
++13. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'useHallTable\(|codeAttempts|codeLockedUntil|nowTs|tableCodeInput|verifyTableCode|showTableConfirmSheet' -Context 2,6
++14. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3498; $end=3598; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++15. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1560; $end=1645; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++16. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'normalizeGuestId|const normalizeId =|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=' -Context 2,3
++17. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'codeLockedUntil|codeAttempts|nowTs' -Context 2,3
++18. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=2138; $end=2160; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++19. New-Item -ItemType Directory -Force 'pipeline/chain-state' | Out-Null
++20. Test-Path 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++21. Test-Path 'pages/PublicMenu/review_2026-03-24.md'
++22. Test-Path 'pages/PublicMenu/commands_2026-03-24.log'
++23. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -TotalCount 80
++24. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -TotalCount 80
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+index 30a0734742b11d6392debfb794880c7309813bcd..419159bde2aefd1ef72a6d0261ca0b5f58f40829
+--- a/pages/PublicMenu/review_2026-03-24.md
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -14,3 +14,21 @@
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+ - Missing context (what info would have helped): None required for this review.
+ - Scope questions (anything you weren't sure if it's in scope): None.
++
++---
++
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..91a5c02ba8ab4a8fc6308f226e217a36b8920067
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+index 8400ac2ad3ae7048a7d41f1da52f629e631c5caa..a6427c2eb46493cca66e7a6c55ba7543ef29c555
+--- a/pages/PublicMenu/commands_2026-03-24.log
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -25,3 +25,30 @@
+ 25. Select-String -Path x.jsx,MenuView.jsx -Pattern 'original_price'
+ 26. $lines = Get-Content x.jsx; for ($i=3660; $i -le 3708; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+ 27. $lines = Get-Content MenuView.jsx; for ($i=130; $i -le 170; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++
++## publicmenu-260324-003211-6767
++
++1. Test-Path 'pages/PublicMenu/README.md'; if ($?) { if (Test-Path 'pages/PublicMenu/README.md') { Get-Content 'pages/PublicMenu/README.md' } }
++2. Test-Path 'pages/PublicMenu/BUGS.md'; if ($?) { if (Test-Path 'pages/PublicMenu/BUGS.md') { Get-Content 'pages/PublicMenu/BUGS.md' } }
++3. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'partner lookup|not found|normalizeGuestId|currentGuestIdRef\.current\s*=|codeLockedUntil|codeAttempts|nowTs|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder|Отправить|send|submit' -Context 4,6
++4. Get-Item 'pages/PublicMenu/README.md' | Select-Object FullName,Length
++5. Get-Item 'pages/PublicMenu/BUGS.md' | Select-Object FullName,Length
++6. Get-Item 'pages/PublicMenu/x.jsx' | Select-Object FullName,Length
++7. Get-Content 'pages/PublicMenu/README.md'
++8. Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-070|PM-073|PM-069|PM-075|PM-112' -Context 2,8
++9. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'currentGuestIdRef\.current\s*=|normalizeGuestId|codeLockedUntil|codeAttempts|nowTs|handleSubmitOrder\(\)|setTimeout\(|Отправить|partner_not_found|restaurant not found|not found|retry|refetch|error' -Context 3,8
++10. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1360; $end=1388; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++11. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3130; $end=3155; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++12. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'autoSubmitTimerRef|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder\(|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=|normalizeGuestId|normalizeId\s*=|codeLockedUntil|codeAttempts|nowTs' -Context 2,4
++13. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'useHallTable\(|codeAttempts|codeLockedUntil|nowTs|tableCodeInput|verifyTableCode|showTableConfirmSheet' -Context 2,6
++14. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3498; $end=3598; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++15. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1560; $end=1645; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++16. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'normalizeGuestId|const normalizeId =|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=' -Context 2,3
++17. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'codeLockedUntil|codeAttempts|nowTs' -Context 2,3
++18. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=2138; $end=2160; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++19. New-Item -ItemType Directory -Force 'pipeline/chain-state' | Out-Null
++20. Test-Path 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++21. Test-Path 'pages/PublicMenu/review_2026-03-24.md'
++22. Test-Path 'pages/PublicMenu/commands_2026-03-24.log'
++23. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -TotalCount 80
++24. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -TotalCount 80
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+index 30a0734742b11d6392debfb794880c7309813bcd..419159bde2aefd1ef72a6d0261ca0b5f58f40829
+--- a/pages/PublicMenu/review_2026-03-24.md
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -14,3 +14,21 @@
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+ - Missing context (what info would have helped): None required for this review.
+ - Scope questions (anything you weren't sure if it's in scope): None.
++
++---
++
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..91a5c02ba8ab4a8fc6308f226e217a36b8920067
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/review_2026-03-24.md' -Tail 22" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.77s:
+# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
+
+## Findings
+1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
+2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
+3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
+
+## Summary
+Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY - do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None required for this review.
+- Scope questions (anything you weren't sure if it's in scope): None.
+ succeeded in 1.85s:
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None required for this review.
+- Scope questions (anything you weren't sure if it's in scope): None.
+
+---
+
+# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
+
+## Findings
+1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
+2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
+3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
+
+## Summary
+Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY - do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+index 8400ac2ad3ae7048a7d41f1da52f629e631c5caa..a6427c2eb46493cca66e7a6c55ba7543ef29c555
+--- a/pages/PublicMenu/commands_2026-03-24.log
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -25,3 +25,30 @@
+ 25. Select-String -Path x.jsx,MenuView.jsx -Pattern 'original_price'
+ 26. $lines = Get-Content x.jsx; for ($i=3660; $i -le 3708; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+ 27. $lines = Get-Content MenuView.jsx; for ($i=130; $i -le 170; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++
++## publicmenu-260324-003211-6767
++
++1. Test-Path 'pages/PublicMenu/README.md'; if ($?) { if (Test-Path 'pages/PublicMenu/README.md') { Get-Content 'pages/PublicMenu/README.md' } }
++2. Test-Path 'pages/PublicMenu/BUGS.md'; if ($?) { if (Test-Path 'pages/PublicMenu/BUGS.md') { Get-Content 'pages/PublicMenu/BUGS.md' } }
++3. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'partner lookup|not found|normalizeGuestId|currentGuestIdRef\.current\s*=|codeLockedUntil|codeAttempts|nowTs|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder|Отправить|send|submit' -Context 4,6
++4. Get-Item 'pages/PublicMenu/README.md' | Select-Object FullName,Length
++5. Get-Item 'pages/PublicMenu/BUGS.md' | Select-Object FullName,Length
++6. Get-Item 'pages/PublicMenu/x.jsx' | Select-Object FullName,Length
++7. Get-Content 'pages/PublicMenu/README.md'
++8. Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-070|PM-073|PM-069|PM-075|PM-112' -Context 2,8
++9. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'currentGuestIdRef\.current\s*=|normalizeGuestId|codeLockedUntil|codeAttempts|nowTs|handleSubmitOrder\(\)|setTimeout\(|Отправить|partner_not_found|restaurant not found|not found|retry|refetch|error' -Context 3,8
++10. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1360; $end=1388; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++11. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3130; $end=3155; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++12. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'autoSubmitTimerRef|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder\(|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=|normalizeGuestId|normalizeId\s*=|codeLockedUntil|codeAttempts|nowTs' -Context 2,4
++13. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'useHallTable\(|codeAttempts|codeLockedUntil|nowTs|tableCodeInput|verifyTableCode|showTableConfirmSheet' -Context 2,6
++14. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3498; $end=3598; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++15. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1560; $end=1645; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++16. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'normalizeGuestId|const normalizeId =|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=' -Context 2,3
++17. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'codeLockedUntil|codeAttempts|nowTs' -Context 2,3
++18. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=2138; $end=2160; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++19. New-Item -ItemType Directory -Force 'pipeline/chain-state' | Out-Null
++20. Test-Path 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++21. Test-Path 'pages/PublicMenu/review_2026-03-24.md'
++22. Test-Path 'pages/PublicMenu/commands_2026-03-24.log'
++23. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -TotalCount 80
++24. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -TotalCount 80
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+index 30a0734742b11d6392debfb794880c7309813bcd..419159bde2aefd1ef72a6d0261ca0b5f58f40829
+--- a/pages/PublicMenu/review_2026-03-24.md
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -14,3 +14,21 @@
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+ - Missing context (what info would have helped): None required for this review.
+ - Scope questions (anything you weren't sure if it's in scope): None.
++
++---
++
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..91a5c02ba8ab4a8fc6308f226e217a36b8920067
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+I’m appending the final verification reads to the command log so the page-local audit trail matches the actual shell activity from this run end to end.
+file update
+M C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-24.log
+@@ -54 +54,8 @@
+ 24. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -TotalCount 80
++25. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -Tail 20
++26. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -Tail 10
++27. Get-Content 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++28. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -Tail 22
++29. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -Tail 30
++30. Get-Content 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++31. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -Tail 22
+apply_patch(auto_approved=true) exited 0 in 260ms:
+Success. Updated the following files:
+M pages/PublicMenu/commands_2026-03-24.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+index 8400ac2ad3ae7048a7d41f1da52f629e631c5caa..ee90538c16903c9409d560450c46eb95717d5a91
+--- a/pages/PublicMenu/commands_2026-03-24.log
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -25,3 +25,37 @@
+ 25. Select-String -Path x.jsx,MenuView.jsx -Pattern 'original_price'
+ 26. $lines = Get-Content x.jsx; for ($i=3660; $i -le 3708; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+ 27. $lines = Get-Content MenuView.jsx; for ($i=130; $i -le 170; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++
++## publicmenu-260324-003211-6767
++
++1. Test-Path 'pages/PublicMenu/README.md'; if ($?) { if (Test-Path 'pages/PublicMenu/README.md') { Get-Content 'pages/PublicMenu/README.md' } }
++2. Test-Path 'pages/PublicMenu/BUGS.md'; if ($?) { if (Test-Path 'pages/PublicMenu/BUGS.md') { Get-Content 'pages/PublicMenu/BUGS.md' } }
++3. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'partner lookup|not found|normalizeGuestId|currentGuestIdRef\.current\s*=|codeLockedUntil|codeAttempts|nowTs|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder|Отправить|send|submit' -Context 4,6
++4. Get-Item 'pages/PublicMenu/README.md' | Select-Object FullName,Length
++5. Get-Item 'pages/PublicMenu/BUGS.md' | Select-Object FullName,Length
++6. Get-Item 'pages/PublicMenu/x.jsx' | Select-Object FullName,Length
++7. Get-Content 'pages/PublicMenu/README.md'
++8. Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-070|PM-073|PM-069|PM-075|PM-112' -Context 2,8
++9. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'currentGuestIdRef\.current\s*=|normalizeGuestId|codeLockedUntil|codeAttempts|nowTs|handleSubmitOrder\(\)|setTimeout\(|Отправить|partner_not_found|restaurant not found|not found|retry|refetch|error' -Context 3,8
++10. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1360; $end=1388; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++11. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3130; $end=3155; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++12. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'autoSubmitTimerRef|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder\(|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=|normalizeGuestId|normalizeId\s*=|codeLockedUntil|codeAttempts|nowTs' -Context 2,4
++13. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'useHallTable\(|codeAttempts|codeLockedUntil|nowTs|tableCodeInput|verifyTableCode|showTableConfirmSheet' -Context 2,6
++14. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3498; $end=3598; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++15. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1560; $end=1645; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++16. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'normalizeGuestId|const normalizeId =|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=' -Context 2,3
++17. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'codeLockedUntil|codeAttempts|nowTs' -Context 2,3
++18. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=2138; $end=2160; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++19. New-Item -ItemType Directory -Force 'pipeline/chain-state' | Out-Null
++20. Test-Path 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++21. Test-Path 'pages/PublicMenu/review_2026-03-24.md'
++22. Test-Path 'pages/PublicMenu/commands_2026-03-24.log'
++23. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -TotalCount 80
++24. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -TotalCount 80
++25. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -Tail 20
++26. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -Tail 10
++27. Get-Content 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++28. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -Tail 22
++29. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -Tail 30
++30. Get-Content 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++31. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -Tail 22
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+index 30a0734742b11d6392debfb794880c7309813bcd..419159bde2aefd1ef72a6d0261ca0b5f58f40829
+--- a/pages/PublicMenu/review_2026-03-24.md
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -14,3 +14,21 @@
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+ - Missing context (what info would have helped): None required for this review.
+ - Scope questions (anything you weren't sure if it's in scope): None.
++
++---
++
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..91a5c02ba8ab4a8fc6308f226e217a36b8920067
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+index 8400ac2ad3ae7048a7d41f1da52f629e631c5caa..ee90538c16903c9409d560450c46eb95717d5a91
+--- a/pages/PublicMenu/commands_2026-03-24.log
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -25,3 +25,37 @@
+ 25. Select-String -Path x.jsx,MenuView.jsx -Pattern 'original_price'
+ 26. $lines = Get-Content x.jsx; for ($i=3660; $i -le 3708; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+ 27. $lines = Get-Content MenuView.jsx; for ($i=130; $i -le 170; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++
++## publicmenu-260324-003211-6767
++
++1. Test-Path 'pages/PublicMenu/README.md'; if ($?) { if (Test-Path 'pages/PublicMenu/README.md') { Get-Content 'pages/PublicMenu/README.md' } }
++2. Test-Path 'pages/PublicMenu/BUGS.md'; if ($?) { if (Test-Path 'pages/PublicMenu/BUGS.md') { Get-Content 'pages/PublicMenu/BUGS.md' } }
++3. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'partner lookup|not found|normalizeGuestId|currentGuestIdRef\.current\s*=|codeLockedUntil|codeAttempts|nowTs|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder|Отправить|send|submit' -Context 4,6
++4. Get-Item 'pages/PublicMenu/README.md' | Select-Object FullName,Length
++5. Get-Item 'pages/PublicMenu/BUGS.md' | Select-Object FullName,Length
++6. Get-Item 'pages/PublicMenu/x.jsx' | Select-Object FullName,Length
++7. Get-Content 'pages/PublicMenu/README.md'
++8. Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-070|PM-073|PM-069|PM-075|PM-112' -Context 2,8
++9. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'currentGuestIdRef\.current\s*=|normalizeGuestId|codeLockedUntil|codeAttempts|nowTs|handleSubmitOrder\(\)|setTimeout\(|Отправить|partner_not_found|restaurant not found|not found|retry|refetch|error' -Context 3,8
++10. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1360; $end=1388; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++11. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3130; $end=3155; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++12. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'autoSubmitTimerRef|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder\(|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=|normalizeGuestId|normalizeId\s*=|codeLockedUntil|codeAttempts|nowTs' -Context 2,4
++13. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'useHallTable\(|codeAttempts|codeLockedUntil|nowTs|tableCodeInput|verifyTableCode|showTableConfirmSheet' -Context 2,6
++14. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3498; $end=3598; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++15. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1560; $end=1645; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++16. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'normalizeGuestId|const normalizeId =|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=' -Context 2,3
++17. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'codeLockedUntil|codeAttempts|nowTs' -Context 2,3
++18. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=2138; $end=2160; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++19. New-Item -ItemType Directory -Force 'pipeline/chain-state' | Out-Null
++20. Test-Path 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++21. Test-Path 'pages/PublicMenu/review_2026-03-24.md'
++22. Test-Path 'pages/PublicMenu/commands_2026-03-24.log'
++23. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -TotalCount 80
++24. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -TotalCount 80
++25. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -Tail 20
++26. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -Tail 10
++27. Get-Content 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++28. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -Tail 22
++29. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -Tail 30
++30. Get-Content 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++31. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -Tail 22
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+index 30a0734742b11d6392debfb794880c7309813bcd..419159bde2aefd1ef72a6d0261ca0b5f58f40829
+--- a/pages/PublicMenu/review_2026-03-24.md
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -14,3 +14,21 @@
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+ - Missing context (what info would have helped): None required for this review.
+ - Scope questions (anything you weren't sure if it's in scope): None.
++
++---
++
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..91a5c02ba8ab4a8fc6308f226e217a36b8920067
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+Three active issues remain in [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx): PM-070 at [x.jsx:1377](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1377) and [x.jsx:3148](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3148), where a transient failure in the primary partner lookup can still resolve to the not-found path; PM-069 at [x.jsx:1554](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1554) and [x.jsx:3550](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3550), where the bottom sheet still lacks `codeAttempts`/`codeLockedUntil`/`nowTs` so there is no lockout countdown or cooldown disablement; and PM-112 at [x.jsx:3580](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3580), where the redundant Send button is still rendered.
+
+PM-073 and PM-075 did not reproduce in the current `x.jsx`; the guest ID path is already normalized before assigning `currentGuestIdRef.current`, and the auto-submit timeout is already stored in `autoSubmitTimerRef` with cleanup.
+
+Saved the outputs to [publicmenu-260324-003211-6767-codex-findings.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md), [review_2026-03-24.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-24.md), and [commands_2026-03-24.log](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-24.log).
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+index 8400ac2ad3ae7048a7d41f1da52f629e631c5caa..ee90538c16903c9409d560450c46eb95717d5a91
+--- a/pages/PublicMenu/commands_2026-03-24.log
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -25,3 +25,37 @@
+ 25. Select-String -Path x.jsx,MenuView.jsx -Pattern 'original_price'
+ 26. $lines = Get-Content x.jsx; for ($i=3660; $i -le 3708; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
+ 27. $lines = Get-Content MenuView.jsx; for ($i=130; $i -le 170; $i++) { '{0,5}: {1}' -f ($i+1), $lines[$i] }
++
++## publicmenu-260324-003211-6767
++
++1. Test-Path 'pages/PublicMenu/README.md'; if ($?) { if (Test-Path 'pages/PublicMenu/README.md') { Get-Content 'pages/PublicMenu/README.md' } }
++2. Test-Path 'pages/PublicMenu/BUGS.md'; if ($?) { if (Test-Path 'pages/PublicMenu/BUGS.md') { Get-Content 'pages/PublicMenu/BUGS.md' } }
++3. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'partner lookup|not found|normalizeGuestId|currentGuestIdRef\.current\s*=|codeLockedUntil|codeAttempts|nowTs|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder|Отправить|send|submit' -Context 4,6
++4. Get-Item 'pages/PublicMenu/README.md' | Select-Object FullName,Length
++5. Get-Item 'pages/PublicMenu/BUGS.md' | Select-Object FullName,Length
++6. Get-Item 'pages/PublicMenu/x.jsx' | Select-Object FullName,Length
++7. Get-Content 'pages/PublicMenu/README.md'
++8. Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-070|PM-073|PM-069|PM-075|PM-112' -Context 2,8
++9. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'currentGuestIdRef\.current\s*=|normalizeGuestId|codeLockedUntil|codeAttempts|nowTs|handleSubmitOrder\(\)|setTimeout\(|Отправить|partner_not_found|restaurant not found|not found|retry|refetch|error' -Context 3,8
++10. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1360; $end=1388; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++11. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3130; $end=3155; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++12. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'autoSubmitTimerRef|setTimeout\(\s*\(\)\s*=>\s*handleSubmitOrder\(|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=|normalizeGuestId|normalizeId\s*=|codeLockedUntil|codeAttempts|nowTs' -Context 2,4
++13. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'useHallTable\(|codeAttempts|codeLockedUntil|nowTs|tableCodeInput|verifyTableCode|showTableConfirmSheet' -Context 2,6
++14. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=3498; $end=3598; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++15. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=1560; $end=1645; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++16. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'normalizeGuestId|const normalizeId =|currentGuestIdRef\.current\s*=\s*guest\.id|currentGuestIdRef\.current\s*=' -Context 2,3
++17. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'codeLockedUntil|codeAttempts|nowTs' -Context 2,3
++18. $lines = Get-Content 'pages/PublicMenu/x.jsx'; $start=2138; $end=2160; for($i=$start;$i -le $end;$i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++19. New-Item -ItemType Directory -Force 'pipeline/chain-state' | Out-Null
++20. Test-Path 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++21. Test-Path 'pages/PublicMenu/review_2026-03-24.md'
++22. Test-Path 'pages/PublicMenu/commands_2026-03-24.log'
++23. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -TotalCount 80
++24. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -TotalCount 80
++25. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -Tail 20
++26. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -Tail 10
++27. Get-Content 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++28. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -Tail 22
++29. Get-Content 'pages/PublicMenu/commands_2026-03-24.log' -Tail 30
++30. Get-Content 'pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md'
++31. Get-Content 'pages/PublicMenu/review_2026-03-24.md' -Tail 22
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+index 30a0734742b11d6392debfb794880c7309813bcd..419159bde2aefd1ef72a6d0261ca0b5f58f40829
+--- a/pages/PublicMenu/review_2026-03-24.md
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -14,3 +14,21 @@
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+ - Missing context (what info would have helped): None required for this review.
+ - Scope questions (anything you weren't sure if it's in scope): None.
++
++---
++
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..91a5c02ba8ab4a8fc6308f226e217a36b8920067
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260324-003211-6767
++
++## Findings
++1. [P1] Fix 1 / PM-070: Primary partner lookup errors can still collapse into the not-found path - In `x.jsx:1377-1385`, the primary `Partner.filter(...)` call catches every exception and immediately falls through to the alternate lookup. If the primary lookup fails because of a transient backend problem but the fallback lookup simply returns no rows, the query resolves `null`, which drives the not-found UI in `x.jsx:3148-3152` instead of the retryable `partnerError` state. FIX: only treat explicit 404/not-found failures as not-found; rethrow network/5xx/timeout/unknown errors so the retry UI is shown.
++2. [P2] Fix 3 / PM-069: The table-code bottom sheet still has no lockout countdown state or lockout disablement - `useHallTable(...)` is destructured in `x.jsx:1554-1564`, but `codeAttempts`, `codeLockedUntil`, and `nowTs` are not available in this scope. As rendered in `x.jsx:3550-3584`, the bottom sheet can only show `codeVerificationError`, and the input/button are disabled only while `isVerifyingCode` or when the code is too short. Locked-out users still do not get the required `MM:SS` countdown, and the controls are not disabled for the cooldown window. FIX: expose `codeAttempts`, `codeLockedUntil`, and `nowTs` to this render path and use them to show `Please wait MM:SS` plus disable the code input and submit action while `codeLockedUntil > nowTs`.
++3. [P3] Fix 5 / PM-112: The redundant Send button is still present in the table-code bottom sheet - The bottom sheet still renders a primary CTA with `tr('cart.confirm_table.submit', ...)` in `x.jsx:3580-3595`. That keeps the manual submit affordance the task explicitly says to remove. FIX: remove this button block entirely and keep the existing auto-submit-on-last-digit behavior unchanged.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None required for this review.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+tokens used
+70 850
+Three active issues remain in [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx): PM-070 at [x.jsx:1377](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1377) and [x.jsx:3148](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3148), where a transient failure in the primary partner lookup can still resolve to the not-found path; PM-069 at [x.jsx:1554](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1554) and [x.jsx:3550](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3550), where the bottom sheet still lacks `codeAttempts`/`codeLockedUntil`/`nowTs` so there is no lockout countdown or cooldown disablement; and PM-112 at [x.jsx:3580](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3580), where the redundant Send button is still rendered.
+
+PM-073 and PM-075 did not reproduce in the current `x.jsx`; the guest ID path is already normalized before assigning `currentGuestIdRef.current`, and the auto-submit timeout is already stored in `autoSubmitTimerRef` with cleanup.
+
+Saved the outputs to [publicmenu-260324-003211-6767-codex-findings.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260324-003211-6767-codex-findings.md), [review_2026-03-24.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-24.md), and [commands_2026-03-24.log](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-24.log).

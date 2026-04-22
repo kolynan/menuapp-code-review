@@ -1,0 +1,109 @@
+---
+chain: infra-260415-123810-8239
+chain_step: 1
+chain_total: 2
+chain_step_name: discussion-writer-codex
+chain_group: writers
+chain_group_size: 2
+page: Infra
+budget: 10.00
+runner: codex
+type: chain-step
+---
+**MANDATORY FIRST STEP — run this before anything else:**
+```
+git fetch origin 2>/dev/null; git reset --hard origin/main
+```
+This ensures your working copy is in sync with the remote repository.
+
+---
+
+You are the Codex Discussion Writer in a modular discussion pipeline.
+Your job: independently analyze each question from the TASK CONTEXT and write your position.
+You work in PARALLEL with a CC Discussion Writer — do NOT read CC findings.
+
+SPEED RULES — this is a time-sensitive pipeline step (KB-142 guard):
+- The full source file (if applicable) is INLINED below under === SOURCE CODE ===.
+  Use that inline content as the authoritative source. Do NOT read the same file from disk.
+- Do NOT run ripgrep, Get-ChildItem, Select-String, rg, cat, head, tail, or any other
+  filesystem scan on the target page file. This burns your entire time budget on I/O
+  and leaves you with no time for analysis (KB-142 pattern seen on files >2000 lines).
+- Do NOT dump raw grep / ripgrep output as your answer. Those are not findings.
+- You MAY read small auxiliary files explicitly named in the TASK CONTEXT (BUGS.md,
+  README.md in the same page folder, UX docs) — but do so with narrow commands, not
+  recursive scans.
+- Be concise but thorough in your analysis.
+
+INSTRUCTIONS:
+1. Read the TASK CONTEXT below — it contains questions for discussion.
+2. Use the inline SOURCE CODE block below as the source of truth (if provided).
+3. If small auxiliary reference files are mentioned (BUGS.md, UX docs, screenshots) — read them for context with narrow commands.
+4. For EACH question: write your analysis with a recommended answer and reasoning.
+5. Focus on: mobile-first UX, restaurant app context, real-world user behavior, best practices.
+6. When reviewing a code-review prompt (ПССК): verify line numbers against the inline source AND check whether each referenced line sits inside a block comment (`/* ... */`) or a commented-out JSX snapshot. Call out dead-code false positives explicitly.
+7. Write your position to (ABSOLUTE PATH — required, see KB-139): C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/chain-state/infra-260415-123810-8239-codex-position.md
+8. Do NOT read or reference any CC output.
+
+FORMAT for position file:
+# Codex Discussion Position — Infra
+Chain: infra-260415-123810-8239
+Topic: [title from task]
+
+## Questions Analyzed
+
+### Q1: [question title]
+**Recommendation:** [your recommended option]
+**Reasoning:** [why this is the best approach]
+**Trade-offs:** [what you sacrifice with this choice]
+**Mobile UX:** [specific mobile considerations if relevant]
+
+### Q2: [question title]
+...
+
+## Summary Table
+| # | Question | Codex Recommendation | Confidence |
+|---|----------|----------------------|------------|
+| 1 | ...      | ...                  | high/medium/low |
+
+## Prompt Clarity
+Rate the task description quality (1-5). For any score below 4, explain what was unclear:
+- Overall clarity: [1-5]
+- Ambiguous questions (list # and what was unclear): ...
+- Missing context (what info would have helped): ...
+
+Do NOT apply any code changes.
+
+=== SOURCE CODE (with line numbers) ===
+(source file not found — reviewer may need to read from disk)
+=== END SOURCE CODE ===
+
+=== TASK CONTEXT ===
+# Д3 — Smoke-test S280 Pipeline Hardening
+
+## Scope
+Дискуссионная задача без правки кода. Цель — прогнать chain `discussion-cc-codex` end-to-end и проверить, что S280 фиксы (#326 auto-cleanup stale locks, #327 TG alert on merge fail, #328 pre-flight lock check, #331 wt-task-* cleanup) отработали:
+
+1. Chain стартует → expand_chain_task_if_needed вызывает cleanup_stale_git_locks (#328) → если лок есть, снимает + TG.
+2. Writers CC+Codex параллельно пишут 2-4 bullets «что улучшить в cleanup_stale_git_locks».
+3. Synthesizer объединяет.
+4. merge_worktree_to_main вызывает cleanup_stale_git_locks (#326) перед stash.
+5. Чистый merge → main, branch удаляется локально и на origin (#331).
+6. При fail — TG FAILED_AUTO_MERGE alert (#327).
+
+## Вопрос для дискуссии
+**«Какие ещё 2 улучшения стоит внести в `cleanup_stale_git_locks(repo_dir, logger, stale_age_sec=60)` в `scripts/task-watcher-multi.py`?»**
+
+Контекст helper'а:
+- Удаляет `.git/{index,ORIG_HEAD,HEAD,MERGE_HEAD}.lock` + `.git/refs/heads/main.lock` если mtime > 60s.
+- Возвращает list[str] удалённых файлов.
+- Вызывается из `expand_chain_task_if_needed` (pre-flight) и `merge_worktree_to_main` (перед auto-stash).
+
+## Ограничения
+- **No code changes** — это discussion-only задача. Writers пишут markdown-bullets, не правят .py.
+- CC writer: прочитать `scripts/task-watcher-multi.py` §cleanup_stale_git_locks + callsites, предложить 2 улучшения с обоснованием (1-2 фразы каждое).
+- Codex writer: то же самое, независимо.
+- Synthesizer: объединить без дублей, отметить пересечения.
+
+## Выход
+Итоговый markdown с 2-4 non-overlapping улучшений будет в chain-findings. Использую в S281 для решения — делать эс#332 или нет.
+=== END ===

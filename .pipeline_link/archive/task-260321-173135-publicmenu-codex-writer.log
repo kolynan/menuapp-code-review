@@ -1,0 +1,1390 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Dev/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d1061-32c2-7961-bd79-bd589f715f9e
+--------
+user
+Review the file pages/PublicMenu/base/*.jsx for bugs in a React restaurant QR-menu app on Base44 platform. Also check pages/PublicMenu/README.md and pages/PublicMenu/BUGS.md for context (ONLY these 3 files, nothing else). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the 3 files above. Do NOT search the repo, do NOT read old findings, do NOT read files outside pages/PublicMenu/. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. Find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260321-173133-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260321-173133 ## Findings 1. [P0] Title — Description. FIX: ... 2. [P1] Title — Description. FIX: ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... Do NOT apply fixes — only document findings. === TASK CONTEXT === # PM-071: Bottom Sheet trigger для Table Confirmation [H] Reference: `ux-concepts/public-menu.md` v4.1, `ux-concepts/UX_LOCKED_PublicMenu.md`, `STYLE_GUIDE.md`, `BUGS_MASTER.md`. --- ## Fix 1 — PM-071 (P1) [MUST-FIX]: Bottom Sheet «Подтвердите стол» не открывается ### Сейчас (текущее поведение) Новый гость (стол не верифицирован, localStorage пуст) нажимает «Отправить официанту» в drawer корзины → **ничего не происходит**. Детали: - Кнопка визуально активна (терракотовая), не disabled — TC-3 ✅ - Клик регистрируется (Network: `analytics/track/batch` POST 200) - Заказ НЕ уходит — P0-гейт `isTableVerified` работает ✅ - Но Bottom Sheet «Подтвердите стол» НЕ появляется - В DOM нет ни одного BS-компонента (`role="dialog"` — только drawer корзины) - В консоли нет app-ошибок, только Chrome extension warnings Пользователь в тупике: кнопка есть, нажал, ноль реакции. Не может ввести код стола → не может отправить заказ. ### Должно быть (ожидаемое поведение) Клик на «Отправить официанту» при `!isTableVerified`: 1. Drawer корзины остаётся открытым (НЕ закрывается) 2. Поверх drawer появляется Bottom Sheet (~75-85% высоты экрана) с: - Заголовок: «Подтвердите стол» - Подзаголовок: «Чтобы отправить заказ официанту» - Поле ввода кода стола (4-6 цифр, `tableCodeLength` из partner config) - Кнопка CTA: «Подтвердить и отправить» (терракотовая) - Ссылка: «Не тот стол? Изменить» 3. После ввода верного кода → `isTableVerified = true` → заказ отправляется Ref: `ux-concepts/public-menu.md` §E (Table Confirmation flow). ### НЕ должно быть (анти-паттерны) - **НЕ ВОЗВРАЩАТЬ inline-инпут кода стола в drawer** — он был удалён в Batch 4 (201 строк). Это было правильно. Не откатывать. - **НЕ убирать P0-гейт** на `isTableVerified` в `handleSubmitOrder` — он блокирует orphan orders. Оставить. - **НЕ отправлять заказ без верификации стола** — даже если кажется что "так проще". - **НЕ показывать fullscreen overlay** — только Bottom Sheet поверх drawer. ### Файл и локация Файл: `CartView.jsx` (основной файл — `pages/PublicMenu/base/CartView.jsx`) Вероятная проблема: в функции `handleSubmitOrder` (или аналогичном onClick кнопки «Отправить официанту») есть проверка `if (!isTableVerified) return;` (или `if (!isTableVerified) { /* ничего */ }`), но **отсутствует** вызов `setShowTableVerificationSheet(true)` перед return. Нужно: 1. Найти обработчик кнопки «Отправить официанту» → внутри, ПЕРЕД P0-гейтом (или В блоке гейта) добавить: `setShowTableVerificationSheet(true)` (или как назван state). 2. Убедиться что JSX содержит условный рендер BS: `{showTableVerificationSheet && <BottomSheet>...</BottomSheet>}` — если этого нет, добавить. 3. Bottom Sheet должен содержать: заголовок, поле ввода, CTA кнопку, ссылку «Не тот стол?». 4. При успешной верификации: `setShowTableVerificationSheet(false)` + `setIsTableVerified(true)` + отправить заказ. ### Уже пробовали Batch 4, chain `publicmenu-260321-140331` ($4.69, 6 фиксов): - КС добавил P0-гейт ✅ - КС удалил inline verification (201 строк) ✅ - КС описал CTA кнопку в BS ✅ - **НО не подключил onClick → BS open trigger.** Старый путь (inline) убрали, новый путь (BS) к нему не подключили. Вероятная причина: merge применил delete (inline) и add (P0-гейт) корректно, но пропустил связку onClick → setState. Это типичная проблема при рефакторинге: удаление + добавление по отдельности ОК, но интеграция пропущена. ### Проверка (мини тест-кейс) 1. Инкогнито → `/x?partner=69540a85f2492cff3e46a283&mode=hall&lang=RU` 2. Добавить любое блюдо → нажать «Оформить заказ» → drawer открывается 3. Нажать «Отправить официанту» → **Bottom Sheet «Подтвердите стол» появляется** 4. Ввести код стола → нажать «Подтвердить и отправить» → заказ уходит --- ## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано выше - Изменяй ТОЛЬКО код, описанный в Fix 1 (Bottom Sheet trigger + BS UI). - ВСЁ остальное (цвета чипов, stepper, StickyCartBar, layout) — НЕ ТРОГАТЬ. - Если видишь «проблему» не из этой задачи — ПРОПУСТИ, не чини. - Locked UX decisions: см. `ux-concepts/UX_LOCKED_PublicMenu.md` — ЗАПРЕЩЕНО менять. ## Prompt Clarity _(заполняется CC/Codex writer после выполнения)_ ## Implementation Notes - Основной файл: `CartView.jsx` - Может потребоваться также: `x.jsx` (если state поднят выше) - НЕ ломать: PM-063 (stepper «− 1 +»), PM-041 (polling clean), P0-гейт `isTableVerified` - Ref: STYLE_GUIDE.md (#B5543A primary), BUGS_MASTER.md (PM-064, PM-071) - git add [конкретные файлы] && git commit -m "PM-071: add BS trigger for table verification" && git push === END ===
+mcp startup: no servers
+codex
+I’m limiting inspection to the requested PublicMenu files and will write a findings-only report, without touching code. First step is to identify the exact `pages/PublicMenu/base/*.jsx` target and read only that plus `README.md` and `BUGS.md`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'" in C:/Dev/menuapp-code-review exited 124 in 11.14s:
+
+ exited 124 in 10.99s:
+
+ exited 124 in 10.91s:
+
+codex
+The first reads timed out, likely on file size rather than scope. I’m retrying the same three paths with a longer timeout and no repo-wide search.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName" in C:/Dev/menuapp-code-review succeeded in 22.53s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 22.54s:
+---
+version: "29.0"
+updated: "2026-03-21"
+session: 153
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*16 active bugs remaining (0x P0, 8x P1, 5x P2, 2x P3, 1x suggestion).*
+
+### BUG-PM-056: Drawer layout not visit-state-driven (P1 â€” Batch 2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P1
+- **ÐšÐ¾Ð³Ð´Ð°:** S153 (consensus chain publicmenu-260321-093745)
+ succeeded in 25.50s:
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\MenuView.jsx
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\useTableSession.jsx
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\x.jsx
+codex
+`base/*.jsx` expands to six source files here, so I’m treating that glob as the requested scope and staying inside `pages/PublicMenu/` only. Next I’m reading those six files directly and will synthesize only new findings from the current code.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'" in C:/Dev/menuapp-code-review succeeded in 19.19s:
+import React from "react";
+import { XIcon, Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, X, Minus, Plus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import Rating from "@/components/Rating";
+
+export default function CartView({
+  partner,
+  currentTable,
+  currentGuest,
+  t,
+  setView,
+  isEditingName,
+  guestNameInput,
+  setGuestNameInput,
+  handleUpdateGuestName,
+  setIsEditingName,
+  getGuestDisplayName,
+  cart,
+ succeeded in 19.02s:
+import { useEffect, useMemo, useRef, useState } from "react";
+import { base44 } from "@/api/base44Client";
+import {
+  getSessionGuests,
+  getSessionOrders,
+  getDeviceId,
+  findGuestByDevice,
+  isSessionExpired,
+} from "@/components/sessionHelpers";
+
+// Persistence helpers (FIX-260131-01: session + guest, 8h TTL)
+const TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+
+// BUG-PM-004: TTL for optimistic data before server confirms
+const OPTIMISTIC_TTL_MS = 30000; // 30 seconds
+
+// FIX-260131-06: Normalize guest id (support both id and _id)
+const normalizeGuestId = (g) => String(g?.id ?? g?._id ?? "");
+
+// FIX-260131-07: Get menu_guest_code from localStorage
+ succeeded in 19.55s:
+import React from "react";
+import { Plus, Minus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+export default function CheckoutView({
+  t,
+  setView,
+  cart,
+  updateQuantity,
+  formatPrice,
+  finalTotal,
+  activeCurrency,
+  defaultCurrency,
+  orderMode,
+  renderHallCheckoutContent,
+  clientName,
+  setClientName,
+  clientPhone,
+ succeeded in 19.63s:
+import React from "react";
+import { Loader2, ImageIcon, Minus, Plus, LayoutGrid, List } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import DishRating from "@/components/publicMenu/DishRating";
+
+// Grid mappings for Tailwind (explicit full class names)
+const DESKTOP_GRID = {
+  1: "md:grid-cols-1",
+  2: "md:grid-cols-2",
+  3: "md:grid-cols-3",
+  4: "md:grid-cols-4",
+  5: "md:grid-cols-5",
+};
+
+const MOBILE_GRID = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+};
+
+export default function MenuView({
+ succeeded in 19.52s:
+// ======================================================
+// pages/x.jsx â€” PUBLIC MENU with i18n + Channels Visibility + Gating
+// UPDATED: Simplified Hall logic (TASK-260123-01b)
+// FIXED: P0-1..P0-7 security and functionality fixes
+// UPDATED: TASK-260127-01 - session restore, UI cleanup
+// PATCHED: 2026-01-28 - P0-1, P0-2, P0-2b, P1-1..P1-4
+// PATCHED: 2026-02-01 - FIX-260131-07 FINAL - guest safeguard in submit
+// PATCHED: 2026-02-01 - TASK-260201-01 - Hall StickyBar always visible
+// PATCHED: 2026-03-03 - GAP-01 - Order Confirmation Screen
+// FIXED: 2026-03-03 - GAP-01 fix - Confirmation as full-screen overlay (z-60)
+// FIXED: 2026-03-03 - GAP-02 fix - Embed OrderStatusScreen inside x.jsx (no /orderstatus route)
+// FIXED: 2026-03-03 - GAP-02 fix - Remove auto-dismiss timer (race condition: ghost click on menu)
+// ======================================================
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { useI18n } from "@/components/i18n";
+import { toast } from "sonner"; // P0-6: sonner instead of custom toast
+ succeeded in 20.47s:
+import React from "react";
+import { CheckCircle2, AlertCircle } from "lucide-react";
+
+export default function ModeTabs({
+  visibleModeTabs,
+  orderMode,
+  onModeChange,
+  getModeDescription,
+  isHallMode,
+  isTableVerified,
+  currentTableId,
+  currentTable,
+  tableCodeParam,
+  resolvedTable,
+  verifiedByCode,
+  t,
+}) {
+  return (
+    <div className="max-w-2xl mx-auto px-4 mt-4">
+      {visibleModeTabs.length > 1 ? (
+codex
+I have the file set. Now I’m drilling into the submit flow, verification sheet wiring, partner/error handling, and the smaller component-level i18n/mobile issues with targeted reads inside the same files only.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@( 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' ) | ForEach-Object { "'$p=$_; $lines=(Get-Content $p).Length; Write-Output "$p`t$lines" }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleSubmitOrder|showTableConfirmSheet|pendingSubmitRef|verifyTableCode|partner_not_found|renderHallCheckoutContent|hallStickyMode|showCartButton|tableCodeLength|isTableVerified|Drawer' | ForEach-Object { \"{0}:{1}: {2}\" -f "'$_.Filename,$_.LineNumber,$_.Line.Trim() }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'send_to_waiter|handleSubmitOrder|aria-label|placeholder|toLocaleString|ru-RU|tableCode|codeLockedUntil|codeAttempts|showLoyaltySection|isTableVerified|document.querySelector|guestDisplay|Button|sticky bottom-0' | ForEach-Object { \"{0}:{1}: {2}\" -f "'$_.Filename,$_.LineNumber,$_.Line.Trim() }' in C:/Dev/menuapp-code-review succeeded in 17.99s:
+x.jsx:91: // TASK-260203-01: Drawer for cart
+x.jsx:92: import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+x.jsx:384: "error.partner_not_found": "Ресторан не найден",
+x.jsx:1268: // TASK-260203-01: Drawer state
+x.jsx:1269: const [drawerMode, setDrawerMode] = useState(null); // 'cart' | null
+x.jsx:1272: const [showTableConfirmSheet, setShowTableConfirmSheet] = useState(false);
+x.jsx:1273: const pendingSubmitRef = useRef(false);
+x.jsx:1452: setDrawerMode(null);
+x.jsx:1517: verifyTableCode,
+x.jsx:1556: const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
+x.jsx:1559: const tableCodeLength = useMemo(() => {
+x.jsx:1992: isTableVerified,
+x.jsx:2078: const showCartButton = isHallMode && (isTableVerified || (cart?.length || 0) > 0);
+x.jsx:2084: if (!isTableVerified || tableSession) return;
+x.jsx:2087: }, [isTableVerified, tableSession]);
+x.jsx:2088: const isSessionLoading = isTableVerified && !tableSession && !sessionCheckTimedOut;
+x.jsx:2092: if (pendingSubmitRef.current && isTableVerified && currentTableId) {
+x.jsx:2093: pendingSubmitRef.current = false;
+x.jsx:2094: setShowTableConfirmSheet(false);
+x.jsx:2096: setTimeout(() => handleSubmitOrder(), 100);
+ succeeded in 17.83s:
+CartView.jsx:4: import { Button } from "@/components/ui/button";
+CartView.jsx:19: getGuestDisplayName,
+CartView.jsx:42: handleSubmitOrder,
+CartView.jsx:65: isTableVerified,
+CartView.jsx:66: tableCodeInput,
+CartView.jsx:67: setTableCodeInput,
+CartView.jsx:69: verifyTableCode,
+CartView.jsx:73: showLoyaltySection,
+CartView.jsx:88: const [infoModal, setInfoModal] = React.useState(null); // 'online' | 'tableCode' | null
+CartView.jsx:89: const [codeAttempts, setCodeAttempts] = React.useState(0);
+CartView.jsx:90: const [codeLockedUntil, setCodeLockedUntil] = React.useState(null); // timestamp ms
+CartView.jsx:103: const tableCodeLength = React.useMemo(() => {
+CartView.jsx:109: const maxCodeAttempts = React.useMemo(() => {
+CartView.jsx:121: const isCodeLocked = Boolean(codeLockedUntil && nowTs < codeLockedUntil);
+CartView.jsx:122: const codeSecondsLeft = isCodeLocked ? Math.max(0, Math.ceil((codeLockedUntil - nowTs) / 1000)) : 0;
+CartView.jsx:134: if (!codeLockedUntil) return;
+CartView.jsx:135: if (nowTs < codeLockedUntil) return;
+CartView.jsx:136: setCodeLockedUntil(null);
+CartView.jsx:137: setCodeAttempts(0);
+CartView.jsx:140: }, [nowTs, codeLockedUntil]);
+ succeeded in 19.26s:
+C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx	1084
+C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx	189
+C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx	298
+C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx	84
+C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx	838
+C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx	3595
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; "'$lines=Get-Content $p; foreach($r in @(@{S=1;E=130},@{S=131;E=298})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '"'{0}: {1}' -f "'$i,$lines[$i-1] } }; '"'---' }" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content $p; foreach($r in @(@{S=1290;E=1605},@{S=2068;E=2148},@{S=2608;E=2688},@{S=2988;E=3050},@{S=3380;E=3478})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '"'{0}: {1}' -f "'$i,$lines[$i-1] } }; '"'---' }" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; "'$lines=Get-Content $p; foreach($r in @(@{S=430;E=490},@{S=500;E=560},@{S=930;E=1010},@{S=1050;E=1084})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '"'{0}: {1}' -f "'$i,$lines[$i-1] } }; '"'---' }" in C:/Dev/menuapp-code-review succeeded in 31.60s:
+430:       {/* P0 Header: [ðŸ””] Ð¡Ñ‚Ð¾Ð» Â· Ð“Ð¾ÑÑ‚ÑŒ [âœ•] */}
+431:       <div className="bg-white rounded-lg shadow-sm border p-3 mb-4">
+432:         <div className="flex items-center justify-between">
+433:           {/* Left: Call waiter */}
+434:           {onCallWaiter && (
+435:             <button
+436:               onClick={onCallWaiter}
+437:               className="min-w-[44px] min-h-[44px] p-2 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center"
+438:               aria-label={tr('help.call_waiter', 'ÐŸÐ¾Ð·Ð²Ð°Ñ‚ÑŒ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ð°')}
+439:             >
+440:               <Bell className="w-5 h-5" />
+441:             </button>
+442:           )}
+443: 
+444:           {/* Center: Table & Guest */}
+445:           <div className="text-center flex-1 mx-2">
+446:             <div className="text-sm font-medium text-slate-700">{tableLabel}</div>
+447:             <div className="flex items-center justify-center gap-1 text-xs">
+448:               <span className="text-slate-500">{tr('cart.you', 'Ð’Ñ‹')}:</span>
+449:               {isEditingName ? (
+ succeeded in 31.68s:
+1: import React from "react";
+2: import { Loader2, ImageIcon, Minus, Plus, LayoutGrid, List } from "lucide-react";
+3: import { Card, CardContent } from "@/components/ui/card";
+4: import DishRating from "@/components/publicMenu/DishRating";
+5: 
+6: // Grid mappings for Tailwind (explicit full class names)
+7: const DESKTOP_GRID = {
+8:   1: "md:grid-cols-1",
+9:   2: "md:grid-cols-2",
+10:   3: "md:grid-cols-3",
+11:   4: "md:grid-cols-4",
+12:   5: "md:grid-cols-5",
+13: };
+14: 
+15: const MOBILE_GRID = {
+16:   1: "grid-cols-1",
+17:   2: "grid-cols-2",
+18: };
+19: 
+20: export default function MenuView({
+ succeeded in 31.92s:
+1290: 
+1291:   // Dish reviews modal state
+1292:   const [selectedDishId, setSelectedDishId] = useState(null);
+1293: 
+1294:   // Form
+1295:   const [clientName, setClientName] = useState("");
+1296:   const [clientPhone, setClientPhone] = useState("");
+1297:   const [deliveryAddress, setDeliveryAddress] = useState("");
+1298:   const [comment, setComment] = useState("");
+1299:   const [errors, setErrors] = useState({});
+1300: 
+1301:   const [isSubmitting, setIsSubmitting] = useState(false);
+1302:   const [submitError, setSubmitError] = useState(null);
+1303: 
+1304:   // Guest code (4-digit code for showing to waiter)
+1305:   const [guestCode, setGuestCode] = useState(null);
+1306: 
+1307:   // Hall UI state (not in session hook)
+1308:   const [splitType, setSplitType] = useState('single'); // 'single' | 'all'
+1309:   const [otherGuestsExpanded, setOtherGuestsExpanded] = useState(false);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; "'$lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '"'{0}: {1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'; "'$lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '"'{0}: {1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'; "'$lines=Get-Content $p; foreach($r in @(@{S=220;E=430},@{S=430;E=650},@{S=650;E=760},@{S=760;E=838})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '"'{0}: {1}' -f "'$i,$lines[$i-1] } }; '"'---' }" in C:/Dev/menuapp-code-review succeeded in 17.01s:
+1: import React from "react";
+2: import { CheckCircle2, AlertCircle } from "lucide-react";
+3: 
+4: export default function ModeTabs({
+5:   visibleModeTabs,
+6:   orderMode,
+7:   onModeChange,
+8:   getModeDescription,
+9:   isHallMode,
+10:   isTableVerified,
+11:   currentTableId,
+12:   currentTable,
+13:   tableCodeParam,
+14:   resolvedTable,
+15:   verifiedByCode,
+16:   t,
+17: }) {
+18:   return (
+19:     <div className="max-w-2xl mx-auto px-4 mt-4">
+20:       {visibleModeTabs.length > 1 ? (
+ succeeded in 17.53s:
+1: import React from "react";
+2: import { Plus, Minus } from "lucide-react";
+3: import { Card, CardContent } from "@/components/ui/card";
+4: import { Button } from "@/components/ui/button";
+5: import { Input } from "@/components/ui/input";
+6: 
+7: export default function CheckoutView({
+8:   t,
+9:   setView,
+10:   cart,
+11:   updateQuantity,
+12:   formatPrice,
+13:   finalTotal,
+14:   activeCurrency,
+15:   defaultCurrency,
+16:   orderMode,
+17:   renderHallCheckoutContent,
+18:   clientName,
+19:   setClientName,
+20:   clientPhone,
+ succeeded in 18.24s:
+220:     const prev = prevTableIdRef.current;
+221:     const curr = currentTableId;
+222:     
+223:     // Clear storage ONLY on REAL table change (both prev and curr defined and different)
+224:     if (prev && curr && prev !== curr && partner?.id) {
+225:       clearSessionId(partner.id, prev);
+226:       clearGuestId(partner.id, sessionIdRef.current, prev);
+227:     }
+228:     
+229:     // Reset state when table changes (including null â†’ tableId on initial mount)
+230:     if (prev !== curr) {
+231:       setTableSession(null);
+232:       setCurrentGuest(null);
+233:       setSessionOrders([]);
+234:       setSessionGuests([]);
+235:       setSessionItems([]);
+236:       sessionIdRef.current = null;
+237:       currentGuestIdRef.current = null;
+238:       didAttemptRestoreRef.current = false;
+239:     }
+codex
+I have enough context for the major flow bugs, but I’m doing one more pass for hardcoded strings, production logs, and a couple of hall-state edge cases before I write the report file.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const showLoyaltySection|showLoyaltySection =|useLoyalty|discountEnabled|loyaltyEnabled|customerEmail|earnedPoints|maxRedeemPoints|redeemedPoints' | ForEach-Object { \"{0}:{1}: {2}\" -f "'$_.Filename,$_.LineNumber,$_.Line.Trim() }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'console\\.|toast\\.|hardcoded|toLocaleString\\(|ru-RU|hallSticky|showLoyaltySection|setView\\(\"checkout\"\\)|handleCheckoutClick|common.loading|error.send.subtitle|cart.confirm_table|partner_missing|partner_not_found' | ForEach-Object { \"{0}:{1}: {2}\" -f "'$_.Filename,$_.LineNumber,$_.Line.Trim() }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'aria-label=\"|placeholder=\"|toLocaleString\\(|console\\.|t\\(' | ForEach-Object { \"{0}:{1}: {2}\" -f "'$_.Path,$_.LineNumber,$_.Line.Trim() }' in C:/Dev/menuapp-code-review succeeded in 20.76s:
+x.jsx:113: import { useLoyalty } from "@/components/publicMenu/refactor/hooks/useLoyalty";
+x.jsx:1946: customerEmail,
+x.jsx:1947: setCustomerEmail,
+x.jsx:1951: redeemedPoints,
+x.jsx:1952: setRedeemedPoints,
+x.jsx:1956: earnedPoints,
+x.jsx:1957: maxRedeemPoints,
+x.jsx:1958: } = useLoyalty({ partner, cartTotalAmount });
+x.jsx:1961: const loyaltyEnabled = partner?.loyalty_enabled === true;
+x.jsx:1962: const discountEnabled = partner?.discount_enabled === true;
+x.jsx:1963: const showLoyaltySection = (loyaltyEnabled || discountEnabled) && cart.length > 0;
+x.jsx:2035: const showLoginPromptAfterRating = loyaltyEnabled && !loyaltyAccount && showRatingBlock && hasAnyDraftRating;
+x.jsx:2301: setCustomerEmail('');
+x.jsx:2303: setRedeemedPoints(0);
+x.jsx:2421: if (customerEmail && customerEmail.trim() && !loyaltyAccountToUse) {
+x.jsx:2422: const emailLower = customerEmail.trim().toLowerCase();
+x.jsx:2430: } else if (loyaltyEnabled) {
+x.jsx:2444: if (redeemedPoints > 0) {
+x.jsx:2445: if (!loyaltyAccountToUse || loyaltyAccountToUse.balance < redeemedPoints) {
+x.jsx:2466: client_email: customerEmail && customerEmail.trim() ? customerEmail.trim().toLowerCase() : undefined,
+ succeeded in 20.77s:
+x.jsx:382: "error.partner_missing": "Ресторан не указан",
+x.jsx:384: "error.partner_not_found": "Ресторан не найден",
+x.jsx:407: "error.send.subtitle": "Попробуйте отправить ещё раз",
+x.jsx:444: "toast.error": "Ошибка",
+x.jsx:445: "common.loading": "Загрузка...",
+x.jsx:511: "cart.confirm_table.title": "Подтвердите стол",
+x.jsx:512: "cart.confirm_table.subtitle": "Чтобы отправить заказ официанту",
+x.jsx:513: "cart.confirm_table.benefit_loyalty": "По онлайн-заказу вы получите бонусы / скидку",
+x.jsx:514: "cart.confirm_table.benefit_default": "Так официант быстрее найдёт ваш заказ",
+x.jsx:515: "cart.confirm_table.submit": "Подтвердить и отправить",
+x.jsx:516: "cart.confirm_table.change": "Не тот стол? Изменить",
+x.jsx:988: const formatted = num.toLocaleString();
+x.jsx:1495: toast.error(t('error.invalid_link'), { id: 'mm1' });
+x.jsx:1530: console.error("Failed to save table", e);
+x.jsx:1963: const showLoyaltySection = (loyaltyEnabled || discountEnabled) && cart.length > 0;
+x.jsx:2057: toast.success(t('review.thanks'), { id: 'mm1' });
+x.jsx:2066: console.error('Failed to save rating:', err);
+x.jsx:2067: toast.error(t('error.save_failed'), { id: 'mm1' });
+x.jsx:2101: const hallStickyMode =
+x.jsx:2111: const hallStickyButtonLabel =
+ succeeded in 21.10s:
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:76: const safeReviewedItems = reviewedItems || new Set();
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:100: React.useEffect(() => () => clearTimeout(rewardTimerRef.current), []);
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:125: React.useEffect(() => {
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:133: React.useEffect(() => {
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:143: React.useEffect(() => {
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:154: React.useEffect(() => {
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:180: React.useEffect(() => {
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:189: const id = setTimeout(() => {
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:206: return () => clearTimeout(id);
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:222: const val = typeof t === "function" ? t(key) : "";
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:231: const val = typeof t === "function" ? t(key, params) : "";
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:249: const parts = label.split('.');
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:321: const ids = new Set(
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:347: if (!map.has(k)) map.set(k, []);
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:348: map.get(k).push(o);
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:362: const orders = ordersByGuestId.get(gid) || [];
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:413: return `${Number(loyaltyAccount.balance || 0).toLocaleString()} ${tr('loyalty.points_short', 'баллов')}`;
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:454: onChange={(e) => setGuestNameInput(e.target.value)}
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:460: if (e.key === 'Escape') { setIsEditingName(false); setGuestNameInput(''); }
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:464: <button onClick={() => { setIsEditingName(false); setGuestNameInput(''); }} className="text-slate-400 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label={tr('common.cancel', 'Отмена')}>✕</button>
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content $p; for($i=2976;$i -le 2990;$i++){ '"'{0}: {1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-review succeeded in 22.50s:
+2976:     }
+2977:   };
+2978: 
+2979:   // Request bill (ServiceRequest)
+2980:   const handleCheckoutClick = () => {
+2981:     setView("checkout");
+2982:   };
+2983: 
+2984:   const handleRequestBill = async () => {
+2985:     if (billCooldown || billRequested) {
+2986:       toast.info(tr('cart.bill_already_requested', 'Ð¡Ñ‡Ñ‘Ñ‚ ÑƒÐ¶Ðµ Ð·Ð°Ð¿Ñ€Ð¾ÑˆÐµÐ½'), { id: 'mm1' });
+2987:       return;
+2988:     }
+2989:     
+2990:     setBillRequested(true);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content $p; for($i=2570;$i -le 2625;$i++){ '"'{0}: {1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-review succeeded in 13.62s:
+2570:         : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+2571:       
+2572:       // BUG-PM-004: add _optimisticAt so polling merge preserves temp items
+2573:       const itemsWithLinks = newItems.map((item, i) => ({
+2574:         ...item,
+2575:         id: `temp_${tempIdBase}_${i}`,
+2576:         order: order.id,
+2577:         _optimisticAt: optimisticAt,
+2578:       }));
+2579:       
+2580:       setSessionItems(prev => [...prev, ...itemsWithLinks]);
+2581: 
+2582:       // GAP-01: Save cart snapshot for confirmation screen BEFORE clearing
+2583:       // FIX P1: Use finalTotal (post-discount) instead of raw cart.reduce
+2584:       const confirmedItems = [...cart];
+2585:       const confirmedTotal = finalTotal;
+2586:       const guestLabel = guestToUse
+2587:         ? getGuestDisplayName(guestToUse)
+2588:         : null;
+2589: 
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|function validate|validate\\(' | ForEach-Object { \"{0}:{1}: {2}\" -f "'$_.Filename,$_.LineNumber,$_.Line.Trim() }' in C:/Dev/menuapp-code-review succeeded in 13.97s:
+x.jsx:2334: const validate = () => {
+x.jsx:2620: if (!validate()) return;
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content $p; for($i=2334;$i -le 2410;$i++){ '"'{0}: {1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-review succeeded in 27.33s:
+2334:   const validate = () => {
+2335:     const newErrors = {};
+2336:     const raw = (clientPhone || "").trim();
+2337: 
+2338:     const checkPhone = () => {
+2339:       if (!/^\+?\d*$/.test(raw)) return t('error.phone_invalid');
+2340:       const digitsCount = raw.replace(/\D/g, "").length;
+2341:       if (digitsCount < 8) return t('error.phone_short');
+2342:       if (digitsCount > 15) return t('error.phone_long');
+2343:       return null;
+2344:     };
+2345: 
+2346:     if (orderMode === "hall") {
+2347:       // P0-1: Hall mode - table MUST be verified with real ID
+2348:       if (!currentTableId) {
+2349:         newErrors.tableSelection = t('error.table_required');
+2350:       }
+2351:       if (raw) {
+2352:         const err = checkPhone();
+2353:         if (err) newErrors.clientPhone = err;
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\\.hall\\.verified|hall\\.invalid_code|hall\\.invalid_code_desc|help\\.call_waiter|loyalty\\.email_placeholder|guest\\.name_placeholder|cart\\.you|common\\.save|common\\.cancel|cart\\.confirm_table\\.dismissed' | ForEach-Object { \"{0}:{1}: {2}\" -f "'$_.Filename,$_.LineNumber,$_.Line.Trim() }' in C:/Dev/menuapp-code-review succeeded in 19.09s:
+x.jsx:393: "cart.your_orders": "Ваши заказы",
+x.jsx:399: "cart.your_order": "Ваш заказ",
+x.jsx:443: "guest.name_placeholder": "Имя",
+x.jsx:450: "common.save": "Сохранить",
+x.jsx:464: "cart.you": "Вы",
+x.jsx:485: "loyalty.email_placeholder": "email@example.com",
+x.jsx:506: "help.call_waiter": "Позвать официанта",
+x.jsx:2128: : tr("cart.your_orders", "Ваши заказы");
+x.jsx:3390: toast(tr('cart.confirm_table.dismissed', 'Для отправки заказа нужно подтвердить стол'), { id: 'table-dismiss' });
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested|billCooldown|tableSession\\?.status|status === \\'closed\\'|ended_at|closed_at|paid|requested_bill|request bill' | ForEach-Object { \"{0}:{1}: {2}\" -f "'$_.Filename,$_.LineNumber,$_.Line.Trim() }' in C:/Dev/menuapp-code-review exited 1 in 15.34s:
+Select-String : A positional parameter cannot be found that accepts argument 
+'closed\|ended_at|closed_at|paid|requested_bill|request bill'.
+At line:2 char:1
++ Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) [Select-String], ParameterBindingException
+    + FullyQualifiedErrorId : PositionalParameterNotFound,Microsoft.PowerShell.Commands.SelectStringCommand
+ 
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested','billCooldown','tableSession\\?\\.status','ended_at','closed_at','paid','request bill' | ForEach-Object { \"{0}:{1}: {2}\" -f "'$_.Filename,$_.LineNumber,$_.Line.Trim() }' in C:/Dev/menuapp-code-review succeeded in 26.58s:
+x.jsx:281: const getBillCooldownKey = (tableId) => `menuapp_bill_requested_${tableId}`;
+x.jsx:285: const key = getBillCooldownKey(tableId);
+x.jsx:292: const setBillCooldownStorage = (tableId) => {
+x.jsx:294: const key = getBillCooldownKey(tableId);
+x.jsx:1314: const [billRequested, setBillRequested] = useState(false);
+x.jsx:1315: const [billCooldown, setBillCooldown] = useState(false);
+x.jsx:2309: setBillCooldown(isBillOnCooldown(currentTableId));
+x.jsx:2462: payment_status: "unpaid",
+x.jsx:2649: closed_at: new Date().toISOString(),
+x.jsx:2843: payment_status: "unpaid",
+x.jsx:2979: // Request bill (ServiceRequest)
+x.jsx:2985: if (billCooldown || billRequested) {
+x.jsx:2990: setBillRequested(true);
+x.jsx:3001: setBillCooldownStorage(currentTableId);
+x.jsx:3002: setBillCooldown(true);
+x.jsx:3005: console.error('Failed to request bill:', err);
+x.jsx:3007: setBillRequested(false);
+x.jsx:3355: billRequested={billRequested}
+x.jsx:3356: billCooldown={billCooldown}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content $p; for($i=2298;$i -le 2313;$i++){ '"'{0}: {1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-review succeeded in 23.40s:
+2298: 
+2299:   const clearCart = () => {
+2300:     setCart([]);
+2301:     setCustomerEmail('');
+2302:     setLoyaltyAccount(null);
+2303:     setRedeemedPoints(0);
+2304:   };
+2305: 
+2306:   // Check bill cooldown on mount
+2307:   useEffect(() => {
+2308:     if (currentTableId) {
+2309:       setBillCooldown(isBillOnCooldown(currentTableId));
+2310:     }
+2311:   }, [currentTableId]);
+2312: 
+2313:   // Debug hook kept as no-op to maintain hook order (BUG-PM-040: removed prod logging)
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content $p; for($i=3220;$i -le 3246;$i++){ '"'{0}: {1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-review succeeded in 23.14s:
+3220:         <CheckoutView
+3221:           t={t}
+3222:           setView={setView}
+3223:           cart={cart}
+3224:           updateQuantity={updateQuantity}
+3225:           formatPrice={formatPrice}
+3226:           cartTotalItems={cartTotalItems}
+3227:           cartTotalAmount={cartTotalAmount}
+3228:           clearCart={clearCart}
+3229:           showLoyaltySection={showLoyaltySection}
+3230:           customerEmail={customerEmail}
+3231:           setCustomerEmail={setCustomerEmail}
+3232:           loyaltyLoading={loyaltyLoading}
+3233:           loyaltyAccount={loyaltyAccount}
+3234:           partner={partner}
+3235:           earnedPoints={earnedPoints}
+3236:           redeemedPoints={redeemedPoints}
+3237:           setRedeemedPoints={setRedeemedPoints}
+3238:           maxRedeemPoints={maxRedeemPoints}
+3239:           discountEnabled={discountEnabled}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content $p; for($i=3246;$i -le 3263;$i++){ '"'{0}: {1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-review succeeded in 16.41s:
+3246:           orderMode={orderMode}
+3247:           renderHallCheckoutContent={renderHallCheckoutContent}
+3248:           clientName={clientName}
+3249:           setClientName={setClientName}
+3250:           clientPhone={clientPhone}
+3251:           handlePhoneChange={handlePhoneChange}
+3252:           handlePhoneFocus={handlePhoneFocus}
+3253:           deliveryAddress={deliveryAddress}
+3254:           setDeliveryAddress={setDeliveryAddress}
+3255:           comment={comment}
+3256:           setComment={setComment}
+3257:           errors={errors}
+3258:           submitError={submitError}
+3259:           isSubmitting={isSubmitting}
+3260:           handleSubmitOrder={handleSubmitOrder}
+3261:           isTableVerified={isTableVerified}
+3262:           currentTableId={currentTableId}
+3263:         />
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'tableSelection|errors\\.' | ForEach-Object { \"{0}:{1}: {2}\" -f "'$_.Path,$_.LineNumber,$_.Line.Trim() }' in C:/Dev/menuapp-code-review succeeded in 16.64s:
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\x.jsx:1521: const saveTableSelection = (partnerId, tableId) => {
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\x.jsx:1586: } = useHelpRequests({ partner, currentTableId, t, toast, isRateLimitError, saveTableSelection });
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\x.jsx:2316: // P0-7: Removed handleTableSelection - no dropdown
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\x.jsx:2349: newErrors.tableSelection = t('error.table_required');
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\x.jsx:2353: if (err) newErrors.clientPhone = err;
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\x.jsx:2356: if (!clientName.trim()) newErrors.clientName = t('error.name_required');
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\x.jsx:2358: if (!raw) newErrors.clientPhone = t('error.phone_required');
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\x.jsx:2361: if (err) newErrors.clientPhone = err;
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\x.jsx:2365: newErrors.deliveryAddress = t('error.address_required');
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\x.jsx:2477: if (partner?.id && orderData.table) saveTableSelection(partner.id, orderData.table);
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:105: className={errors.clientName ? "border-red-300" : ""}
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:107: {errors.clientName && <p className="text-xs text-red-500">{errors.clientName}</p>}
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:122: className={errors.clientPhone ? "border-red-300" : ""}
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:124: {errors.clientPhone && <p className="text-xs text-red-500">{errors.clientPhone}</p>}
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:139: className={errors.deliveryAddress ? "border-red-300" : ""}
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx:141: {errors.deliveryAddress && <p className="text-xs text-red-500">{errors.deliveryAddress}</p>}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const \\[isMobile, setIsMobile\\]' | ForEach-Object { \"{0}:{1}: {2}\" -f "'$_.Filename,$_.LineNumber,$_.Line.Trim() }' in C:/Dev/menuapp-code-review succeeded in 19.91s:
+x.jsx:1280: const [isMobile, setIsMobile] = useState(() => {
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; "'$lines=Get-Content $p; for($i=1278;$i -le 1288;$i++){ '"'{0}: {1}' -f "'$i,$lines[$i-1] }' in C:/Dev/menuapp-code-review succeeded in 13.32s:
+1278: 
+1279:   // Mobile breakpoint detection
+1280:   const [isMobile, setIsMobile] = useState(() => {
+1281:     if (typeof window === 'undefined') return false;
+1282:     return window.matchMedia("(max-width: 767px)").matches;
+1283:   });
+1284: 
+1285:   // Mobile layout preference (tile | list) â€” S72: default list for mobile-first UX
+1286:   const [mobileLayout, setMobileLayout] = useState('list');
+1287: 
+1288:   // Redirect banner state
+codex
+I’ve isolated the findings. I’m writing the required pipeline file now, and I’m also saving the repo-mandated review artifact and command log under `pages/PublicMenu/` without reading anything else.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'" in C:/Dev/menuapp-code-review exited 124 in 11.00s:
+
+ exited 124 in 11.12s:
+
+codex
+The workspace is just slow on shell startup, not on scope. I’m retrying the two existence checks with a longer timeout, then applying the report files directly.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'" in C:/Dev/menuapp-code-review succeeded in 18.11s:
+True
+ succeeded in 18.06s:
+True
+codex
+I’m applying three file writes in one patch: the required pipeline findings file, the repo-mandated review copy, and the command log. No code changes are being made.
+file update
+A C:/Dev/menuapp-code-review\pipeline/chain-state/publicmenu-260321-173133-codex-findings.md
+# Codex Writer Findings — PublicMenu
+Chain: publicmenu-260321-173133
+
+## Findings
+1. [P1] Hall submit validates table before opening confirmation sheet - `x.jsx:2334-2350` requires `currentTableId` in hall mode, but `x.jsx:2628-2632` opens the confirmation Bottom Sheet only after `validate()` passes. On `/x?...mode=hall` with no verified table, the click dies at `newErrors.tableSelection`; there is no rendered `tableSelection` error in the hall drawer, so the user sees nothing. FIX: move the `!isTableVerified` gate above `validate()`, or skip hall `tableSelection` validation until after the Bottom Sheet verification flow.
+2. [P1] Partner lookup converts backend failures into "restaurant not found" - `x.jsx:1322-1346` catches both lookup attempts and returns `null`, and `x.jsx:3035-3040` always renders `error.partner_not_found` when `partner` is null. Transient API failures are misreported as a bad QR link and the query never retries because it resolves successfully. FIX: let request errors throw (or store them separately), use React Query's error state, and render a retryable backend error distinct from true not-found.
+3. [P1] Pickup/delivery checkout drops loyalty and discount flow entirely - `x.jsx:3220-3263` passes loyalty props into `CheckoutView`, but `CheckoutView.jsx:7-32` does not accept them and `CheckoutView.jsx:88-149` renders only contact/comment fields. Guests cannot enter loyalty email, see balance or discounts, or redeem points in pickup/delivery even though submit logic still supports those fields in `x.jsx`. FIX: extend `CheckoutView` to consume the passed loyalty and discount props and render the same email, balance, and redeem UI for non-hall checkout.
+4. [P1] Session restore stops forever after a single transient failure - `useTableSession.jsx:265-487` sets `didAttemptRestoreRef.current = true` before the async restore work, then swallows all errors in the outer `catch` without resetting it. If any restore request fails once, the effect never retries until the table changes or the page is reloaded. FIX: reset the attempt flag on failure, or only mark restore as attempted after successful completion and add retry/backoff handling for recoverable errors.
+5. [P1] Hall StickyCartBar ignores visit lifecycle and bill state - `x.jsx:2101-2144` derives `hallStickyMode` only from `cart`, `myOrders`, and `sessionOrders`, while bill state exists separately in `x.jsx:1314-1315`, `x.jsx:2306-2310`, and `x.jsx:2984-3002` and is never consulted here. That prevents lifecycle-specific CTA, copy, and visibility for requested bill, closed visit, paid visit, and other post-order hall states. FIX: compute sticky-bar mode from `tableSession`, `billRequested`, `billCooldown`, and visit or payment status before choosing label, amount, and visibility.
+6. [P2] Table-code verification is split between hidden CartView state and visible Bottom Sheet - `CartView.jsx:89-177` still owns code attempts and lockout state and `CartView.jsx:180-206` auto-calls `verifyTableCode`, but the live Bottom Sheet in `x.jsx:3383-3478` does not read that state and its CTA directly calls `verifyTableCode` again. The visible sheet therefore has no cooldown or countdown UI and verification behavior comes from two components at once. FIX: move code attempts, lockout, and auto-submit state into `x.jsx` or the shared verification hook, remove the hidden CartView verification effects, and let the sheet render and enforce the single source of truth.
+7. [P2] Mobile tile layout ignores partner's configured mobile grid size - `MenuView.jsx:42-49` computes `mobileCols` from `partner.menu_grid_mobile`, but `MenuView.jsx:284` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for a 1-column mobile grid still get 2 columns. FIX: use `MOBILE_GRID[mobileCols]` or `gridColsClass` in the mobile tile branch instead of hardcoding `grid-cols-2`.
+8. [P3] Several user-facing controls still miss required i18n or accessibility wiring - examples: `CheckoutView.jsx:58-63` hardcodes English `aria-label`s (`"Decrease"`, `"Increase"`), `MenuView.jsx:102-125` list-mode quantity buttons have no `aria-label`s at all, and `CartView.jsx:467-485` has unlabeled edit and close buttons plus a hardcoded reward-email placeholder at `CartView.jsx:524`. This creates mixed-language UI and weaker screen-reader behavior. FIX: localize all placeholders and labels with `t()` or `tr()` and add explicit `aria-label`s to every icon-only control.
+
+## Summary
+Total: 8 findings (0 P0, 5 P1, 2 P2, 1 P3)
+
+## Prompt Clarity
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): `Fix 1` in the task context describes only PM-071, but the top-level request asks for a full bug review across `pages/PublicMenu/base/*.jsx`; it was unclear whether to review only PM-071 or all current bugs in the matched files.
+- Missing context (what info would have helped): Whether `pages/PublicMenu/base/*.jsx` should mean one current page file or all six matching JSX files.
+- Scope questions (anything you weren't sure if it's in scope): The request says "ONLY these 3 files," but the glob expands to six JSX files; I treated the glob as in-scope and did not read anything outside `pages/PublicMenu/`.
+A C:/Dev/menuapp-code-review\pages/PublicMenu/commands_2026-03-21.log
+Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'
+@( 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' ) | ForEach-Object { $p=$_; $lines=(Get-Content $p).Length; Write-Output "$p`t$lines" }
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleSubmitOrder|showTableConfirmSheet|pendingSubmitRef|verifyTableCode|partner_not_found|renderHallCheckoutContent|hallStickyMode|showCartButton|tableCodeLength|isTableVerified|Drawer' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'send_to_waiter|handleSubmitOrder|aria-label|placeholder|toLocaleString|ru-RU|tableCode|codeLockedUntil|codeAttempts|showLoyaltySection|isTableVerified|document.querySelector|guestDisplay|Button|sticky bottom-0' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1290;E=1605},@{S=2068;E=2148},@{S=2608;E=2688},@{S=2988;E=3050},@{S=3380;E=3478})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=430;E=490},@{S=500;E=560},@{S=930;E=1010},@{S=1050;E=1084})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1;E=130},@{S=131;E=298})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=220;E=430},@{S=430;E=650},@{S=650;E=760},@{S=760;E=838})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'console\.|toast\.|hardcoded|toLocaleString\(|ru-RU|hallSticky|showLoyaltySection|setView\("checkout"\)|handleCheckoutClick|common.loading|error.send.subtitle|cart.confirm_table|partner_missing|partner_not_found' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'aria-label="|placeholder="|toLocaleString\(|console\.|t\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const showLoyaltySection|showLoyaltySection =|useLoyalty|discountEnabled|loyaltyEnabled|customerEmail|earnedPoints|maxRedeemPoints|redeemedPoints' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2976;$i -le 2990;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2570;$i -le 2625;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|function validate|validate\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2334;$i -le 2410;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'tableSelection|errors\.' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|help\.call_waiter|loyalty\.email_placeholder|guest\.name_placeholder|cart\.you|common\.save|common\.cancel|cart\.confirm_table\.dismissed' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const \[isMobile, setIsMobile\]' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=1278;$i -le 1288;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
+Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
+Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
+Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested|billCooldown|tableSession\?\.status|ended_at|closed_at|paid|request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested','billCooldown','tableSession\?\.status','ended_at','closed_at','paid','request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2298;$i -le 2313;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3220;$i -le 3246;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3246;$i -le 3263;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+A C:/Dev/menuapp-code-review\pages/PublicMenu/review_2026-03-21.md
+# Codex Writer Findings — PublicMenu
+Chain: publicmenu-260321-173133
+
+## Findings
+1. [P1] Hall submit validates table before opening confirmation sheet - `x.jsx:2334-2350` requires `currentTableId` in hall mode, but `x.jsx:2628-2632` opens the confirmation Bottom Sheet only after `validate()` passes. On `/x?...mode=hall` with no verified table, the click dies at `newErrors.tableSelection`; there is no rendered `tableSelection` error in the hall drawer, so the user sees nothing. FIX: move the `!isTableVerified` gate above `validate()`, or skip hall `tableSelection` validation until after the Bottom Sheet verification flow.
+2. [P1] Partner lookup converts backend failures into "restaurant not found" - `x.jsx:1322-1346` catches both lookup attempts and returns `null`, and `x.jsx:3035-3040` always renders `error.partner_not_found` when `partner` is null. Transient API failures are misreported as a bad QR link and the query never retries because it resolves successfully. FIX: let request errors throw (or store them separately), use React Query's error state, and render a retryable backend error distinct from true not-found.
+3. [P1] Pickup/delivery checkout drops loyalty and discount flow entirely - `x.jsx:3220-3263` passes loyalty props into `CheckoutView`, but `CheckoutView.jsx:7-32` does not accept them and `CheckoutView.jsx:88-149` renders only contact/comment fields. Guests cannot enter loyalty email, see balance or discounts, or redeem points in pickup/delivery even though submit logic still supports those fields in `x.jsx`. FIX: extend `CheckoutView` to consume the passed loyalty and discount props and render the same email, balance, and redeem UI for non-hall checkout.
+4. [P1] Session restore stops forever after a single transient failure - `useTableSession.jsx:265-487` sets `didAttemptRestoreRef.current = true` before the async restore work, then swallows all errors in the outer `catch` without resetting it. If any restore request fails once, the effect never retries until the table changes or the page is reloaded. FIX: reset the attempt flag on failure, or only mark restore as attempted after successful completion and add retry/backoff handling for recoverable errors.
+5. [P1] Hall StickyCartBar ignores visit lifecycle and bill state - `x.jsx:2101-2144` derives `hallStickyMode` only from `cart`, `myOrders`, and `sessionOrders`, while bill state exists separately in `x.jsx:1314-1315`, `x.jsx:2306-2310`, and `x.jsx:2984-3002` and is never consulted here. That prevents lifecycle-specific CTA, copy, and visibility for requested bill, closed visit, paid visit, and other post-order hall states. FIX: compute sticky-bar mode from `tableSession`, `billRequested`, `billCooldown`, and visit or payment status before choosing label, amount, and visibility.
+6. [P2] Table-code verification is split between hidden CartView state and visible Bottom Sheet - `CartView.jsx:89-177` still owns code attempts and lockout state and `CartView.jsx:180-206` auto-calls `verifyTableCode`, but the live Bottom Sheet in `x.jsx:3383-3478` does not read that state and its CTA directly calls `verifyTableCode` again. The visible sheet therefore has no cooldown or countdown UI and verification behavior comes from two components at once. FIX: move code attempts, lockout, and auto-submit state into `x.jsx` or the shared verification hook, remove the hidden CartView verification effects, and let the sheet render and enforce the single source of truth.
+7. [P2] Mobile tile layout ignores partner's configured mobile grid size - `MenuView.jsx:42-49` computes `mobileCols` from `partner.menu_grid_mobile`, but `MenuView.jsx:284` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for a 1-column mobile grid still get 2 columns. FIX: use `MOBILE_GRID[mobileCols]` or `gridColsClass` in the mobile tile branch instead of hardcoding `grid-cols-2`.
+8. [P3] Several user-facing controls still miss required i18n or accessibility wiring - examples: `CheckoutView.jsx:58-63` hardcodes English `aria-label`s (`"Decrease"`, `"Increase"`), `MenuView.jsx:102-125` list-mode quantity buttons have no `aria-label`s at all, and `CartView.jsx:467-485` has unlabeled edit and close buttons plus a hardcoded reward-email placeholder at `CartView.jsx:524`. This creates mixed-language UI and weaker screen-reader behavior. FIX: localize all placeholders and labels with `t()` or `tr()` and add explicit `aria-label`s to every icon-only control.
+
+## Summary
+Total: 8 findings (0 P0, 5 P1, 2 P2, 1 P3)
+
+## Prompt Clarity
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): `Fix 1` in the task context describes only PM-071, but the top-level request asks for a full bug review across `pages/PublicMenu/base/*.jsx`; it was unclear whether to review only PM-071 or all current bugs in the matched files.
+- Missing context (what info would have helped): Whether `pages/PublicMenu/base/*.jsx` should mean one current page file or all six matching JSX files.
+- Scope questions (anything you weren't sure if it's in scope): The request says "ONLY these 3 files," but the glob expands to six JSX files; I treated the glob as in-scope and did not read anything outside `pages/PublicMenu/`.
+apply_patch(auto_approved=true) exited 0 in 5.67s:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260321-173133-codex-findings.md
+A pages/PublicMenu/review_2026-03-21.md
+A pages/PublicMenu/commands_2026-03-21.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-21.log b/pages/PublicMenu/commands_2026-03-21.log
+index 10694b2c74c5a745fd5a43a4e37c34b3cedca47f..a8f7bf4e2477650e1dc867726cf011e7b744f493
+--- a/pages/PublicMenu/commands_2026-03-21.log
++++ b/pages/PublicMenu/commands_2026-03-21.log
+@@ -1,40 +1,41 @@
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'showTableConfirmSheet|pendingSubmitRef|handleSubmitOrder|verifyTableCode|base44.entities.Partner|partner_not_found|CategoryChips|ModeTabs|CartView|CheckoutView|useTableSession|DrawerContent className=\"max-h-\\[85dvh\\] rounded-t-3xl\"' -Context 4,8 | ForEach-Object { $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'verify.enter_table_code|tableCodeInput|isTableVerified|handleSubmitOrder|cart.send_to_waiter|aria-label=|onMouseEnter|onMouseLeave|querySelector|rewardEmail|setTimeout|scrollTop' -Context 3,6 | ForEach-Object { $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx' -Pattern 'aria-label=|activeColor|B5543A|onMouseEnter|onMouseLeave|toLocaleString\\(|status.new|localStorage|document|window|setTimeout|setInterval' -Context 2,4 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; $ranges=@(@{s=2130;e=2215},@{s=2460;e=2555},@{s=3360;e=3465}); foreach($r in $ranges){ for($i=$r.s; $i -le $r.e; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; $ranges=@(@{s=120;e=220},@{s=360;e=470},@{s=1030;e=1225}); foreach($r in $ranges){ for($i=$r.s; $i -le $r.e; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=140; $i -le 190; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleCheckoutClick|setView\\(\"checkout\"\\)|view === \"checkout\"|orderMode === \"hall\"' -Context 3,8 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=470; $i -le 590; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=900; $i -le 1045; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'setView\\(\"checkout\"\\)' | ForEach-Object { $_.LineNumber.ToString() + ':' + $_.Line }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=1280; $i -le 1385; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2605; $i -le 2665; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2000; $i -le 2045; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2060; $i -le 2105; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=1; $i -le 105; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=45; $i -le 70; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=95; $i -le 115; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }; '---'; for($i=156; $i -le 188; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=95; $i -le 112; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=112; $i -le 116; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=84; $i -le 110; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'if \\(!partner\\)' -Context 0,8 | ForEach-Object { $_.LineNumber.ToString()+':'+$_.Line; $_.Context.PostContext }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'Ваш заказ сохранён|error.send.subtitle' -Context 2,3 | ForEach-Object { $_.LineNumber.ToString()+':'+$_.Line; $_.Context.PreContext; $_.Context.PostContext }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=1244; $i -le 1254; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=100; $i -le 123; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=123; $i -le 128; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2633; $i -le 2925; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'processHallOrder|processPickupOrDeliveryOrder|orderMode === \"hall\"' -Context 2,6 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|newErrors.tableSelection' -Context 3,10 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'
++@( 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' ) | ForEach-Object { $p=$_; $lines=(Get-Content $p).Length; Write-Output "$p`t$lines" }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleSubmitOrder|showTableConfirmSheet|pendingSubmitRef|verifyTableCode|partner_not_found|renderHallCheckoutContent|hallStickyMode|showCartButton|tableCodeLength|isTableVerified|Drawer' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'send_to_waiter|handleSubmitOrder|aria-label|placeholder|toLocaleString|ru-RU|tableCode|codeLockedUntil|codeAttempts|showLoyaltySection|isTableVerified|document.querySelector|guestDisplay|Button|sticky bottom-0' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1290;E=1605},@{S=2068;E=2148},@{S=2608;E=2688},@{S=2988;E=3050},@{S=3380;E=3478})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=430;E=490},@{S=500;E=560},@{S=930;E=1010},@{S=1050;E=1084})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1;E=130},@{S=131;E=298})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=220;E=430},@{S=430;E=650},@{S=650;E=760},@{S=760;E=838})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'console\.|toast\.|hardcoded|toLocaleString\(|ru-RU|hallSticky|showLoyaltySection|setView\("checkout"\)|handleCheckoutClick|common.loading|error.send.subtitle|cart.confirm_table|partner_missing|partner_not_found' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'aria-label="|placeholder="|toLocaleString\(|console\.|t\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const showLoyaltySection|showLoyaltySection =|useLoyalty|discountEnabled|loyaltyEnabled|customerEmail|earnedPoints|maxRedeemPoints|redeemedPoints' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2976;$i -le 2990;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2570;$i -le 2625;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|function validate|validate\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2334;$i -le 2410;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'tableSelection|errors\.' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|help\.call_waiter|loyalty\.email_placeholder|guest\.name_placeholder|cart\.you|common\.save|common\.cancel|cart\.confirm_table\.dismissed' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const \[isMobile, setIsMobile\]' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=1278;$i -le 1288;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
++Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
++Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
++Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested|billCooldown|tableSession\?\.status|ended_at|closed_at|paid|request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested','billCooldown','tableSession\?\.status','ended_at','closed_at','paid','request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2298;$i -le 2313;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3220;$i -le 3246;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3246;$i -le 3263;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+diff --git a/pages/PublicMenu/review_2026-03-21.md b/pages/PublicMenu/review_2026-03-21.md
+index e70a1508ae2ef09a3e777e6e1ec933503b1bb689..558164b5aff88cac1673e9e460463d2ac9a559f8
+--- a/pages/PublicMenu/review_2026-03-21.md
++++ b/pages/PublicMenu/review_2026-03-21.md
+@@ -1,13 +1,21 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260321-140331
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-173133
+ 
+ ## Findings
+-1. [P0] Hall submit bypasses table verification when `currentTableId` already exists — `handleSubmitOrder()` opens the confirmation sheet only on `!currentTableId` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2622)), but the safe hall path only runs when `isTableVerified` is true ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2635)). If a QR/session already provides `currentTableId` while verification is still false, the code falls into the generic branch ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2783)) and creates a hall order without `table`, `table_session`, or `guest`. FIX: gate hall submit on `!isTableVerified`, and hard-stop the generic branch for unverified hall orders.
+-2. [P1] The old inline table-confirmation UI is still rendered before submit — `CartView` still shows the full verification block inside the drawer before the guest taps submit ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1035)), and submit only adds `showTableConfirmSheet` without replacing that drawer flow ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2622), [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3377)). Guests can still see table UI before submit, which violates the just-in-time spec. FIX: remove the inline verification block from `CartView` and make the bottom sheet the only table-confirmation surface after submit tap.
+-3. [P1] The bottom sheet implementation is incomplete and ignores partner-configured code length — the sheet hardcodes 4 slots, `slice(0, 4)`, `maxLength={4}`, and placeholder `0000` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3407)), while `CartView` already derives `tableCodeLength` from partner config ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L102)). The sheet also has no primary `Подтвердить и отправить` CTA in scoped code, only a secondary reset link ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3445)). FIX: extract shared table-code UI with configurable length and add the required primary CTA that verifies and immediately submits.
+-4. [P1] Partner lookup hides backend/query failures as “restaurant not found” — the partner query swallows both lookup exceptions and returns `null` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L1321)), then the page always renders `error.partner_not_found` for `!partner` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3029)). A transient backend failure is therefore misreported as a bad QR link. FIX: preserve request errors separately from true not-found and render retryable error UI for backend failures.
+-5. [P1] `x.jsx` is not wired to the sibling `base/*.jsx` modules being reviewed — it imports `MenuView`, `CartView`, `ModeTabs`, `CheckoutView`, and `useTableSession` from `@/components/publicMenu/...` and `refactor/...`, not from `pages/PublicMenu/base/*` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L100)). That means fixes made to the scoped base files can miss runtime behavior entirely, including the PM-062/PM-064 paths called out in the task context. FIX: either switch `x.jsx` to import the sibling base modules or stop treating these base files as the active implementation.
+-6. [P2] Submit-error fallback still tells guests the order was saved — `CartView` falls back to `Ваш заказ сохранён. Попробуйте снова` on submit failure ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1247)). That message is factually wrong if failure happened before any order was created. FIX: replace the fallback with neutral retry copy consistent with the safer `error.send.subtitle` wording.
+-7. [P3] Remaining i18n/accessibility regressions in mobile controls — `CheckoutView` hardcodes English aria labels `Decrease` / `Increase` ([CheckoutView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx#L58)), `CartView` hardcodes the reward email placeholder instead of using `t(...)` ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L520)), and `MenuView` list-mode add/stepper buttons have no aria-labels at all ([MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L102)). FIX: route all user-facing control text through i18n keys and add translated aria-labels to every action button.
++1. [P1] Hall submit validates table before opening confirmation sheet - `x.jsx:2334-2350` requires `currentTableId` in hall mode, but `x.jsx:2628-2632` opens the confirmation Bottom Sheet only after `validate()` passes. On `/x?...mode=hall` with no verified table, the click dies at `newErrors.tableSelection`; there is no rendered `tableSelection` error in the hall drawer, so the user sees nothing. FIX: move the `!isTableVerified` gate above `validate()`, or skip hall `tableSelection` validation until after the Bottom Sheet verification flow.
++2. [P1] Partner lookup converts backend failures into "restaurant not found" - `x.jsx:1322-1346` catches both lookup attempts and returns `null`, and `x.jsx:3035-3040` always renders `error.partner_not_found` when `partner` is null. Transient API failures are misreported as a bad QR link and the query never retries because it resolves successfully. FIX: let request errors throw (or store them separately), use React Query's error state, and render a retryable backend error distinct from true not-found.
++3. [P1] Pickup/delivery checkout drops loyalty and discount flow entirely - `x.jsx:3220-3263` passes loyalty props into `CheckoutView`, but `CheckoutView.jsx:7-32` does not accept them and `CheckoutView.jsx:88-149` renders only contact/comment fields. Guests cannot enter loyalty email, see balance or discounts, or redeem points in pickup/delivery even though submit logic still supports those fields in `x.jsx`. FIX: extend `CheckoutView` to consume the passed loyalty and discount props and render the same email, balance, and redeem UI for non-hall checkout.
++4. [P1] Session restore stops forever after a single transient failure - `useTableSession.jsx:265-487` sets `didAttemptRestoreRef.current = true` before the async restore work, then swallows all errors in the outer `catch` without resetting it. If any restore request fails once, the effect never retries until the table changes or the page is reloaded. FIX: reset the attempt flag on failure, or only mark restore as attempted after successful completion and add retry/backoff handling for recoverable errors.
++5. [P1] Hall StickyCartBar ignores visit lifecycle and bill state - `x.jsx:2101-2144` derives `hallStickyMode` only from `cart`, `myOrders`, and `sessionOrders`, while bill state exists separately in `x.jsx:1314-1315`, `x.jsx:2306-2310`, and `x.jsx:2984-3002` and is never consulted here. That prevents lifecycle-specific CTA, copy, and visibility for requested bill, closed visit, paid visit, and other post-order hall states. FIX: compute sticky-bar mode from `tableSession`, `billRequested`, `billCooldown`, and visit or payment status before choosing label, amount, and visibility.
++6. [P2] Table-code verification is split between hidden CartView state and visible Bottom Sheet - `CartView.jsx:89-177` still owns code attempts and lockout state and `CartView.jsx:180-206` auto-calls `verifyTableCode`, but the live Bottom Sheet in `x.jsx:3383-3478` does not read that state and its CTA directly calls `verifyTableCode` again. The visible sheet therefore has no cooldown or countdown UI and verification behavior comes from two components at once. FIX: move code attempts, lockout, and auto-submit state into `x.jsx` or the shared verification hook, remove the hidden CartView verification effects, and let the sheet render and enforce the single source of truth.
++7. [P2] Mobile tile layout ignores partner's configured mobile grid size - `MenuView.jsx:42-49` computes `mobileCols` from `partner.menu_grid_mobile`, but `MenuView.jsx:284` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for a 1-column mobile grid still get 2 columns. FIX: use `MOBILE_GRID[mobileCols]` or `gridColsClass` in the mobile tile branch instead of hardcoding `grid-cols-2`.
++8. [P3] Several user-facing controls still miss required i18n or accessibility wiring - examples: `CheckoutView.jsx:58-63` hardcodes English `aria-label`s (`"Decrease"`, `"Increase"`), `MenuView.jsx:102-125` list-mode quantity buttons have no `aria-label`s at all, and `CartView.jsx:467-485` has unlabeled edit and close buttons plus a hardcoded reward-email placeholder at `CartView.jsx:524`. This creates mixed-language UI and weaker screen-reader behavior. FIX: localize all placeholders and labels with `t()` or `tr()` and add explicit `aria-label`s to every icon-only control.
+ 
+ ## Summary
+-Total: 7 findings (1 P0, 4 P1, 1 P2, 1 P3)
++Total: 8 findings (0 P0, 5 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): `Fix 1` in the task context describes only PM-071, but the top-level request asks for a full bug review across `pages/PublicMenu/base/*.jsx`; it was unclear whether to review only PM-071 or all current bugs in the matched files.
++- Missing context (what info would have helped): Whether `pages/PublicMenu/base/*.jsx` should mean one current page file or all six matching JSX files.
++- Scope questions (anything you weren't sure if it's in scope): The request says "ONLY these 3 files," but the glob expands to six JSX files; I treated the glob as in-scope and did not read anything outside `pages/PublicMenu/`.
+diff --git a/pipeline/chain-state/publicmenu-260321-173133-codex-findings.md b/pipeline/chain-state/publicmenu-260321-173133-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..558164b5aff88cac1673e9e460463d2ac9a559f8
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260321-173133-codex-findings.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-173133
++
++## Findings
++1. [P1] Hall submit validates table before opening confirmation sheet - `x.jsx:2334-2350` requires `currentTableId` in hall mode, but `x.jsx:2628-2632` opens the confirmation Bottom Sheet only after `validate()` passes. On `/x?...mode=hall` with no verified table, the click dies at `newErrors.tableSelection`; there is no rendered `tableSelection` error in the hall drawer, so the user sees nothing. FIX: move the `!isTableVerified` gate above `validate()`, or skip hall `tableSelection` validation until after the Bottom Sheet verification flow.
++2. [P1] Partner lookup converts backend failures into "restaurant not found" - `x.jsx:1322-1346` catches both lookup attempts and returns `null`, and `x.jsx:3035-3040` always renders `error.partner_not_found` when `partner` is null. Transient API failures are misreported as a bad QR link and the query never retries because it resolves successfully. FIX: let request errors throw (or store them separately), use React Query's error state, and render a retryable backend error distinct from true not-found.
++3. [P1] Pickup/delivery checkout drops loyalty and discount flow entirely - `x.jsx:3220-3263` passes loyalty props into `CheckoutView`, but `CheckoutView.jsx:7-32` does not accept them and `CheckoutView.jsx:88-149` renders only contact/comment fields. Guests cannot enter loyalty email, see balance or discounts, or redeem points in pickup/delivery even though submit logic still supports those fields in `x.jsx`. FIX: extend `CheckoutView` to consume the passed loyalty and discount props and render the same email, balance, and redeem UI for non-hall checkout.
++4. [P1] Session restore stops forever after a single transient failure - `useTableSession.jsx:265-487` sets `didAttemptRestoreRef.current = true` before the async restore work, then swallows all errors in the outer `catch` without resetting it. If any restore request fails once, the effect never retries until the table changes or the page is reloaded. FIX: reset the attempt flag on failure, or only mark restore as attempted after successful completion and add retry/backoff handling for recoverable errors.
++5. [P1] Hall StickyCartBar ignores visit lifecycle and bill state - `x.jsx:2101-2144` derives `hallStickyMode` only from `cart`, `myOrders`, and `sessionOrders`, while bill state exists separately in `x.jsx:1314-1315`, `x.jsx:2306-2310`, and `x.jsx:2984-3002` and is never consulted here. That prevents lifecycle-specific CTA, copy, and visibility for requested bill, closed visit, paid visit, and other post-order hall states. FIX: compute sticky-bar mode from `tableSession`, `billRequested`, `billCooldown`, and visit or payment status before choosing label, amount, and visibility.
++6. [P2] Table-code verification is split between hidden CartView state and visible Bottom Sheet - `CartView.jsx:89-177` still owns code attempts and lockout state and `CartView.jsx:180-206` auto-calls `verifyTableCode`, but the live Bottom Sheet in `x.jsx:3383-3478` does not read that state and its CTA directly calls `verifyTableCode` again. The visible sheet therefore has no cooldown or countdown UI and verification behavior comes from two components at once. FIX: move code attempts, lockout, and auto-submit state into `x.jsx` or the shared verification hook, remove the hidden CartView verification effects, and let the sheet render and enforce the single source of truth.
++7. [P2] Mobile tile layout ignores partner's configured mobile grid size - `MenuView.jsx:42-49` computes `mobileCols` from `partner.menu_grid_mobile`, but `MenuView.jsx:284` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for a 1-column mobile grid still get 2 columns. FIX: use `MOBILE_GRID[mobileCols]` or `gridColsClass` in the mobile tile branch instead of hardcoding `grid-cols-2`.
++8. [P3] Several user-facing controls still miss required i18n or accessibility wiring - examples: `CheckoutView.jsx:58-63` hardcodes English `aria-label`s (`"Decrease"`, `"Increase"`), `MenuView.jsx:102-125` list-mode quantity buttons have no `aria-label`s at all, and `CartView.jsx:467-485` has unlabeled edit and close buttons plus a hardcoded reward-email placeholder at `CartView.jsx:524`. This creates mixed-language UI and weaker screen-reader behavior. FIX: localize all placeholders and labels with `t()` or `tr()` and add explicit `aria-label`s to every icon-only control.
++
++## Summary
++Total: 8 findings (0 P0, 5 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): `Fix 1` in the task context describes only PM-071, but the top-level request asks for a full bug review across `pages/PublicMenu/base/*.jsx`; it was unclear whether to review only PM-071 or all current bugs in the matched files.
++- Missing context (what info would have helped): Whether `pages/PublicMenu/base/*.jsx` should mean one current page file or all six matching JSX files.
++- Scope questions (anything you weren't sure if it's in scope): The request says "ONLY these 3 files," but the glob expands to six JSX files; I treated the glob as in-scope and did not read anything outside `pages/PublicMenu/`.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-21.log b/pages/PublicMenu/commands_2026-03-21.log
+index 10694b2c74c5a745fd5a43a4e37c34b3cedca47f..a8f7bf4e2477650e1dc867726cf011e7b744f493
+--- a/pages/PublicMenu/commands_2026-03-21.log
++++ b/pages/PublicMenu/commands_2026-03-21.log
+@@ -1,40 +1,41 @@
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'showTableConfirmSheet|pendingSubmitRef|handleSubmitOrder|verifyTableCode|base44.entities.Partner|partner_not_found|CategoryChips|ModeTabs|CartView|CheckoutView|useTableSession|DrawerContent className=\"max-h-\\[85dvh\\] rounded-t-3xl\"' -Context 4,8 | ForEach-Object { $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'verify.enter_table_code|tableCodeInput|isTableVerified|handleSubmitOrder|cart.send_to_waiter|aria-label=|onMouseEnter|onMouseLeave|querySelector|rewardEmail|setTimeout|scrollTop' -Context 3,6 | ForEach-Object { $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx' -Pattern 'aria-label=|activeColor|B5543A|onMouseEnter|onMouseLeave|toLocaleString\\(|status.new|localStorage|document|window|setTimeout|setInterval' -Context 2,4 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; $ranges=@(@{s=2130;e=2215},@{s=2460;e=2555},@{s=3360;e=3465}); foreach($r in $ranges){ for($i=$r.s; $i -le $r.e; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; $ranges=@(@{s=120;e=220},@{s=360;e=470},@{s=1030;e=1225}); foreach($r in $ranges){ for($i=$r.s; $i -le $r.e; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=140; $i -le 190; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleCheckoutClick|setView\\(\"checkout\"\\)|view === \"checkout\"|orderMode === \"hall\"' -Context 3,8 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=470; $i -le 590; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=900; $i -le 1045; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'setView\\(\"checkout\"\\)' | ForEach-Object { $_.LineNumber.ToString() + ':' + $_.Line }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=1280; $i -le 1385; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2605; $i -le 2665; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2000; $i -le 2045; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2060; $i -le 2105; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=1; $i -le 105; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=45; $i -le 70; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=95; $i -le 115; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }; '---'; for($i=156; $i -le 188; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=95; $i -le 112; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=112; $i -le 116; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=84; $i -le 110; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'if \\(!partner\\)' -Context 0,8 | ForEach-Object { $_.LineNumber.ToString()+':'+$_.Line; $_.Context.PostContext }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'Ваш заказ сохранён|error.send.subtitle' -Context 2,3 | ForEach-Object { $_.LineNumber.ToString()+':'+$_.Line; $_.Context.PreContext; $_.Context.PostContext }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=1244; $i -le 1254; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=100; $i -le 123; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=123; $i -le 128; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2633; $i -le 2925; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'processHallOrder|processPickupOrDeliveryOrder|orderMode === \"hall\"' -Context 2,6 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|newErrors.tableSelection' -Context 3,10 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'
++@( 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' ) | ForEach-Object { $p=$_; $lines=(Get-Content $p).Length; Write-Output "$p`t$lines" }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleSubmitOrder|showTableConfirmSheet|pendingSubmitRef|verifyTableCode|partner_not_found|renderHallCheckoutContent|hallStickyMode|showCartButton|tableCodeLength|isTableVerified|Drawer' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'send_to_waiter|handleSubmitOrder|aria-label|placeholder|toLocaleString|ru-RU|tableCode|codeLockedUntil|codeAttempts|showLoyaltySection|isTableVerified|document.querySelector|guestDisplay|Button|sticky bottom-0' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1290;E=1605},@{S=2068;E=2148},@{S=2608;E=2688},@{S=2988;E=3050},@{S=3380;E=3478})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=430;E=490},@{S=500;E=560},@{S=930;E=1010},@{S=1050;E=1084})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1;E=130},@{S=131;E=298})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=220;E=430},@{S=430;E=650},@{S=650;E=760},@{S=760;E=838})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'console\.|toast\.|hardcoded|toLocaleString\(|ru-RU|hallSticky|showLoyaltySection|setView\("checkout"\)|handleCheckoutClick|common.loading|error.send.subtitle|cart.confirm_table|partner_missing|partner_not_found' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'aria-label="|placeholder="|toLocaleString\(|console\.|t\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const showLoyaltySection|showLoyaltySection =|useLoyalty|discountEnabled|loyaltyEnabled|customerEmail|earnedPoints|maxRedeemPoints|redeemedPoints' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2976;$i -le 2990;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2570;$i -le 2625;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|function validate|validate\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2334;$i -le 2410;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'tableSelection|errors\.' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|help\.call_waiter|loyalty\.email_placeholder|guest\.name_placeholder|cart\.you|common\.save|common\.cancel|cart\.confirm_table\.dismissed' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const \[isMobile, setIsMobile\]' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=1278;$i -le 1288;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
++Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
++Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
++Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested|billCooldown|tableSession\?\.status|ended_at|closed_at|paid|request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested','billCooldown','tableSession\?\.status','ended_at','closed_at','paid','request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2298;$i -le 2313;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3220;$i -le 3246;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3246;$i -le 3263;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+diff --git a/pages/PublicMenu/review_2026-03-21.md b/pages/PublicMenu/review_2026-03-21.md
+index e70a1508ae2ef09a3e777e6e1ec933503b1bb689..558164b5aff88cac1673e9e460463d2ac9a559f8
+--- a/pages/PublicMenu/review_2026-03-21.md
++++ b/pages/PublicMenu/review_2026-03-21.md
+@@ -1,13 +1,21 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260321-140331
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-173133
+ 
+ ## Findings
+-1. [P0] Hall submit bypasses table verification when `currentTableId` already exists — `handleSubmitOrder()` opens the confirmation sheet only on `!currentTableId` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2622)), but the safe hall path only runs when `isTableVerified` is true ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2635)). If a QR/session already provides `currentTableId` while verification is still false, the code falls into the generic branch ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2783)) and creates a hall order without `table`, `table_session`, or `guest`. FIX: gate hall submit on `!isTableVerified`, and hard-stop the generic branch for unverified hall orders.
+-2. [P1] The old inline table-confirmation UI is still rendered before submit — `CartView` still shows the full verification block inside the drawer before the guest taps submit ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1035)), and submit only adds `showTableConfirmSheet` without replacing that drawer flow ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2622), [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3377)). Guests can still see table UI before submit, which violates the just-in-time spec. FIX: remove the inline verification block from `CartView` and make the bottom sheet the only table-confirmation surface after submit tap.
+-3. [P1] The bottom sheet implementation is incomplete and ignores partner-configured code length — the sheet hardcodes 4 slots, `slice(0, 4)`, `maxLength={4}`, and placeholder `0000` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3407)), while `CartView` already derives `tableCodeLength` from partner config ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L102)). The sheet also has no primary `Подтвердить и отправить` CTA in scoped code, only a secondary reset link ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3445)). FIX: extract shared table-code UI with configurable length and add the required primary CTA that verifies and immediately submits.
+-4. [P1] Partner lookup hides backend/query failures as “restaurant not found” — the partner query swallows both lookup exceptions and returns `null` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L1321)), then the page always renders `error.partner_not_found` for `!partner` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3029)). A transient backend failure is therefore misreported as a bad QR link. FIX: preserve request errors separately from true not-found and render retryable error UI for backend failures.
+-5. [P1] `x.jsx` is not wired to the sibling `base/*.jsx` modules being reviewed — it imports `MenuView`, `CartView`, `ModeTabs`, `CheckoutView`, and `useTableSession` from `@/components/publicMenu/...` and `refactor/...`, not from `pages/PublicMenu/base/*` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L100)). That means fixes made to the scoped base files can miss runtime behavior entirely, including the PM-062/PM-064 paths called out in the task context. FIX: either switch `x.jsx` to import the sibling base modules or stop treating these base files as the active implementation.
+-6. [P2] Submit-error fallback still tells guests the order was saved — `CartView` falls back to `Ваш заказ сохранён. Попробуйте снова` on submit failure ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1247)). That message is factually wrong if failure happened before any order was created. FIX: replace the fallback with neutral retry copy consistent with the safer `error.send.subtitle` wording.
+-7. [P3] Remaining i18n/accessibility regressions in mobile controls — `CheckoutView` hardcodes English aria labels `Decrease` / `Increase` ([CheckoutView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx#L58)), `CartView` hardcodes the reward email placeholder instead of using `t(...)` ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L520)), and `MenuView` list-mode add/stepper buttons have no aria-labels at all ([MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L102)). FIX: route all user-facing control text through i18n keys and add translated aria-labels to every action button.
++1. [P1] Hall submit validates table before opening confirmation sheet - `x.jsx:2334-2350` requires `currentTableId` in hall mode, but `x.jsx:2628-2632` opens the confirmation Bottom Sheet only after `validate()` passes. On `/x?...mode=hall` with no verified table, the click dies at `newErrors.tableSelection`; there is no rendered `tableSelection` error in the hall drawer, so the user sees nothing. FIX: move the `!isTableVerified` gate above `validate()`, or skip hall `tableSelection` validation until after the Bottom Sheet verification flow.
++2. [P1] Partner lookup converts backend failures into "restaurant not found" - `x.jsx:1322-1346` catches both lookup attempts and returns `null`, and `x.jsx:3035-3040` always renders `error.partner_not_found` when `partner` is null. Transient API failures are misreported as a bad QR link and the query never retries because it resolves successfully. FIX: let request errors throw (or store them separately), use React Query's error state, and render a retryable backend error distinct from true not-found.
++3. [P1] Pickup/delivery checkout drops loyalty and discount flow entirely - `x.jsx:3220-3263` passes loyalty props into `CheckoutView`, but `CheckoutView.jsx:7-32` does not accept them and `CheckoutView.jsx:88-149` renders only contact/comment fields. Guests cannot enter loyalty email, see balance or discounts, or redeem points in pickup/delivery even though submit logic still supports those fields in `x.jsx`. FIX: extend `CheckoutView` to consume the passed loyalty and discount props and render the same email, balance, and redeem UI for non-hall checkout.
++4. [P1] Session restore stops forever after a single transient failure - `useTableSession.jsx:265-487` sets `didAttemptRestoreRef.current = true` before the async restore work, then swallows all errors in the outer `catch` without resetting it. If any restore request fails once, the effect never retries until the table changes or the page is reloaded. FIX: reset the attempt flag on failure, or only mark restore as attempted after successful completion and add retry/backoff handling for recoverable errors.
++5. [P1] Hall StickyCartBar ignores visit lifecycle and bill state - `x.jsx:2101-2144` derives `hallStickyMode` only from `cart`, `myOrders`, and `sessionOrders`, while bill state exists separately in `x.jsx:1314-1315`, `x.jsx:2306-2310`, and `x.jsx:2984-3002` and is never consulted here. That prevents lifecycle-specific CTA, copy, and visibility for requested bill, closed visit, paid visit, and other post-order hall states. FIX: compute sticky-bar mode from `tableSession`, `billRequested`, `billCooldown`, and visit or payment status before choosing label, amount, and visibility.
++6. [P2] Table-code verification is split between hidden CartView state and visible Bottom Sheet - `CartView.jsx:89-177` still owns code attempts and lockout state and `CartView.jsx:180-206` auto-calls `verifyTableCode`, but the live Bottom Sheet in `x.jsx:3383-3478` does not read that state and its CTA directly calls `verifyTableCode` again. The visible sheet therefore has no cooldown or countdown UI and verification behavior comes from two components at once. FIX: move code attempts, lockout, and auto-submit state into `x.jsx` or the shared verification hook, remove the hidden CartView verification effects, and let the sheet render and enforce the single source of truth.
++7. [P2] Mobile tile layout ignores partner's configured mobile grid size - `MenuView.jsx:42-49` computes `mobileCols` from `partner.menu_grid_mobile`, but `MenuView.jsx:284` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for a 1-column mobile grid still get 2 columns. FIX: use `MOBILE_GRID[mobileCols]` or `gridColsClass` in the mobile tile branch instead of hardcoding `grid-cols-2`.
++8. [P3] Several user-facing controls still miss required i18n or accessibility wiring - examples: `CheckoutView.jsx:58-63` hardcodes English `aria-label`s (`"Decrease"`, `"Increase"`), `MenuView.jsx:102-125` list-mode quantity buttons have no `aria-label`s at all, and `CartView.jsx:467-485` has unlabeled edit and close buttons plus a hardcoded reward-email placeholder at `CartView.jsx:524`. This creates mixed-language UI and weaker screen-reader behavior. FIX: localize all placeholders and labels with `t()` or `tr()` and add explicit `aria-label`s to every icon-only control.
+ 
+ ## Summary
+-Total: 7 findings (1 P0, 4 P1, 1 P2, 1 P3)
++Total: 8 findings (0 P0, 5 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): `Fix 1` in the task context describes only PM-071, but the top-level request asks for a full bug review across `pages/PublicMenu/base/*.jsx`; it was unclear whether to review only PM-071 or all current bugs in the matched files.
++- Missing context (what info would have helped): Whether `pages/PublicMenu/base/*.jsx` should mean one current page file or all six matching JSX files.
++- Scope questions (anything you weren't sure if it's in scope): The request says "ONLY these 3 files," but the glob expands to six JSX files; I treated the glob as in-scope and did not read anything outside `pages/PublicMenu/`.
+diff --git a/pipeline/chain-state/publicmenu-260321-173133-codex-findings.md b/pipeline/chain-state/publicmenu-260321-173133-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..558164b5aff88cac1673e9e460463d2ac9a559f8
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260321-173133-codex-findings.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-173133
++
++## Findings
++1. [P1] Hall submit validates table before opening confirmation sheet - `x.jsx:2334-2350` requires `currentTableId` in hall mode, but `x.jsx:2628-2632` opens the confirmation Bottom Sheet only after `validate()` passes. On `/x?...mode=hall` with no verified table, the click dies at `newErrors.tableSelection`; there is no rendered `tableSelection` error in the hall drawer, so the user sees nothing. FIX: move the `!isTableVerified` gate above `validate()`, or skip hall `tableSelection` validation until after the Bottom Sheet verification flow.
++2. [P1] Partner lookup converts backend failures into "restaurant not found" - `x.jsx:1322-1346` catches both lookup attempts and returns `null`, and `x.jsx:3035-3040` always renders `error.partner_not_found` when `partner` is null. Transient API failures are misreported as a bad QR link and the query never retries because it resolves successfully. FIX: let request errors throw (or store them separately), use React Query's error state, and render a retryable backend error distinct from true not-found.
++3. [P1] Pickup/delivery checkout drops loyalty and discount flow entirely - `x.jsx:3220-3263` passes loyalty props into `CheckoutView`, but `CheckoutView.jsx:7-32` does not accept them and `CheckoutView.jsx:88-149` renders only contact/comment fields. Guests cannot enter loyalty email, see balance or discounts, or redeem points in pickup/delivery even though submit logic still supports those fields in `x.jsx`. FIX: extend `CheckoutView` to consume the passed loyalty and discount props and render the same email, balance, and redeem UI for non-hall checkout.
++4. [P1] Session restore stops forever after a single transient failure - `useTableSession.jsx:265-487` sets `didAttemptRestoreRef.current = true` before the async restore work, then swallows all errors in the outer `catch` without resetting it. If any restore request fails once, the effect never retries until the table changes or the page is reloaded. FIX: reset the attempt flag on failure, or only mark restore as attempted after successful completion and add retry/backoff handling for recoverable errors.
++5. [P1] Hall StickyCartBar ignores visit lifecycle and bill state - `x.jsx:2101-2144` derives `hallStickyMode` only from `cart`, `myOrders`, and `sessionOrders`, while bill state exists separately in `x.jsx:1314-1315`, `x.jsx:2306-2310`, and `x.jsx:2984-3002` and is never consulted here. That prevents lifecycle-specific CTA, copy, and visibility for requested bill, closed visit, paid visit, and other post-order hall states. FIX: compute sticky-bar mode from `tableSession`, `billRequested`, `billCooldown`, and visit or payment status before choosing label, amount, and visibility.
++6. [P2] Table-code verification is split between hidden CartView state and visible Bottom Sheet - `CartView.jsx:89-177` still owns code attempts and lockout state and `CartView.jsx:180-206` auto-calls `verifyTableCode`, but the live Bottom Sheet in `x.jsx:3383-3478` does not read that state and its CTA directly calls `verifyTableCode` again. The visible sheet therefore has no cooldown or countdown UI and verification behavior comes from two components at once. FIX: move code attempts, lockout, and auto-submit state into `x.jsx` or the shared verification hook, remove the hidden CartView verification effects, and let the sheet render and enforce the single source of truth.
++7. [P2] Mobile tile layout ignores partner's configured mobile grid size - `MenuView.jsx:42-49` computes `mobileCols` from `partner.menu_grid_mobile`, but `MenuView.jsx:284` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for a 1-column mobile grid still get 2 columns. FIX: use `MOBILE_GRID[mobileCols]` or `gridColsClass` in the mobile tile branch instead of hardcoding `grid-cols-2`.
++8. [P3] Several user-facing controls still miss required i18n or accessibility wiring - examples: `CheckoutView.jsx:58-63` hardcodes English `aria-label`s (`"Decrease"`, `"Increase"`), `MenuView.jsx:102-125` list-mode quantity buttons have no `aria-label`s at all, and `CartView.jsx:467-485` has unlabeled edit and close buttons plus a hardcoded reward-email placeholder at `CartView.jsx:524`. This creates mixed-language UI and weaker screen-reader behavior. FIX: localize all placeholders and labels with `t()` or `tr()` and add explicit `aria-label`s to every icon-only control.
++
++## Summary
++Total: 8 findings (0 P0, 5 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): `Fix 1` in the task context describes only PM-071, but the top-level request asks for a full bug review across `pages/PublicMenu/base/*.jsx`; it was unclear whether to review only PM-071 or all current bugs in the matched files.
++- Missing context (what info would have helped): Whether `pages/PublicMenu/base/*.jsx` should mean one current page file or all six matching JSX files.
++- Scope questions (anything you weren't sure if it's in scope): The request says "ONLY these 3 files," but the glob expands to six JSX files; I treated the glob as in-scope and did not read anything outside `pages/PublicMenu/`.
+
+codex
+The findings file and the two repo-required artifacts are written. I’m doing a quick existence check on those exact output paths, then I’ll close with the result.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Item 'C:/Dev/menuapp-code-review/pages/PublicMenu/review_2026-03-21.md' | Select-Object -ExpandProperty FullName" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Item 'C:/Dev/menuapp-code-review/pages/PublicMenu/commands_2026-03-21.log' | Select-Object -ExpandProperty FullName" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Item 'C:/Dev/menuapp-code-review/pipeline/chain-state/publicmenu-260321-173133-codex-findings.md' | Select-Object -ExpandProperty FullName" in C:/Dev/menuapp-code-review succeeded in 26.60s:
+C:\Dev\menuapp-code-review\pages\PublicMenu\review_2026-03-21.md
+ succeeded in 26.63s:
+C:\Dev\menuapp-code-review\pages\PublicMenu\commands_2026-03-21.log
+ succeeded in 26.73s:
+C:\Dev\menuapp-code-review\pipeline\chain-state\publicmenu-260321-173133-codex-findings.md
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-21.log b/pages/PublicMenu/commands_2026-03-21.log
+index 10694b2c74c5a745fd5a43a4e37c34b3cedca47f..a8f7bf4e2477650e1dc867726cf011e7b744f493
+--- a/pages/PublicMenu/commands_2026-03-21.log
++++ b/pages/PublicMenu/commands_2026-03-21.log
+@@ -1,40 +1,41 @@
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'showTableConfirmSheet|pendingSubmitRef|handleSubmitOrder|verifyTableCode|base44.entities.Partner|partner_not_found|CategoryChips|ModeTabs|CartView|CheckoutView|useTableSession|DrawerContent className=\"max-h-\\[85dvh\\] rounded-t-3xl\"' -Context 4,8 | ForEach-Object { $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'verify.enter_table_code|tableCodeInput|isTableVerified|handleSubmitOrder|cart.send_to_waiter|aria-label=|onMouseEnter|onMouseLeave|querySelector|rewardEmail|setTimeout|scrollTop' -Context 3,6 | ForEach-Object { $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx' -Pattern 'aria-label=|activeColor|B5543A|onMouseEnter|onMouseLeave|toLocaleString\\(|status.new|localStorage|document|window|setTimeout|setInterval' -Context 2,4 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; $ranges=@(@{s=2130;e=2215},@{s=2460;e=2555},@{s=3360;e=3465}); foreach($r in $ranges){ for($i=$r.s; $i -le $r.e; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; $ranges=@(@{s=120;e=220},@{s=360;e=470},@{s=1030;e=1225}); foreach($r in $ranges){ for($i=$r.s; $i -le $r.e; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=140; $i -le 190; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleCheckoutClick|setView\\(\"checkout\"\\)|view === \"checkout\"|orderMode === \"hall\"' -Context 3,8 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=470; $i -le 590; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=900; $i -le 1045; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'setView\\(\"checkout\"\\)' | ForEach-Object { $_.LineNumber.ToString() + ':' + $_.Line }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=1280; $i -le 1385; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2605; $i -le 2665; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2000; $i -le 2045; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2060; $i -le 2105; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=1; $i -le 105; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=45; $i -le 70; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=95; $i -le 115; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }; '---'; for($i=156; $i -le 188; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=95; $i -le 112; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=112; $i -le 116; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=84; $i -le 110; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'if \\(!partner\\)' -Context 0,8 | ForEach-Object { $_.LineNumber.ToString()+':'+$_.Line; $_.Context.PostContext }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'Ваш заказ сохранён|error.send.subtitle' -Context 2,3 | ForEach-Object { $_.LineNumber.ToString()+':'+$_.Line; $_.Context.PreContext; $_.Context.PostContext }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=1244; $i -le 1254; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=100; $i -le 123; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=123; $i -le 128; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2633; $i -le 2925; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'processHallOrder|processPickupOrDeliveryOrder|orderMode === \"hall\"' -Context 2,6 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|newErrors.tableSelection' -Context 3,10 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'
++@( 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' ) | ForEach-Object { $p=$_; $lines=(Get-Content $p).Length; Write-Output "$p`t$lines" }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleSubmitOrder|showTableConfirmSheet|pendingSubmitRef|verifyTableCode|partner_not_found|renderHallCheckoutContent|hallStickyMode|showCartButton|tableCodeLength|isTableVerified|Drawer' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'send_to_waiter|handleSubmitOrder|aria-label|placeholder|toLocaleString|ru-RU|tableCode|codeLockedUntil|codeAttempts|showLoyaltySection|isTableVerified|document.querySelector|guestDisplay|Button|sticky bottom-0' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1290;E=1605},@{S=2068;E=2148},@{S=2608;E=2688},@{S=2988;E=3050},@{S=3380;E=3478})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=430;E=490},@{S=500;E=560},@{S=930;E=1010},@{S=1050;E=1084})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1;E=130},@{S=131;E=298})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=220;E=430},@{S=430;E=650},@{S=650;E=760},@{S=760;E=838})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'console\.|toast\.|hardcoded|toLocaleString\(|ru-RU|hallSticky|showLoyaltySection|setView\("checkout"\)|handleCheckoutClick|common.loading|error.send.subtitle|cart.confirm_table|partner_missing|partner_not_found' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'aria-label="|placeholder="|toLocaleString\(|console\.|t\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const showLoyaltySection|showLoyaltySection =|useLoyalty|discountEnabled|loyaltyEnabled|customerEmail|earnedPoints|maxRedeemPoints|redeemedPoints' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2976;$i -le 2990;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2570;$i -le 2625;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|function validate|validate\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2334;$i -le 2410;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'tableSelection|errors\.' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|help\.call_waiter|loyalty\.email_placeholder|guest\.name_placeholder|cart\.you|common\.save|common\.cancel|cart\.confirm_table\.dismissed' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const \[isMobile, setIsMobile\]' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=1278;$i -le 1288;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
++Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
++Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
++Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested|billCooldown|tableSession\?\.status|ended_at|closed_at|paid|request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested','billCooldown','tableSession\?\.status','ended_at','closed_at','paid','request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2298;$i -le 2313;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3220;$i -le 3246;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3246;$i -le 3263;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+diff --git a/pages/PublicMenu/review_2026-03-21.md b/pages/PublicMenu/review_2026-03-21.md
+index e70a1508ae2ef09a3e777e6e1ec933503b1bb689..558164b5aff88cac1673e9e460463d2ac9a559f8
+--- a/pages/PublicMenu/review_2026-03-21.md
++++ b/pages/PublicMenu/review_2026-03-21.md
+@@ -1,13 +1,21 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260321-140331
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-173133
+ 
+ ## Findings
+-1. [P0] Hall submit bypasses table verification when `currentTableId` already exists — `handleSubmitOrder()` opens the confirmation sheet only on `!currentTableId` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2622)), but the safe hall path only runs when `isTableVerified` is true ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2635)). If a QR/session already provides `currentTableId` while verification is still false, the code falls into the generic branch ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2783)) and creates a hall order without `table`, `table_session`, or `guest`. FIX: gate hall submit on `!isTableVerified`, and hard-stop the generic branch for unverified hall orders.
+-2. [P1] The old inline table-confirmation UI is still rendered before submit — `CartView` still shows the full verification block inside the drawer before the guest taps submit ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1035)), and submit only adds `showTableConfirmSheet` without replacing that drawer flow ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2622), [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3377)). Guests can still see table UI before submit, which violates the just-in-time spec. FIX: remove the inline verification block from `CartView` and make the bottom sheet the only table-confirmation surface after submit tap.
+-3. [P1] The bottom sheet implementation is incomplete and ignores partner-configured code length — the sheet hardcodes 4 slots, `slice(0, 4)`, `maxLength={4}`, and placeholder `0000` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3407)), while `CartView` already derives `tableCodeLength` from partner config ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L102)). The sheet also has no primary `Подтвердить и отправить` CTA in scoped code, only a secondary reset link ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3445)). FIX: extract shared table-code UI with configurable length and add the required primary CTA that verifies and immediately submits.
+-4. [P1] Partner lookup hides backend/query failures as “restaurant not found” — the partner query swallows both lookup exceptions and returns `null` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L1321)), then the page always renders `error.partner_not_found` for `!partner` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3029)). A transient backend failure is therefore misreported as a bad QR link. FIX: preserve request errors separately from true not-found and render retryable error UI for backend failures.
+-5. [P1] `x.jsx` is not wired to the sibling `base/*.jsx` modules being reviewed — it imports `MenuView`, `CartView`, `ModeTabs`, `CheckoutView`, and `useTableSession` from `@/components/publicMenu/...` and `refactor/...`, not from `pages/PublicMenu/base/*` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L100)). That means fixes made to the scoped base files can miss runtime behavior entirely, including the PM-062/PM-064 paths called out in the task context. FIX: either switch `x.jsx` to import the sibling base modules or stop treating these base files as the active implementation.
+-6. [P2] Submit-error fallback still tells guests the order was saved — `CartView` falls back to `Ваш заказ сохранён. Попробуйте снова` on submit failure ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1247)). That message is factually wrong if failure happened before any order was created. FIX: replace the fallback with neutral retry copy consistent with the safer `error.send.subtitle` wording.
+-7. [P3] Remaining i18n/accessibility regressions in mobile controls — `CheckoutView` hardcodes English aria labels `Decrease` / `Increase` ([CheckoutView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx#L58)), `CartView` hardcodes the reward email placeholder instead of using `t(...)` ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L520)), and `MenuView` list-mode add/stepper buttons have no aria-labels at all ([MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L102)). FIX: route all user-facing control text through i18n keys and add translated aria-labels to every action button.
++1. [P1] Hall submit validates table before opening confirmation sheet - `x.jsx:2334-2350` requires `currentTableId` in hall mode, but `x.jsx:2628-2632` opens the confirmation Bottom Sheet only after `validate()` passes. On `/x?...mode=hall` with no verified table, the click dies at `newErrors.tableSelection`; there is no rendered `tableSelection` error in the hall drawer, so the user sees nothing. FIX: move the `!isTableVerified` gate above `validate()`, or skip hall `tableSelection` validation until after the Bottom Sheet verification flow.
++2. [P1] Partner lookup converts backend failures into "restaurant not found" - `x.jsx:1322-1346` catches both lookup attempts and returns `null`, and `x.jsx:3035-3040` always renders `error.partner_not_found` when `partner` is null. Transient API failures are misreported as a bad QR link and the query never retries because it resolves successfully. FIX: let request errors throw (or store them separately), use React Query's error state, and render a retryable backend error distinct from true not-found.
++3. [P1] Pickup/delivery checkout drops loyalty and discount flow entirely - `x.jsx:3220-3263` passes loyalty props into `CheckoutView`, but `CheckoutView.jsx:7-32` does not accept them and `CheckoutView.jsx:88-149` renders only contact/comment fields. Guests cannot enter loyalty email, see balance or discounts, or redeem points in pickup/delivery even though submit logic still supports those fields in `x.jsx`. FIX: extend `CheckoutView` to consume the passed loyalty and discount props and render the same email, balance, and redeem UI for non-hall checkout.
++4. [P1] Session restore stops forever after a single transient failure - `useTableSession.jsx:265-487` sets `didAttemptRestoreRef.current = true` before the async restore work, then swallows all errors in the outer `catch` without resetting it. If any restore request fails once, the effect never retries until the table changes or the page is reloaded. FIX: reset the attempt flag on failure, or only mark restore as attempted after successful completion and add retry/backoff handling for recoverable errors.
++5. [P1] Hall StickyCartBar ignores visit lifecycle and bill state - `x.jsx:2101-2144` derives `hallStickyMode` only from `cart`, `myOrders`, and `sessionOrders`, while bill state exists separately in `x.jsx:1314-1315`, `x.jsx:2306-2310`, and `x.jsx:2984-3002` and is never consulted here. That prevents lifecycle-specific CTA, copy, and visibility for requested bill, closed visit, paid visit, and other post-order hall states. FIX: compute sticky-bar mode from `tableSession`, `billRequested`, `billCooldown`, and visit or payment status before choosing label, amount, and visibility.
++6. [P2] Table-code verification is split between hidden CartView state and visible Bottom Sheet - `CartView.jsx:89-177` still owns code attempts and lockout state and `CartView.jsx:180-206` auto-calls `verifyTableCode`, but the live Bottom Sheet in `x.jsx:3383-3478` does not read that state and its CTA directly calls `verifyTableCode` again. The visible sheet therefore has no cooldown or countdown UI and verification behavior comes from two components at once. FIX: move code attempts, lockout, and auto-submit state into `x.jsx` or the shared verification hook, remove the hidden CartView verification effects, and let the sheet render and enforce the single source of truth.
++7. [P2] Mobile tile layout ignores partner's configured mobile grid size - `MenuView.jsx:42-49` computes `mobileCols` from `partner.menu_grid_mobile`, but `MenuView.jsx:284` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for a 1-column mobile grid still get 2 columns. FIX: use `MOBILE_GRID[mobileCols]` or `gridColsClass` in the mobile tile branch instead of hardcoding `grid-cols-2`.
++8. [P3] Several user-facing controls still miss required i18n or accessibility wiring - examples: `CheckoutView.jsx:58-63` hardcodes English `aria-label`s (`"Decrease"`, `"Increase"`), `MenuView.jsx:102-125` list-mode quantity buttons have no `aria-label`s at all, and `CartView.jsx:467-485` has unlabeled edit and close buttons plus a hardcoded reward-email placeholder at `CartView.jsx:524`. This creates mixed-language UI and weaker screen-reader behavior. FIX: localize all placeholders and labels with `t()` or `tr()` and add explicit `aria-label`s to every icon-only control.
+ 
+ ## Summary
+-Total: 7 findings (1 P0, 4 P1, 1 P2, 1 P3)
++Total: 8 findings (0 P0, 5 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): `Fix 1` in the task context describes only PM-071, but the top-level request asks for a full bug review across `pages/PublicMenu/base/*.jsx`; it was unclear whether to review only PM-071 or all current bugs in the matched files.
++- Missing context (what info would have helped): Whether `pages/PublicMenu/base/*.jsx` should mean one current page file or all six matching JSX files.
++- Scope questions (anything you weren't sure if it's in scope): The request says "ONLY these 3 files," but the glob expands to six JSX files; I treated the glob as in-scope and did not read anything outside `pages/PublicMenu/`.
+diff --git a/pipeline/chain-state/publicmenu-260321-173133-codex-findings.md b/pipeline/chain-state/publicmenu-260321-173133-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..558164b5aff88cac1673e9e460463d2ac9a559f8
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260321-173133-codex-findings.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-173133
++
++## Findings
++1. [P1] Hall submit validates table before opening confirmation sheet - `x.jsx:2334-2350` requires `currentTableId` in hall mode, but `x.jsx:2628-2632` opens the confirmation Bottom Sheet only after `validate()` passes. On `/x?...mode=hall` with no verified table, the click dies at `newErrors.tableSelection`; there is no rendered `tableSelection` error in the hall drawer, so the user sees nothing. FIX: move the `!isTableVerified` gate above `validate()`, or skip hall `tableSelection` validation until after the Bottom Sheet verification flow.
++2. [P1] Partner lookup converts backend failures into "restaurant not found" - `x.jsx:1322-1346` catches both lookup attempts and returns `null`, and `x.jsx:3035-3040` always renders `error.partner_not_found` when `partner` is null. Transient API failures are misreported as a bad QR link and the query never retries because it resolves successfully. FIX: let request errors throw (or store them separately), use React Query's error state, and render a retryable backend error distinct from true not-found.
++3. [P1] Pickup/delivery checkout drops loyalty and discount flow entirely - `x.jsx:3220-3263` passes loyalty props into `CheckoutView`, but `CheckoutView.jsx:7-32` does not accept them and `CheckoutView.jsx:88-149` renders only contact/comment fields. Guests cannot enter loyalty email, see balance or discounts, or redeem points in pickup/delivery even though submit logic still supports those fields in `x.jsx`. FIX: extend `CheckoutView` to consume the passed loyalty and discount props and render the same email, balance, and redeem UI for non-hall checkout.
++4. [P1] Session restore stops forever after a single transient failure - `useTableSession.jsx:265-487` sets `didAttemptRestoreRef.current = true` before the async restore work, then swallows all errors in the outer `catch` without resetting it. If any restore request fails once, the effect never retries until the table changes or the page is reloaded. FIX: reset the attempt flag on failure, or only mark restore as attempted after successful completion and add retry/backoff handling for recoverable errors.
++5. [P1] Hall StickyCartBar ignores visit lifecycle and bill state - `x.jsx:2101-2144` derives `hallStickyMode` only from `cart`, `myOrders`, and `sessionOrders`, while bill state exists separately in `x.jsx:1314-1315`, `x.jsx:2306-2310`, and `x.jsx:2984-3002` and is never consulted here. That prevents lifecycle-specific CTA, copy, and visibility for requested bill, closed visit, paid visit, and other post-order hall states. FIX: compute sticky-bar mode from `tableSession`, `billRequested`, `billCooldown`, and visit or payment status before choosing label, amount, and visibility.
++6. [P2] Table-code verification is split between hidden CartView state and visible Bottom Sheet - `CartView.jsx:89-177` still owns code attempts and lockout state and `CartView.jsx:180-206` auto-calls `verifyTableCode`, but the live Bottom Sheet in `x.jsx:3383-3478` does not read that state and its CTA directly calls `verifyTableCode` again. The visible sheet therefore has no cooldown or countdown UI and verification behavior comes from two components at once. FIX: move code attempts, lockout, and auto-submit state into `x.jsx` or the shared verification hook, remove the hidden CartView verification effects, and let the sheet render and enforce the single source of truth.
++7. [P2] Mobile tile layout ignores partner's configured mobile grid size - `MenuView.jsx:42-49` computes `mobileCols` from `partner.menu_grid_mobile`, but `MenuView.jsx:284` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for a 1-column mobile grid still get 2 columns. FIX: use `MOBILE_GRID[mobileCols]` or `gridColsClass` in the mobile tile branch instead of hardcoding `grid-cols-2`.
++8. [P3] Several user-facing controls still miss required i18n or accessibility wiring - examples: `CheckoutView.jsx:58-63` hardcodes English `aria-label`s (`"Decrease"`, `"Increase"`), `MenuView.jsx:102-125` list-mode quantity buttons have no `aria-label`s at all, and `CartView.jsx:467-485` has unlabeled edit and close buttons plus a hardcoded reward-email placeholder at `CartView.jsx:524`. This creates mixed-language UI and weaker screen-reader behavior. FIX: localize all placeholders and labels with `t()` or `tr()` and add explicit `aria-label`s to every icon-only control.
++
++## Summary
++Total: 8 findings (0 P0, 5 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): `Fix 1` in the task context describes only PM-071, but the top-level request asks for a full bug review across `pages/PublicMenu/base/*.jsx`; it was unclear whether to review only PM-071 or all current bugs in the matched files.
++- Missing context (what info would have helped): Whether `pages/PublicMenu/base/*.jsx` should mean one current page file or all six matching JSX files.
++- Scope questions (anything you weren't sure if it's in scope): The request says "ONLY these 3 files," but the glob expands to six JSX files; I treated the glob as in-scope and did not read anything outside `pages/PublicMenu/`.
+
+codex
+Findings are saved to [publicmenu-260321-173133-codex-findings.md](C:/Dev/menuapp-code-review/pipeline/chain-state/publicmenu-260321-173133-codex-findings.md). The main blocker is the hall submit flow in [x.jsx](C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx): `validate()` requires `currentTableId` before the Bottom Sheet gate runs, so the "Send to waiter" click can still no-op instead of opening table confirmation.
+
+Per repo instructions, I also saved a copy of the report to [review_2026-03-21.md](C:/Dev/menuapp-code-review/pages/PublicMenu/review_2026-03-21.md) and the command log to [commands_2026-03-21.log](C:/Dev/menuapp-code-review/pages/PublicMenu/commands_2026-03-21.log). No fixes were applied.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-21.log b/pages/PublicMenu/commands_2026-03-21.log
+index 10694b2c74c5a745fd5a43a4e37c34b3cedca47f..a8f7bf4e2477650e1dc867726cf011e7b744f493
+--- a/pages/PublicMenu/commands_2026-03-21.log
++++ b/pages/PublicMenu/commands_2026-03-21.log
+@@ -1,40 +1,41 @@
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'
+-Get-Content -Raw -Encoding utf8 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'showTableConfirmSheet|pendingSubmitRef|handleSubmitOrder|verifyTableCode|base44.entities.Partner|partner_not_found|CategoryChips|ModeTabs|CartView|CheckoutView|useTableSession|DrawerContent className=\"max-h-\\[85dvh\\] rounded-t-3xl\"' -Context 4,8 | ForEach-Object { $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'verify.enter_table_code|tableCodeInput|isTableVerified|handleSubmitOrder|cart.send_to_waiter|aria-label=|onMouseEnter|onMouseLeave|querySelector|rewardEmail|setTimeout|scrollTop' -Context 3,6 | ForEach-Object { $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx' -Pattern 'aria-label=|activeColor|B5543A|onMouseEnter|onMouseLeave|toLocaleString\\(|status.new|localStorage|document|window|setTimeout|setInterval' -Context 2,4 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; $ranges=@(@{s=2130;e=2215},@{s=2460;e=2555},@{s=3360;e=3465}); foreach($r in $ranges){ for($i=$r.s; $i -le $r.e; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; $ranges=@(@{s=120;e=220},@{s=360;e=470},@{s=1030;e=1225}); foreach($r in $ranges){ for($i=$r.s; $i -le $r.e; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=140; $i -le 190; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleCheckoutClick|setView\\(\"checkout\"\\)|view === \"checkout\"|orderMode === \"hall\"' -Context 3,8 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=470; $i -le 590; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=900; $i -le 1045; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'setView\\(\"checkout\"\\)' | ForEach-Object { $_.LineNumber.ToString() + ':' + $_.Line }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=1280; $i -le 1385; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2605; $i -le 2665; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2000; $i -le 2045; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2060; $i -le 2105; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=1; $i -le 105; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=45; $i -le 70; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=95; $i -le 115; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }; '---'; for($i=156; $i -le 188; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=95; $i -le 112; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=112; $i -le 116; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=84; $i -le 110; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'if \\(!partner\\)' -Context 0,8 | ForEach-Object { $_.LineNumber.ToString()+':'+$_.Line; $_.Context.PostContext }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'Ваш заказ сохранён|error.send.subtitle' -Context 2,3 | ForEach-Object { $_.LineNumber.ToString()+':'+$_.Line; $_.Context.PreContext; $_.Context.PostContext }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=1244; $i -le 1254; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=100; $i -le 123; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=123; $i -le 128; $i++){ '{0}:{1}' -f $i,$lines[$i-1] }
+-$path='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content -Encoding utf8 $path; for($i=2633; $i -le 2925; $i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'processHallOrder|processPickupOrDeliveryOrder|orderMode === \"hall\"' -Context 2,6 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|newErrors.tableSelection' -Context 3,10 | ForEach-Object { $_.Filename + ':' + $_.LineNumber; $_.Context.PreContext; $_.Line; $_.Context.PostContext; '---' }
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'
++@( 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' ) | ForEach-Object { $p=$_; $lines=(Get-Content $p).Length; Write-Output "$p`t$lines" }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleSubmitOrder|showTableConfirmSheet|pendingSubmitRef|verifyTableCode|partner_not_found|renderHallCheckoutContent|hallStickyMode|showCartButton|tableCodeLength|isTableVerified|Drawer' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'send_to_waiter|handleSubmitOrder|aria-label|placeholder|toLocaleString|ru-RU|tableCode|codeLockedUntil|codeAttempts|showLoyaltySection|isTableVerified|document.querySelector|guestDisplay|Button|sticky bottom-0' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1290;E=1605},@{S=2068;E=2148},@{S=2608;E=2688},@{S=2988;E=3050},@{S=3380;E=3478})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=430;E=490},@{S=500;E=560},@{S=930;E=1010},@{S=1050;E=1084})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1;E=130},@{S=131;E=298})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=220;E=430},@{S=430;E=650},@{S=650;E=760},@{S=760;E=838})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'console\.|toast\.|hardcoded|toLocaleString\(|ru-RU|hallSticky|showLoyaltySection|setView\("checkout"\)|handleCheckoutClick|common.loading|error.send.subtitle|cart.confirm_table|partner_missing|partner_not_found' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'aria-label="|placeholder="|toLocaleString\(|console\.|t\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const showLoyaltySection|showLoyaltySection =|useLoyalty|discountEnabled|loyaltyEnabled|customerEmail|earnedPoints|maxRedeemPoints|redeemedPoints' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2976;$i -le 2990;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2570;$i -le 2625;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|function validate|validate\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2334;$i -le 2410;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'tableSelection|errors\.' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|help\.call_waiter|loyalty\.email_placeholder|guest\.name_placeholder|cart\.you|common\.save|common\.cancel|cart\.confirm_table\.dismissed' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const \[isMobile, setIsMobile\]' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=1278;$i -le 1288;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
++Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
++Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
++Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested|billCooldown|tableSession\?\.status|ended_at|closed_at|paid|request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested','billCooldown','tableSession\?\.status','ended_at','closed_at','paid','request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2298;$i -le 2313;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3220;$i -le 3246;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3246;$i -le 3263;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+diff --git a/pages/PublicMenu/review_2026-03-21.md b/pages/PublicMenu/review_2026-03-21.md
+index e70a1508ae2ef09a3e777e6e1ec933503b1bb689..558164b5aff88cac1673e9e460463d2ac9a559f8
+--- a/pages/PublicMenu/review_2026-03-21.md
++++ b/pages/PublicMenu/review_2026-03-21.md
+@@ -1,13 +1,21 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260321-140331
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-173133
+ 
+ ## Findings
+-1. [P0] Hall submit bypasses table verification when `currentTableId` already exists — `handleSubmitOrder()` opens the confirmation sheet only on `!currentTableId` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2622)), but the safe hall path only runs when `isTableVerified` is true ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2635)). If a QR/session already provides `currentTableId` while verification is still false, the code falls into the generic branch ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2783)) and creates a hall order without `table`, `table_session`, or `guest`. FIX: gate hall submit on `!isTableVerified`, and hard-stop the generic branch for unverified hall orders.
+-2. [P1] The old inline table-confirmation UI is still rendered before submit — `CartView` still shows the full verification block inside the drawer before the guest taps submit ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1035)), and submit only adds `showTableConfirmSheet` without replacing that drawer flow ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2622), [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3377)). Guests can still see table UI before submit, which violates the just-in-time spec. FIX: remove the inline verification block from `CartView` and make the bottom sheet the only table-confirmation surface after submit tap.
+-3. [P1] The bottom sheet implementation is incomplete and ignores partner-configured code length — the sheet hardcodes 4 slots, `slice(0, 4)`, `maxLength={4}`, and placeholder `0000` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3407)), while `CartView` already derives `tableCodeLength` from partner config ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L102)). The sheet also has no primary `Подтвердить и отправить` CTA in scoped code, only a secondary reset link ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3445)). FIX: extract shared table-code UI with configurable length and add the required primary CTA that verifies and immediately submits.
+-4. [P1] Partner lookup hides backend/query failures as “restaurant not found” — the partner query swallows both lookup exceptions and returns `null` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L1321)), then the page always renders `error.partner_not_found` for `!partner` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3029)). A transient backend failure is therefore misreported as a bad QR link. FIX: preserve request errors separately from true not-found and render retryable error UI for backend failures.
+-5. [P1] `x.jsx` is not wired to the sibling `base/*.jsx` modules being reviewed — it imports `MenuView`, `CartView`, `ModeTabs`, `CheckoutView`, and `useTableSession` from `@/components/publicMenu/...` and `refactor/...`, not from `pages/PublicMenu/base/*` ([x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L100)). That means fixes made to the scoped base files can miss runtime behavior entirely, including the PM-062/PM-064 paths called out in the task context. FIX: either switch `x.jsx` to import the sibling base modules or stop treating these base files as the active implementation.
+-6. [P2] Submit-error fallback still tells guests the order was saved — `CartView` falls back to `Ваш заказ сохранён. Попробуйте снова` on submit failure ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1247)). That message is factually wrong if failure happened before any order was created. FIX: replace the fallback with neutral retry copy consistent with the safer `error.send.subtitle` wording.
+-7. [P3] Remaining i18n/accessibility regressions in mobile controls — `CheckoutView` hardcodes English aria labels `Decrease` / `Increase` ([CheckoutView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx#L58)), `CartView` hardcodes the reward email placeholder instead of using `t(...)` ([CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L520)), and `MenuView` list-mode add/stepper buttons have no aria-labels at all ([MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L102)). FIX: route all user-facing control text through i18n keys and add translated aria-labels to every action button.
++1. [P1] Hall submit validates table before opening confirmation sheet - `x.jsx:2334-2350` requires `currentTableId` in hall mode, but `x.jsx:2628-2632` opens the confirmation Bottom Sheet only after `validate()` passes. On `/x?...mode=hall` with no verified table, the click dies at `newErrors.tableSelection`; there is no rendered `tableSelection` error in the hall drawer, so the user sees nothing. FIX: move the `!isTableVerified` gate above `validate()`, or skip hall `tableSelection` validation until after the Bottom Sheet verification flow.
++2. [P1] Partner lookup converts backend failures into "restaurant not found" - `x.jsx:1322-1346` catches both lookup attempts and returns `null`, and `x.jsx:3035-3040` always renders `error.partner_not_found` when `partner` is null. Transient API failures are misreported as a bad QR link and the query never retries because it resolves successfully. FIX: let request errors throw (or store them separately), use React Query's error state, and render a retryable backend error distinct from true not-found.
++3. [P1] Pickup/delivery checkout drops loyalty and discount flow entirely - `x.jsx:3220-3263` passes loyalty props into `CheckoutView`, but `CheckoutView.jsx:7-32` does not accept them and `CheckoutView.jsx:88-149` renders only contact/comment fields. Guests cannot enter loyalty email, see balance or discounts, or redeem points in pickup/delivery even though submit logic still supports those fields in `x.jsx`. FIX: extend `CheckoutView` to consume the passed loyalty and discount props and render the same email, balance, and redeem UI for non-hall checkout.
++4. [P1] Session restore stops forever after a single transient failure - `useTableSession.jsx:265-487` sets `didAttemptRestoreRef.current = true` before the async restore work, then swallows all errors in the outer `catch` without resetting it. If any restore request fails once, the effect never retries until the table changes or the page is reloaded. FIX: reset the attempt flag on failure, or only mark restore as attempted after successful completion and add retry/backoff handling for recoverable errors.
++5. [P1] Hall StickyCartBar ignores visit lifecycle and bill state - `x.jsx:2101-2144` derives `hallStickyMode` only from `cart`, `myOrders`, and `sessionOrders`, while bill state exists separately in `x.jsx:1314-1315`, `x.jsx:2306-2310`, and `x.jsx:2984-3002` and is never consulted here. That prevents lifecycle-specific CTA, copy, and visibility for requested bill, closed visit, paid visit, and other post-order hall states. FIX: compute sticky-bar mode from `tableSession`, `billRequested`, `billCooldown`, and visit or payment status before choosing label, amount, and visibility.
++6. [P2] Table-code verification is split between hidden CartView state and visible Bottom Sheet - `CartView.jsx:89-177` still owns code attempts and lockout state and `CartView.jsx:180-206` auto-calls `verifyTableCode`, but the live Bottom Sheet in `x.jsx:3383-3478` does not read that state and its CTA directly calls `verifyTableCode` again. The visible sheet therefore has no cooldown or countdown UI and verification behavior comes from two components at once. FIX: move code attempts, lockout, and auto-submit state into `x.jsx` or the shared verification hook, remove the hidden CartView verification effects, and let the sheet render and enforce the single source of truth.
++7. [P2] Mobile tile layout ignores partner's configured mobile grid size - `MenuView.jsx:42-49` computes `mobileCols` from `partner.menu_grid_mobile`, but `MenuView.jsx:284` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for a 1-column mobile grid still get 2 columns. FIX: use `MOBILE_GRID[mobileCols]` or `gridColsClass` in the mobile tile branch instead of hardcoding `grid-cols-2`.
++8. [P3] Several user-facing controls still miss required i18n or accessibility wiring - examples: `CheckoutView.jsx:58-63` hardcodes English `aria-label`s (`"Decrease"`, `"Increase"`), `MenuView.jsx:102-125` list-mode quantity buttons have no `aria-label`s at all, and `CartView.jsx:467-485` has unlabeled edit and close buttons plus a hardcoded reward-email placeholder at `CartView.jsx:524`. This creates mixed-language UI and weaker screen-reader behavior. FIX: localize all placeholders and labels with `t()` or `tr()` and add explicit `aria-label`s to every icon-only control.
+ 
+ ## Summary
+-Total: 7 findings (1 P0, 4 P1, 1 P2, 1 P3)
++Total: 8 findings (0 P0, 5 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): `Fix 1` in the task context describes only PM-071, but the top-level request asks for a full bug review across `pages/PublicMenu/base/*.jsx`; it was unclear whether to review only PM-071 or all current bugs in the matched files.
++- Missing context (what info would have helped): Whether `pages/PublicMenu/base/*.jsx` should mean one current page file or all six matching JSX files.
++- Scope questions (anything you weren't sure if it's in scope): The request says "ONLY these 3 files," but the glob expands to six JSX files; I treated the glob as in-scope and did not read anything outside `pages/PublicMenu/`.
+diff --git a/pipeline/chain-state/publicmenu-260321-173133-codex-findings.md b/pipeline/chain-state/publicmenu-260321-173133-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..558164b5aff88cac1673e9e460463d2ac9a559f8
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260321-173133-codex-findings.md
+@@ -0,0 +1,21 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-173133
++
++## Findings
++1. [P1] Hall submit validates table before opening confirmation sheet - `x.jsx:2334-2350` requires `currentTableId` in hall mode, but `x.jsx:2628-2632` opens the confirmation Bottom Sheet only after `validate()` passes. On `/x?...mode=hall` with no verified table, the click dies at `newErrors.tableSelection`; there is no rendered `tableSelection` error in the hall drawer, so the user sees nothing. FIX: move the `!isTableVerified` gate above `validate()`, or skip hall `tableSelection` validation until after the Bottom Sheet verification flow.
++2. [P1] Partner lookup converts backend failures into "restaurant not found" - `x.jsx:1322-1346` catches both lookup attempts and returns `null`, and `x.jsx:3035-3040` always renders `error.partner_not_found` when `partner` is null. Transient API failures are misreported as a bad QR link and the query never retries because it resolves successfully. FIX: let request errors throw (or store them separately), use React Query's error state, and render a retryable backend error distinct from true not-found.
++3. [P1] Pickup/delivery checkout drops loyalty and discount flow entirely - `x.jsx:3220-3263` passes loyalty props into `CheckoutView`, but `CheckoutView.jsx:7-32` does not accept them and `CheckoutView.jsx:88-149` renders only contact/comment fields. Guests cannot enter loyalty email, see balance or discounts, or redeem points in pickup/delivery even though submit logic still supports those fields in `x.jsx`. FIX: extend `CheckoutView` to consume the passed loyalty and discount props and render the same email, balance, and redeem UI for non-hall checkout.
++4. [P1] Session restore stops forever after a single transient failure - `useTableSession.jsx:265-487` sets `didAttemptRestoreRef.current = true` before the async restore work, then swallows all errors in the outer `catch` without resetting it. If any restore request fails once, the effect never retries until the table changes or the page is reloaded. FIX: reset the attempt flag on failure, or only mark restore as attempted after successful completion and add retry/backoff handling for recoverable errors.
++5. [P1] Hall StickyCartBar ignores visit lifecycle and bill state - `x.jsx:2101-2144` derives `hallStickyMode` only from `cart`, `myOrders`, and `sessionOrders`, while bill state exists separately in `x.jsx:1314-1315`, `x.jsx:2306-2310`, and `x.jsx:2984-3002` and is never consulted here. That prevents lifecycle-specific CTA, copy, and visibility for requested bill, closed visit, paid visit, and other post-order hall states. FIX: compute sticky-bar mode from `tableSession`, `billRequested`, `billCooldown`, and visit or payment status before choosing label, amount, and visibility.
++6. [P2] Table-code verification is split between hidden CartView state and visible Bottom Sheet - `CartView.jsx:89-177` still owns code attempts and lockout state and `CartView.jsx:180-206` auto-calls `verifyTableCode`, but the live Bottom Sheet in `x.jsx:3383-3478` does not read that state and its CTA directly calls `verifyTableCode` again. The visible sheet therefore has no cooldown or countdown UI and verification behavior comes from two components at once. FIX: move code attempts, lockout, and auto-submit state into `x.jsx` or the shared verification hook, remove the hidden CartView verification effects, and let the sheet render and enforce the single source of truth.
++7. [P2] Mobile tile layout ignores partner's configured mobile grid size - `MenuView.jsx:42-49` computes `mobileCols` from `partner.menu_grid_mobile`, but `MenuView.jsx:284` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for a 1-column mobile grid still get 2 columns. FIX: use `MOBILE_GRID[mobileCols]` or `gridColsClass` in the mobile tile branch instead of hardcoding `grid-cols-2`.
++8. [P3] Several user-facing controls still miss required i18n or accessibility wiring - examples: `CheckoutView.jsx:58-63` hardcodes English `aria-label`s (`"Decrease"`, `"Increase"`), `MenuView.jsx:102-125` list-mode quantity buttons have no `aria-label`s at all, and `CartView.jsx:467-485` has unlabeled edit and close buttons plus a hardcoded reward-email placeholder at `CartView.jsx:524`. This creates mixed-language UI and weaker screen-reader behavior. FIX: localize all placeholders and labels with `t()` or `tr()` and add explicit `aria-label`s to every icon-only control.
++
++## Summary
++Total: 8 findings (0 P0, 5 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): `Fix 1` in the task context describes only PM-071, but the top-level request asks for a full bug review across `pages/PublicMenu/base/*.jsx`; it was unclear whether to review only PM-071 or all current bugs in the matched files.
++- Missing context (what info would have helped): Whether `pages/PublicMenu/base/*.jsx` should mean one current page file or all six matching JSX files.
++- Scope questions (anything you weren't sure if it's in scope): The request says "ONLY these 3 files," but the glob expands to six JSX files; I treated the glob as in-scope and did not read anything outside `pages/PublicMenu/`.
+
+tokens used
+126 527
+Findings are saved to [publicmenu-260321-173133-codex-findings.md](C:/Dev/menuapp-code-review/pipeline/chain-state/publicmenu-260321-173133-codex-findings.md). The main blocker is the hall submit flow in [x.jsx](C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx): `validate()` requires `currentTableId` before the Bottom Sheet gate runs, so the "Send to waiter" click can still no-op instead of opening table confirmation.
+
+Per repo instructions, I also saved a copy of the report to [review_2026-03-21.md](C:/Dev/menuapp-code-review/pages/PublicMenu/review_2026-03-21.md) and the command log to [commands_2026-03-21.log](C:/Dev/menuapp-code-review/pages/PublicMenu/commands_2026-03-21.log). No fixes were applied.

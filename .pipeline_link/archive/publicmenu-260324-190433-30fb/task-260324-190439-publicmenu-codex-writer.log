@@ -1,0 +1,737 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d2029-af09-7e02-852e-2495fc4f7eb7
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260324-190433-30fb ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Батч 9 — Drawers & Android Back (BACKLOG #145) Reference: `BUGS_MASTER.md`, `ux-concepts/ACCEPTANCE_CRITERIA_publicmenu.md`. **Production page.** Единый паттерн Android Back для всех drawers + колокольчик + шевроны. Файлы: `pages/PublicMenu/x.jsx` (primary) + `pages/PublicMenu/CartView.jsx` (secondary). ## CONTEXT All drawers in the app must behave consistently: Android hardware back button should close the topmost drawer instead of navigating back in browser. Pattern: `history.pushState` on drawer open + `popstate` listener to close. The app has 4 drawers that need this pattern: 1. БКБ (detail card) — opens when user taps a dish card 2. Cart (CartView) — opens from StickyCartBar 3. Table code input — opens when user submits order without table code 4. "Нужна помощь?" (help) — opens from bell icon. Currently a Dialog, must become a Drawer. ## TARGET FILES (modify) - `pages/PublicMenu/x.jsx` — detail card drawer, table code BS, help dialog, bell icon on main menu - `pages/PublicMenu/CartView.jsx` — cart drawer, chevron in table info card ## CONTEXT FILES (read-only) - `BUGS_MASTER.md` — bug reference - `pages/PublicMenu/MenuView.jsx` — context only (bell icon may have been here before; read git history if needed) --- ## Fix 1 — PM-126 (P2) [MUST-FIX]: Android Back → единый pushState паттерн для ВСЕХ drawers ### Сейчас When any drawer is open (detail card, cart, table code, help), pressing Android hardware Back button closes the entire browser tab instead of just the drawer. ### Должно быть Implement a **reusable hook**: `useAndroidBack(isOpen: boolean, onClose: () => void)`. Hook logic: ```js // On isOpen → true: push a history entry window.history.pushState({ drawer: 'name' }, ''); // Add popstate listener → call onClose() when triggered // CRITICAL: Programmatic close guard (prevents regression PM-107) // Hardware Back → popstate fires → listener calls onClose() // Programmatic close (swipe / × / button) → MUST do: // 1. isProgrammaticCloseRef.current = true // 2. setState(false) ← closes drawer visually // 3. history.back() ← cleans up the history entry // In popstate listener: // if (isProgrammaticCloseRef.current) { isProgrammaticCloseRef.current = false; return; } // This prevents the listener firing AGAIN after programmatic close. ``` Apply `useAndroidBack` to all 4 drawers: - Detail card drawer in `pages/PublicMenu/x.jsx` — search for `isDetailOpen` or `selectedDish` or the PM-122 Drawer component (~lines 3300–3600) - Table code BS in `pages/PublicMenu/x.jsx` — search for "Введите код стола" or `tableCodeOpen` or `isVerifyCodeOpen` (~line 3400) - Help drawer in `pages/PublicMenu/x.jsx` — search for "needHelp" or "helpOpen" (after Fix 2 creates it) - Cart Bottom Sheet in `pages/PublicMenu/CartView.jsx` — search for `isOpen` prop on the main Sheet component (~lines 400–450) Do NOT implement separate pushState logic copy-pasted in 4 places — use the hook. Edge cases to handle: - Multiple drawers in sequence: each drawer manages its own history entry independently - If `history.back()` fails silently (already at start of history) — catch and ignore ### НЕ должно быть - Separate pushState logic copy-pasted in 4 places - Browser navigating back (tab close / page change) when drawer is open - Multiple pushState entries stacking (open, close, open again → only 1 entry at a time) - Programmatic close (swipe / ×) triggering double-close cascade (use isProgrammaticCloseRef guard) ### Проверка 1. Open БКБ (detail card) → press Android Back → drawer closes, menu visible ✓ 2. Open cart → press Android Back → cart closes ✓ 3. Open table code input → press Android Back → input closes ✓ 4. Open help → press Android Back → help closes ✓ 5. On main menu (no drawer open) → press Android Back → normal browser behavior (go back) ✓ 6. Swipe to close detail card → ONLY detail card closes (no cascade history.back) ✓ --- ## Fix 2 — PM-125 (P2) [MUST-FIX]: «Нужна помощь?» Dialog → Drawer + auto-close cart ### Сейчас Bell icon 🔔 in cart's table info card ("Стол — Гость #1313") opens "Нужна помощь?" as a **Dialog** (centered modal). The Dialog opens BEHIND the cart drawer (z-index conflict). User doesn't see it. ### Должно быть 1. Click bell in CartView → **close cart drawer first** (call cart's `onOpenChange(false)`) 2. After cart closes (300ms delay for animation) → trigger help drawer open in x.jsx 3. Convert "Нужна помощь?" from **Dialog → Drawer (bottom sheet)** in `pages/PublicMenu/x.jsx` 4. Help drawer contains: title "Нужна помощь?", subtitle, table number display, 5 option buttons (Позвать официанта, Счёт, Салфетки, Меню, Другое), comment textarea, Cancel + Submit buttons 5. Apply `useAndroidBack` hook from Fix 1 to the help drawer ⚠️ Fix 1 creates `useAndroidBack` → Fix 2's new help Drawer MUST use it: `useAndroidBack(helpOpen, handleHelpClose)`. Implementation: - Bell click handler: `pages/PublicMenu/CartView.jsx` — search for `BellIcon` or bell 🔔 click (~lines 500–600) - Help component (currently Dialog): `pages/PublicMenu/x.jsx` — search for "Нужна помощь" or "needHelp" or "helpDialog" - To trigger help from CartView: add a callback prop `onHelpRequest` from x.jsx down to CartView; CartView closes itself then calls `onHelpRequest()` after 300ms ### НЕ должно быть - Dialog component for "Нужна помощь?" — replace with Drawer/Bottom Sheet - Help appearing behind cart (z-index issue) - Cart remaining open when help drawer is shown - Help opening instantly (skip the 300ms delay for cart close animation) ### Проверка 1. Open cart → tap bell icon 🔔 → cart slides down → help drawer slides up ✓ 2. Help drawer shows all options (Позвать официанта, Счёт, Салфетки, Меню, Другое) ✓ 3. Tap "Отмена" or swipe down → help closes → StickyCartBar visible to reopen cart ✓ --- ## Fix 3 — PM-127 (P2) [MUST-FIX]: Вернуть колокольчик на главное меню ### Сейчас Bell icon 🔔 is missing from the main menu screen (when cart is not open). Likely removed by a recent КС run (regression). The bell only appears inside CartView's table info card. ### Должно быть Bell icon visible on main menu screen (outside cart). When tapped → opens "Нужна помощь?" help drawer directly (cart is not open). 1. Run `git log --oneline -20 -- pages/PublicMenu/x.jsx` to find when bell was removed 2. Restore bell icon at its original position (likely near header or near StickyCartBar area) 3. Bell tap → opens the same help Drawer component from Fix 2 ⚠️ Fix 2 creates the help Drawer component → Fix 3 REUSES it. Do not create a second help component. ### НЕ должно быть - Bell icon missing from main menu - Bell only visible inside cart - A second separate help Drawer component (reuse Fix 2's Drawer) ### Проверка 1. Load menu page (no cart open) → bell icon visible on screen ✓ 2. Tap bell → "Нужна помощь?" drawer opens ✓ 3. Submit help request → works correctly ✓ --- ## Fix 4 — #143 (P3) [MUST-FIX]: Шеврон ˅ на drawer кода стола ### Сейчас Table code input drawer (Bottom Sheet "Введите код стола") has no chevron button to close it. The only way to close is swiping down. Other drawers (e.g. detail card) have a grey circle chevron ˅ in the top-right corner. ### Должно быть Add `ChevronDown` icon button in top-right corner of the table code input drawer. - Same style as detail card drawer chevron: grey circle background, ChevronDown icon, 44×44px touch target - To find exact classes: grep for `ChevronDown` + `bg-gray-` in `pages/PublicMenu/x.jsx` (existing detail card chevron) → apply same classes - Click → closes the table code drawer Location: `pages/PublicMenu/x.jsx` — table code Bottom Sheet at ~line 3400 (search for "Введите код стола" or `isVerifyCodeOpen`). Find the header/top area of this BS → add button top-right. ### НЕ должно быть - Table code drawer without a close button - Chevron in a different style than detail card drawer (must match) ### Проверка 1. Open table code input → grey circle chevron visible in top-right corner ✓ 2. Tap chevron → drawer closes ✓ 3. Style matches detail card drawer chevron ✓ --- ## Fix 5 — #140 (P3) [MUST-FIX]: Шеврон ˅ → правая часть карточки стола в CartView (не липкий) ### Сейчас CartView has a **separate sticky row** with a chevron ˅ above the table info card ("Стол — Гость #1313"). This row wastes vertical space. Note: PM-085 previously made the chevron sticky — **that decision is intentionally reversed in S174/S175.** The chevron moves INTO the table info card row (non-sticky). ### Должно быть 1. **Remove** the separate chevron row (sticky bar above table card) from `pages/PublicMenu/CartView.jsx` 2. Add `ChevronDown` icon button to the **RIGHT side of the table info card** (same row as bell icon + "Стол — Гость #XXXX") 3. The chevron is **NOT sticky** — it scrolls with the content 4. Cart closure: swipe down (native drawer behavior) OR tap chevron in table card Layout of table info card after fix: ``` ┌─────────────────────────────────────────┐ │ 🔔 Стол — ˅ │ │ Вы: Гость #1313 ✏️ │ └─────────────────────────────────────────┘ ``` Location: `pages/PublicMenu/CartView.jsx` — search for `ChevronDown` or `sticky` near lines ~400–460. Find the separate chevron row → delete it. Find the table info card div (search for "Стол" or `tableCode` in that same area) → add ChevronDown to the right side of that row. ### НЕ должно быть - Separate row/bar with chevron above the table card - Sticky or fixed positioning on the chevron - Chevron outside the table info card boundaries ### Проверка 1. Open cart → chevron visible in RIGHT side of table info card (same row as bell) ✓ 2. Scroll down in cart → chevron scrolls away (not sticky) ✓ 3. Tap chevron → cart closes ✓ 4. Swipe down → cart also closes (native behavior intact) ✓ --- ## ⛔ SCOPE LOCK Only change what is described in Fix 1–5. Do NOT: - Change dish card rendering, prices, steppers, or any MenuView content - Modify StickyCartBar appearance or behavior (button color, layout, visibility) - Change order submission logic or table code validation logic - Alter styles/layout of cart items list or checkout flow - Change detail card content, photo layout, or discount badge - Touch `pages/PublicMenu/MenuView.jsx` (read-only for context only) --- ## FROZEN UX (DO NOT CHANGE) These elements are ✅ Fixed+Tested. Do NOT regress them: **pages/PublicMenu/x.jsx:** - **PM-064/PM-071 ✅** — Table Confirmation BS opens when "Отправить официанту" tapped without verified table. Trigger: `!isTableVerified` check before `validate()`, z-index `z-[60]` on BS. - **PM-079 ✅** — Hidden text input in table code BS: `className="sr-only"` (~line 3409). Must stay. - **PM-088 ✅** — 4-cell digit input in table code BS accepts input and displays correctly (~line 3409). - **PM-090 ✅** — StickyCartBar "Оформить заказ" button uses `partner.primary_color` (not hardcoded). - **PM-099 ✅** — No custom drag handle in detail card drawer (was removed; do NOT add one back). - **PM-117 ✅** — Detail card photo: `aspect-square object-cover` layout. Do not change. - **PM-032 ✅** — Loyalty points deducted AFTER Order.create() succeeds (not before). - **PM-033 ✅** — localStorage access wrapped in try/catch (~lines 283–287). **pages/PublicMenu/CartView.jsx:** - **PM-031 ✅** — Cart cannot be closed during order submission (dismissible guard + onOpenChange guard active). - **PM-083 ✅** — Chevron ˅ on the RIGHT side. Fix 5 moves it into table card row — still right-aligned ✅. - **PM-086 ✅** — Email bonus field is removed from cart. Do NOT add it back. - **PM-027 ✅** — Loyalty/discount UI visible when applicable (showLoyaltySection logic correct). - **PM-039 ✅** — Table-code input area: no overflow on 375px screens (~lines 1085–1092). - **PM-028 ✅** — Failed star rating resets draftRating on error (~lines 705–725). - **PM-099 ✅** — No custom drag handle in CartView (was removed; do NOT add one back). --- ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Primary usage: customer phone at the table. Before committing, verify ALL changes at 375px viewport width: - [ ] All new close/chevron buttons: RIGHT-ALIGNED, correct position - [ ] Touch targets ≥ 44×44px (h-11 w-11) for: new chevrons, bell icon, help drawer buttons - [ ] No excessive whitespace/gaps on small screens - [ ] Help drawer: all 5 option buttons visible and tappable - [ ] Bottom sheet content scrollable without losing close/submit button - [ ] No duplicate visual indicators (e.g. two gray lines) - [ ] Android Back closes correct drawer (simulate with browser back button) --- ## Implementation Notes - `useAndroidBack` hook: one `useEffect` adding/removing `popstate` listener based on `isOpen`. The `isProgrammaticCloseRef` flag is the critical guard against double-close regression (see PM-107 history, S166). - For PM-125: 300ms delay between cart close animation and help drawer open for smooth UX. - For PM-127: if bell was never in `x.jsx` main page layout (only in CartView), add it near the header — match bell style from CartView. - Git: `git add pages/PublicMenu/x.jsx pages/PublicMenu/CartView.jsx` === END ===
+mcp startup: no servers
+codex
+I’m reviewing only the `PublicMenu` page folder as requested: `x.jsx`, `CartView.jsx`, plus local `README.md`/`BUGS.md`. First I’ll load just those files, then I’ll write a scoped findings report limited to Fix 1–5.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'if (Test-Path pages/PublicMenu/README.md) { Get-Content -Raw pages/PublicMenu/README.md }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content -Raw pages/PublicMenu/BUGS.md }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw pages/PublicMenu/x.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw pages/PublicMenu/CartView.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Force pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 16.23s:
+
+ exited 124 in 17.68s:
+
+ exited 124 in 15.34s:
+
+ exited 124 in 17.49s:
+
+ exited 124 in 14.28s:
+
+codex
+The page files look large, so I’m switching to targeted reads inside `pages/PublicMenu` only: file sizes, then the exact sections tied to Fix 1–5. That keeps within your scope restriction and avoids dragging in unrelated code.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'if (Test-Path pages/PublicMenu/BUGS.md) { Get-Item pages/PublicMenu/BUGS.md | Select-Object Name,Length }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'if (Test-Path pages/PublicMenu/README.md) { Get-Item pages/PublicMenu/README.md | Select-Object Name,Length }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem pages/PublicMenu | Select-Object Name,Length' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 16.47s:
+
+Name      Length
+----      ------
+README.md   6998
+
+
+ succeeded in 16.51s:
+
+Name    Length
+----    ------
+BUGS.md  60591
+
+
+ succeeded in 16.30s:
+
+Name                                  Length
+----                                  ------
+components                                  
+versions                                    
+260320-01 useTableSession RELEASE.jsx 30461 
+260323-03 CheckoutView RELEASE.jsx    7840  
+260324-03 CartView RELEASE.jsx        42910 
+260324-04 MenuView RELEASE.jsx        16326 
+260324-05 x RELEASE.jsx               142855
+ACCEPTANCE_CRITERIA_PHASE1.md         12831 
+BUGS.md                               60591 
+CartView.jsx                          42910 
+CheckoutView.jsx                      7840  
+COPY_SPEC.md                          10857 
+i18n_DrawerUX_S79.csv                 464   
+i18n_WorkingHours_S79.csv             1206  
+MenuView.jsx                          16326 
+ModeTabs.jsx                          3026  
+PublicMenu README.md                  16847 
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'useAndroidBack|popstate|pushState|history.back|selectedDish|isDetailOpen|needHelp|helpOpen|Нужна помощь|Введите код стола|ChevronDown|Bell|bell|Dialog|Drawer|Sheet|tableCodeOpen|isVerifyCodeOpen' -Context 3,18" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|Android Back|Нужна помощь|bell|chevron|table code|drawer|cart' -Context 2,4" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/README.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|Android Back|Нужна помощь|bell|chevron|table code|drawer|cart' -Context 2,4" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'useAndroidBack|popstate|pushState|history.back|Bell|bell|ChevronDown|sticky|onOpenChange|Drawer|Sheet|Стол|tableCode|help|Нужна помощь' -Context 3,18" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 14.50s:
+
+  pages\PublicMenu\README.md:15:|---|---|---|---|
+  pages\PublicMenu\README.md:16:| x.jsx | `260306-01 x RELEASE.jsx` | 06 мар 2026 | S87 |
+> pages\PublicMenu\README.md:17:| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 мар 2026 | S82 |
+  pages\PublicMenu\README.md:18:| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 мар 2026 | S79 |
+  pages\PublicMenu\README.md:19:| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 мар 2026 | S68 |
+  pages\PublicMenu\README.md:20:
+  pages\PublicMenu\README.md:21:## Активные баги
+  pages\PublicMenu\README.md:31:### Session 119 — 13 мар 2026
+  pages\PublicMenu\README.md:32:
+> pages\PublicMenu\README.md:33:- Full CC code review всех 6 base файлов (CartView, CheckoutView, MenuView, ModeTabs, 
+useTableSession, x.jsx)
+  pages\PublicMenu\README.md:34:- 14 багов из S116 подтверждены как всё ещё активные
+  pages\PublicMenu\README.md:35:- BUG-PM-040 (P0): Loyalty points debited before order creation — no rollback on 
+failure
+  pages\PublicMenu\README.md:36:- BUG-PM-041 (P0): Polling timer leak in useTableSession after cleanup
+  pages\PublicMenu\README.md:37:- BUG-PM-042 (P1): isBillOnCooldown crashes without try/catch in restricted 
+environments
+  pages\PublicMenu\README.md:58:### Session 85 — 06 мар 2026
+  pages\PublicMenu\README.md:59:
+ succeeded in 14.86s:
+
+  pages\PublicMenu\CartView.jsx:1:import React from "react";
+> pages\PublicMenu\CartView.jsx:2:import { Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, Minus, 
+Plus } from "lucide-react";
+  pages\PublicMenu\CartView.jsx:3:import { Card, CardContent } from "@/components/ui/card";
+  pages\PublicMenu\CartView.jsx:4:import { Button } from "@/components/ui/button";
+  pages\PublicMenu\CartView.jsx:5:import { Input } from "@/components/ui/input";
+  pages\PublicMenu\CartView.jsx:6:import Rating from "@/components/Rating";
+  pages\PublicMenu\CartView.jsx:7:
+  pages\PublicMenu\CartView.jsx:8:function lightenColor(hex, amount) {
+  pages\PublicMenu\CartView.jsx:9:  const num = parseInt(hex.replace('#', ''), 16);
+  pages\PublicMenu\CartView.jsx:10:  const r = Math.min(255, (num >> 16) + Math.round((255 - (num >> 16)) * amount));
+  pages\PublicMenu\CartView.jsx:11:  const g = Math.min(255, ((num >> 8) & 0x00FF) + Math.round((255 - ((num >> 8) & 
+0x00FF)) * amount));
+  pages\PublicMenu\CartView.jsx:12:  const b = Math.min(255, (num & 0x0000FF) + Math.round((255 - (num & 0x0000FF)) * 
+amount));
+  pages\PublicMenu\CartView.jsx:13:  return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
+  pages\PublicMenu\CartView.jsx:14:}
+  pages\PublicMenu\CartView.jsx:15:
+  pages\PublicMenu\CartView.jsx:16:export default function CartView({
+ succeeded in 16.03s:
+
+  pages\PublicMenu\x.jsx:22:import {
+  pages\PublicMenu\x.jsx:23:  AlertCircle,
+  pages\PublicMenu\x.jsx:24:  ArrowLeft,
+> pages\PublicMenu\x.jsx:25:  Bell,
+  pages\PublicMenu\x.jsx:26:  Check,
+  pages\PublicMenu\x.jsx:27:  CheckCircle2,
+  pages\PublicMenu\x.jsx:28:  Clock,
+> pages\PublicMenu\x.jsx:29:  ChevronDown,
+  pages\PublicMenu\x.jsx:30:  ChevronUp,
+  pages\PublicMenu\x.jsx:31:  Image as ImageIcon,
+  pages\PublicMenu\x.jsx:32:  Loader2,
+  pages\PublicMenu\x.jsx:33:  MapPin,
+  pages\PublicMenu\x.jsx:34:  Minus,
+  pages\PublicMenu\x.jsx:35:  Plus,
+  pages\PublicMenu\x.jsx:36:  RefreshCw,
+  pages\PublicMenu\x.jsx:37:  ShoppingCart,
+  pages\PublicMenu\x.jsx:38:  X as XIcon,
+  pages\PublicMenu\x.jsx:39:  XCircle,
+  pages\PublicMenu\x.jsx:40:  Globe,
+ succeeded in 17.92s:
+
+  pages\PublicMenu\BUGS.md:16:*8 active bugs remaining (0x P0, 4x P1, 3x P2, 0x P3, 1x suggestion).*
+  pages\PublicMenu\BUGS.md:17:
+> pages\PublicMenu\BUGS.md:18:### BUG-PM-056: Drawer layout not visit-state-driven (P1 — Batch 2)
+  pages\PublicMenu\BUGS.md:19:- **Приоритет:** P1
+  pages\PublicMenu\BUGS.md:20:- **Когда:** S153 (consensus chain publicmenu-260321-093745)
+> pages\PublicMenu\BUGS.md:21:- **Файл:** CartView.jsx
+> pages\PublicMenu\BUGS.md:22:- **Симптом:** CartView renders same layout regardless of visit state. Missing 3 
+distinct drawer layouts per spec (before send / after send+draft / after send no draft).
+> pages\PublicMenu\BUGS.md:23:- **Фикс:** Introduce `drawerLayout` variable, conditionally reorder sections, add 
+collapsible bill.
+  pages\PublicMenu\BUGS.md:24:
+  pages\PublicMenu\BUGS.md:25:### BUG-PM-057: CTA 7-state matrix not implemented (P1 — Batch 2)
+  pages\PublicMenu\BUGS.md:26:- **Приоритет:** P1
+  pages\PublicMenu\BUGS.md:27:- **Когда:** S153 (consensus chain publicmenu-260321-093745)
+> pages\PublicMenu\BUGS.md:28:- **Файл:** CartView.jsx
+  pages\PublicMenu\BUGS.md:29:- **Симптом:** Submit button text doesn't vary by visit+draft state. Missing "Заказать 
+ещё", "Открыть счёт" CTAs.
+  pages\PublicMenu\BUGS.md:30:- **Фикс:** Compute CTA text/behavior from 7-state matrix.
+  pages\PublicMenu\BUGS.md:31:
+codex
+I’ve isolated the relevant code paths. Next I’m pulling the exact line ranges for overlay history, help opening/closing, the table-code sheet, the detail drawer, and the cart header so I can verify each numbered fix without drifting outside scope.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/x.jsx'; "'$lines=Get-Content $p; $ranges=@(@{s=1298;e=1335},@{s=1630;e=1685},@{s=2020;e=2105},@{s=3388;e=3515},@{s=3516;e=3605},@{s=3606;e=3668},@{s=3666;e=3690},@{s=3746;e=3775}); foreach($r in $ranges){"--- $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }}' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'handleOpenHelpModal|setIsHelpModalOpen\\(|pushOverlay\\(|popOverlay\\(|window.addEventListener\\(\"popstate\"|window\\.addEventListener\\(''popstate''|overlayStackRef|detailDish|showTableConfirmSheet|Bell className' -Context 4,10" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/CartView.jsx'; "'$lines=Get-Content $p; $ranges=@(@{s=1;e=95},@{s=420;e=470},@{s=900;e=950}); foreach($r in $ranges){"--- $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '"'{0}:{1}' -f "'$i,$lines[$i-1] } }}' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'onCallWaiter|onClose|ChevronDown|sticky top-0|aria-label|Bell|onOpenChange|help|300|setTimeout' -Context 3,12" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 12.66s:
+--- 1298-1335 ---
+1298:  const pendingSubmitRef = useRef(false);
+1299:
+1300:  // PM-105: Ref-based overlay stack for Android back button priority
+1301:  const overlayStackRef = useRef([]);
+1302:  const isPopStateClosingRef = useRef(false);
+1303:  const isProgrammaticCloseRef = useRef(false);
+1304:
+1305:  const pushOverlay = useCallback((name) => {
+1306:    overlayStackRef.current = [...overlayStackRef.current.filter(n => n !== name), name];
+1307:    window.history.pushState({ sheet: name }, '');
+1308:  }, []);
+1309:
+1310:  const popOverlay = useCallback((name) => {
+1311:    overlayStackRef.current = overlayStackRef.current.filter(n => n !== name);
+1312:    if (!isPopStateClosingRef.current) {
+1313:      isProgrammaticCloseRef.current = true;
+1314:      window.history.back();
+1315:    }
+1316:  }, []);
+ succeeded in 13.47s:
+--- 1-95 ---
+1:import React from "react";
+2:import { Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, Minus, Plus } from "lucide-react";
+3:import { Card, CardContent } from "@/components/ui/card";
+4:import { Button } from "@/components/ui/button";
+5:import { Input } from "@/components/ui/input";
+6:import Rating from "@/components/Rating";
+7:
+8:function lightenColor(hex, amount) {
+9:  const num = parseInt(hex.replace('#', ''), 16);
+10:  const r = Math.min(255, (num >> 16) + Math.round((255 - (num >> 16)) * amount));
+11:  const g = Math.min(255, ((num >> 8) & 0x00FF) + Math.round((255 - ((num >> 8) & 0x00FF)) * amount));
+12:  const b = Math.min(255, (num & 0x0000FF) + Math.round((255 - (num & 0x0000FF)) * amount));
+13:  return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
+14:}
+15:
+16:export default function CartView({
+17:  partner,
+18:  currentTable,
+19:  currentGuest,
+ succeeded in 13.85s:
+
+  pages\PublicMenu\CartView.jsx:1:import React from "react";
+> pages\PublicMenu\CartView.jsx:2:import { Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, Minus, 
+Plus } from "lucide-react";
+  pages\PublicMenu\CartView.jsx:3:import { Card, CardContent } from "@/components/ui/card";
+  pages\PublicMenu\CartView.jsx:4:import { Button } from "@/components/ui/button";
+  pages\PublicMenu\CartView.jsx:5:import { Input } from "@/components/ui/input";
+  pages\PublicMenu\CartView.jsx:6:import Rating from "@/components/Rating";
+  pages\PublicMenu\CartView.jsx:7:
+  pages\PublicMenu\CartView.jsx:8:function lightenColor(hex, amount) {
+  pages\PublicMenu\CartView.jsx:9:  const num = parseInt(hex.replace('#', ''), 16);
+  pages\PublicMenu\CartView.jsx:10:  const r = Math.min(255, (num >> 16) + Math.round((255 - (num >> 16)) * amount));
+  pages\PublicMenu\CartView.jsx:11:  const g = Math.min(255, ((num >> 8) & 0x00FF) + Math.round((255 - ((num >> 8) & 
+0x00FF)) * amount));
+  pages\PublicMenu\CartView.jsx:12:  const b = Math.min(255, (num & 0x0000FF) + Math.round((255 - (num & 0x0000FF)) * 
+amount));
+  pages\PublicMenu\CartView.jsx:13:  return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
+  pages\PublicMenu\CartView.jsx:14:}
+  pages\PublicMenu\CartView.jsx:68:  handleRateDish,
+  pages\PublicMenu\CartView.jsx:69:  ratingSavingByItemId,
+ succeeded in 14.64s:
+
+  pages\PublicMenu\x.jsx:1293:  // TASK-260203-01: Drawer state
+  pages\PublicMenu\x.jsx:1294:  const [drawerMode, setDrawerMode] = useState(null); // 'cart' | null
+  pages\PublicMenu\x.jsx:1295:
+  pages\PublicMenu\x.jsx:1296:  // Just-in-time table confirmation (Batch A+5 Fix 1)
+> pages\PublicMenu\x.jsx:1297:  const [showTableConfirmSheet, setShowTableConfirmSheet] = useState(false);
+  pages\PublicMenu\x.jsx:1298:  const pendingSubmitRef = useRef(false);
+  pages\PublicMenu\x.jsx:1299:
+  pages\PublicMenu\x.jsx:1300:  // PM-105: Ref-based overlay stack for Android back button priority
+> pages\PublicMenu\x.jsx:1301:  const overlayStackRef = useRef([]);
+  pages\PublicMenu\x.jsx:1302:  const isPopStateClosingRef = useRef(false);
+  pages\PublicMenu\x.jsx:1303:  const isProgrammaticCloseRef = useRef(false);
+  pages\PublicMenu\x.jsx:1304:
+  pages\PublicMenu\x.jsx:1305:  const pushOverlay = useCallback((name) => {
+> pages\PublicMenu\x.jsx:1306:    overlayStackRef.current = [...overlayStackRef.current.filter(n => n !== name), name];
+  pages\PublicMenu\x.jsx:1307:    window.history.pushState({ sheet: name }, '');
+  pages\PublicMenu\x.jsx:1308:  }, []);
+  pages\PublicMenu\x.jsx:1309:
+  pages\PublicMenu\x.jsx:1310:  const popOverlay = useCallback((name) => {
+> pages\PublicMenu\x.jsx:1311:    overlayStackRef.current = overlayStackRef.current.filter(n => n !== name);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/README.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|HelpFab|help modal|bell|table code|chevron|Android back' -Context 2,4" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|HelpFab|help modal|bell|table code|chevron|Android back' -Context 2,4" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 7.03s:
+
+ succeeded in 7.46s:
+
+  pages\PublicMenu\BUGS.md:137:- **Файл:** x.jsx
+  pages\PublicMenu\BUGS.md:138:- **Баги:**
+> pages\PublicMenu\BUGS.md:139:  - PM-122 (P2): Detail card Dialog → Drawer (bottom sheet, max-h-[88vh], close 
+chevron, sr-only DrawerTitle, scrollable content, sticky bottom bar)
+  pages\PublicMenu\BUGS.md:140:  - PM-123 (P2): Content reorder: Photo → Title → Description → Price+Discount → Rating 
+→ Sticky bar (was: Title → Price → Rating → Description)
+  pages\PublicMenu\BUGS.md:141:  - PM-118 (P2): Discount display aligned to partner-level fields 
+(partner.discount_enabled, partner.discount_percent), matching MenuView.jsx pattern
+  pages\PublicMenu\BUGS.md:142:- **Commit:** 98f67d0
+  pages\PublicMenu\BUGS.md:143:
+  pages\PublicMenu\BUGS.md:163:  - PM-102 (P2): Dish detail button — inline `color: '#FFFFFF'` bypasses CSS 
+specificity (shadcn Button class override). Removed `text-white hover:text-white` classes.
+  pages\PublicMenu\BUGS.md:164:  - PM-108 (P2): "+" button in list-mode — added `pr-1` to button container for 
+breathing room inside `overflow-hidden` Card.
+> pages\PublicMenu\BUGS.md:165:  - PM-104 (P3): Added `[&_[data-vaul-handle]]:hidden` to cart DrawerContent for handle 
+artifact. Removed unused `ChevronDown` import.
+  pages\PublicMenu\BUGS.md:166:- **No-ops:** PM-103 (already fully fixed by d0a4), PM-096/PM-discount-check/#84b 
+(already fixed in prior КС).
+  pages\PublicMenu\BUGS.md:167:
+codex
+I’ve got enough context to write the report. I’m saving the scoped findings to the pipeline file the task requested, and I’ll also drop the repository-mandated review and command log into `pages/PublicMenu/` without touching the source files.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pipeline/chain-state' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 11.23s:
+
+ exited 124 in 11.39s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pipeline/chain-state' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.71s:
+True
+ succeeded in 8.76s:
+True
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pages/PublicMenu/review_2026-03-24.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pages/PublicMenu/commands_2026-03-24.log' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.64s:
+False
+ succeeded in 8.67s:
+False
+ succeeded in 8.32s:
+False
+codex
+I’m writing three files now: the pipeline findings file the step asked for, a copy of the final report in `pages/PublicMenu/`, and the command log required by this repository’s review workflow.
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-190433-30fb
+
+## Findings
+1. [P2] Fix 1 - Android Back is not unified across all 4 drawers — `pages/PublicMenu/x.jsx:1300-1315` and `pages/PublicMenu/x.jsx:2384-2413` still use the old page-level `pushOverlay` / `popOverlay` stack, and that stack only knows about `tableConfirm` and `cart`. The detail drawer closes via `setDetailDish(null)` at `pages/PublicMenu/x.jsx:3666-3688`, and help still uses `isHelpModalOpen` / `setIsHelpModalOpen(false)` at `pages/PublicMenu/x.jsx:3615-3630`, so Android Back is not wired for 2 of the 4 required drawers and the reusable `useAndroidBack(isOpen, onClose)` hook does not exist. FIX: replace the ad hoc overlay stack usage with a reusable `useAndroidBack` hook and apply it to cart, table-code sheet, detail drawer, and help drawer, including the programmatic-close guard before `history.back()`.
+2. [P2] Fix 2 - Cart bell still opens the legacy help modal directly instead of closing cart and opening a help drawer — `pages/PublicMenu/CartView.jsx:441-447` calls `onCallWaiter` immediately, `pages/PublicMenu/x.jsx:3488-3489` passes `handleOpenHelpModal` straight through, and `pages/PublicMenu/x.jsx:3615-3630` still renders `HelpModal` instead of a bottom `Drawer`. There is no close-cart-first flow, no 300 ms delay, and no shared help-drawer state in `x.jsx`, so the z-index problem described in the task remains. FIX: introduce an `onHelpRequest` flow from `x.jsx` to `CartView`, close the cart first, wait 300 ms, then open a help drawer in `x.jsx` that uses the Fix 1 Android-back hook.
+3. [P2] Fix 3 - Main-menu bell is not restored in the reviewed page code — `pages/PublicMenu/x.jsx:25` imports `Bell`, but `x.jsx` never renders that icon anywhere. The only explicit bell render in the reviewed target files is still inside the cart header at `pages/PublicMenu/CartView.jsx:441-447`, while `x.jsx` only mounts the legacy `HelpFab` branch at `pages/PublicMenu/x.jsx:3604-3612`. That means the requested main-menu bell tied to the shared help drawer is still missing from this page implementation. FIX: add a bell trigger in the main menu layout in `x.jsx` and wire it to the same help drawer used by the cart bell.
+4. [P3] Fix 4 - Table-code drawer still has no top-right chevron close button — the table-code sheet header at `pages/PublicMenu/x.jsx:3518-3527` contains only the title and helper text, and there is no close control anywhere in the sheet body at `pages/PublicMenu/x.jsx:3528-3601`. The drawer therefore still relies on swipe/back only, which does not satisfy the required visible 44x44 chevron affordance. FIX: add a right-aligned `ChevronDown` button to the table-code drawer header and hook it into the same close path as the sheet dismissal.
+5. [P3] Fix 5 - Cart chevron remains a separate sticky row above the table card — `pages/PublicMenu/CartView.jsx:425-436` still renders a dedicated sticky top bar for the close chevron, and the table info card at `pages/PublicMenu/CartView.jsx:438-453` does not contain a right-side close control. This is the old sticky-row layout, not the requested chevron-inside-table-card layout that scrolls away with content. FIX: remove the sticky chevron row and place the close chevron on the right side of the table info card row next to the bell/table info block.
+
+## Summary
+Total: 5 findings (0 P0, 0 P1, 3 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 says to restore the bell at its "original position" and run `git log`, but the speed rules for this review restrict the work to the target files plus local `README.md` / `BUGS.md`, so the original placement cannot be confirmed from the allowed inputs. Fix 4 says to copy the detail-drawer chevron style, but the current detail chevron in `x.jsx` is a dark translucent circle, while the task text describes a gray circle.
+- Missing context (what info would have helped): Whether `HelpFab` is supposed to be removed or coexist with the restored bell, and whether the existing `HelpModal` component's internals should be preserved inside the new drawer. That content lives outside the allowed review scope.
+- Scope questions (anything you weren't sure if it's in scope): Whether the existing `HelpFab` in `x.jsx` should count as the menu-level help entry for Fix 3, since its implementation is outside the files allowed for this review.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-24.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-190433-30fb
+
+## Findings
+1. [P2] Fix 1 - Android Back is not unified across all 4 drawers — `pages/PublicMenu/x.jsx:1300-1315` and `pages/PublicMenu/x.jsx:2384-2413` still use the old page-level `pushOverlay` / `popOverlay` stack, and that stack only knows about `tableConfirm` and `cart`. The detail drawer closes via `setDetailDish(null)` at `pages/PublicMenu/x.jsx:3666-3688`, and help still uses `isHelpModalOpen` / `setIsHelpModalOpen(false)` at `pages/PublicMenu/x.jsx:3615-3630`, so Android Back is not wired for 2 of the 4 required drawers and the reusable `useAndroidBack(isOpen, onClose)` hook does not exist. FIX: replace the ad hoc overlay stack usage with a reusable `useAndroidBack` hook and apply it to cart, table-code sheet, detail drawer, and help drawer, including the programmatic-close guard before `history.back()`.
+2. [P2] Fix 2 - Cart bell still opens the legacy help modal directly instead of closing cart and opening a help drawer — `pages/PublicMenu/CartView.jsx:441-447` calls `onCallWaiter` immediately, `pages/PublicMenu/x.jsx:3488-3489` passes `handleOpenHelpModal` straight through, and `pages/PublicMenu/x.jsx:3615-3630` still renders `HelpModal` instead of a bottom `Drawer`. There is no close-cart-first flow, no 300 ms delay, and no shared help-drawer state in `x.jsx`, so the z-index problem described in the task remains. FIX: introduce an `onHelpRequest` flow from `x.jsx` to `CartView`, close the cart first, wait 300 ms, then open a help drawer in `x.jsx` that uses the Fix 1 Android-back hook.
+3. [P2] Fix 3 - Main-menu bell is not restored in the reviewed page code — `pages/PublicMenu/x.jsx:25` imports `Bell`, but `x.jsx` never renders that icon anywhere. The only explicit bell render in the reviewed target files is still inside the cart header at `pages/PublicMenu/CartView.jsx:441-447`, while `x.jsx` only mounts the legacy `HelpFab` branch at `pages/PublicMenu/x.jsx:3604-3612`. That means the requested main-menu bell tied to the shared help drawer is still missing from this page implementation. FIX: add a bell trigger in the main menu layout in `x.jsx` and wire it to the same help drawer used by the cart bell.
+4. [P3] Fix 4 - Table-code drawer still has no top-right chevron close button — the table-code sheet header at `pages/PublicMenu/x.jsx:3518-3527` contains only the title and helper text, and there is no close control anywhere in the sheet body at `pages/PublicMenu/x.jsx:3528-3601`. The drawer therefore still relies on swipe/back only, which does not satisfy the required visible 44x44 chevron affordance. FIX: add a right-aligned `ChevronDown` button to the table-code drawer header and hook it into the same close path as the sheet dismissal.
+5. [P3] Fix 5 - Cart chevron remains a separate sticky row above the table card — `pages/PublicMenu/CartView.jsx:425-436` still renders a dedicated sticky top bar for the close chevron, and the table info card at `pages/PublicMenu/CartView.jsx:438-453` does not contain a right-side close control. This is the old sticky-row layout, not the requested chevron-inside-table-card layout that scrolls away with content. FIX: remove the sticky chevron row and place the close chevron on the right side of the table info card row next to the bell/table info block.
+
+## Summary
+Total: 5 findings (0 P0, 0 P1, 3 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 says to restore the bell at its "original position" and run `git log`, but the speed rules for this review restrict the work to the target files plus local `README.md` / `BUGS.md`, so the original placement cannot be confirmed from the allowed inputs. Fix 4 says to copy the detail-drawer chevron style, but the current detail chevron in `x.jsx` is a dark translucent circle, while the task text describes a gray circle.
+- Missing context (what info would have helped): Whether `HelpFab` is supposed to be removed or coexist with the restored bell, and whether the existing `HelpModal` component's internals should be preserved inside the new drawer. That content lives outside the allowed review scope.
+- Scope questions (anything you weren't sure if it's in scope): Whether the existing `HelpFab` in `x.jsx` should count as the menu-level help entry for Fix 3, since its implementation is outside the files allowed for this review.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-24.log
+1. [timeout] Get-ChildItem -Force pages/PublicMenu
+2. [timeout] Get-Content -Raw pages/PublicMenu/x.jsx
+3. [timeout] Get-Content -Raw pages/PublicMenu/CartView.jsx
+4. [timeout] if (Test-Path pages/PublicMenu/README.md) { Get-Content -Raw pages/PublicMenu/README.md }
+5. [timeout] if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content -Raw pages/PublicMenu/BUGS.md }
+6. Get-ChildItem pages/PublicMenu | Select-Object Name,Length
+7. if (Test-Path pages/PublicMenu/README.md) { Get-Item pages/PublicMenu/README.md | Select-Object Name,Length }
+8. if (Test-Path pages/PublicMenu/BUGS.md) { Get-Item pages/PublicMenu/BUGS.md | Select-Object Name,Length }
+9. Select-String -Path pages/PublicMenu/README.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|Android Back|Нужна помощь|bell|chevron|table code|drawer|cart' -Context 2,4
+10. Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|Android Back|Нужна помощь|bell|chevron|table code|drawer|cart' -Context 2,4
+11. Select-String -Path pages/PublicMenu/x.jsx -Pattern 'useAndroidBack|popstate|pushState|history.back|selectedDish|isDetailOpen|needHelp|helpOpen|Нужна помощь|Введите код стола|ChevronDown|Bell|bell|Dialog|Drawer|Sheet|tableCodeOpen|isVerifyCodeOpen' -Context 3,18
+12. Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'useAndroidBack|popstate|pushState|history.back|Bell|bell|ChevronDown|sticky|onOpenChange|Drawer|Sheet|Стол|tableCode|help|Нужна помощь' -Context 3,18
+13. $p='pages/PublicMenu/x.jsx'; $lines=Get-Content $p; $ranges=@(@{s=1298;e=1335},@{s=1630;e=1685},@{s=2020;e=2105},@{s=3388;e=3515},@{s=3516;e=3605},@{s=3606;e=3668},@{s=3666;e=3690},@{s=3746;e=3775}); foreach($r in $ranges){"--- $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }}
+14. Select-String -Path pages/PublicMenu/x.jsx -Pattern 'handleOpenHelpModal|setIsHelpModalOpen\(|pushOverlay\(|popOverlay\(|window.addEventListener\(\"popstate\"|window\.addEventListener\(''popstate''|overlayStackRef|detailDish|showTableConfirmSheet|Bell className' -Context 4,10
+15. $p='pages/PublicMenu/CartView.jsx'; $lines=Get-Content $p; $ranges=@(@{s=1;e=95},@{s=420;e=470},@{s=900;e=950}); foreach($r in $ranges){"--- $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }}
+16. Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'onCallWaiter|onClose|ChevronDown|sticky top-0|aria-label|Bell|onOpenChange|help|300|setTimeout' -Context 3,12
+17. [timeout] Test-Path pipeline/chain-state
+18. [timeout] Test-Path pages/PublicMenu
+19. Test-Path pipeline/chain-state
+20. Test-Path pages/PublicMenu
+21. Select-String -Path pages/PublicMenu/README.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|HelpFab|help modal|bell|table code|chevron|Android back' -Context 2,4
+22. Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|HelpFab|help modal|bell|table code|chevron|Android back' -Context 2,4
+23. Test-Path pages/PublicMenu/review_2026-03-24.md
+24. Test-Path pages/PublicMenu/commands_2026-03-24.log
+25. Test-Path pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md
+apply_patch(auto_approved=true) exited 0 in 2.25s:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md
+A pages/PublicMenu/review_2026-03-24.md
+A pages/PublicMenu/commands_2026-03-24.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..73ed469db6f03d8662edef33ebcb2b91995be8c2
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -0,0 +1,25 @@
++1. [timeout] Get-ChildItem -Force pages/PublicMenu
++2. [timeout] Get-Content -Raw pages/PublicMenu/x.jsx
++3. [timeout] Get-Content -Raw pages/PublicMenu/CartView.jsx
++4. [timeout] if (Test-Path pages/PublicMenu/README.md) { Get-Content -Raw pages/PublicMenu/README.md }
++5. [timeout] if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content -Raw pages/PublicMenu/BUGS.md }
++6. Get-ChildItem pages/PublicMenu | Select-Object Name,Length
++7. if (Test-Path pages/PublicMenu/README.md) { Get-Item pages/PublicMenu/README.md | Select-Object Name,Length }
++8. if (Test-Path pages/PublicMenu/BUGS.md) { Get-Item pages/PublicMenu/BUGS.md | Select-Object Name,Length }
++9. Select-String -Path pages/PublicMenu/README.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|Android Back|Нужна помощь|bell|chevron|table code|drawer|cart' -Context 2,4
++10. Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|Android Back|Нужна помощь|bell|chevron|table code|drawer|cart' -Context 2,4
++11. Select-String -Path pages/PublicMenu/x.jsx -Pattern 'useAndroidBack|popstate|pushState|history.back|selectedDish|isDetailOpen|needHelp|helpOpen|Нужна помощь|Введите код стола|ChevronDown|Bell|bell|Dialog|Drawer|Sheet|tableCodeOpen|isVerifyCodeOpen' -Context 3,18
++12. Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'useAndroidBack|popstate|pushState|history.back|Bell|bell|ChevronDown|sticky|onOpenChange|Drawer|Sheet|Стол|tableCode|help|Нужна помощь' -Context 3,18
++13. $p='pages/PublicMenu/x.jsx'; $lines=Get-Content $p; $ranges=@(@{s=1298;e=1335},@{s=1630;e=1685},@{s=2020;e=2105},@{s=3388;e=3515},@{s=3516;e=3605},@{s=3606;e=3668},@{s=3666;e=3690},@{s=3746;e=3775}); foreach($r in $ranges){"--- $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }}
++14. Select-String -Path pages/PublicMenu/x.jsx -Pattern 'handleOpenHelpModal|setIsHelpModalOpen\(|pushOverlay\(|popOverlay\(|window.addEventListener\(\"popstate\"|window\.addEventListener\(''popstate''|overlayStackRef|detailDish|showTableConfirmSheet|Bell className' -Context 4,10
++15. $p='pages/PublicMenu/CartView.jsx'; $lines=Get-Content $p; $ranges=@(@{s=1;e=95},@{s=420;e=470},@{s=900;e=950}); foreach($r in $ranges){"--- $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }}
++16. Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'onCallWaiter|onClose|ChevronDown|sticky top-0|aria-label|Bell|onOpenChange|help|300|setTimeout' -Context 3,12
++17. [timeout] Test-Path pipeline/chain-state
++18. [timeout] Test-Path pages/PublicMenu
++19. Test-Path pipeline/chain-state
++20. Test-Path pages/PublicMenu
++21. Select-String -Path pages/PublicMenu/README.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|HelpFab|help modal|bell|table code|chevron|Android back' -Context 2,4
++22. Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|HelpFab|help modal|bell|table code|chevron|Android back' -Context 2,4
++23. Test-Path pages/PublicMenu/review_2026-03-24.md
++24. Test-Path pages/PublicMenu/commands_2026-03-24.log
++25. Test-Path pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b514c1c3bac3bade1a9f83f35591f58bc818c2fc
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-190433-30fb
++
++## Findings
++1. [P2] Fix 1 - Android Back is not unified across all 4 drawers — `pages/PublicMenu/x.jsx:1300-1315` and `pages/PublicMenu/x.jsx:2384-2413` still use the old page-level `pushOverlay` / `popOverlay` stack, and that stack only knows about `tableConfirm` and `cart`. The detail drawer closes via `setDetailDish(null)` at `pages/PublicMenu/x.jsx:3666-3688`, and help still uses `isHelpModalOpen` / `setIsHelpModalOpen(false)` at `pages/PublicMenu/x.jsx:3615-3630`, so Android Back is not wired for 2 of the 4 required drawers and the reusable `useAndroidBack(isOpen, onClose)` hook does not exist. FIX: replace the ad hoc overlay stack usage with a reusable `useAndroidBack` hook and apply it to cart, table-code sheet, detail drawer, and help drawer, including the programmatic-close guard before `history.back()`.
++2. [P2] Fix 2 - Cart bell still opens the legacy help modal directly instead of closing cart and opening a help drawer — `pages/PublicMenu/CartView.jsx:441-447` calls `onCallWaiter` immediately, `pages/PublicMenu/x.jsx:3488-3489` passes `handleOpenHelpModal` straight through, and `pages/PublicMenu/x.jsx:3615-3630` still renders `HelpModal` instead of a bottom `Drawer`. There is no close-cart-first flow, no 300 ms delay, and no shared help-drawer state in `x.jsx`, so the z-index problem described in the task remains. FIX: introduce an `onHelpRequest` flow from `x.jsx` to `CartView`, close the cart first, wait 300 ms, then open a help drawer in `x.jsx` that uses the Fix 1 Android-back hook.
++3. [P2] Fix 3 - Main-menu bell is not restored in the reviewed page code — `pages/PublicMenu/x.jsx:25` imports `Bell`, but `x.jsx` never renders that icon anywhere. The only explicit bell render in the reviewed target files is still inside the cart header at `pages/PublicMenu/CartView.jsx:441-447`, while `x.jsx` only mounts the legacy `HelpFab` branch at `pages/PublicMenu/x.jsx:3604-3612`. That means the requested main-menu bell tied to the shared help drawer is still missing from this page implementation. FIX: add a bell trigger in the main menu layout in `x.jsx` and wire it to the same help drawer used by the cart bell.
++4. [P3] Fix 4 - Table-code drawer still has no top-right chevron close button — the table-code sheet header at `pages/PublicMenu/x.jsx:3518-3527` contains only the title and helper text, and there is no close control anywhere in the sheet body at `pages/PublicMenu/x.jsx:3528-3601`. The drawer therefore still relies on swipe/back only, which does not satisfy the required visible 44x44 chevron affordance. FIX: add a right-aligned `ChevronDown` button to the table-code drawer header and hook it into the same close path as the sheet dismissal.
++5. [P3] Fix 5 - Cart chevron remains a separate sticky row above the table card — `pages/PublicMenu/CartView.jsx:425-436` still renders a dedicated sticky top bar for the close chevron, and the table info card at `pages/PublicMenu/CartView.jsx:438-453` does not contain a right-side close control. This is the old sticky-row layout, not the requested chevron-inside-table-card layout that scrolls away with content. FIX: remove the sticky chevron row and place the close chevron on the right side of the table info card row next to the bell/table info block.
++
++## Summary
++Total: 5 findings (0 P0, 0 P1, 3 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 says to restore the bell at its "original position" and run `git log`, but the speed rules for this review restrict the work to the target files plus local `README.md` / `BUGS.md`, so the original placement cannot be confirmed from the allowed inputs. Fix 4 says to copy the detail-drawer chevron style, but the current detail chevron in `x.jsx` is a dark translucent circle, while the task text describes a gray circle.
++- Missing context (what info would have helped): Whether `HelpFab` is supposed to be removed or coexist with the restored bell, and whether the existing `HelpModal` component's internals should be preserved inside the new drawer. That content lives outside the allowed review scope.
++- Scope questions (anything you weren't sure if it's in scope): Whether the existing `HelpFab` in `x.jsx` should count as the menu-level help entry for Fix 3, since its implementation is outside the files allowed for this review.
+diff --git a/pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md b/pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b514c1c3bac3bade1a9f83f35591f58bc818c2fc
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-190433-30fb
++
++## Findings
++1. [P2] Fix 1 - Android Back is not unified across all 4 drawers — `pages/PublicMenu/x.jsx:1300-1315` and `pages/PublicMenu/x.jsx:2384-2413` still use the old page-level `pushOverlay` / `popOverlay` stack, and that stack only knows about `tableConfirm` and `cart`. The detail drawer closes via `setDetailDish(null)` at `pages/PublicMenu/x.jsx:3666-3688`, and help still uses `isHelpModalOpen` / `setIsHelpModalOpen(false)` at `pages/PublicMenu/x.jsx:3615-3630`, so Android Back is not wired for 2 of the 4 required drawers and the reusable `useAndroidBack(isOpen, onClose)` hook does not exist. FIX: replace the ad hoc overlay stack usage with a reusable `useAndroidBack` hook and apply it to cart, table-code sheet, detail drawer, and help drawer, including the programmatic-close guard before `history.back()`.
++2. [P2] Fix 2 - Cart bell still opens the legacy help modal directly instead of closing cart and opening a help drawer — `pages/PublicMenu/CartView.jsx:441-447` calls `onCallWaiter` immediately, `pages/PublicMenu/x.jsx:3488-3489` passes `handleOpenHelpModal` straight through, and `pages/PublicMenu/x.jsx:3615-3630` still renders `HelpModal` instead of a bottom `Drawer`. There is no close-cart-first flow, no 300 ms delay, and no shared help-drawer state in `x.jsx`, so the z-index problem described in the task remains. FIX: introduce an `onHelpRequest` flow from `x.jsx` to `CartView`, close the cart first, wait 300 ms, then open a help drawer in `x.jsx` that uses the Fix 1 Android-back hook.
++3. [P2] Fix 3 - Main-menu bell is not restored in the reviewed page code — `pages/PublicMenu/x.jsx:25` imports `Bell`, but `x.jsx` never renders that icon anywhere. The only explicit bell render in the reviewed target files is still inside the cart header at `pages/PublicMenu/CartView.jsx:441-447`, while `x.jsx` only mounts the legacy `HelpFab` branch at `pages/PublicMenu/x.jsx:3604-3612`. That means the requested main-menu bell tied to the shared help drawer is still missing from this page implementation. FIX: add a bell trigger in the main menu layout in `x.jsx` and wire it to the same help drawer used by the cart bell.
++4. [P3] Fix 4 - Table-code drawer still has no top-right chevron close button — the table-code sheet header at `pages/PublicMenu/x.jsx:3518-3527` contains only the title and helper text, and there is no close control anywhere in the sheet body at `pages/PublicMenu/x.jsx:3528-3601`. The drawer therefore still relies on swipe/back only, which does not satisfy the required visible 44x44 chevron affordance. FIX: add a right-aligned `ChevronDown` button to the table-code drawer header and hook it into the same close path as the sheet dismissal.
++5. [P3] Fix 5 - Cart chevron remains a separate sticky row above the table card — `pages/PublicMenu/CartView.jsx:425-436` still renders a dedicated sticky top bar for the close chevron, and the table info card at `pages/PublicMenu/CartView.jsx:438-453` does not contain a right-side close control. This is the old sticky-row layout, not the requested chevron-inside-table-card layout that scrolls away with content. FIX: remove the sticky chevron row and place the close chevron on the right side of the table info card row next to the bell/table info block.
++
++## Summary
++Total: 5 findings (0 P0, 0 P1, 3 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 says to restore the bell at its "original position" and run `git log`, but the speed rules for this review restrict the work to the target files plus local `README.md` / `BUGS.md`, so the original placement cannot be confirmed from the allowed inputs. Fix 4 says to copy the detail-drawer chevron style, but the current detail chevron in `x.jsx` is a dark translucent circle, while the task text describes a gray circle.
++- Missing context (what info would have helped): Whether `HelpFab` is supposed to be removed or coexist with the restored bell, and whether the existing `HelpModal` component's internals should be preserved inside the new drawer. That content lives outside the allowed review scope.
++- Scope questions (anything you weren't sure if it's in scope): Whether the existing `HelpFab` in `x.jsx` should count as the menu-level help entry for Fix 3, since its implementation is outside the files allowed for this review.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..73ed469db6f03d8662edef33ebcb2b91995be8c2
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -0,0 +1,25 @@
++1. [timeout] Get-ChildItem -Force pages/PublicMenu
++2. [timeout] Get-Content -Raw pages/PublicMenu/x.jsx
++3. [timeout] Get-Content -Raw pages/PublicMenu/CartView.jsx
++4. [timeout] if (Test-Path pages/PublicMenu/README.md) { Get-Content -Raw pages/PublicMenu/README.md }
++5. [timeout] if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content -Raw pages/PublicMenu/BUGS.md }
++6. Get-ChildItem pages/PublicMenu | Select-Object Name,Length
++7. if (Test-Path pages/PublicMenu/README.md) { Get-Item pages/PublicMenu/README.md | Select-Object Name,Length }
++8. if (Test-Path pages/PublicMenu/BUGS.md) { Get-Item pages/PublicMenu/BUGS.md | Select-Object Name,Length }
++9. Select-String -Path pages/PublicMenu/README.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|Android Back|Нужна помощь|bell|chevron|table code|drawer|cart' -Context 2,4
++10. Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|Android Back|Нужна помощь|bell|chevron|table code|drawer|cart' -Context 2,4
++11. Select-String -Path pages/PublicMenu/x.jsx -Pattern 'useAndroidBack|popstate|pushState|history.back|selectedDish|isDetailOpen|needHelp|helpOpen|Нужна помощь|Введите код стола|ChevronDown|Bell|bell|Dialog|Drawer|Sheet|tableCodeOpen|isVerifyCodeOpen' -Context 3,18
++12. Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'useAndroidBack|popstate|pushState|history.back|Bell|bell|ChevronDown|sticky|onOpenChange|Drawer|Sheet|Стол|tableCode|help|Нужна помощь' -Context 3,18
++13. $p='pages/PublicMenu/x.jsx'; $lines=Get-Content $p; $ranges=@(@{s=1298;e=1335},@{s=1630;e=1685},@{s=2020;e=2105},@{s=3388;e=3515},@{s=3516;e=3605},@{s=3606;e=3668},@{s=3666;e=3690},@{s=3746;e=3775}); foreach($r in $ranges){"--- $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }}
++14. Select-String -Path pages/PublicMenu/x.jsx -Pattern 'handleOpenHelpModal|setIsHelpModalOpen\(|pushOverlay\(|popOverlay\(|window.addEventListener\(\"popstate\"|window\.addEventListener\(''popstate''|overlayStackRef|detailDish|showTableConfirmSheet|Bell className' -Context 4,10
++15. $p='pages/PublicMenu/CartView.jsx'; $lines=Get-Content $p; $ranges=@(@{s=1;e=95},@{s=420;e=470},@{s=900;e=950}); foreach($r in $ranges){"--- $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }}
++16. Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'onCallWaiter|onClose|ChevronDown|sticky top-0|aria-label|Bell|onOpenChange|help|300|setTimeout' -Context 3,12
++17. [timeout] Test-Path pipeline/chain-state
++18. [timeout] Test-Path pages/PublicMenu
++19. Test-Path pipeline/chain-state
++20. Test-Path pages/PublicMenu
++21. Select-String -Path pages/PublicMenu/README.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|HelpFab|help modal|bell|table code|chevron|Android back' -Context 2,4
++22. Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|HelpFab|help modal|bell|table code|chevron|Android back' -Context 2,4
++23. Test-Path pages/PublicMenu/review_2026-03-24.md
++24. Test-Path pages/PublicMenu/commands_2026-03-24.log
++25. Test-Path pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b514c1c3bac3bade1a9f83f35591f58bc818c2fc
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-190433-30fb
++
++## Findings
++1. [P2] Fix 1 - Android Back is not unified across all 4 drawers — `pages/PublicMenu/x.jsx:1300-1315` and `pages/PublicMenu/x.jsx:2384-2413` still use the old page-level `pushOverlay` / `popOverlay` stack, and that stack only knows about `tableConfirm` and `cart`. The detail drawer closes via `setDetailDish(null)` at `pages/PublicMenu/x.jsx:3666-3688`, and help still uses `isHelpModalOpen` / `setIsHelpModalOpen(false)` at `pages/PublicMenu/x.jsx:3615-3630`, so Android Back is not wired for 2 of the 4 required drawers and the reusable `useAndroidBack(isOpen, onClose)` hook does not exist. FIX: replace the ad hoc overlay stack usage with a reusable `useAndroidBack` hook and apply it to cart, table-code sheet, detail drawer, and help drawer, including the programmatic-close guard before `history.back()`.
++2. [P2] Fix 2 - Cart bell still opens the legacy help modal directly instead of closing cart and opening a help drawer — `pages/PublicMenu/CartView.jsx:441-447` calls `onCallWaiter` immediately, `pages/PublicMenu/x.jsx:3488-3489` passes `handleOpenHelpModal` straight through, and `pages/PublicMenu/x.jsx:3615-3630` still renders `HelpModal` instead of a bottom `Drawer`. There is no close-cart-first flow, no 300 ms delay, and no shared help-drawer state in `x.jsx`, so the z-index problem described in the task remains. FIX: introduce an `onHelpRequest` flow from `x.jsx` to `CartView`, close the cart first, wait 300 ms, then open a help drawer in `x.jsx` that uses the Fix 1 Android-back hook.
++3. [P2] Fix 3 - Main-menu bell is not restored in the reviewed page code — `pages/PublicMenu/x.jsx:25` imports `Bell`, but `x.jsx` never renders that icon anywhere. The only explicit bell render in the reviewed target files is still inside the cart header at `pages/PublicMenu/CartView.jsx:441-447`, while `x.jsx` only mounts the legacy `HelpFab` branch at `pages/PublicMenu/x.jsx:3604-3612`. That means the requested main-menu bell tied to the shared help drawer is still missing from this page implementation. FIX: add a bell trigger in the main menu layout in `x.jsx` and wire it to the same help drawer used by the cart bell.
++4. [P3] Fix 4 - Table-code drawer still has no top-right chevron close button — the table-code sheet header at `pages/PublicMenu/x.jsx:3518-3527` contains only the title and helper text, and there is no close control anywhere in the sheet body at `pages/PublicMenu/x.jsx:3528-3601`. The drawer therefore still relies on swipe/back only, which does not satisfy the required visible 44x44 chevron affordance. FIX: add a right-aligned `ChevronDown` button to the table-code drawer header and hook it into the same close path as the sheet dismissal.
++5. [P3] Fix 5 - Cart chevron remains a separate sticky row above the table card — `pages/PublicMenu/CartView.jsx:425-436` still renders a dedicated sticky top bar for the close chevron, and the table info card at `pages/PublicMenu/CartView.jsx:438-453` does not contain a right-side close control. This is the old sticky-row layout, not the requested chevron-inside-table-card layout that scrolls away with content. FIX: remove the sticky chevron row and place the close chevron on the right side of the table info card row next to the bell/table info block.
++
++## Summary
++Total: 5 findings (0 P0, 0 P1, 3 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 says to restore the bell at its "original position" and run `git log`, but the speed rules for this review restrict the work to the target files plus local `README.md` / `BUGS.md`, so the original placement cannot be confirmed from the allowed inputs. Fix 4 says to copy the detail-drawer chevron style, but the current detail chevron in `x.jsx` is a dark translucent circle, while the task text describes a gray circle.
++- Missing context (what info would have helped): Whether `HelpFab` is supposed to be removed or coexist with the restored bell, and whether the existing `HelpModal` component's internals should be preserved inside the new drawer. That content lives outside the allowed review scope.
++- Scope questions (anything you weren't sure if it's in scope): Whether the existing `HelpFab` in `x.jsx` should count as the menu-level help entry for Fix 3, since its implementation is outside the files allowed for this review.
+diff --git a/pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md b/pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b514c1c3bac3bade1a9f83f35591f58bc818c2fc
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-190433-30fb
++
++## Findings
++1. [P2] Fix 1 - Android Back is not unified across all 4 drawers — `pages/PublicMenu/x.jsx:1300-1315` and `pages/PublicMenu/x.jsx:2384-2413` still use the old page-level `pushOverlay` / `popOverlay` stack, and that stack only knows about `tableConfirm` and `cart`. The detail drawer closes via `setDetailDish(null)` at `pages/PublicMenu/x.jsx:3666-3688`, and help still uses `isHelpModalOpen` / `setIsHelpModalOpen(false)` at `pages/PublicMenu/x.jsx:3615-3630`, so Android Back is not wired for 2 of the 4 required drawers and the reusable `useAndroidBack(isOpen, onClose)` hook does not exist. FIX: replace the ad hoc overlay stack usage with a reusable `useAndroidBack` hook and apply it to cart, table-code sheet, detail drawer, and help drawer, including the programmatic-close guard before `history.back()`.
++2. [P2] Fix 2 - Cart bell still opens the legacy help modal directly instead of closing cart and opening a help drawer — `pages/PublicMenu/CartView.jsx:441-447` calls `onCallWaiter` immediately, `pages/PublicMenu/x.jsx:3488-3489` passes `handleOpenHelpModal` straight through, and `pages/PublicMenu/x.jsx:3615-3630` still renders `HelpModal` instead of a bottom `Drawer`. There is no close-cart-first flow, no 300 ms delay, and no shared help-drawer state in `x.jsx`, so the z-index problem described in the task remains. FIX: introduce an `onHelpRequest` flow from `x.jsx` to `CartView`, close the cart first, wait 300 ms, then open a help drawer in `x.jsx` that uses the Fix 1 Android-back hook.
++3. [P2] Fix 3 - Main-menu bell is not restored in the reviewed page code — `pages/PublicMenu/x.jsx:25` imports `Bell`, but `x.jsx` never renders that icon anywhere. The only explicit bell render in the reviewed target files is still inside the cart header at `pages/PublicMenu/CartView.jsx:441-447`, while `x.jsx` only mounts the legacy `HelpFab` branch at `pages/PublicMenu/x.jsx:3604-3612`. That means the requested main-menu bell tied to the shared help drawer is still missing from this page implementation. FIX: add a bell trigger in the main menu layout in `x.jsx` and wire it to the same help drawer used by the cart bell.
++4. [P3] Fix 4 - Table-code drawer still has no top-right chevron close button — the table-code sheet header at `pages/PublicMenu/x.jsx:3518-3527` contains only the title and helper text, and there is no close control anywhere in the sheet body at `pages/PublicMenu/x.jsx:3528-3601`. The drawer therefore still relies on swipe/back only, which does not satisfy the required visible 44x44 chevron affordance. FIX: add a right-aligned `ChevronDown` button to the table-code drawer header and hook it into the same close path as the sheet dismissal.
++5. [P3] Fix 5 - Cart chevron remains a separate sticky row above the table card — `pages/PublicMenu/CartView.jsx:425-436` still renders a dedicated sticky top bar for the close chevron, and the table info card at `pages/PublicMenu/CartView.jsx:438-453` does not contain a right-side close control. This is the old sticky-row layout, not the requested chevron-inside-table-card layout that scrolls away with content. FIX: remove the sticky chevron row and place the close chevron on the right side of the table info card row next to the bell/table info block.
++
++## Summary
++Total: 5 findings (0 P0, 0 P1, 3 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 says to restore the bell at its "original position" and run `git log`, but the speed rules for this review restrict the work to the target files plus local `README.md` / `BUGS.md`, so the original placement cannot be confirmed from the allowed inputs. Fix 4 says to copy the detail-drawer chevron style, but the current detail chevron in `x.jsx` is a dark translucent circle, while the task text describes a gray circle.
++- Missing context (what info would have helped): Whether `HelpFab` is supposed to be removed or coexist with the restored bell, and whether the existing `HelpModal` component's internals should be preserved inside the new drawer. That content lives outside the allowed review scope.
++- Scope questions (anything you weren't sure if it's in scope): Whether the existing `HelpFab` in `x.jsx` should count as the menu-level help entry for Fix 3, since its implementation is outside the files allowed for this review.
+
+codex
+The report files are written. I’m doing one quick verification pass on the saved artifacts, then I’ll return the concise result with the findings count and file locations.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -TotalCount 20 pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -TotalCount 10 pages/PublicMenu/review_2026-03-24.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -TotalCount 10 pages/PublicMenu/commands_2026-03-24.log' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.21s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260324-190433-30fb
+
+## Findings
+1. [P2] Fix 1 - Android Back is not unified across all 4 drawers â€” `pages/PublicMenu/x.jsx:1300-1315` and `pages/PublicMenu/x.jsx:2384-2413` still use the old page-level `pushOverlay` / `popOverlay` stack, and that stack only knows about `tableConfirm` and `cart`. The detail drawer closes via `setDetailDish(null)` at `pages/PublicMenu/x.jsx:3666-3688`, and help still uses `isHelpModalOpen` / `setIsHelpModalOpen(false)` at `pages/PublicMenu/x.jsx:3615-3630`, so Android Back is not wired for 2 of the 4 required drawers and the reusable `useAndroidBack(isOpen, onClose)` hook does not exist. FIX: replace the ad hoc overlay stack usage with a reusable `useAndroidBack` hook and apply it to cart, table-code sheet, detail drawer, and help drawer, including the programmatic-close guard before `history.back()`.
+2. [P2] Fix 2 - Cart bell still opens the legacy help modal directly instead of closing cart and opening a help drawer â€” `pages/PublicMenu/CartView.jsx:441-447` calls `onCallWaiter` immediately, `pages/PublicMenu/x.jsx:3488-3489` passes `handleOpenHelpModal` straight through, and `pages/PublicMenu/x.jsx:3615-3630` still renders `HelpModal` instead of a bottom `Drawer`. There is no close-cart-first flow, no 300 ms delay, and no shared help-drawer state in `x.jsx`, so the z-index problem described in the task remains. FIX: introduce an `onHelpRequest` flow from `x.jsx` to `CartView`, close the cart first, wait 300 ms, then open a help drawer in `x.jsx` that uses the Fix 1 Android-back hook.
+3. [P2] Fix 3 - Main-menu bell is not restored in the reviewed page code â€” `pages/PublicMenu/x.jsx:25` imports `Bell`, but `x.jsx` never renders that icon anywhere. The only explicit bell render in the reviewed target files is still inside the cart header at `pages/PublicMenu/CartView.jsx:441-447`, while `x.jsx` only mounts the legacy `HelpFab` branch at `pages/PublicMenu/x.jsx:3604-3612`. That means the requested main-menu bell tied to the shared help drawer is still missing from this page implementation. FIX: add a bell trigger in the main menu layout in `x.jsx` and wire it to the same help drawer used by the cart bell.
+4. [P3] Fix 4 - Table-code drawer still has no top-right chevron close button â€” the table-code sheet header at `pages/PublicMenu/x.jsx:3518-3527` contains only the title and helper text, and there is no close control anywhere in the sheet body at `pages/PublicMenu/x.jsx:3528-3601`. The drawer therefore still relies on swipe/back only, which does not satisfy the required visible 44x44 chevron affordance. FIX: add a right-aligned `ChevronDown` button to the table-code drawer header and hook it into the same close path as the sheet dismissal.
+5. [P3] Fix 5 - Cart chevron remains a separate sticky row above the table card â€” `pages/PublicMenu/CartView.jsx:425-436` still renders a dedicated sticky top bar for the close chevron, and the table info card at `pages/PublicMenu/CartView.jsx:438-453` does not contain a right-side close control. This is the old sticky-row layout, not the requested chevron-inside-table-card layout that scrolls away with content. FIX: remove the sticky chevron row and place the close chevron on the right side of the table info card row next to the bell/table info block.
+
+## Summary
+ succeeded in 11.27s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260324-190433-30fb
+
+## Findings
+1. [P2] Fix 1 - Android Back is not unified across all 4 drawers â€” `pages/PublicMenu/x.jsx:1300-1315` and `pages/PublicMenu/x.jsx:2384-2413` still use the old page-level `pushOverlay` / `popOverlay` stack, and that stack only knows about `tableConfirm` and `cart`. The detail drawer closes via `setDetailDish(null)` at `pages/PublicMenu/x.jsx:3666-3688`, and help still uses `isHelpModalOpen` / `setIsHelpModalOpen(false)` at `pages/PublicMenu/x.jsx:3615-3630`, so Android Back is not wired for 2 of the 4 required drawers and the reusable `useAndroidBack(isOpen, onClose)` hook does not exist. FIX: replace the ad hoc overlay stack usage with a reusable `useAndroidBack` hook and apply it to cart, table-code sheet, detail drawer, and help drawer, including the programmatic-close guard before `history.back()`.
+2. [P2] Fix 2 - Cart bell still opens the legacy help modal directly instead of closing cart and opening a help drawer â€” `pages/PublicMenu/CartView.jsx:441-447` calls `onCallWaiter` immediately, `pages/PublicMenu/x.jsx:3488-3489` passes `handleOpenHelpModal` straight through, and `pages/PublicMenu/x.jsx:3615-3630` still renders `HelpModal` instead of a bottom `Drawer`. There is no close-cart-first flow, no 300 ms delay, and no shared help-drawer state in `x.jsx`, so the z-index problem described in the task remains. FIX: introduce an `onHelpRequest` flow from `x.jsx` to `CartView`, close the cart first, wait 300 ms, then open a help drawer in `x.jsx` that uses the Fix 1 Android-back hook.
+3. [P2] Fix 3 - Main-menu bell is not restored in the reviewed page code â€” `pages/PublicMenu/x.jsx:25` imports `Bell`, but `x.jsx` never renders that icon anywhere. The only explicit bell render in the reviewed target files is still inside the cart header at `pages/PublicMenu/CartView.jsx:441-447`, while `x.jsx` only mounts the legacy `HelpFab` branch at `pages/PublicMenu/x.jsx:3604-3612`. That means the requested main-menu bell tied to the shared help drawer is still missing from this page implementation. FIX: add a bell trigger in the main menu layout in `x.jsx` and wire it to the same help drawer used by the cart bell.
+4. [P3] Fix 4 - Table-code drawer still has no top-right chevron close button â€” the table-code sheet header at `pages/PublicMenu/x.jsx:3518-3527` contains only the title and helper text, and there is no close control anywhere in the sheet body at `pages/PublicMenu/x.jsx:3528-3601`. The drawer therefore still relies on swipe/back only, which does not satisfy the required visible 44x44 chevron affordance. FIX: add a right-aligned `ChevronDown` button to the table-code drawer header and hook it into the same close path as the sheet dismissal.
+5. [P3] Fix 5 - Cart chevron remains a separate sticky row above the table card â€” `pages/PublicMenu/CartView.jsx:425-436` still renders a dedicated sticky top bar for the close chevron, and the table info card at `pages/PublicMenu/CartView.jsx:438-453` does not contain a right-side close control. This is the old sticky-row layout, not the requested chevron-inside-table-card layout that scrolls away with content. FIX: remove the sticky chevron row and place the close chevron on the right side of the table info card row next to the bell/table info block.
+
+## Summary
+Total: 5 findings (0 P0, 0 P1, 3 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY â€” do NOT skip this section)
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 says to restore the bell at its "original position" and run `git log`, but the speed rules for this review restrict the work to the target files plus local `README.md` / `BUGS.md`, so the original placement cannot be confirmed from the allowed inputs. Fix 4 says to copy the detail-drawer chevron style, but the current detail chevron in `x.jsx` is a dark translucent circle, while the task text describes a gray circle.
+- Missing context (what info would have helped): Whether `HelpFab` is supposed to be removed or coexist with the restored bell, and whether the existing `HelpModal` component's internals should be preserved inside the new drawer. That content lives outside the allowed review scope.
+- Scope questions (anything you weren't sure if it's in scope): Whether the existing `HelpFab` in `x.jsx` should count as the menu-level help entry for Fix 3, since its implementation is outside the files allowed for this review.
+ succeeded in 10.93s:
+1. [timeout] Get-ChildItem -Force pages/PublicMenu
+2. [timeout] Get-Content -Raw pages/PublicMenu/x.jsx
+3. [timeout] Get-Content -Raw pages/PublicMenu/CartView.jsx
+4. [timeout] if (Test-Path pages/PublicMenu/README.md) { Get-Content -Raw pages/PublicMenu/README.md }
+5. [timeout] if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content -Raw pages/PublicMenu/BUGS.md }
+6. Get-ChildItem pages/PublicMenu | Select-Object Name,Length
+7. if (Test-Path pages/PublicMenu/README.md) { Get-Item pages/PublicMenu/README.md | Select-Object Name,Length }
+8. if (Test-Path pages/PublicMenu/BUGS.md) { Get-Item pages/PublicMenu/BUGS.md | Select-Object Name,Length }
+9. Select-String -Path pages/PublicMenu/README.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|Android Back|ÐÑƒÐ¶Ð½Ð° Ð¿Ð¾Ð¼Ð¾Ñ‰ÑŒ|bell|chevron|table code|drawer|cart' -Context 2,4
+10. Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|Android Back|ÐÑƒÐ¶Ð½Ð° Ð¿Ð¾Ð¼Ð¾Ñ‰ÑŒ|bell|chevron|table code|drawer|cart' -Context 2,4
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..73ed469db6f03d8662edef33ebcb2b91995be8c2
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -0,0 +1,25 @@
++1. [timeout] Get-ChildItem -Force pages/PublicMenu
++2. [timeout] Get-Content -Raw pages/PublicMenu/x.jsx
++3. [timeout] Get-Content -Raw pages/PublicMenu/CartView.jsx
++4. [timeout] if (Test-Path pages/PublicMenu/README.md) { Get-Content -Raw pages/PublicMenu/README.md }
++5. [timeout] if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content -Raw pages/PublicMenu/BUGS.md }
++6. Get-ChildItem pages/PublicMenu | Select-Object Name,Length
++7. if (Test-Path pages/PublicMenu/README.md) { Get-Item pages/PublicMenu/README.md | Select-Object Name,Length }
++8. if (Test-Path pages/PublicMenu/BUGS.md) { Get-Item pages/PublicMenu/BUGS.md | Select-Object Name,Length }
++9. Select-String -Path pages/PublicMenu/README.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|Android Back|Нужна помощь|bell|chevron|table code|drawer|cart' -Context 2,4
++10. Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|Android Back|Нужна помощь|bell|chevron|table code|drawer|cart' -Context 2,4
++11. Select-String -Path pages/PublicMenu/x.jsx -Pattern 'useAndroidBack|popstate|pushState|history.back|selectedDish|isDetailOpen|needHelp|helpOpen|Нужна помощь|Введите код стола|ChevronDown|Bell|bell|Dialog|Drawer|Sheet|tableCodeOpen|isVerifyCodeOpen' -Context 3,18
++12. Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'useAndroidBack|popstate|pushState|history.back|Bell|bell|ChevronDown|sticky|onOpenChange|Drawer|Sheet|Стол|tableCode|help|Нужна помощь' -Context 3,18
++13. $p='pages/PublicMenu/x.jsx'; $lines=Get-Content $p; $ranges=@(@{s=1298;e=1335},@{s=1630;e=1685},@{s=2020;e=2105},@{s=3388;e=3515},@{s=3516;e=3605},@{s=3606;e=3668},@{s=3666;e=3690},@{s=3746;e=3775}); foreach($r in $ranges){"--- $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }}
++14. Select-String -Path pages/PublicMenu/x.jsx -Pattern 'handleOpenHelpModal|setIsHelpModalOpen\(|pushOverlay\(|popOverlay\(|window.addEventListener\(\"popstate\"|window\.addEventListener\(''popstate''|overlayStackRef|detailDish|showTableConfirmSheet|Bell className' -Context 4,10
++15. $p='pages/PublicMenu/CartView.jsx'; $lines=Get-Content $p; $ranges=@(@{s=1;e=95},@{s=420;e=470},@{s=900;e=950}); foreach($r in $ranges){"--- $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }}
++16. Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'onCallWaiter|onClose|ChevronDown|sticky top-0|aria-label|Bell|onOpenChange|help|300|setTimeout' -Context 3,12
++17. [timeout] Test-Path pipeline/chain-state
++18. [timeout] Test-Path pages/PublicMenu
++19. Test-Path pipeline/chain-state
++20. Test-Path pages/PublicMenu
++21. Select-String -Path pages/PublicMenu/README.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|HelpFab|help modal|bell|table code|chevron|Android back' -Context 2,4
++22. Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|HelpFab|help modal|bell|table code|chevron|Android back' -Context 2,4
++23. Test-Path pages/PublicMenu/review_2026-03-24.md
++24. Test-Path pages/PublicMenu/commands_2026-03-24.log
++25. Test-Path pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b514c1c3bac3bade1a9f83f35591f58bc818c2fc
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-190433-30fb
++
++## Findings
++1. [P2] Fix 1 - Android Back is not unified across all 4 drawers — `pages/PublicMenu/x.jsx:1300-1315` and `pages/PublicMenu/x.jsx:2384-2413` still use the old page-level `pushOverlay` / `popOverlay` stack, and that stack only knows about `tableConfirm` and `cart`. The detail drawer closes via `setDetailDish(null)` at `pages/PublicMenu/x.jsx:3666-3688`, and help still uses `isHelpModalOpen` / `setIsHelpModalOpen(false)` at `pages/PublicMenu/x.jsx:3615-3630`, so Android Back is not wired for 2 of the 4 required drawers and the reusable `useAndroidBack(isOpen, onClose)` hook does not exist. FIX: replace the ad hoc overlay stack usage with a reusable `useAndroidBack` hook and apply it to cart, table-code sheet, detail drawer, and help drawer, including the programmatic-close guard before `history.back()`.
++2. [P2] Fix 2 - Cart bell still opens the legacy help modal directly instead of closing cart and opening a help drawer — `pages/PublicMenu/CartView.jsx:441-447` calls `onCallWaiter` immediately, `pages/PublicMenu/x.jsx:3488-3489` passes `handleOpenHelpModal` straight through, and `pages/PublicMenu/x.jsx:3615-3630` still renders `HelpModal` instead of a bottom `Drawer`. There is no close-cart-first flow, no 300 ms delay, and no shared help-drawer state in `x.jsx`, so the z-index problem described in the task remains. FIX: introduce an `onHelpRequest` flow from `x.jsx` to `CartView`, close the cart first, wait 300 ms, then open a help drawer in `x.jsx` that uses the Fix 1 Android-back hook.
++3. [P2] Fix 3 - Main-menu bell is not restored in the reviewed page code — `pages/PublicMenu/x.jsx:25` imports `Bell`, but `x.jsx` never renders that icon anywhere. The only explicit bell render in the reviewed target files is still inside the cart header at `pages/PublicMenu/CartView.jsx:441-447`, while `x.jsx` only mounts the legacy `HelpFab` branch at `pages/PublicMenu/x.jsx:3604-3612`. That means the requested main-menu bell tied to the shared help drawer is still missing from this page implementation. FIX: add a bell trigger in the main menu layout in `x.jsx` and wire it to the same help drawer used by the cart bell.
++4. [P3] Fix 4 - Table-code drawer still has no top-right chevron close button — the table-code sheet header at `pages/PublicMenu/x.jsx:3518-3527` contains only the title and helper text, and there is no close control anywhere in the sheet body at `pages/PublicMenu/x.jsx:3528-3601`. The drawer therefore still relies on swipe/back only, which does not satisfy the required visible 44x44 chevron affordance. FIX: add a right-aligned `ChevronDown` button to the table-code drawer header and hook it into the same close path as the sheet dismissal.
++5. [P3] Fix 5 - Cart chevron remains a separate sticky row above the table card — `pages/PublicMenu/CartView.jsx:425-436` still renders a dedicated sticky top bar for the close chevron, and the table info card at `pages/PublicMenu/CartView.jsx:438-453` does not contain a right-side close control. This is the old sticky-row layout, not the requested chevron-inside-table-card layout that scrolls away with content. FIX: remove the sticky chevron row and place the close chevron on the right side of the table info card row next to the bell/table info block.
++
++## Summary
++Total: 5 findings (0 P0, 0 P1, 3 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 says to restore the bell at its "original position" and run `git log`, but the speed rules for this review restrict the work to the target files plus local `README.md` / `BUGS.md`, so the original placement cannot be confirmed from the allowed inputs. Fix 4 says to copy the detail-drawer chevron style, but the current detail chevron in `x.jsx` is a dark translucent circle, while the task text describes a gray circle.
++- Missing context (what info would have helped): Whether `HelpFab` is supposed to be removed or coexist with the restored bell, and whether the existing `HelpModal` component's internals should be preserved inside the new drawer. That content lives outside the allowed review scope.
++- Scope questions (anything you weren't sure if it's in scope): Whether the existing `HelpFab` in `x.jsx` should count as the menu-level help entry for Fix 3, since its implementation is outside the files allowed for this review.
+diff --git a/pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md b/pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b514c1c3bac3bade1a9f83f35591f58bc818c2fc
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-190433-30fb
++
++## Findings
++1. [P2] Fix 1 - Android Back is not unified across all 4 drawers — `pages/PublicMenu/x.jsx:1300-1315` and `pages/PublicMenu/x.jsx:2384-2413` still use the old page-level `pushOverlay` / `popOverlay` stack, and that stack only knows about `tableConfirm` and `cart`. The detail drawer closes via `setDetailDish(null)` at `pages/PublicMenu/x.jsx:3666-3688`, and help still uses `isHelpModalOpen` / `setIsHelpModalOpen(false)` at `pages/PublicMenu/x.jsx:3615-3630`, so Android Back is not wired for 2 of the 4 required drawers and the reusable `useAndroidBack(isOpen, onClose)` hook does not exist. FIX: replace the ad hoc overlay stack usage with a reusable `useAndroidBack` hook and apply it to cart, table-code sheet, detail drawer, and help drawer, including the programmatic-close guard before `history.back()`.
++2. [P2] Fix 2 - Cart bell still opens the legacy help modal directly instead of closing cart and opening a help drawer — `pages/PublicMenu/CartView.jsx:441-447` calls `onCallWaiter` immediately, `pages/PublicMenu/x.jsx:3488-3489` passes `handleOpenHelpModal` straight through, and `pages/PublicMenu/x.jsx:3615-3630` still renders `HelpModal` instead of a bottom `Drawer`. There is no close-cart-first flow, no 300 ms delay, and no shared help-drawer state in `x.jsx`, so the z-index problem described in the task remains. FIX: introduce an `onHelpRequest` flow from `x.jsx` to `CartView`, close the cart first, wait 300 ms, then open a help drawer in `x.jsx` that uses the Fix 1 Android-back hook.
++3. [P2] Fix 3 - Main-menu bell is not restored in the reviewed page code — `pages/PublicMenu/x.jsx:25` imports `Bell`, but `x.jsx` never renders that icon anywhere. The only explicit bell render in the reviewed target files is still inside the cart header at `pages/PublicMenu/CartView.jsx:441-447`, while `x.jsx` only mounts the legacy `HelpFab` branch at `pages/PublicMenu/x.jsx:3604-3612`. That means the requested main-menu bell tied to the shared help drawer is still missing from this page implementation. FIX: add a bell trigger in the main menu layout in `x.jsx` and wire it to the same help drawer used by the cart bell.
++4. [P3] Fix 4 - Table-code drawer still has no top-right chevron close button — the table-code sheet header at `pages/PublicMenu/x.jsx:3518-3527` contains only the title and helper text, and there is no close control anywhere in the sheet body at `pages/PublicMenu/x.jsx:3528-3601`. The drawer therefore still relies on swipe/back only, which does not satisfy the required visible 44x44 chevron affordance. FIX: add a right-aligned `ChevronDown` button to the table-code drawer header and hook it into the same close path as the sheet dismissal.
++5. [P3] Fix 5 - Cart chevron remains a separate sticky row above the table card — `pages/PublicMenu/CartView.jsx:425-436` still renders a dedicated sticky top bar for the close chevron, and the table info card at `pages/PublicMenu/CartView.jsx:438-453` does not contain a right-side close control. This is the old sticky-row layout, not the requested chevron-inside-table-card layout that scrolls away with content. FIX: remove the sticky chevron row and place the close chevron on the right side of the table info card row next to the bell/table info block.
++
++## Summary
++Total: 5 findings (0 P0, 0 P1, 3 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 says to restore the bell at its "original position" and run `git log`, but the speed rules for this review restrict the work to the target files plus local `README.md` / `BUGS.md`, so the original placement cannot be confirmed from the allowed inputs. Fix 4 says to copy the detail-drawer chevron style, but the current detail chevron in `x.jsx` is a dark translucent circle, while the task text describes a gray circle.
++- Missing context (what info would have helped): Whether `HelpFab` is supposed to be removed or coexist with the restored bell, and whether the existing `HelpModal` component's internals should be preserved inside the new drawer. That content lives outside the allowed review scope.
++- Scope questions (anything you weren't sure if it's in scope): Whether the existing `HelpFab` in `x.jsx` should count as the menu-level help entry for Fix 3, since its implementation is outside the files allowed for this review.
+
+codex
+Saved the scoped review to [publicmenu-260324-190433-30fb-codex-findings.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md). It contains 5 findings, limited to Fix 1–5: missing unified Android Back hook coverage, help still opening as the legacy modal from cart, main-menu bell not restored in `x.jsx`, no chevron on the table-code drawer, and the cart chevron still living in a separate sticky row.
+
+Per repo workflow, I also saved a copy of the report to [review_2026-03-24.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-24.md) and the executed command log to [commands_2026-03-24.log](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-24.log). No source files were modified.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..73ed469db6f03d8662edef33ebcb2b91995be8c2
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -0,0 +1,25 @@
++1. [timeout] Get-ChildItem -Force pages/PublicMenu
++2. [timeout] Get-Content -Raw pages/PublicMenu/x.jsx
++3. [timeout] Get-Content -Raw pages/PublicMenu/CartView.jsx
++4. [timeout] if (Test-Path pages/PublicMenu/README.md) { Get-Content -Raw pages/PublicMenu/README.md }
++5. [timeout] if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content -Raw pages/PublicMenu/BUGS.md }
++6. Get-ChildItem pages/PublicMenu | Select-Object Name,Length
++7. if (Test-Path pages/PublicMenu/README.md) { Get-Item pages/PublicMenu/README.md | Select-Object Name,Length }
++8. if (Test-Path pages/PublicMenu/BUGS.md) { Get-Item pages/PublicMenu/BUGS.md | Select-Object Name,Length }
++9. Select-String -Path pages/PublicMenu/README.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|Android Back|Нужна помощь|bell|chevron|table code|drawer|cart' -Context 2,4
++10. Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|Android Back|Нужна помощь|bell|chevron|table code|drawer|cart' -Context 2,4
++11. Select-String -Path pages/PublicMenu/x.jsx -Pattern 'useAndroidBack|popstate|pushState|history.back|selectedDish|isDetailOpen|needHelp|helpOpen|Нужна помощь|Введите код стола|ChevronDown|Bell|bell|Dialog|Drawer|Sheet|tableCodeOpen|isVerifyCodeOpen' -Context 3,18
++12. Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'useAndroidBack|popstate|pushState|history.back|Bell|bell|ChevronDown|sticky|onOpenChange|Drawer|Sheet|Стол|tableCode|help|Нужна помощь' -Context 3,18
++13. $p='pages/PublicMenu/x.jsx'; $lines=Get-Content $p; $ranges=@(@{s=1298;e=1335},@{s=1630;e=1685},@{s=2020;e=2105},@{s=3388;e=3515},@{s=3516;e=3605},@{s=3606;e=3668},@{s=3666;e=3690},@{s=3746;e=3775}); foreach($r in $ranges){"--- $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }}
++14. Select-String -Path pages/PublicMenu/x.jsx -Pattern 'handleOpenHelpModal|setIsHelpModalOpen\(|pushOverlay\(|popOverlay\(|window.addEventListener\(\"popstate\"|window\.addEventListener\(''popstate''|overlayStackRef|detailDish|showTableConfirmSheet|Bell className' -Context 4,10
++15. $p='pages/PublicMenu/CartView.jsx'; $lines=Get-Content $p; $ranges=@(@{s=1;e=95},@{s=420;e=470},@{s=900;e=950}); foreach($r in $ranges){"--- $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '{0}:{1}' -f $i,$lines[$i-1] } }}
++16. Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'onCallWaiter|onClose|ChevronDown|sticky top-0|aria-label|Bell|onOpenChange|help|300|setTimeout' -Context 3,12
++17. [timeout] Test-Path pipeline/chain-state
++18. [timeout] Test-Path pages/PublicMenu
++19. Test-Path pipeline/chain-state
++20. Test-Path pages/PublicMenu
++21. Select-String -Path pages/PublicMenu/README.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|HelpFab|help modal|bell|table code|chevron|Android back' -Context 2,4
++22. Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'PM-126|PM-125|PM-127|#143|#140|HelpFab|help modal|bell|table code|chevron|Android back' -Context 2,4
++23. Test-Path pages/PublicMenu/review_2026-03-24.md
++24. Test-Path pages/PublicMenu/commands_2026-03-24.log
++25. Test-Path pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b514c1c3bac3bade1a9f83f35591f58bc818c2fc
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-190433-30fb
++
++## Findings
++1. [P2] Fix 1 - Android Back is not unified across all 4 drawers — `pages/PublicMenu/x.jsx:1300-1315` and `pages/PublicMenu/x.jsx:2384-2413` still use the old page-level `pushOverlay` / `popOverlay` stack, and that stack only knows about `tableConfirm` and `cart`. The detail drawer closes via `setDetailDish(null)` at `pages/PublicMenu/x.jsx:3666-3688`, and help still uses `isHelpModalOpen` / `setIsHelpModalOpen(false)` at `pages/PublicMenu/x.jsx:3615-3630`, so Android Back is not wired for 2 of the 4 required drawers and the reusable `useAndroidBack(isOpen, onClose)` hook does not exist. FIX: replace the ad hoc overlay stack usage with a reusable `useAndroidBack` hook and apply it to cart, table-code sheet, detail drawer, and help drawer, including the programmatic-close guard before `history.back()`.
++2. [P2] Fix 2 - Cart bell still opens the legacy help modal directly instead of closing cart and opening a help drawer — `pages/PublicMenu/CartView.jsx:441-447` calls `onCallWaiter` immediately, `pages/PublicMenu/x.jsx:3488-3489` passes `handleOpenHelpModal` straight through, and `pages/PublicMenu/x.jsx:3615-3630` still renders `HelpModal` instead of a bottom `Drawer`. There is no close-cart-first flow, no 300 ms delay, and no shared help-drawer state in `x.jsx`, so the z-index problem described in the task remains. FIX: introduce an `onHelpRequest` flow from `x.jsx` to `CartView`, close the cart first, wait 300 ms, then open a help drawer in `x.jsx` that uses the Fix 1 Android-back hook.
++3. [P2] Fix 3 - Main-menu bell is not restored in the reviewed page code — `pages/PublicMenu/x.jsx:25` imports `Bell`, but `x.jsx` never renders that icon anywhere. The only explicit bell render in the reviewed target files is still inside the cart header at `pages/PublicMenu/CartView.jsx:441-447`, while `x.jsx` only mounts the legacy `HelpFab` branch at `pages/PublicMenu/x.jsx:3604-3612`. That means the requested main-menu bell tied to the shared help drawer is still missing from this page implementation. FIX: add a bell trigger in the main menu layout in `x.jsx` and wire it to the same help drawer used by the cart bell.
++4. [P3] Fix 4 - Table-code drawer still has no top-right chevron close button — the table-code sheet header at `pages/PublicMenu/x.jsx:3518-3527` contains only the title and helper text, and there is no close control anywhere in the sheet body at `pages/PublicMenu/x.jsx:3528-3601`. The drawer therefore still relies on swipe/back only, which does not satisfy the required visible 44x44 chevron affordance. FIX: add a right-aligned `ChevronDown` button to the table-code drawer header and hook it into the same close path as the sheet dismissal.
++5. [P3] Fix 5 - Cart chevron remains a separate sticky row above the table card — `pages/PublicMenu/CartView.jsx:425-436` still renders a dedicated sticky top bar for the close chevron, and the table info card at `pages/PublicMenu/CartView.jsx:438-453` does not contain a right-side close control. This is the old sticky-row layout, not the requested chevron-inside-table-card layout that scrolls away with content. FIX: remove the sticky chevron row and place the close chevron on the right side of the table info card row next to the bell/table info block.
++
++## Summary
++Total: 5 findings (0 P0, 0 P1, 3 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 says to restore the bell at its "original position" and run `git log`, but the speed rules for this review restrict the work to the target files plus local `README.md` / `BUGS.md`, so the original placement cannot be confirmed from the allowed inputs. Fix 4 says to copy the detail-drawer chevron style, but the current detail chevron in `x.jsx` is a dark translucent circle, while the task text describes a gray circle.
++- Missing context (what info would have helped): Whether `HelpFab` is supposed to be removed or coexist with the restored bell, and whether the existing `HelpModal` component's internals should be preserved inside the new drawer. That content lives outside the allowed review scope.
++- Scope questions (anything you weren't sure if it's in scope): Whether the existing `HelpFab` in `x.jsx` should count as the menu-level help entry for Fix 3, since its implementation is outside the files allowed for this review.
+diff --git a/pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md b/pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b514c1c3bac3bade1a9f83f35591f58bc818c2fc
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-190433-30fb
++
++## Findings
++1. [P2] Fix 1 - Android Back is not unified across all 4 drawers — `pages/PublicMenu/x.jsx:1300-1315` and `pages/PublicMenu/x.jsx:2384-2413` still use the old page-level `pushOverlay` / `popOverlay` stack, and that stack only knows about `tableConfirm` and `cart`. The detail drawer closes via `setDetailDish(null)` at `pages/PublicMenu/x.jsx:3666-3688`, and help still uses `isHelpModalOpen` / `setIsHelpModalOpen(false)` at `pages/PublicMenu/x.jsx:3615-3630`, so Android Back is not wired for 2 of the 4 required drawers and the reusable `useAndroidBack(isOpen, onClose)` hook does not exist. FIX: replace the ad hoc overlay stack usage with a reusable `useAndroidBack` hook and apply it to cart, table-code sheet, detail drawer, and help drawer, including the programmatic-close guard before `history.back()`.
++2. [P2] Fix 2 - Cart bell still opens the legacy help modal directly instead of closing cart and opening a help drawer — `pages/PublicMenu/CartView.jsx:441-447` calls `onCallWaiter` immediately, `pages/PublicMenu/x.jsx:3488-3489` passes `handleOpenHelpModal` straight through, and `pages/PublicMenu/x.jsx:3615-3630` still renders `HelpModal` instead of a bottom `Drawer`. There is no close-cart-first flow, no 300 ms delay, and no shared help-drawer state in `x.jsx`, so the z-index problem described in the task remains. FIX: introduce an `onHelpRequest` flow from `x.jsx` to `CartView`, close the cart first, wait 300 ms, then open a help drawer in `x.jsx` that uses the Fix 1 Android-back hook.
++3. [P2] Fix 3 - Main-menu bell is not restored in the reviewed page code — `pages/PublicMenu/x.jsx:25` imports `Bell`, but `x.jsx` never renders that icon anywhere. The only explicit bell render in the reviewed target files is still inside the cart header at `pages/PublicMenu/CartView.jsx:441-447`, while `x.jsx` only mounts the legacy `HelpFab` branch at `pages/PublicMenu/x.jsx:3604-3612`. That means the requested main-menu bell tied to the shared help drawer is still missing from this page implementation. FIX: add a bell trigger in the main menu layout in `x.jsx` and wire it to the same help drawer used by the cart bell.
++4. [P3] Fix 4 - Table-code drawer still has no top-right chevron close button — the table-code sheet header at `pages/PublicMenu/x.jsx:3518-3527` contains only the title and helper text, and there is no close control anywhere in the sheet body at `pages/PublicMenu/x.jsx:3528-3601`. The drawer therefore still relies on swipe/back only, which does not satisfy the required visible 44x44 chevron affordance. FIX: add a right-aligned `ChevronDown` button to the table-code drawer header and hook it into the same close path as the sheet dismissal.
++5. [P3] Fix 5 - Cart chevron remains a separate sticky row above the table card — `pages/PublicMenu/CartView.jsx:425-436` still renders a dedicated sticky top bar for the close chevron, and the table info card at `pages/PublicMenu/CartView.jsx:438-453` does not contain a right-side close control. This is the old sticky-row layout, not the requested chevron-inside-table-card layout that scrolls away with content. FIX: remove the sticky chevron row and place the close chevron on the right side of the table info card row next to the bell/table info block.
++
++## Summary
++Total: 5 findings (0 P0, 0 P1, 3 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 says to restore the bell at its "original position" and run `git log`, but the speed rules for this review restrict the work to the target files plus local `README.md` / `BUGS.md`, so the original placement cannot be confirmed from the allowed inputs. Fix 4 says to copy the detail-drawer chevron style, but the current detail chevron in `x.jsx` is a dark translucent circle, while the task text describes a gray circle.
++- Missing context (what info would have helped): Whether `HelpFab` is supposed to be removed or coexist with the restored bell, and whether the existing `HelpModal` component's internals should be preserved inside the new drawer. That content lives outside the allowed review scope.
++- Scope questions (anything you weren't sure if it's in scope): Whether the existing `HelpFab` in `x.jsx` should count as the menu-level help entry for Fix 3, since its implementation is outside the files allowed for this review.
+
+tokens used
+97 170
+Saved the scoped review to [publicmenu-260324-190433-30fb-codex-findings.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260324-190433-30fb-codex-findings.md). It contains 5 findings, limited to Fix 1–5: missing unified Android Back hook coverage, help still opening as the legacy modal from cart, main-menu bell not restored in `x.jsx`, no chevron on the table-code drawer, and the cart chevron still living in a separate sticky row.
+
+Per repo workflow, I also saved a copy of the report to [review_2026-03-24.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-24.md) and the executed command log to [commands_2026-03-24.log](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-24.log). No source files were modified.

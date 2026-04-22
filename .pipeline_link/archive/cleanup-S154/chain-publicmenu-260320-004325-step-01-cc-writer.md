@@ -1,0 +1,71 @@
+---
+chain: publicmenu-260320-004325
+chain_step: 1
+chain_total: 4
+chain_step_name: cc-writer
+chain_group: writers
+chain_group_size: 2
+page: PublicMenu
+budget: 3.00
+runner: cc
+type: chain-step
+---
+=== CHAIN STEP: CC Writer (1/4) ===
+Chain: publicmenu-260320-004325
+Page: PublicMenu
+
+You are the CC Writer in a modular consensus pipeline.
+Your job: independently analyze the code and find ALL bugs.
+
+INSTRUCTIONS:
+1. Read the code file for PublicMenu in pages/PublicMenu/base/*.jsx
+2. Also read README.md and BUGS.md in the same folder for context
+3. Do your OWN independent analysis — find ALL bugs and issues
+4. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns
+5. For each finding: [P0/P1/P2/P3] Title - Description. FIX: description of code change needed.
+6. Write your findings to: pipeline/chain-state/publicmenu-260320-004325-cc-findings.md
+7. Do NOT apply any fixes yet — only document findings
+
+FORMAT for findings file:
+# CC Writer Findings — PublicMenu
+Chain: publicmenu-260320-004325
+
+## Findings
+1. [P0] Title — Description. FIX: ...
+2. [P1] Title — Description. FIX: ...
+...
+
+## Summary
+Total: N findings (X P0, Y P1, Z P2, W P3)
+
+=== TASK CONTEXT ===
+Fix BUG-PM-031: Cart can be closed while order is being submitted.
+
+## Problem
+When the user presses "Send to waiter" (submit order), the cart drawer can still be closed (swiped down or closed via button) while the async submit request is in progress. This can cause:
+- A submitted order that the user doesn't see confirmation for (they already closed the cart)
+- Potential duplicate submissions if the user re-opens the cart and presses submit again
+- React state updates on unmounted/hidden component
+
+## Reproduction
+1. Open the public menu at https://menu-app-mvp-49a4f5b2.base44.app/x
+2. Add items to the cart
+3. Enter the table code
+4. Press "Send to waiter" — immediately try to swipe down or close the cart drawer
+5. The cart closes mid-submission
+
+## Expected Behavior
+While an order submission is in progress (loading state), the cart drawer should be non-closeable:
+- Swipe-to-close gesture should be disabled
+- Close button (if any) should be disabled or hidden
+- UI should show a clear loading indicator
+- Drawer closes automatically only after successful submission (or stays open on error)
+
+## Context
+- File: pages/PublicMenu/base/CartView.jsx
+- Related state: likely an `isSubmitting` / `isLoading` boolean flag already exists for the submit button
+- The fix should use this existing flag to gate close gestures
+- Check if the drawer close handler is passed as a prop (e.g., `onClose`) — it should be wrapped: `if (!isSubmitting) onClose()`
+- Also check the drag handle / swipe gesture handler for the same guard
+- Do NOT change the overall drawer architecture — minimal targeted fix only
+=== END ===

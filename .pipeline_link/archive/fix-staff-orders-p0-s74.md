@@ -1,0 +1,98 @@
+---
+task_id: fix-staff-orders-p0-s74
+type: bugfix
+priority: P0
+created: 2026-03-03
+session: S74
+budget: 12.00
+---
+
+# Task: StaffOrdersMobile — Stale Data + Close Table Confirm
+
+## Git first
+```
+git add . && git commit -m "S74 pre-staff-orders snapshot" && git push
+```
+
+## Context
+
+Two issues in `/staffordersmobile` that affect restaurant operations. Both are in the same file and should be fixed together.
+
+## Files to change
+
+| File | Action |
+|------|--------|
+| `menuapp-code-review/pages/StaffOrdersMobile/260303-06 StaffOrdersMobile RELEASE.jsx` | Edit |
+| `menuapp-code-review/pages/StaffOrdersMobile/StaffOrdersMobile README.md` | Update |
+| `menuapp-code-review/pages/StaffOrdersMobile/BUGS.md` | Update |
+
+## Fix 1: Stale data — new orders don't appear in detail view (P0)
+
+### Symptom
+When a guest sends a new order:
+- Toast notification appears ✅
+- Order counter on table card increments ✅
+- BUT: detail view (table expanded/opened) does NOT update — old orders still shown ❌
+
+This is a P0 bug: waiter misses the new order.
+
+### What to do
+1. **On "new order" event** (the same event that triggers the toast):
+   - Invalidate / force-refetch the data source that feeds:
+     - The table card list
+     - The detail view for that specific table
+2. **On opening the detail view** for any table:
+   - Always perform a fresh refetch (do not rely on cached/stale data from initial page load)
+3. **Regarding "ПРОСРОЧЕН" label:**
+   - "ПРОСРОЧЕН" = priority indicator (>10 min without activity), NOT a technical block
+   - When a new order arrives for a table marked "ПРОСРОЧЕН" → the label should disappear (because `last_activity_at` was just updated)
+   - If `last_activity_at` update is handled by the backend on order creation, the UI just needs to refetch and re-evaluate
+
+### CC + Codex: investigate first
+- How is the toast triggered? What event/callback fires?
+- Is there a polling interval? How often does it refresh the table list?
+- Does the detail view have its own data fetching or shares with the list?
+- Where does "ПРОСРОЧЕН" status come from — is it calculated on frontend or backend?
+
+### What NOT to do
+- Do NOT change the session expiry logic (8h hard expire, 4h new-session threshold)
+- Do NOT change the session entity fields
+- Only fix the UI/cache/refetch layer
+
+---
+
+## Fix 2: "Закрыть стол" without confirmation dialog (P0)
+
+### Symptom
+The "Закрыть стол" button on the staff order detail view is a single tap — no confirmation dialog. Accidental tap = table closed, guests can no longer add orders.
+
+### What to do
+Before executing the "close table" action, show a confirmation dialog:
+
+```
+Title:   "Закрыть стол [номер стола]?"
+Text:    "Гости больше не смогут отправлять заказы."
+Buttons: [Отмена]  [Закрыть] ← destructive (red)
+```
+
+- Use the existing dialog/modal component in the codebase if one exists
+- The "Закрыть" button should be visually destructive (red color)
+- "Отмена" cancels and does nothing
+- Only proceed with close after user explicitly confirms
+
+---
+
+## Acceptance criteria
+- [ ] When a new guest order arrives, the detail view updates within one polling cycle (no manual refresh needed)
+- [ ] Order counter and order list content are always in sync
+- [ ] "ПРОСРОЧЕН" label disappears when a new order comes in for that table
+- [ ] Tapping "Закрыть стол" always shows a confirmation dialog first
+- [ ] Closing the dialog with "Отмена" does NOT close the table
+- [ ] No console errors
+- [ ] Mobile 320px — dialog displays correctly
+
+## Output
+- RELEASE: `260303-NN StaffOrdersMobile RELEASE.jsx`
+- Updated `StaffOrdersMobile README.md` with changelog
+- Updated `BUGS.md` with fixed bugs
+- CC + Codex both review before RELEASE

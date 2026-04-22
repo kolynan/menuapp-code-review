@@ -1,0 +1,413 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d1498-4c12-7323-877e-5155b1485569
+--------
+user
+Review the file pages/PublicMenu/*.jsx for bugs in a React restaurant QR-menu app on Base44 platform. Also check pages/PublicMenu/README.md and pages/PublicMenu/BUGS.md for context (ONLY these 3 files, nothing else). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the 3 files above. Do NOT search the repo, do NOT read old findings, do NOT read files outside pages/PublicMenu/. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. Find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260322-131000-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260322-131000 ## Findings 1. [P0] Title — Description. FIX: ... 2. [P1] Title — Description. FIX: ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... Do NOT apply fixes — only document findings. === TASK CONTEXT === # UX Batch: MenuView fixes + discount color (#87 KS-3) Reference: `ux-concepts/UX_LOCKED_PublicMenu.md`, `BUGS_MASTER.md`, `STYLE_GUIDE.md`. Production page. **Context:** MenuView has several open L-bugs that are all visually testable together. Plus discount color feature (#84) — partner entity already has `discount_color` field (added S156, default `#C92A2A`). All fixes target MenuView.jsx primarily, with CartView.jsx for discount badges if they render there. TARGET FILES (modify): MenuView.jsx, CartView.jsx CONTEXT FILES (read-only): README.md, BUGS.md --- ## Fix 1 — PM-077 (P2) [MUST-FIX]: Move "+" button to bottom-right of dish card ### Сейчас (текущее поведение) The "+" (add to cart) button on each dish card is positioned in the CENTER of the card. This violates LOCK-PM-001. ### Должно быть (ожидаемое поведение) The "+" button should be positioned in the **bottom-right corner** of each dish card. Standard FAB-pattern per Material Design: - `position: absolute` (relative to card container) - `bottom-right` corner of the card - Button style: `bg-[#B5543A] text-white rounded-full w-11 h-11` (44×44px, primary color) - The card container needs `position: relative` if not already set This is a LOCKED UX decision: `ux-concepts/UX_LOCKED_PublicMenu.md` → LOCK-PM-001. ### НЕ должно быть (анти-паттерны) - NO centered "+" button on dish cards - NO inline "+" button (not absolute positioned) - NO "+" button smaller than 44×44px - NO indigo/purple/blue color on "+" button — must be primary (#B5543A) ### Файл и локация File: `pages/PublicMenu/MenuView.jsx` Look for: the "+" button/icon rendered inside each dish card (grid item). Currently centered — move to bottom-right with absolute positioning. ### Проверка (мини тест-кейс) 1. Open menu → each dish card has "+" in bottom-right corner 2. "+" button is terracotta (#B5543A), round, 44×44px --- ## Fix 2 — PM-072 (P2) [MUST-FIX]: Dynamic grid columns from partner setting ### Сейчас (текущее поведение) MenuView uses hardcoded `grid-cols-2` for the dish grid, ignoring the `partner.menu_grid_mobile` setting. ### Должно быть (ожидаемое поведение) Read `partner.menu_grid_mobile` (number: 1, 2, or 3) and apply dynamically: ```jsx className={`grid grid-cols-${partner.menu_grid_mobile || 2} gap-4`} ``` Or use a mapping object if template literals don't work with Tailwind: ```jsx const gridCols = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' }; className={`grid ${gridCols[partner.menu_grid_mobile] || 'grid-cols-2'} gap-4`} ``` Default: 2 columns if `menu_grid_mobile` is not set. ### НЕ должно быть (анти-паттерны) - NO hardcoded `grid-cols-2` in MenuView - NO breaking the grid when `menu_grid_mobile` is undefined (must fallback to 2) ### Файл и локация File: `pages/PublicMenu/MenuView.jsx` Look for: `grid-cols-2` in the dish grid container. Replace with dynamic class. ### Уже пробовали Chain 195108 (S155A): SKIPPED — task was focused on other fixes. First attempt in this batch. ### Проверка (мини тест-кейс) 1. Check partner settings for `menu_grid_mobile` value → grid matches that value 2. If not set → defaults to 2 columns --- ## Fix 3 — AC-09 (P2) [MUST-FIX]: Toast feedback on add to cart ### Сейчас (текущее поведение) When user taps "+" to add a dish to cart, the dish is added but there is NO visual feedback/confirmation. User doesn't know if the action succeeded. ### Должно быть (ожидаемое поведение) Show a brief toast/notification when a dish is added to cart: - Text: "Добавлено" (or dish name + "добавлено") - Duration: 1.5 seconds, then auto-dismiss - Position: bottom-center of screen, above the StickyCartBar if visible - Style: small, subtle, non-blocking. Example: `bg-slate-800 text-white text-sm rounded-lg px-4 py-2 shadow-lg` - Animation: fade in + slide up, fade out Alternative (simpler): brief animation on the "+" button itself (scale pulse, checkmark flash for 0.5s). Either approach is acceptable. ### НЕ должно быть (анти-паттерны) - NO blocking modal or alert - NO toast lasting more than 2 seconds - NO toast that covers the CTA or important UI elements ### Файл и локация File: `pages/PublicMenu/MenuView.jsx` Look for: `handleAddToCart` or similar function triggered by "+" button. Add toast state and rendering there. If a toast component already exists in the codebase, reuse it. ### Проверка (мини тест-кейс) 1. Tap "+" on any dish → see brief "Добавлено" toast or button animation 2. Toast disappears after ~1.5s 3. Rapid tapping "+" multiple times → no stacking/overlapping toasts --- ## Fix 4 — #84 (P2) [MUST-FIX]: Discount badges use partner.discount_color ### Сейчас (текущее поведение) Discount badges on dish cards (e.g., "-20%") use a hardcoded color (likely red or default). ### Должно быть (ожидаемое поведение) Discount badges should use `partner.discount_color` from the Partner entity: - Background: `partner.discount_color` (default: `#C92A2A` if not set) - Text: white - Example: `style={{ backgroundColor: partner.discount_color || '#C92A2A' }}` with `text-white` The `discount_color` field already exists in Partner entity (added S156). ### НЕ должно быть (анти-паттерны) - NO hardcoded discount badge color - NO breaking badges when `discount_color` is not set (must fallback to `#C92A2A`) ### Файл и локация Files: `pages/PublicMenu/MenuView.jsx` (dish cards with discount badges) and potentially `pages/PublicMenu/CartView.jsx` (if discount is shown in cart) Look for: discount percentage rendering, badge/chip with "-X%" text. Replace hardcoded color with dynamic `partner.discount_color`. ### Проверка (мини тест-кейс) 1. Partner with `discount_color` set → badges use that color 2. Partner without `discount_color` → badges use default #C92A2A 3. Badges still readable (white text on colored background) --- ## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано выше - Изменяй ТОЛЬКО код, описанный в Fix-секциях выше. - ВСЁ остальное — НЕ ТРОГАТЬ. - Если видишь «проблему» не из этой задачи — ПРОПУСТИ, не чини. - Locked UX decisions (см. `ux-concepts/UX_LOCKED_PublicMenu.md`) — ЗАПРЕЩЕНО менять. - Do NOT change primary_color logic (already implemented in #82). - Do NOT change category chips, header, or checkout flow. ## Implementation Notes - TARGET FILES: `MenuView.jsx`, `CartView.jsx` - CONTEXT FILES: `README.md`, `BUGS.md` - НЕ ломать: #82 (primary_color dynamic), PM-063 (stepper), KS-1 fixes (motivation text), KS-2 fixes (chevron) - Partner entity fields available: `partner.primary_color`, `partner.discount_color`, `partner.menu_grid_mobile` - After all fixes: `git add pages/PublicMenu/MenuView.jsx pages/PublicMenu/CartView.jsx && git commit -m "ux: menuview fixes + discount color #87-KS3" && git push` === END ===
+mcp startup: no servers
+codex
+Reviewing only `pages/PublicMenu/*.jsx`, `pages/PublicMenu/README.md`, and `pages/PublicMenu/BUGS.md`. I’m first identifying the exact files in `pages/PublicMenu/`, then I’ll read just those files and write the findings report to the requested pipeline path.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Date -Format 'yyyy-MM-dd HH:mm:ssK'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 11.20s:
+
+ exited 124 in 11.26s:
+
+codex
+The first shell calls timed out before PowerShell returned. I’m retrying with a longer timeout and still keeping scope limited to the `pages/PublicMenu` directory.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Date -Format 'yyyy-MM-dd HH:mm:ssK'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 21.64s:
+2026-03-22 13:12:51+05:00
+ succeeded in 22.35s:
+
+
+    Каталог: C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu
+
+
+Mode                 LastWriteTime         Length Name                                                                 
+----                 -------------         ------ ----                                                                 
+dar---         3/21/2026   9:20 PM                versions                                                             
+-a----         3/20/2026   6:45 PM          30461 260320-01 useTableSession RELEASE.jsx                                
+-a----         3/21/2026   2:49 PM          48348 260321-02 CartView RELEASE.jsx                                       
+-a----         3/21/2026   2:49 PM         133582 260321-02 x RELEASE.jsx                                              
+-a----          3/7/2026   7:58 PM          12831 ACCEPTANCE_CRITERIA_PHASE1.md                                        
+-a----         3/21/2026   8:29 PM          48986 BUGS.md                                                              
+-a----         3/22/2026  12:00 PM          48891 CartView.jsx                                                         
+-a----         3/22/2026  11:58 AM           7776 CheckoutView.jsx                                                     
+-a----         3/22/2026   1:09 PM           5555 commands_2026-03-22.log                                              
+-a----          3/7/2026   7:58 PM          10857 COPY_SPEC.md                                                         
+-a----          3/5/2026   4:38 PM            464 i18n_DrawerUX_S79.csv                                                
+-a----          3/5/2026   3:53 PM           1206 i18n_WorkingHours_S79.csv                                            
+-a----         3/22/2026  11:59 AM          11889 MenuView.jsx                                                         
+codex
+I’ve confirmed the folder contains multiple `.jsx` files, so the prompt’s “ONLY these 3 files” conflicts with the wildcard. To stay within the tighter scope, I’m treating the review set as `MenuView.jsx`, `README.md`, and `BUGS.md`, and I’ll call out that ambiguity in the prompt-clarity section.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 17.26s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 17.41s:
+import React from "react";
+import { Loader2, ImageIcon, Minus, Plus, LayoutGrid, List } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import DishRating from "@/components/publicMenu/DishRating";
+
+// Grid mappings for Tailwind (explicit full class names)
+const DESKTOP_GRID = {
+  1: "md:grid-cols-1",
+  2: "md:grid-cols-2",
+  3: "md:grid-cols-3",
+  4: "md:grid-cols-4",
+  5: "md:grid-cols-5",
+};
+
+const MOBILE_GRID = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+};
+
+function darkenColor(hex, amount) {
+ succeeded in 17.35s:
+---
+version: "29.0"
+updated: "2026-03-21"
+session: 153
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*18 active bugs remaining (0x P0, 8x P1, 7x P2, 2x P3, 1x suggestion).*
+
+### BUG-PM-056: Drawer layout not visit-state-driven (P1 â€” Batch 2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P1
+- **ÐšÐ¾Ð³Ð´Ð°:** S153 (consensus chain publicmenu-260321-093745)
+codex
+I have the main file loaded and I’m checking it line-by-line against the four scoped fixes and the requested review categories. I’m pulling exact line numbers now so the report can stay short and concrete.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content -Path '"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx' -Pattern 'discount|oldPrice|old_price|sale|badge|%|price_old|original'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md','C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md' -Pattern 'PM-072|PM-077|AC-09|discount_color|toast|grid|MenuView'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 10.79s:
+
+ succeeded in 11.60s:
+   1: import React from "react";
+   2: import { Loader2, ImageIcon, Minus, Plus, LayoutGrid, List } from "lucide-react";
+   3: import { Card, CardContent } from "@/components/ui/card";
+   4: import DishRating from "@/components/publicMenu/DishRating";
+   5: 
+   6: // Grid mappings for Tailwind (explicit full class names)
+   7: const DESKTOP_GRID = {
+   8:   1: "md:grid-cols-1",
+   9:   2: "md:grid-cols-2",
+  10:   3: "md:grid-cols-3",
+  11:   4: "md:grid-cols-4",
+  12:   5: "md:grid-cols-5",
+  13: };
+  14: 
+  15: const MOBILE_GRID = {
+  16:   1: "grid-cols-1",
+  17:   2: "grid-cols-2",
+  18: };
+  19: 
+  20: function darkenColor(hex, amount) {
+ succeeded in 11.09s:
+
+pages\PublicMenu\BUGS.md:122:- **Файл:** CheckoutView.jsx, CartView.jsx, MenuView.jsx
+pages\PublicMenu\BUGS.md:123:- **Симптом:** Hardcoded English aria labels in CheckoutView, hardcoded placeholder in 
+CartView, missing aria-labels in MenuView.
+pages\PublicMenu\BUGS.md:133:### BUG-PM-072: Mobile grid partner setting ignored in MenuView (P2)
+pages\PublicMenu\BUGS.md:136:- **Файл:** MenuView.jsx
+pages\PublicMenu\BUGS.md:137:- **Симптом:** `grid-cols-2` hardcoded on mobile despite `partner.menu_grid_mobile` 
+setting.
+pages\PublicMenu\BUGS.md:138:- **Фикс:** Read partner setting and apply dynamic grid class.
+pages\PublicMenu\BUGS.md:169:  5. [P1] Toast on Bottom Sheet close without verification (C8)
+pages\PublicMenu\BUGS.md:188:### FIX-PM-TOAST: Mode-switch toast i18n fallback (P2) — FIXED S153
+pages\PublicMenu\BUGS.md:207:- **Фикс:** `handleModeChange()` now filters cart items via `isDishEnabledForMode()`, 
+drops unavailable with toast.
+pages\PublicMenu\BUGS.md:216:### BUG-PM-054: Hardcoded colors in MenuView, CheckoutView, ModeTabs (P2) — FIXED S153
+pages\PublicMenu\BUGS.md:218:- **Файл:** MenuView.jsx, CheckoutView.jsx, ModeTabs.jsx
+pages\PublicMenu\BUGS.md:283:- **Фикс:** Added email regex validation before save, error toast on invalid format.
+pages\PublicMenu\BUGS.md:332:### BUG-AC-09: No visual feedback when dish added to cart (P2) — FIXED (prior session)
+pages\PublicMenu\BUGS.md:333:- **Когда:** AC-09, already fixed in prior session
+pages\PublicMenu\BUGS.md:335:- **Симптом:** No toast or animation when user taps dish to add to cart.
+pages\PublicMenu\BUGS.md:336:- **Фикс:** Toast already present: `toast.success(t('cart.item_added'), { id: 'cart-add', 
+codex
+The file shows the grid bug directly, no add-to-cart feedback path, and no discount rendering at all. I’m checking the context docs for the exact product expectation around discount badges and the prior toast behavior before I write the final report file.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content -Path '"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md' | ForEach-Object { '{0,4}: {1}' -f "'$i, $_; $i++ } | Select-String -Pattern '"'MenuView|скидк|badge|toast|добав|green|зел'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content -Path '"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md' | ForEach-Object { '{0,4}: {1}' -f "'$i, $_; $i++ } | Select-String -Pattern '"'PM-072|AC-09|discount_color|MenuView|aria-label|toast|скидк|badge'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 13.52s:
+
+  18: | MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+  33: - Full CC code review Ð²ÑÐµÑ… 6 base Ñ„Ð°Ð¹Ð»Ð¾Ð² (CartView, CheckoutView, MenuView, ModeTabs, useTableSession, 
+x.jsx)
+  73: - BUG-S81-17: ÐŸÑ€Ð¸ Ð¾ÑˆÐ¸Ð±ÐºÐµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð·Ð°ÐºÐ°Ð·Ð° Ð² Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Â«Ð—Ð°Ð»Â» Ñ‚ÐµÐ¿ÐµÑ€ÑŒ 
+Ð²Ð¸Ð´ÐµÐ½ toast Ñ Ñ‚ÐµÐºÑÑ‚Ð¾Ð¼ Ð¾ÑˆÐ¸Ð±ÐºÐ¸
+
+
+ succeeded in 13.44s:
+
+  75: - **Ð¤Ð°Ð¹Ð»:** x.jsx (OrderStatusBadge, osGetStatusConfig), CartView.jsx (getSafeStatus)
+  82: - **Ð¤Ð°Ð¹Ð»:** x.jsx (OrderStatusBadge, osGetStatusConfig), CartView.jsx (getSafeStatus)
+ 122: - **Ð¤Ð°Ð¹Ð»:** CheckoutView.jsx, CartView.jsx, MenuView.jsx
+ 123: - **Ð¡Ð¸Ð¼Ð¿Ñ‚Ð¾Ð¼:** Hardcoded English aria labels in CheckoutView, hardcoded placeholder in CartView, missing 
+aria-labels in MenuView.
+ 133: ### BUG-PM-072: Mobile grid partner setting ignored in MenuView (P2)
+ 136: - **Ð¤Ð°Ð¹Ð»:** MenuView.jsx
+ 169:   5. [P1] Toast on Bottom Sheet close without verification (C8)
+ 188: ### FIX-PM-TOAST: Mode-switch toast i18n fallback (P2) â€” FIXED S153
+ 207: - **Ð¤Ð¸ÐºÑ:** `handleModeChange()` now filters cart items via `isDishEnabledForMode()`, drops unavailable with 
+toast.
+ 216: ### BUG-PM-054: Hardcoded colors in MenuView, CheckoutView, ModeTabs (P2) â€” FIXED S153
+ 218: - **Ð¤Ð°Ð¹Ð»:** MenuView.jsx, CheckoutView.jsx, ModeTabs.jsx
+ 248: - **Ð¤Ð¸ÐºÑ:** Added `accepted` fallback to getSafeStatus. Render `{icon} {label}` in all badge locations.
+ 283: - **Ð¤Ð¸ÐºÑ:** Added email regex validation before save, error toast on invalid format.
+ 315: ### BUG-PM-047: Interactive elements missing aria-label (P3) â€” FIXED S148
+ 318: - **Ð¤Ð¸ÐºÑ:** Added `aria-label` and min 44px touch targets to bell, save/cancel, info buttons.
+ 332: ### BUG-AC-09: No visual feedback when dish added to cart (P2) â€” FIXED (prior session)
+ 333: - **ÐšÐ¾Ð³Ð´Ð°:** AC-09, already fixed in prior session
+codex
+I’ve narrowed this to four concrete regressions in `MenuView.jsx`. One prompt ambiguity remains: the task says “3 files only” but also names `CartView.jsx` in the embedded context, so I’m keeping the report explicit that `CartView.jsx` was not inspected.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content -Path '"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; for ("'$i=330; $i -le 338; $i++) { if ($i -le $lines.Length) { '"'{0,4}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content -Path '"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; for ("'$i=70; $i -le 80; $i++) { if ($i -le $lines.Length) { '"'{0,4}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content -Path '"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; for ("'$i=133; $i -le 138; $i++) { if ($i -le $lines.Length) { '"'{0,4}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 18.46s:
+ 330: - **Ð¤Ð¸ÐºÑ:** Changed `isTableVerified === false` to `!isTableVerified` in both className ternary and disabled prop.
+ 331: 
+ 332: ### BUG-AC-09: No visual feedback when dish added to cart (P2) â€” FIXED (prior session)
+ 333: - **ÐšÐ¾Ð³Ð´Ð°:** AC-09, already fixed in prior session
+ 334: - **Ð¤Ð°Ð¹Ð»:** x.jsx:2237-2238
+ 335: - **Ð¡Ð¸Ð¼Ð¿Ñ‚Ð¾Ð¼:** No toast or animation when user taps dish to add to cart.
+ 336: - **Ð¤Ð¸ÐºÑ:** Toast already present: `toast.success(t('cart.item_added'), { id: 'cart-add', duration: 2000 })`. No additional changes needed.
+ 337: 
+ 338: ### BUG-PM-S140-03: Reward-email setTimeout not cleared on unmount (P3) â€” FIXED S148
+ succeeded in 18.58s:
+  70: 
+  71: - BUG-S81-02: ÐŸÐ¾Ð»Ðµ ÐºÐ¾Ð´Ð° ÑÑ‚Ð¾Ð»Ð° Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°ÐµÑ‚ 4 ÑÑ‡ÐµÐ¹ÐºÐ¸ Ð²Ð¼ÐµÑÑ‚Ð¾ 5 â€” ÐºÐ¾Ð´ Ð¿Ñ€Ð¸Ð½Ð¸Ð¼Ð°ÐµÑ‚ÑÑ, ÑÑ‚Ð¾Ð» Ð¿Ñ€Ð¸Ð²ÑÐ·Ñ‹Ð²Ð°ÐµÑ‚ÑÑ
+  72: - BUG-S81-17: Ð£Ð²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ðµ Â«Ð—Ð°ÐºÐ°Ð· Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚ÑƒÂ» Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°ÐµÑ‚ÑÑ 4 ÑÐµÐºÑƒÐ½Ð´Ñ‹ Ð²Ð¼ÐµÑÑ‚Ð¾ 2
+  73: - BUG-S81-17: ÐŸÑ€Ð¸ Ð¾ÑˆÐ¸Ð±ÐºÐµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð·Ð°ÐºÐ°Ð·Ð° Ð² Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Â«Ð—Ð°Ð»Â» Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð²Ð¸Ð´ÐµÐ½ toast Ñ Ñ‚ÐµÐºÑÑ‚Ð¾Ð¼ Ð¾ÑˆÐ¸Ð±ÐºÐ¸
+  74: - BUG-S81-17: ÐšÐ¾Ñ€Ð·Ð¸Ð½Ð° Ð¾Ñ‡Ð¸Ñ‰Ð°ÐµÑ‚ÑÑ Ð¿Ð¾ÑÐ»Ðµ ÑƒÑÐ¿ÐµÑˆÐ½Ð¾Ð¹ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð·Ð°ÐºÐ°Ð·Ð° (Ð² Ð·Ð°Ð»Ðµ Ð¸ Ð²Ð¾ Ð²ÑÐµÑ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…)
+  75: - BUG-S81-01: Ð¡Ð²Ð°Ð¹Ð¿ Ð²Ð½Ð¸Ð· Ð·Ð°ÐºÑ€Ñ‹Ð²Ð°ÐµÑ‚ drawer ÐºÐ¾Ñ€Ð·Ð¸Ð½Ñ‹ (Ð¿Ð¾Ñ‡Ð¸Ð½ÐµÐ½ Ð¾Ð±Ñ€Ð°Ð±Ð¾Ñ‚Ñ‡Ð¸Ðº setActiveSnapPoint)
+  76: - BUG-S81-03: Drawer Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ñ€Ð°Ð·Ð²Ð¾Ñ€Ð°Ñ‡Ð¸Ð²Ð°ÐµÑ‚ÑÑ Ð´Ð¾ Ð¿Ð¾Ð»Ð½Ð¾Ð³Ð¾ Ñ€Ð°Ð·Ð¼ÐµÑ€Ð° Ð¿Ñ€Ð¸ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð¸Ð¸ Ð±Ð»ÑŽÐ´
+  77: - BUG-S81-14: Checkout Ð´Ð»Ñ ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·Ð°/Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ¸ Ð¿ÐµÑ€ÐµÐ½ÐµÑÑ‘Ð½ Ð² drawer (Ð²Ð¼ÐµÑÑ‚Ð¾ fullscreen)
+  78: 
+  79: ### Session 79 â€” 05 Ð¼Ð°Ñ€ 2026
+  80: 
+ succeeded in 18.50s:
+ 133: ### BUG-PM-072: Mobile grid partner setting ignored in MenuView (P2)
+ 134: - **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P2
+ 135: - **ÐšÐ¾Ð³Ð´Ð°:** S155D (Codex review, chain publicmenu-260321-195108)
+ 136: - **Ð¤Ð°Ð¹Ð»:** MenuView.jsx
+ 137: - **Ð¡Ð¸Ð¼Ð¿Ñ‚Ð¾Ð¼:** `grid-cols-2` hardcoded on mobile despite `partner.menu_grid_mobile` setting.
+ 138: - **Ð¤Ð¸ÐºÑ:** Read partner setting and apply dynamic grid class.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content -Path '"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; for ("'$i=84; $i -le 92; $i++) { if ($i -le $lines.Length) { '"'{0,4}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 6.61s:
+  84: - Ð‘Ð»ÑŽÐ´Ð° Ð² ÐºÐ¾Ñ€Ð·Ð¸Ð½Ðµ Ð² Ð´Ð²Ðµ ÑÑ‚Ñ€Ð¾ÐºÐ¸, Ð¿Ð¾Ð´Ð¿Ð¸ÑÑŒ Ð±Ð¾Ð½ÑƒÑÐ° Ð·Ð° Ð¾Ð½Ð»Ð°Ð¹Ð½-Ð·Ð°ÐºÐ°Ð·
+  85: 
+  86: ### Session 75 â€” 04 Ð¼Ð°Ñ€ 2026
+  87: 
+  88: - ÐšÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ¸ Ð±Ð»ÑŽÐ´: ÐºÐ²Ð°Ð´Ñ€Ð°Ñ‚Ð½Ñ‹Ðµ Ñ„Ð¾Ñ‚Ð¾, Ð±ÐµÐ¹Ð´Ð¶ ÑÐºÐ¸Ð´ÐºÐ¸ -X% Ð·ÐµÐ»Ñ‘Ð½Ñ‹Ð¹, Ð·Ð°Ñ‡Ñ‘Ñ€ÐºÐ½ÑƒÑ‚Ð°Ñ ÑÑ‚Ð°Ñ€Ð°Ñ Ñ†ÐµÐ½Ð°
+  89: - Inline stepper Â«â€” 1 +Â» Ð¿Ñ€ÑÐ¼Ð¾ Ð½Ð° ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐµ
+  90: 
+  91: ### Session 74 â€” 04 Ð¼Ð°Ñ€ 2026
+  92: 
+codex
+I’m at the write stage. I’m checking that the requested `pipeline/chain-state` path exists, then I’ll save the findings report with only the scoped issues and the prompt-clarity notes about the wildcard/3-file conflict.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 5.54s:
+True
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 5.91s:
+False
+codex
+I’ve finished the findings list and I’m saving it now. I’m keeping the file strictly to the requested format and explicitly noting the scope ambiguity rather than broadening the review beyond the allowed files.
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md
+# Codex Writer Findings — PublicMenu
+Chain: publicmenu-260322-131000
+
+## Findings
+1. [P2] Mobile grid setting is still ignored on phones — `MenuView.jsx:15-18` only supports `menu_grid_mobile` values `1` and `2`, and `MenuView.jsx:294` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for `1` or `3` columns still render two columns. FIX: add `3: 'grid-cols-3'` to `MOBILE_GRID`, keep the fallback at `2`, and use the computed mobile grid class in the render branch instead of the hardcoded `grid-cols-2`.
+2. [P2] Add-to-cart feedback regressed — `MenuView.jsx:113` and `MenuView.jsx:173` call `addToCart(dish)` directly, but this component has no toast/animation state, timer, or UI path for confirmation. `BUGS.md:332-336` says AC-09 was already fixed, so the current file has regressed. FIX: add a local `handleAddToCart(dish)` wrapper that calls `addToCart`, shows one non-stacking localized toast/animation, auto-dismisses after about `1.5s`, and clears/resets its timer on repeat taps and unmount.
+3. [P2] Tile CTA is anchored to the photo, not the dish card — `MenuView.jsx:152-170` positions the `+`/stepper inside the image wrapper. On cards with longer text, the control sits around the middle of the full card instead of the locked bottom-right corner of the card. FIX: make the full card `relative`, anchor the CTA container to the card’s bottom-right corner, and reserve bottom padding so the floating control does not overlap content.
+4. [P2] Discount badge/original-price UI is missing, so `partner.discount_color` cannot be applied — both card variants only render one price (`MenuView.jsx:95-97`, `MenuView.jsx:218-221`). There is no `-X%` badge or struck-through old price in this component, even though `README.md:88` documents discount badges on dish cards. FIX: restore the discount badge and original-price markup in `MenuView.jsx`, and style the badge with `backgroundColor: partner?.discount_color || '#C92A2A'` plus white text.
+5. [P3] List-mode icon buttons still miss accessible/i18n labels — the icon-only add/remove controls in `MenuView.jsx:112-135` have no `aria-label`, while tile mode does. `BUGS.md:122-123` already flags missing aria labels in MenuView, and this remains a mobile accessibility issue. FIX: add localized `aria-label` values such as `t('menu.add')` / `t('menu.remove')` to all icon-only list-mode controls.
+
+## Summary
+Total: 5 findings (0 P0, 0 P1, 4 P2, 1 P3)
+
+## Prompt Clarity
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix #4 referenced `CartView.jsx` even though the top-level instruction said to inspect only 3 files; the discount data fields needed to render the badge were not named inside the allowed files.
+- Missing context (what info would have helped): Whether `CartView.jsx` was intentionally out of scope; the exact dish fields for original price / discount percent.
+- Scope questions (anything you weren't sure if it's in scope): The prompt says `pages/PublicMenu/*.jsx` but also says "ONLY these 3 files"; this folder contains multiple `.jsx` files, so I constrained the review to `MenuView.jsx`, `README.md`, and `BUGS.md`.
+apply_patch(auto_approved=true) exited 0 in 242ms:
+Success. Updated the following files:
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md b/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ca4dd5da5c79d1b99a1dae330bcebadd21322248
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-131000
++
++## Findings
++1. [P2] Mobile grid setting is still ignored on phones — `MenuView.jsx:15-18` only supports `menu_grid_mobile` values `1` and `2`, and `MenuView.jsx:294` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for `1` or `3` columns still render two columns. FIX: add `3: 'grid-cols-3'` to `MOBILE_GRID`, keep the fallback at `2`, and use the computed mobile grid class in the render branch instead of the hardcoded `grid-cols-2`.
++2. [P2] Add-to-cart feedback regressed — `MenuView.jsx:113` and `MenuView.jsx:173` call `addToCart(dish)` directly, but this component has no toast/animation state, timer, or UI path for confirmation. `BUGS.md:332-336` says AC-09 was already fixed, so the current file has regressed. FIX: add a local `handleAddToCart(dish)` wrapper that calls `addToCart`, shows one non-stacking localized toast/animation, auto-dismisses after about `1.5s`, and clears/resets its timer on repeat taps and unmount.
++3. [P2] Tile CTA is anchored to the photo, not the dish card — `MenuView.jsx:152-170` positions the `+`/stepper inside the image wrapper. On cards with longer text, the control sits around the middle of the full card instead of the locked bottom-right corner of the card. FIX: make the full card `relative`, anchor the CTA container to the card’s bottom-right corner, and reserve bottom padding so the floating control does not overlap content.
++4. [P2] Discount badge/original-price UI is missing, so `partner.discount_color` cannot be applied — both card variants only render one price (`MenuView.jsx:95-97`, `MenuView.jsx:218-221`). There is no `-X%` badge or struck-through old price in this component, even though `README.md:88` documents discount badges on dish cards. FIX: restore the discount badge and original-price markup in `MenuView.jsx`, and style the badge with `backgroundColor: partner?.discount_color || '#C92A2A'` plus white text.
++5. [P3] List-mode icon buttons still miss accessible/i18n labels — the icon-only add/remove controls in `MenuView.jsx:112-135` have no `aria-label`, while tile mode does. `BUGS.md:122-123` already flags missing aria labels in MenuView, and this remains a mobile accessibility issue. FIX: add localized `aria-label` values such as `t('menu.add')` / `t('menu.remove')` to all icon-only list-mode controls.
++
++## Summary
++Total: 5 findings (0 P0, 0 P1, 4 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix #4 referenced `CartView.jsx` even though the top-level instruction said to inspect only 3 files; the discount data fields needed to render the badge were not named inside the allowed files.
++- Missing context (what info would have helped): Whether `CartView.jsx` was intentionally out of scope; the exact dish fields for original price / discount percent.
++- Scope questions (anything you weren't sure if it's in scope): The prompt says `pages/PublicMenu/*.jsx` but also says "ONLY these 3 files"; this folder contains multiple `.jsx` files, so I constrained the review to `MenuView.jsx`, `README.md`, and `BUGS.md`.
+
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md b/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ca4dd5da5c79d1b99a1dae330bcebadd21322248
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-131000
++
++## Findings
++1. [P2] Mobile grid setting is still ignored on phones — `MenuView.jsx:15-18` only supports `menu_grid_mobile` values `1` and `2`, and `MenuView.jsx:294` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for `1` or `3` columns still render two columns. FIX: add `3: 'grid-cols-3'` to `MOBILE_GRID`, keep the fallback at `2`, and use the computed mobile grid class in the render branch instead of the hardcoded `grid-cols-2`.
++2. [P2] Add-to-cart feedback regressed — `MenuView.jsx:113` and `MenuView.jsx:173` call `addToCart(dish)` directly, but this component has no toast/animation state, timer, or UI path for confirmation. `BUGS.md:332-336` says AC-09 was already fixed, so the current file has regressed. FIX: add a local `handleAddToCart(dish)` wrapper that calls `addToCart`, shows one non-stacking localized toast/animation, auto-dismisses after about `1.5s`, and clears/resets its timer on repeat taps and unmount.
++3. [P2] Tile CTA is anchored to the photo, not the dish card — `MenuView.jsx:152-170` positions the `+`/stepper inside the image wrapper. On cards with longer text, the control sits around the middle of the full card instead of the locked bottom-right corner of the card. FIX: make the full card `relative`, anchor the CTA container to the card’s bottom-right corner, and reserve bottom padding so the floating control does not overlap content.
++4. [P2] Discount badge/original-price UI is missing, so `partner.discount_color` cannot be applied — both card variants only render one price (`MenuView.jsx:95-97`, `MenuView.jsx:218-221`). There is no `-X%` badge or struck-through old price in this component, even though `README.md:88` documents discount badges on dish cards. FIX: restore the discount badge and original-price markup in `MenuView.jsx`, and style the badge with `backgroundColor: partner?.discount_color || '#C92A2A'` plus white text.
++5. [P3] List-mode icon buttons still miss accessible/i18n labels — the icon-only add/remove controls in `MenuView.jsx:112-135` have no `aria-label`, while tile mode does. `BUGS.md:122-123` already flags missing aria labels in MenuView, and this remains a mobile accessibility issue. FIX: add localized `aria-label` values such as `t('menu.add')` / `t('menu.remove')` to all icon-only list-mode controls.
++
++## Summary
++Total: 5 findings (0 P0, 0 P1, 4 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix #4 referenced `CartView.jsx` even though the top-level instruction said to inspect only 3 files; the discount data fields needed to render the badge were not named inside the allowed files.
++- Missing context (what info would have helped): Whether `CartView.jsx` was intentionally out of scope; the exact dish fields for original price / discount percent.
++- Scope questions (anything you weren't sure if it's in scope): The prompt says `pages/PublicMenu/*.jsx` but also says "ONLY these 3 files"; this folder contains multiple `.jsx` files, so I constrained the review to `MenuView.jsx`, `README.md`, and `BUGS.md`.
+
+codex
+The report file is written. I’m doing one quick read-back on that generated file to verify the saved content matches the requested format and summary counts.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.64s:
+# Codex Writer Findings â€” PublicMenu
+Chain: publicmenu-260322-131000
+
+## Findings
+1. [P2] Mobile grid setting is still ignored on phones â€” `MenuView.jsx:15-18` only supports `menu_grid_mobile` values `1` and `2`, and `MenuView.jsx:294` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for `1` or `3` columns still render two columns. FIX: add `3: 'grid-cols-3'` to `MOBILE_GRID`, keep the fallback at `2`, and use the computed mobile grid class in the render branch instead of the hardcoded `grid-cols-2`.
+2. [P2] Add-to-cart feedback regressed â€” `MenuView.jsx:113` and `MenuView.jsx:173` call `addToCart(dish)` directly, but this component has no toast/animation state, timer, or UI path for confirmation. `BUGS.md:332-336` says AC-09 was already fixed, so the current file has regressed. FIX: add a local `handleAddToCart(dish)` wrapper that calls `addToCart`, shows one non-stacking localized toast/animation, auto-dismisses after about `1.5s`, and clears/resets its timer on repeat taps and unmount.
+3. [P2] Tile CTA is anchored to the photo, not the dish card â€” `MenuView.jsx:152-170` positions the `+`/stepper inside the image wrapper. On cards with longer text, the control sits around the middle of the full card instead of the locked bottom-right corner of the card. FIX: make the full card `relative`, anchor the CTA container to the cardâ€™s bottom-right corner, and reserve bottom padding so the floating control does not overlap content.
+4. [P2] Discount badge/original-price UI is missing, so `partner.discount_color` cannot be applied â€” both card variants only render one price (`MenuView.jsx:95-97`, `MenuView.jsx:218-221`). There is no `-X%` badge or struck-through old price in this component, even though `README.md:88` documents discount badges on dish cards. FIX: restore the discount badge and original-price markup in `MenuView.jsx`, and style the badge with `backgroundColor: partner?.discount_color || '#C92A2A'` plus white text.
+5. [P3] List-mode icon buttons still miss accessible/i18n labels â€” the icon-only add/remove controls in `MenuView.jsx:112-135` have no `aria-label`, while tile mode does. `BUGS.md:122-123` already flags missing aria labels in MenuView, and this remains a mobile accessibility issue. FIX: add localized `aria-label` values such as `t('menu.add')` / `t('menu.remove')` to all icon-only list-mode controls.
+
+## Summary
+Total: 5 findings (0 P0, 0 P1, 4 P2, 1 P3)
+
+## Prompt Clarity
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix #4 referenced `CartView.jsx` even though the top-level instruction said to inspect only 3 files; the discount data fields needed to render the badge were not named inside the allowed files.
+- Missing context (what info would have helped): Whether `CartView.jsx` was intentionally out of scope; the exact dish fields for original price / discount percent.
+- Scope questions (anything you weren't sure if it's in scope): The prompt says `pages/PublicMenu/*.jsx` but also says "ONLY these 3 files"; this folder contains multiple `.jsx` files, so I constrained the review to `MenuView.jsx`, `README.md`, and `BUGS.md`.
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md b/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ca4dd5da5c79d1b99a1dae330bcebadd21322248
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-131000
++
++## Findings
++1. [P2] Mobile grid setting is still ignored on phones — `MenuView.jsx:15-18` only supports `menu_grid_mobile` values `1` and `2`, and `MenuView.jsx:294` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for `1` or `3` columns still render two columns. FIX: add `3: 'grid-cols-3'` to `MOBILE_GRID`, keep the fallback at `2`, and use the computed mobile grid class in the render branch instead of the hardcoded `grid-cols-2`.
++2. [P2] Add-to-cart feedback regressed — `MenuView.jsx:113` and `MenuView.jsx:173` call `addToCart(dish)` directly, but this component has no toast/animation state, timer, or UI path for confirmation. `BUGS.md:332-336` says AC-09 was already fixed, so the current file has regressed. FIX: add a local `handleAddToCart(dish)` wrapper that calls `addToCart`, shows one non-stacking localized toast/animation, auto-dismisses after about `1.5s`, and clears/resets its timer on repeat taps and unmount.
++3. [P2] Tile CTA is anchored to the photo, not the dish card — `MenuView.jsx:152-170` positions the `+`/stepper inside the image wrapper. On cards with longer text, the control sits around the middle of the full card instead of the locked bottom-right corner of the card. FIX: make the full card `relative`, anchor the CTA container to the card’s bottom-right corner, and reserve bottom padding so the floating control does not overlap content.
++4. [P2] Discount badge/original-price UI is missing, so `partner.discount_color` cannot be applied — both card variants only render one price (`MenuView.jsx:95-97`, `MenuView.jsx:218-221`). There is no `-X%` badge or struck-through old price in this component, even though `README.md:88` documents discount badges on dish cards. FIX: restore the discount badge and original-price markup in `MenuView.jsx`, and style the badge with `backgroundColor: partner?.discount_color || '#C92A2A'` plus white text.
++5. [P3] List-mode icon buttons still miss accessible/i18n labels — the icon-only add/remove controls in `MenuView.jsx:112-135` have no `aria-label`, while tile mode does. `BUGS.md:122-123` already flags missing aria labels in MenuView, and this remains a mobile accessibility issue. FIX: add localized `aria-label` values such as `t('menu.add')` / `t('menu.remove')` to all icon-only list-mode controls.
++
++## Summary
++Total: 5 findings (0 P0, 0 P1, 4 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix #4 referenced `CartView.jsx` even though the top-level instruction said to inspect only 3 files; the discount data fields needed to render the badge were not named inside the allowed files.
++- Missing context (what info would have helped): Whether `CartView.jsx` was intentionally out of scope; the exact dish fields for original price / discount percent.
++- Scope questions (anything you weren't sure if it's in scope): The prompt says `pages/PublicMenu/*.jsx` but also says "ONLY these 3 files"; this folder contains multiple `.jsx` files, so I constrained the review to `MenuView.jsx`, `README.md`, and `BUGS.md`.
+
+codex
+Saved the review to [publicmenu-260322-131000-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md).
+
+It documents 5 findings in `MenuView.jsx`: mobile grid setting ignored, add-to-cart feedback regression, `+` CTA anchored to the image instead of the card corner, discount badge/original-price UI missing, and missing list-mode `aria-label`s. No fixes were applied.
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md b/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ca4dd5da5c79d1b99a1dae330bcebadd21322248
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-131000
++
++## Findings
++1. [P2] Mobile grid setting is still ignored on phones — `MenuView.jsx:15-18` only supports `menu_grid_mobile` values `1` and `2`, and `MenuView.jsx:294` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for `1` or `3` columns still render two columns. FIX: add `3: 'grid-cols-3'` to `MOBILE_GRID`, keep the fallback at `2`, and use the computed mobile grid class in the render branch instead of the hardcoded `grid-cols-2`.
++2. [P2] Add-to-cart feedback regressed — `MenuView.jsx:113` and `MenuView.jsx:173` call `addToCart(dish)` directly, but this component has no toast/animation state, timer, or UI path for confirmation. `BUGS.md:332-336` says AC-09 was already fixed, so the current file has regressed. FIX: add a local `handleAddToCart(dish)` wrapper that calls `addToCart`, shows one non-stacking localized toast/animation, auto-dismisses after about `1.5s`, and clears/resets its timer on repeat taps and unmount.
++3. [P2] Tile CTA is anchored to the photo, not the dish card — `MenuView.jsx:152-170` positions the `+`/stepper inside the image wrapper. On cards with longer text, the control sits around the middle of the full card instead of the locked bottom-right corner of the card. FIX: make the full card `relative`, anchor the CTA container to the card’s bottom-right corner, and reserve bottom padding so the floating control does not overlap content.
++4. [P2] Discount badge/original-price UI is missing, so `partner.discount_color` cannot be applied — both card variants only render one price (`MenuView.jsx:95-97`, `MenuView.jsx:218-221`). There is no `-X%` badge or struck-through old price in this component, even though `README.md:88` documents discount badges on dish cards. FIX: restore the discount badge and original-price markup in `MenuView.jsx`, and style the badge with `backgroundColor: partner?.discount_color || '#C92A2A'` plus white text.
++5. [P3] List-mode icon buttons still miss accessible/i18n labels — the icon-only add/remove controls in `MenuView.jsx:112-135` have no `aria-label`, while tile mode does. `BUGS.md:122-123` already flags missing aria labels in MenuView, and this remains a mobile accessibility issue. FIX: add localized `aria-label` values such as `t('menu.add')` / `t('menu.remove')` to all icon-only list-mode controls.
++
++## Summary
++Total: 5 findings (0 P0, 0 P1, 4 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix #4 referenced `CartView.jsx` even though the top-level instruction said to inspect only 3 files; the discount data fields needed to render the badge were not named inside the allowed files.
++- Missing context (what info would have helped): Whether `CartView.jsx` was intentionally out of scope; the exact dish fields for original price / discount percent.
++- Scope questions (anything you weren't sure if it's in scope): The prompt says `pages/PublicMenu/*.jsx` but also says "ONLY these 3 files"; this folder contains multiple `.jsx` files, so I constrained the review to `MenuView.jsx`, `README.md`, and `BUGS.md`.
+
+tokens used
+51 741
+Saved the review to [publicmenu-260322-131000-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260322-131000-codex-findings.md).
+
+It documents 5 findings in `MenuView.jsx`: mobile grid setting ignored, add-to-cart feedback regression, `+` CTA anchored to the image instead of the card corner, discount badge/original-price UI missing, and missing list-mode `aria-label`s. No fixes were applied.

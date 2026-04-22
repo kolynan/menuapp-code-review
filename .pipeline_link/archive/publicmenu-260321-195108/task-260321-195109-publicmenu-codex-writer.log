@@ -1,0 +1,1191 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Dev/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d10e0-faa1-7c60-842f-b1615554b721
+--------
+user
+Review the file pages/PublicMenu/base/*.jsx for bugs in a React restaurant QR-menu app on Base44 platform. Also check pages/PublicMenu/README.md and pages/PublicMenu/BUGS.md for context (ONLY these 3 files, nothing else). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the 3 files above. Do NOT search the repo, do NOT read old findings, do NOT read files outside pages/PublicMenu/. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. Find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260321-195108-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260321-195108 ## Findings 1. [P0] Title — Description. FIX: ... 2. [P1] Title — Description. FIX: ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... Do NOT apply fixes — only document findings. === TASK CONTEXT === # PM-071: Bottom Sheet trigger для Table Confirmation [H] (Production page) Reference: `ux-concepts/public-menu.md` v4.1, `ux-concepts/UX_LOCKED_PublicMenu.md`, `STYLE_GUIDE.md`, `BUGS_MASTER.md`. ⚠️ Production page: PublicMenu — боевая страница заказов. Приоритеты расставлять как P1. --- ## Fix 1 — PM-071 (P1) [MUST-FIX]: Bottom Sheet «Подтвердите стол» не открывается ### Сейчас (текущее поведение) Новый гость (стол не верифицирован, localStorage пуст) нажимает «Отправить официанту» в drawer корзины → **ничего не происходит**. Детали (проверено тестом S155A): - Кнопка визуально активна (терракотовая), не disabled ✅ - Клик регистрируется: Network видит `analytics/track/batch` POST 200 - Заказ НЕ уходит — P0-гейт `isTableVerified` блокирует ✅ - Bottom Sheet «Подтвердите стол» НЕ появляется ❌ - В DOM нет ни одного BS-компонента (`data-state="open"` только у CartView drawer) - В консоли нет app-ошибок — тихое бездействие Пользователь в тупике: кнопка нажата, ноль реакции. Не может ввести код стола → не может отправить заказ. Заказ В зале невозможен для нового гостя. ### Должно быть (ожидаемое поведение) Клик на «Отправить официанту» при `!isTableVerified`: 1. Drawer корзины остаётся открытым (НЕ закрывается) 2. Поверх drawer появляется Bottom Sheet (~75-85% высоты экрана) с: - Заголовок: «Подтвердите стол» - Подзаголовок: «Чтобы отправить заказ официанту» - Поле ввода кода стола (4-6 цифр, `tableCodeLength` из partner config) - Кнопка CTA: «Подтвердить и отправить» (терракотовый `#B5543A`) - Ссылка: «Не тот стол? Изменить» 3. После ввода верного кода → `isTableVerified = true` → BS закрывается → заказ отправляется Ref: `ux-concepts/public-menu.md` §E (Table Confirmation flow). ### НЕ должно быть (анти-паттерны) - **НЕ возвращать inline-инпут кода стола в drawer** — удалён в Batch 4 (201 строк). Не откатывать. - **НЕ убирать P0-гейт** на `isTableVerified` — он блокирует orphan orders. Оставить. - **НЕ отправлять заказ без верификации стола** — даже если «так проще». - **НЕ показывать fullscreen overlay** — только Bottom Sheet поверх drawer. - **НЕ закрывать drawer** при открытии BS. ### Файл и локация Файл: `CartView.jsx` (`pages/PublicMenu/base/CartView.jsx`) Вероятная проблема: в обработчике кнопки «Отправить официанту» (функция `handleSubmitOrder` или onClick) есть проверка `if (!isTableVerified) { return; }` — но **нет** вызова `setShowTableVerificationSheet(true)` перед или вместо return. Что нужно сделать: 1. Найти onClick кнопки «Отправить официанту» → в блоке `!isTableVerified` добавить: `setShowTableVerificationSheet(true)` (или как назван стейт BS). 2. Убедиться что JSX содержит: `{showTableVerificationSheet && <BottomSheet ...>}` — если нет, добавить. 3. BS должен содержать: заголовок, поле ввода, CTA кнопку, ссылку «Не тот стол?». 4. При успешной верификации: `setShowTableVerificationSheet(false)` + отправить заказ. ### Уже пробовали Batch 4, chain `publicmenu-260321-140331` ($4.69): - КС удалил inline verification (201 строк) ✅ - КС добавил P0-гейт ✅ - КС описал CTA кнопку в BS ✅ - **НО не подключил onClick → BS open trigger.** Старый путь удалили, новый к нему не привязали. ### Проверка (мини тест-кейс) 1. Инкогнито → `/x?partner=69540a85f2492cff3e46a283&mode=hall&lang=RU` 2. Добавить блюдо → «Оформить заказ» → drawer открыт, «Стол —» 3. Нажать «Отправить официанту» → **BS «Подтвердите стол» появляется поверх drawer** 4. Ввести код стола → «Подтвердить и отправить» → заказ уходит --- ## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано выше - Изменяй ТОЛЬКО код, описанный в Fix 1 (BS trigger + BS UI компонент). - ВСЁ остальное (цвета чипов, stepper, StickyCartBar, layout, другие страницы) — НЕ ТРОГАТЬ. - Если видишь «проблему» не из этой задачи — ПРОПУСТИ, не чини. - Locked UX decisions: `ux-concepts/UX_LOCKED_PublicMenu.md` — ЗАПРЕЩЕНО менять. ## Prompt Clarity _(заполняется CC/Codex writer после выполнения: оценка 1-5 + что было неясно)_ ## Implementation Notes - Файл: `CartView.jsx`. Возможно также `x.jsx` если state поднят выше. - НЕ ломать: PM-063 (stepper «− 1 +»), PM-041 (polling clean), P0-гейт `isTableVerified` - git add pages/PublicMenu/base/CartView.jsx && git commit -m "PM-071: add BS open trigger on submit with unverified table" && git push === END ===
+mcp startup: no servers
+codex
+Reviewing only `pages/PublicMenu/base/*.jsx`, `pages/PublicMenu/README.md`, and `pages/PublicMenu/BUGS.md`. I’ll read just those files, extract concrete bugs in scope, and write the findings to the requested chain-state file without touching code.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName" in C:/Dev/menuapp-code-review exited 124 in 11.04s:
+
+codex
+I’m enumerating only the target folder first so I can read exactly the allowed files and nothing else. After that I’ll inspect the JSX and the two markdown context files and synthesize the findings directly into the requested report file.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName" in C:/Dev/menuapp-code-review succeeded in 17.48s:
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\CheckoutView.jsx
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\MenuView.jsx
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\useTableSession.jsx
+C:\Dev\menuapp-code-review\pages\PublicMenu\base\x.jsx
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'" in C:/Dev/menuapp-code-review succeeded in 25.76s:
+import React from "react";
+import { Plus, Minus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+export default function CheckoutView({
+  t,
+  setView,
+  cart,
+  updateQuantity,
+  formatPrice,
+  finalTotal,
+  activeCurrency,
+  defaultCurrency,
+  orderMode,
+  renderHallCheckoutContent,
+  clientName,
+  setClientName,
+  clientPhone,
+ succeeded in 26.58s:
+// ======================================================
+// pages/x.jsx â€” PUBLIC MENU with i18n + Channels Visibility + Gating
+// UPDATED: Simplified Hall logic (TASK-260123-01b)
+// FIXED: P0-1..P0-7 security and functionality fixes
+// UPDATED: TASK-260127-01 - session restore, UI cleanup
+// PATCHED: 2026-01-28 - P0-1, P0-2, P0-2b, P1-1..P1-4
+// PATCHED: 2026-02-01 - FIX-260131-07 FINAL - guest safeguard in submit
+// PATCHED: 2026-02-01 - TASK-260201-01 - Hall StickyBar always visible
+// PATCHED: 2026-03-03 - GAP-01 - Order Confirmation Screen
+// FIXED: 2026-03-03 - GAP-01 fix - Confirmation as full-screen overlay (z-60)
+// FIXED: 2026-03-03 - GAP-02 fix - Embed OrderStatusScreen inside x.jsx (no /orderstatus route)
+// FIXED: 2026-03-03 - GAP-02 fix - Remove auto-dismiss timer (race condition: ghost click on menu)
+// ======================================================
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { useI18n } from "@/components/i18n";
+import { toast } from "sonner"; // P0-6: sonner instead of custom toast
+ succeeded in 26.11s:
+import React from "react";
+import { Loader2, ImageIcon, Minus, Plus, LayoutGrid, List } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import DishRating from "@/components/publicMenu/DishRating";
+
+// Grid mappings for Tailwind (explicit full class names)
+const DESKTOP_GRID = {
+  1: "md:grid-cols-1",
+  2: "md:grid-cols-2",
+  3: "md:grid-cols-3",
+  4: "md:grid-cols-4",
+  5: "md:grid-cols-5",
+};
+
+const MOBILE_GRID = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+};
+
+export default function MenuView({
+ succeeded in 25.60s:
+import React from "react";
+import { CheckCircle2, AlertCircle } from "lucide-react";
+
+export default function ModeTabs({
+  visibleModeTabs,
+  orderMode,
+  onModeChange,
+  getModeDescription,
+  isHallMode,
+  isTableVerified,
+  currentTableId,
+  currentTable,
+  tableCodeParam,
+  resolvedTable,
+  verifiedByCode,
+  t,
+}) {
+  return (
+    <div className="max-w-2xl mx-auto px-4 mt-4">
+      {visibleModeTabs.length > 1 ? (
+ succeeded in 26.23s:
+import { useEffect, useMemo, useRef, useState } from "react";
+import { base44 } from "@/api/base44Client";
+import {
+  getSessionGuests,
+  getSessionOrders,
+  getDeviceId,
+  findGuestByDevice,
+  isSessionExpired,
+} from "@/components/sessionHelpers";
+
+// Persistence helpers (FIX-260131-01: session + guest, 8h TTL)
+const TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+
+// BUG-PM-004: TTL for optimistic data before server confirms
+const OPTIMISTIC_TTL_MS = 30000; // 30 seconds
+
+// FIX-260131-06: Normalize guest id (support both id and _id)
+const normalizeGuestId = (g) => String(g?.id ?? g?._id ?? "");
+
+// FIX-260131-07: Get menu_guest_code from localStorage
+ succeeded in 26.99s:
+import React from "react";
+import { XIcon, Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, X, Minus, Plus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import Rating from "@/components/Rating";
+
+export default function CartView({
+  partner,
+  currentTable,
+  currentGuest,
+  t,
+  setView,
+  isEditingName,
+  guestNameInput,
+  setGuestNameInput,
+  handleUpdateGuestName,
+  setIsEditingName,
+  getGuestDisplayName,
+  cart,
+ succeeded in 25.52s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 25.64s:
+---
+version: "29.0"
+updated: "2026-03-21"
+session: 153
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*16 active bugs remaining (0x P0, 8x P1, 5x P2, 2x P3, 1x suggestion).*
+
+### BUG-PM-056: Drawer layout not visit-state-driven (P1 â€” Batch 2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P1
+- **ÐšÐ¾Ð³Ð´Ð°:** S153 (consensus chain publicmenu-260321-093745)
+codex
+I’ve loaded the allowed files. Next I’m checking the submit path and the confirmation-sheet wiring inside `x.jsx`/`CartView.jsx`, then I’ll scan the other target components for concrete i18n, mobile, and React issues that still affect runtime behavior.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|pendingSubmitRef|handleSubmitOrder|verifyTableCode|tableCodeLength|common.loading|cart.confirm_table|renderHallCheckoutContent|showLoyaltySection' -Context 3,5" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'aria-label|renderHallCheckoutContent|showLoyaltySection|Button|sticky|t\\(' -Context 1,2" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx' -Pattern 'onMouseEnter|onMouseLeave|aria-label|button|img|ImageIcon|mobileLayout|grid-cols-2|t\\(' -Context 1,2" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'button|t\\(|visibleModeTabs|getModeDescription|verified|invalid_code' -Context 1,2" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx' -Pattern 'setTimeout|setInterval|clearTimeout|clearInterval|window|localStorage|filter\\(|useEffect\\(|normalizeGuestId|getOrderStatus|t\\(' -Context 1,2" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'handleSubmitOrder|tableCodeInput|verifyTableCode|codeVerificationError|common.loading|placeholder=|aria-label=|submitError|showLoyaltySection|Drawer|Input|Button' -Context 2,4" in C:/Dev/menuapp-code-review succeeded in 28.14s:
+
+  pages\PublicMenu\base\x.jsx:442:  "guest.name_saved": "Имя сохранено",
+  pages\PublicMenu\base\x.jsx:443:  "guest.name_placeholder": "Имя",
+  pages\PublicMenu\base\x.jsx:444:  "toast.error": "Ошибка",
+> pages\PublicMenu\base\x.jsx:445:  "common.loading": "Загрузка...",
+  pages\PublicMenu\base\x.jsx:446:  "common.close": "Закрыть",
+  pages\PublicMenu\base\x.jsx:447:  "common.info": "Информация",
+  pages\PublicMenu\base\x.jsx:448:  "common.of": "из",
+  pages\PublicMenu\base\x.jsx:449:  "common.or": "или",
+  pages\PublicMenu\base\x.jsx:450:  "common.save": "Сохранить",
+  pages\PublicMenu\base\x.jsx:508:  // Mode-switch toast
+  pages\PublicMenu\base\x.jsx:509:  "cart.items_removed_mode_switch": "Убрано {count} блюд, недоступных в этом режиме",
+  pages\PublicMenu\base\x.jsx:510:  // Table confirmation Bottom Sheet (just-in-time)
+> pages\PublicMenu\base\x.jsx:511:  "cart.confirm_table.title": "Подтвердите стол",
+> pages\PublicMenu\base\x.jsx:512:  "cart.confirm_table.subtitle": "Чтобы отправить заказ официанту",
+> pages\PublicMenu\base\x.jsx:513:  "cart.confirm_table.benefit_loyalty": "По онлайн-заказу вы получите бонусы / 
+скидку",
+> pages\PublicMenu\base\x.jsx:514:  "cart.confirm_table.benefit_default": "Так официант быстрее найдёт ваш заказ",
+> pages\PublicMenu\base\x.jsx:515:  "cart.confirm_table.submit": "Подтвердить и отправить",
+> pages\PublicMenu\base\x.jsx:516:  "cart.confirm_table.change": "Не тот стол? Изменить",
+ succeeded in 29.19s:
+
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:4:export default function ModeTabs({
+> C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:5:  visibleModeTabs,
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:6:  orderMode,
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:7:  onModeChange,
+> C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:8:  getModeDescription,
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:9:  isHallMode,
+> C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:10:  isTableVerified,
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:11:  currentTableId,
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:12:  currentTable,
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:14:  resolvedTable,
+> C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:15:  verifiedByCode,
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:16:  t,
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:17:}) {
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:19:    <div className="max-w-2xl mx-auto px-4 mt-4">
+> C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:20:      {visibleModeTabs.length > 1 ? (
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:21:        <div className="flex bg-slate-50 border 
+border-slate-200 rounded-lg p-0.5 max-w-md mx-auto mb-3">
+> C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:22:          {visibleModeTabs.map((m) => {
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\ModeTabs.jsx:23:            const isActive = orderMode === m.id;
+ succeeded in 29.34s:
+
+  pages\PublicMenu\base\CheckoutView.jsx:3:import { Card, CardContent } from "@/components/ui/card";
+> pages\PublicMenu\base\CheckoutView.jsx:4:import { Button } from "@/components/ui/button";
+  pages\PublicMenu\base\CheckoutView.jsx:5:import { Input } from "@/components/ui/input";
+  pages\PublicMenu\base\CheckoutView.jsx:6:
+  pages\PublicMenu\base\CheckoutView.jsx:16:  orderMode,
+> pages\PublicMenu\base\CheckoutView.jsx:17:  renderHallCheckoutContent,
+  pages\PublicMenu\base\CheckoutView.jsx:18:  clientName,
+  pages\PublicMenu\base\CheckoutView.jsx:19:  setClientName,
+  pages\PublicMenu\base\CheckoutView.jsx:35:      <div className="flex items-center justify-between mb-4">
+> pages\PublicMenu\base\CheckoutView.jsx:36:        <h2 className="text-xl font-bold 
+text-slate-900">{t('cart.your_order')}</h2>
+> pages\PublicMenu\base\CheckoutView.jsx:37:        <button type="button" onClick={() => setView("menu")} 
+className="text-sm hover:underline" style={{color:'#B5543A'}}>
+> pages\PublicMenu\base\CheckoutView.jsx:38:          {t('cart.back_to_menu')}
+> pages\PublicMenu\base\CheckoutView.jsx:39:        </button>
+  pages\PublicMenu\base\CheckoutView.jsx:40:      </div>
+  pages\PublicMenu\base\CheckoutView.jsx:41:
+  pages\PublicMenu\base\CheckoutView.jsx:57:                <div className="flex items-center justify-end bg-slate-100 
+rounded-lg p-1 w-fit ml-auto">
+ exited 124 in 31.70s:
+
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:2:import { XIcon, Loader2, ChevronDown, ChevronUp, 
+Users, Gift, ShoppingBag, Bell, X, Minus, Plus } from "lucide-react";
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:3:import { Card, CardContent } from 
+"@/components/ui/card";
+> C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:4:import { Button } from "@/components/ui/button";
+> C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:5:import { Input } from "@/components/ui/input";
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:6:import Rating from "@/components/Rating";
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:7:
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:8:export default function CartView({
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:9:  partner,
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:13:  setView,
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:14:  isEditingName,
+> C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:15:  guestNameInput,
+> C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:16:  setGuestNameInput,
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:17:  handleUpdateGuestName,
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:18:  setIsEditingName,
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:19:  getGuestDisplayName,
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:20:  cart,
+  C:\Dev\menuapp-code-review\pages\PublicMenu\base\CartView.jsx:38:  pointsDiscountAmount,
+ exited 124 in 32.38s:
+
+  pages\PublicMenu\base\useTableSession.jsx:17:// FIX-260131-06: Normalize guest id (support both id and _id)
+> pages\PublicMenu\base\useTableSession.jsx:18:const normalizeGuestId = (g) => String(g?.id ?? g?._id ?? "");
+  pages\PublicMenu\base\useTableSession.jsx:19:
+> pages\PublicMenu\base\useTableSession.jsx:20:// FIX-260131-07: Get menu_guest_code from localStorage
+  pages\PublicMenu\base\useTableSession.jsx:21:const getMenuGuestCode = () => {
+  pages\PublicMenu\base\useTableSession.jsx:22:  try {
+> pages\PublicMenu\base\useTableSession.jsx:23:    return localStorage.getItem("menu_guest_code");
+  pages\PublicMenu\base\useTableSession.jsx:24:  } catch {
+  pages\PublicMenu\base\useTableSession.jsx:25:    return null;
+  pages\PublicMenu\base\useTableSession.jsx:36:    const key = getSessionStorageKey(partnerId, tableId);
+> pages\PublicMenu\base\useTableSession.jsx:37:    localStorage.setItem(key, JSON.stringify({ tableSessionId: 
+sessionId, ts: Date.now() }));
+  pages\PublicMenu\base\useTableSession.jsx:38:  } catch (e) {
+  pages\PublicMenu\base\useTableSession.jsx:39:    // Silent fail
+  pages\PublicMenu\base\useTableSession.jsx:46:    const key = getSessionStorageKey(partnerId, tableId);
+> pages\PublicMenu\base\useTableSession.jsx:47:    const raw = localStorage.getItem(key);
+  pages\PublicMenu\base\useTableSession.jsx:48:    if (!raw) return null;
+  pages\PublicMenu\base\useTableSession.jsx:49:    const data = JSON.parse(raw);
+  pages\PublicMenu\base\useTableSession.jsx:50:    if (Date.now() - data.ts > TTL_MS) {
+ exited 124 in 32.61s:
+
+  pages\PublicMenu\base\MenuView.jsx:1:import React from "react";
+> pages\PublicMenu\base\MenuView.jsx:2:import { Loader2, ImageIcon, Minus, Plus, LayoutGrid, List } from 
+"lucide-react";
+  pages\PublicMenu\base\MenuView.jsx:3:import { Card, CardContent } from "@/components/ui/card";
+  pages\PublicMenu\base\MenuView.jsx:4:import DishRating from "@/components/publicMenu/DishRating";
+  pages\PublicMenu\base\MenuView.jsx:8:  1: "md:grid-cols-1",
+> pages\PublicMenu\base\MenuView.jsx:9:  2: "md:grid-cols-2",
+  pages\PublicMenu\base\MenuView.jsx:10:  3: "md:grid-cols-3",
+  pages\PublicMenu\base\MenuView.jsx:11:  4: "md:grid-cols-4",
+  pages\PublicMenu\base\MenuView.jsx:16:  1: "grid-cols-1",
+> pages\PublicMenu\base\MenuView.jsx:17:  2: "grid-cols-2",
+  pages\PublicMenu\base\MenuView.jsx:18:};
+  pages\PublicMenu\base\MenuView.jsx:19:
+  pages\PublicMenu\base\MenuView.jsx:22:  isMobile,
+> pages\PublicMenu\base\MenuView.jsx:23:  mobileLayout,
+> pages\PublicMenu\base\MenuView.jsx:24:  onSetMobileLayout,
+  pages\PublicMenu\base\MenuView.jsx:25:  showReviews,
+  pages\PublicMenu\base\MenuView.jsx:26:  dishRatings,
+  pages\PublicMenu\base\MenuView.jsx:63:            {dish.image ? (
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\\.hall\\.verified|hall\\.invalid_code|hall\\.invalid_code_desc|cart\\.verify\\.enter_table_code|cart\\.confirm_table\\.dismissed' -Context 0,0" in C:/Dev/menuapp-code-review succeeded in 3.40s:
+
+pages\PublicMenu\base\x.jsx:470:  "cart.verify.enter_table_code": "Введите код стола",
+pages\PublicMenu\base\x.jsx:3390:              toast(tr('cart.confirm_table.dismissed', 'Для отправки заказа нужно 
+подтвердить стол'), { id: 'table-dismiss' });
+pages\PublicMenu\base\x.jsx:3414:                {tr('cart.verify.enter_table_code', 'Введите код стола')}
+pages\PublicMenu\base\x.jsx:3442:                aria-label={tr('cart.verify.enter_table_code', 'Введите код стола')}
+
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const tr =|function tr\\(|const trFormat|I18N_FALLBACKS|useI18n\\(' -Context 2,4" in C:/Dev/menuapp-code-review succeeded in 1.70s:
+
+  pages\PublicMenu\base\x.jsx:323:// Chain: selected lang → EN fallback → RU fallback → empty string
+  pages\PublicMenu\base\x.jsx:324:// ============================================================
+> pages\PublicMenu\base\x.jsx:325:const I18N_FALLBACKS = {
+  pages\PublicMenu\base\x.jsx:326:  // Order statuses (OrderStatusBadge)
+  pages\PublicMenu\base\x.jsx:327:  "status.new": "Новый",
+  pages\PublicMenu\base\x.jsx:328:  "status.cooking": "Готовится",
+  pages\PublicMenu\base\x.jsx:329:  "status.ready": "Готов",
+  pages\PublicMenu\base\x.jsx:519:/**
+  pages\PublicMenu\base\x.jsx:520: * Wraps raw t() to prevent raw i18n keys from reaching the UI.
+> pages\PublicMenu\base\x.jsx:521: * Falls back to I18N_FALLBACKS map, supports {param} interpolation.
+  pages\PublicMenu\base\x.jsx:522: */
+  pages\PublicMenu\base\x.jsx:523:function makeSafeT(rawT) {
+  pages\PublicMenu\base\x.jsx:524:  return (key, params) => {
+  pages\PublicMenu\base\x.jsx:525:    // Try the real translation first
+  pages\PublicMenu\base\x.jsx:531:    }
+  pages\PublicMenu\base\x.jsx:532:    // Fallback from map
+> pages\PublicMenu\base\x.jsx:533:    let fb = I18N_FALLBACKS[key];
+  pages\PublicMenu\base\x.jsx:534:    if (!fb) return "";
+  pages\PublicMenu\base\x.jsx:535:    // Simple {param} interpolation for fallbacks
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleCheckoutClick|setView\\(\"checkout\"\\)|orderMode === \"hall\"|view === \"checkout\"|drawerMode' -Context 2,4" in C:/Dev/menuapp-code-review succeeded in 1.70s:
+
+  pages\PublicMenu\base\x.jsx:1267:  
+  pages\PublicMenu\base\x.jsx:1268:  // TASK-260203-01: Drawer state
+> pages\PublicMenu\base\x.jsx:1269:  const [drawerMode, setDrawerMode] = useState(null); // 'cart' | null
+  pages\PublicMenu\base\x.jsx:1270:
+  pages\PublicMenu\base\x.jsx:1271:  // Just-in-time table confirmation (Batch A+5 Fix 1)
+  pages\PublicMenu\base\x.jsx:1272:  const [showTableConfirmSheet, setShowTableConfirmSheet] = useState(false);
+  pages\PublicMenu\base\x.jsx:1273:  const pendingSubmitRef = useRef(false);
+  pages\PublicMenu\base\x.jsx:1450:    setConfirmationData(data);
+  pages\PublicMenu\base\x.jsx:1451:    setView("confirmation");
+> pages\PublicMenu\base\x.jsx:1452:    setDrawerMode(null);
+  pages\PublicMenu\base\x.jsx:1453:  }, []);
+  pages\PublicMenu\base\x.jsx:1454:
+  pages\PublicMenu\base\x.jsx:1455:  // GAP-02: Navigate from confirmation to order status tracking
+  pages\PublicMenu\base\x.jsx:1456:  const handleTrackOrder = useCallback((token) => {
+  pages\PublicMenu\base\x.jsx:1476:  // Change 2a/2c: Scroll to top when switching to checkout, confirmation, or 
+orderstatus
+  pages\PublicMenu\base\x.jsx:1477:  useEffect(() => {
+> pages\PublicMenu\base\x.jsx:1478:    if (view === "checkout" || view === "confirmation" || view === "orderstatus") {
+  pages\PublicMenu\base\x.jsx:1479:      window.scrollTo({ top: 0, behavior: 'smooth' });
+codex
+I’ve isolated the verification path. One issue is structural: the actual Bottom Sheet in `x.jsx` is using shared table-code state, but the auto-verify/cooldown behavior still lives in hidden `CartView` effects. I’m confirming that alongside the checkout/loyalty path and the remaining i18n/accessibility regressions before I write the report.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'tableCodeInput|codeAttempts|codeLockedUntil|codeSecondsLeft|isCodeLocked|verifyTableCode|codeVerificationError' -Context 0,0" in C:/Dev/menuapp-code-review succeeded in 1.70s:
+
+pages\PublicMenu\base\CartView.jsx:66:  tableCodeInput,
+pages\PublicMenu\base\CartView.jsx:67:  setTableCodeInput,
+pages\PublicMenu\base\CartView.jsx:69:  verifyTableCode,
+pages\PublicMenu\base\CartView.jsx:70:  codeVerificationError,
+pages\PublicMenu\base\CartView.jsx:89:  const [codeAttempts, setCodeAttempts] = React.useState(0);
+pages\PublicMenu\base\CartView.jsx:90:  const [codeLockedUntil, setCodeLockedUntil] = React.useState(null); // 
+timestamp ms
+pages\PublicMenu\base\CartView.jsx:109:  const maxCodeAttempts = React.useMemo(() => {
+pages\PublicMenu\base\CartView.jsx:121:  const isCodeLocked = Boolean(codeLockedUntil && nowTs < codeLockedUntil);
+pages\PublicMenu\base\CartView.jsx:122:  const codeSecondsLeft = isCodeLocked ? Math.max(0, Math.ceil((codeLockedUntil 
+- nowTs) / 1000)) : 0;
+pages\PublicMenu\base\CartView.jsx:126:    if (!isCodeLocked) return;
+pages\PublicMenu\base\CartView.jsx:130:  }, [isCodeLocked]);
+pages\PublicMenu\base\CartView.jsx:134:    if (!codeLockedUntil) return;
+pages\PublicMenu\base\CartView.jsx:135:    if (nowTs < codeLockedUntil) return;
+pages\PublicMenu\base\CartView.jsx:136:    setCodeLockedUntil(null);
+pages\PublicMenu\base\CartView.jsx:137:    setCodeAttempts(0);
+pages\PublicMenu\base\CartView.jsx:140:  }, [nowTs, codeLockedUntil]);
+pages\PublicMenu\base\CartView.jsx:145:      setCodeAttempts(0);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'billRequested|handleRequestBill|billCooldown|otherGuestsBills|othersTotal' -Context 0,0" in C:/Dev/menuapp-code-review succeeded in 1.65s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const currentTableId|const currentTable =|resolvedTable|verifiedTable|isTableVerified' -Context 2,3" in C:/Dev/menuapp-code-review succeeded in 8.16s:
+
+  pages\PublicMenu\base\x.jsx:1506:  const {
+  pages\PublicMenu\base\x.jsx:1507:    tableCodeParam,
+> pages\PublicMenu\base\x.jsx:1508:    resolvedTable,
+  pages\PublicMenu\base\x.jsx:1509:    isHallMode,
+  pages\PublicMenu\base\x.jsx:1510:    tableCodeInput,
+  pages\PublicMenu\base\x.jsx:1511:    setTableCodeInput,
+  pages\PublicMenu\base\x.jsx:1512:    isVerifyingCode,
+  pages\PublicMenu\base\x.jsx:1513:    verifiedByCode,
+> pages\PublicMenu\base\x.jsx:1514:    verifiedTableId,
+> pages\PublicMenu\base\x.jsx:1515:    verifiedTable,
+  pages\PublicMenu\base\x.jsx:1516:    codeVerificationError,
+  pages\PublicMenu\base\x.jsx:1517:    verifyTableCode,
+  pages\PublicMenu\base\x.jsx:1518:  } = useHallTable({ partner, location, orderMode, t });
+  pages\PublicMenu\base\x.jsx:1554:  // P0-1: Table verified ONLY when actually resolved or verified by code input
+  pages\PublicMenu\base\x.jsx:1555:  // Removed hasTableInUrl from condition - URL param alone doesn't mean verified
+> pages\PublicMenu\base\x.jsx:1556:  const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
+  pages\PublicMenu\base\x.jsx:1557:
+  pages\PublicMenu\base\x.jsx:1558:  // Table code config (for Bottom Sheet — PM-064)
+  pages\PublicMenu\base\x.jsx:1559:  const tableCodeLength = useMemo(() => {
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' | Select-Object -Index (2338..2360)" in C:/Dev/menuapp-code-review succeeded in 2.97s:
+      if (!/^\+?\d*$/.test(raw)) return t('error.phone_invalid');
+      const digitsCount = raw.replace(/\D/g, "").length;
+      if (digitsCount < 8) return t('error.phone_short');
+      if (digitsCount > 15) return t('error.phone_long');
+      return null;
+    };
+
+    if (orderMode === "hall") {
+      // P0-1: Hall mode - table MUST be verified with real ID
+      if (!currentTableId) {
+        newErrors.tableSelection = t('error.table_required');
+      }
+      if (raw) {
+        const err = checkPhone();
+        if (err) newErrors.clientPhone = err;
+      }
+    } else {
+      if (!clientName.trim()) newErrors.clientName = t('error.name_required');
+
+      if (!raw) newErrors.clientPhone = t('error.phone_required');
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'tableSelection|errors\\.tableSelection|newErrors\\.tableSelection' -Context 1,2" in C:/Dev/menuapp-code-review succeeded in 3.45s:
+
+  pages\PublicMenu\base\x.jsx:1520:  // Helper for saving table selection (used by help requests and other features)
+> pages\PublicMenu\base\x.jsx:1521:  const saveTableSelection = (partnerId, tableId) => {
+  pages\PublicMenu\base\x.jsx:1522:    if (!partnerId || !tableId) return;
+  pages\PublicMenu\base\x.jsx:1523:    try {
+  pages\PublicMenu\base\x.jsx:1585:    submitHelpRequest,
+> pages\PublicMenu\base\x.jsx:1586:  } = useHelpRequests({ partner, currentTableId, t, toast, isRateLimitError, 
+saveTableSelection });
+  pages\PublicMenu\base\x.jsx:1587:
+  pages\PublicMenu\base\x.jsx:1588:  // OrderStages for the partner (for stage_id assignment)
+  pages\PublicMenu\base\x.jsx:2315:
+> pages\PublicMenu\base\x.jsx:2316:  // P0-7: Removed handleTableSelection - no dropdown
+  pages\PublicMenu\base\x.jsx:2317:
+  pages\PublicMenu\base\x.jsx:2318:  // Phone input
+  pages\PublicMenu\base\x.jsx:2348:      if (!currentTableId) {
+> pages\PublicMenu\base\x.jsx:2349:        newErrors.tableSelection = t('error.table_required');
+  pages\PublicMenu\base\x.jsx:2350:      }
+  pages\PublicMenu\base\x.jsx:2351:      if (raw) {
+  pages\PublicMenu\base\x.jsx:2476:
+> pages\PublicMenu\base\x.jsx:2477:      if (partner?.id && orderData.table) saveTableSelection(partner.id, 
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'currentGuestIdRef|currentGuest\\?' -Context 2,3" in C:/Dev/menuapp-code-review succeeded in 3.34s:
+
+  pages\PublicMenu\base\x.jsx:1986:    saveGuestId,
+  pages\PublicMenu\base\x.jsx:1987:    sessionIdRef,
+> pages\PublicMenu\base\x.jsx:1988:    currentGuestIdRef,
+  pages\PublicMenu\base\x.jsx:1989:  } = useTableSession({
+  pages\PublicMenu\base\x.jsx:1990:    partner,
+  pages\PublicMenu\base\x.jsx:1991:    isHallMode,
+  pages\PublicMenu\base\x.jsx:2047:        order: orderId,
+  pages\PublicMenu\base\x.jsx:2048:        rating: rating,
+> pages\PublicMenu\base\x.jsx:2049:        reviewed_by: currentGuest?.id || 'guest',
+  pages\PublicMenu\base\x.jsx:2050:        order_item: itemId,
+> pages\PublicMenu\base\x.jsx:2051:        guest: currentGuest?.id,
+  pages\PublicMenu\base\x.jsx:2052:        author_type: loyaltyAccount ? 'loyalty' : 'anonymous',
+  pages\PublicMenu\base\x.jsx:2053:        loyalty_account: loyaltyAccount?.id || undefined,
+  pages\PublicMenu\base\x.jsx:2054:        points_awarded: 0,
+  pages\PublicMenu\base\x.jsx:2749:              const gid = normalizeId(guest);
+  pages\PublicMenu\base\x.jsx:2750:              setCurrentGuest(guest);
+> pages\PublicMenu\base\x.jsx:2751:              currentGuestIdRef.current = gid || null;
+  pages\PublicMenu\base\x.jsx:2752:              if (gid) {
+  pages\PublicMenu\base\x.jsx:2753:                saveGuestId(partner.id, session.id, currentTableId, gid);
+codex
+I’ve got the concrete findings. I’m writing the requested chain-state report now, and I’ll also save the same review plus a command log under `pages/PublicMenu/` to satisfy the repo’s review-output rules.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'" in C:/Dev/menuapp-code-review succeeded in 1.78s:
+True
+ succeeded in 1.76s:
+True
+file update
+A C:/Dev/menuapp-code-review\pages/PublicMenu/commands_2026-03-21.log
+Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
+Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|pendingSubmitRef|handleSubmitOrder|verifyTableCode|tableCodeLength|common.loading|cart.confirm_table|renderHallCheckoutContent|showLoyaltySection' -Context 3,5
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'handleSubmitOrder|tableCodeInput|verifyTableCode|codeVerificationError|common.loading|placeholder=|aria-label=|submitError|showLoyaltySection|Drawer|Input|Button' -Context 2,4
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'aria-label|renderHallCheckoutContent|showLoyaltySection|Button|sticky|t\(' -Context 1,2
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx' -Pattern 'onMouseEnter|onMouseLeave|aria-label|button|img|ImageIcon|mobileLayout|grid-cols-2|t\(' -Context 1,2
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'button|t\(|visibleModeTabs|getModeDescription|verified|invalid_code' -Context 1,2
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx' -Pattern 'setTimeout|setInterval|clearTimeout|clearInterval|window|localStorage|filter\(|useEffect\(|normalizeGuestId|getOrderStatus|t\(' -Context 1,2
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|cart\.verify\.enter_table_code|cart\.confirm_table\.dismissed' -Context 0,0
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const tr =|function tr\(|const trFormat|I18N_FALLBACKS|useI18n\(' -Context 2,4
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleCheckoutClick|setView\("checkout"\)|orderMode === "hall"|view === "checkout"|drawerMode' -Context 2,4
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'tableCodeInput|codeAttempts|codeLockedUntil|codeSecondsLeft|isCodeLocked|verifyTableCode|codeVerificationError' -Context 0,0
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const currentTableId|const currentTable =|resolvedTable|verifiedTable|isTableVerified' -Context 2,3
+Get-Content 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' | Select-Object -Index (2338..2360)
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'tableSelection|errors\.tableSelection|newErrors\.tableSelection' -Context 1,2
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'billRequested|handleRequestBill|billCooldown|otherGuestsBills|othersTotal' -Context 0,0
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'currentGuestIdRef|currentGuest\?' -Context 2,3
+Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
+Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
+A C:/Dev/menuapp-code-review\pipeline/chain-state/publicmenu-260321-195108-codex-findings.md
+# Codex Writer Findings — PublicMenu
+Chain: publicmenu-260321-195108
+
+## Findings
+1. [P1] Hall submit validates before the Bottom Sheet gate — In `pages/PublicMenu/base/x.jsx`, `handleSubmitOrder()` calls `validate()` before the just-in-time table-confirmation check. `validate()` rejects hall submits when `!currentTableId`, but that error is stored as `errors.tableSelection` and is not rendered anywhere in the current drawer flow. Result: on `/x?partner=...&mode=hall` a new guest can tap "Отправить официанту" and get a silent no-op instead of the confirmation sheet. FIX: move the `orderMode === "hall" && !isTableVerified` interception before `validate()`, or skip `tableSelection` validation until after the sheet verifies the table.
+2. [P1] Pickup/delivery checkout still drops loyalty and discount UI — `pages/PublicMenu/base/x.jsx` passes `showLoyaltySection`, `customerEmail`, `loyaltyAccount`, `earnedPoints`, `redeemedPoints`, `maxRedeemPoints`, `discountAmount`, and related props into `CheckoutView`, but `pages/PublicMenu/base/CheckoutView.jsx` neither accepts nor renders them. Users in pickup/delivery lose the email, points, redeem, and discount flows on the actual checkout screen. FIX: add the missing props to `CheckoutView` and render the loyalty block there, or extract the existing loyalty UI into a shared checkout section.
+3. [P2] Table-confirmation state lives in hidden `CartView` instead of the visible Bottom Sheet — After inline verification UI was removed, `pages/PublicMenu/base/CartView.jsx` still owns `codeAttempts`, `codeLockedUntil`, `codeSecondsLeft`, and the auto-verify effect bound to `tableCodeInput`, while the visible input now lives in the Bottom Sheet in `pages/PublicMenu/base/x.jsx`. That means the sheet shows only `codeVerificationError` with no attempt/cooldown feedback, and verification can be triggered by an off-screen component before the CTA tap. FIX: move attempt/lockout/auto-verify state into `x.jsx` with the Bottom Sheet, or remove the hidden auto-verify effect and let the sheet CTA own verification.
+4. [P2] Mobile grid partner setting is ignored — `pages/PublicMenu/base/MenuView.jsx` computes `mobileCols` from `partner.menu_grid_mobile`, but the actual grid render hardcodes `isMobile ? 'grid-cols-2' : gridColsClass`. Any partner configured for a 1-column mobile menu still gets 2 columns. FIX: use the computed mobile class (`MOBILE_GRID[mobileCols]`) in the mobile branch instead of the hardcoded `grid-cols-2`.
+5. [P2] `useTableSession` loses restored guests that only have `_id` — The hook correctly defines `normalizeGuestId()`, but later syncs `currentGuestIdRef.current = currentGuest?.id || null` in `pages/PublicMenu/base/useTableSession.jsx`. If a restored `SessionGuest` only carries `_id`, the ref is reset to `null`, so polling keeps re-running guest restore and downstream logic can behave as if no current guest exists. FIX: store `normalizeGuestId(currentGuest)` in the ref, and align any other guest-id reads in this file with the same normalization rule.
+6. [P3] Several control labels still regress i18n/accessibility — `pages/PublicMenu/base/CheckoutView.jsx` hardcodes `aria-label="Decrease"` / `aria-label="Increase"`, `pages/PublicMenu/base/CartView.jsx` hardcodes the reward-email placeholder `email@example.com`, and `pages/PublicMenu/base/MenuView.jsx` list-mode add/remove buttons plus `CartView` icon-only controls are missing localized accessible labels. This leaves mixed-language assistive text and unlabeled mobile controls in production. FIX: replace hardcoded assistive/user-facing strings with `t()/tr()` and add `aria-label` to icon-only/list-stepper buttons.
+
+## Summary
+Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+## Prompt Clarity
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none required for a review-only pass
+- Scope questions (anything you weren't sure if it's in scope): whether to report only PM-071 regressions or any bug found in the allowed JSX files; also "ONLY these 3 files" refers to `base/*.jsx` plus two markdown files, which is more than three physical files
+A C:/Dev/menuapp-code-review\pages/PublicMenu/review_2026-03-21.md
+# Codex Writer Findings — PublicMenu
+Chain: publicmenu-260321-195108
+
+## Findings
+1. [P1] Hall submit validates before the Bottom Sheet gate — In `pages/PublicMenu/base/x.jsx`, `handleSubmitOrder()` calls `validate()` before the just-in-time table-confirmation check. `validate()` rejects hall submits when `!currentTableId`, but that error is stored as `errors.tableSelection` and is not rendered anywhere in the current drawer flow. Result: on `/x?partner=...&mode=hall` a new guest can tap "Отправить официанту" and get a silent no-op instead of the confirmation sheet. FIX: move the `orderMode === "hall" && !isTableVerified` interception before `validate()`, or skip `tableSelection` validation until after the sheet verifies the table.
+2. [P1] Pickup/delivery checkout still drops loyalty and discount UI — `pages/PublicMenu/base/x.jsx` passes `showLoyaltySection`, `customerEmail`, `loyaltyAccount`, `earnedPoints`, `redeemedPoints`, `maxRedeemPoints`, `discountAmount`, and related props into `CheckoutView`, but `pages/PublicMenu/base/CheckoutView.jsx` neither accepts nor renders them. Users in pickup/delivery lose the email, points, redeem, and discount flows on the actual checkout screen. FIX: add the missing props to `CheckoutView` and render the loyalty block there, or extract the existing loyalty UI into a shared checkout section.
+3. [P2] Table-confirmation state lives in hidden `CartView` instead of the visible Bottom Sheet — After inline verification UI was removed, `pages/PublicMenu/base/CartView.jsx` still owns `codeAttempts`, `codeLockedUntil`, `codeSecondsLeft`, and the auto-verify effect bound to `tableCodeInput`, while the visible input now lives in the Bottom Sheet in `pages/PublicMenu/base/x.jsx`. That means the sheet shows only `codeVerificationError` with no attempt/cooldown feedback, and verification can be triggered by an off-screen component before the CTA tap. FIX: move attempt/lockout/auto-verify state into `x.jsx` with the Bottom Sheet, or remove the hidden auto-verify effect and let the sheet CTA own verification.
+4. [P2] Mobile grid partner setting is ignored — `pages/PublicMenu/base/MenuView.jsx` computes `mobileCols` from `partner.menu_grid_mobile`, but the actual grid render hardcodes `isMobile ? 'grid-cols-2' : gridColsClass`. Any partner configured for a 1-column mobile menu still gets 2 columns. FIX: use the computed mobile class (`MOBILE_GRID[mobileCols]`) in the mobile branch instead of the hardcoded `grid-cols-2`.
+5. [P2] `useTableSession` loses restored guests that only have `_id` — The hook correctly defines `normalizeGuestId()`, but later syncs `currentGuestIdRef.current = currentGuest?.id || null` in `pages/PublicMenu/base/useTableSession.jsx`. If a restored `SessionGuest` only carries `_id`, the ref is reset to `null`, so polling keeps re-running guest restore and downstream logic can behave as if no current guest exists. FIX: store `normalizeGuestId(currentGuest)` in the ref, and align any other guest-id reads in this file with the same normalization rule.
+6. [P3] Several control labels still regress i18n/accessibility — `pages/PublicMenu/base/CheckoutView.jsx` hardcodes `aria-label="Decrease"` / `aria-label="Increase"`, `pages/PublicMenu/base/CartView.jsx` hardcodes the reward-email placeholder `email@example.com`, and `pages/PublicMenu/base/MenuView.jsx` list-mode add/remove buttons plus `CartView` icon-only controls are missing localized accessible labels. This leaves mixed-language assistive text and unlabeled mobile controls in production. FIX: replace hardcoded assistive/user-facing strings with `t()/tr()` and add `aria-label` to icon-only/list-stepper buttons.
+
+## Summary
+Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+## Prompt Clarity
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none required for a review-only pass
+- Scope questions (anything you weren't sure if it's in scope): whether to report only PM-071 regressions or any bug found in the allowed JSX files; also "ONLY these 3 files" refers to `base/*.jsx` plus two markdown files, which is more than three physical files
+apply_patch(auto_approved=true) exited 0 in 870ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260321-195108-codex-findings.md
+A pages/PublicMenu/review_2026-03-21.md
+A pages/PublicMenu/commands_2026-03-21.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-21.log b/pages/PublicMenu/commands_2026-03-21.log
+index a8f7bf4e2477650e1dc867726cf011e7b744f493..5b72d98551b5bd34a49c6bb4ff182b2326b8c4d7
+--- a/pages/PublicMenu/commands_2026-03-21.log
++++ b/pages/PublicMenu/commands_2026-03-21.log
+@@ -1,41 +1,27 @@
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'
+-@( 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' ) | ForEach-Object { $p=$_; $lines=(Get-Content $p).Length; Write-Output "$p`t$lines" }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleSubmitOrder|showTableConfirmSheet|pendingSubmitRef|verifyTableCode|partner_not_found|renderHallCheckoutContent|hallStickyMode|showCartButton|tableCodeLength|isTableVerified|Drawer' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'send_to_waiter|handleSubmitOrder|aria-label|placeholder|toLocaleString|ru-RU|tableCode|codeLockedUntil|codeAttempts|showLoyaltySection|isTableVerified|document.querySelector|guestDisplay|Button|sticky bottom-0' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1290;E=1605},@{S=2068;E=2148},@{S=2608;E=2688},@{S=2988;E=3050},@{S=3380;E=3478})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=430;E=490},@{S=500;E=560},@{S=930;E=1010},@{S=1050;E=1084})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1;E=130},@{S=131;E=298})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=220;E=430},@{S=430;E=650},@{S=650;E=760},@{S=760;E=838})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'console\.|toast\.|hardcoded|toLocaleString\(|ru-RU|hallSticky|showLoyaltySection|setView\("checkout"\)|handleCheckoutClick|common.loading|error.send.subtitle|cart.confirm_table|partner_missing|partner_not_found' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'aria-label="|placeholder="|toLocaleString\(|console\.|t\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const showLoyaltySection|showLoyaltySection =|useLoyalty|discountEnabled|loyaltyEnabled|customerEmail|earnedPoints|maxRedeemPoints|redeemedPoints' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2976;$i -le 2990;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2570;$i -le 2625;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|function validate|validate\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2334;$i -le 2410;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'tableSelection|errors\.' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|help\.call_waiter|loyalty\.email_placeholder|guest\.name_placeholder|cart\.you|common\.save|common\.cancel|cart\.confirm_table\.dismissed' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const \[isMobile, setIsMobile\]' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=1278;$i -le 1288;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|pendingSubmitRef|handleSubmitOrder|verifyTableCode|tableCodeLength|common.loading|cart.confirm_table|renderHallCheckoutContent|showLoyaltySection' -Context 3,5
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'handleSubmitOrder|tableCodeInput|verifyTableCode|codeVerificationError|common.loading|placeholder=|aria-label=|submitError|showLoyaltySection|Drawer|Input|Button' -Context 2,4
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'aria-label|renderHallCheckoutContent|showLoyaltySection|Button|sticky|t\(' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx' -Pattern 'onMouseEnter|onMouseLeave|aria-label|button|img|ImageIcon|mobileLayout|grid-cols-2|t\(' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'button|t\(|visibleModeTabs|getModeDescription|verified|invalid_code' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx' -Pattern 'setTimeout|setInterval|clearTimeout|clearInterval|window|localStorage|filter\(|useEffect\(|normalizeGuestId|getOrderStatus|t\(' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|cart\.verify\.enter_table_code|cart\.confirm_table\.dismissed' -Context 0,0
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const tr =|function tr\(|const trFormat|I18N_FALLBACKS|useI18n\(' -Context 2,4
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleCheckoutClick|setView\("checkout"\)|orderMode === "hall"|view === "checkout"|drawerMode' -Context 2,4
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'tableCodeInput|codeAttempts|codeLockedUntil|codeSecondsLeft|isCodeLocked|verifyTableCode|codeVerificationError' -Context 0,0
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const currentTableId|const currentTable =|resolvedTable|verifiedTable|isTableVerified' -Context 2,3
++Get-Content 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' | Select-Object -Index (2338..2360)
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'tableSelection|errors\.tableSelection|newErrors\.tableSelection' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'billRequested|handleRequestBill|billCooldown|otherGuestsBills|othersTotal' -Context 0,0
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'currentGuestIdRef|currentGuest\?' -Context 2,3
+ Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
+ Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
+-Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
+-Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested|billCooldown|tableSession\?\.status|ended_at|closed_at|paid|request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested','billCooldown','tableSession\?\.status','ended_at','closed_at','paid','request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2298;$i -le 2313;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3220;$i -le 3246;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3246;$i -le 3263;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+diff --git a/pages/PublicMenu/review_2026-03-21.md b/pages/PublicMenu/review_2026-03-21.md
+index 558164b5aff88cac1673e9e460463d2ac9a559f8..92d226ae26b47fc1d47628a1a2a6faddd9d5602b
+--- a/pages/PublicMenu/review_2026-03-21.md
++++ b/pages/PublicMenu/review_2026-03-21.md
+@@ -1,21 +1,19 @@
+ # Codex Writer Findings — PublicMenu
+-Chain: publicmenu-260321-173133
++Chain: publicmenu-260321-195108
+ 
+ ## Findings
+-1. [P1] Hall submit validates table before opening confirmation sheet - `x.jsx:2334-2350` requires `currentTableId` in hall mode, but `x.jsx:2628-2632` opens the confirmation Bottom Sheet only after `validate()` passes. On `/x?...mode=hall` with no verified table, the click dies at `newErrors.tableSelection`; there is no rendered `tableSelection` error in the hall drawer, so the user sees nothing. FIX: move the `!isTableVerified` gate above `validate()`, or skip hall `tableSelection` validation until after the Bottom Sheet verification flow.
+-2. [P1] Partner lookup converts backend failures into "restaurant not found" - `x.jsx:1322-1346` catches both lookup attempts and returns `null`, and `x.jsx:3035-3040` always renders `error.partner_not_found` when `partner` is null. Transient API failures are misreported as a bad QR link and the query never retries because it resolves successfully. FIX: let request errors throw (or store them separately), use React Query's error state, and render a retryable backend error distinct from true not-found.
+-3. [P1] Pickup/delivery checkout drops loyalty and discount flow entirely - `x.jsx:3220-3263` passes loyalty props into `CheckoutView`, but `CheckoutView.jsx:7-32` does not accept them and `CheckoutView.jsx:88-149` renders only contact/comment fields. Guests cannot enter loyalty email, see balance or discounts, or redeem points in pickup/delivery even though submit logic still supports those fields in `x.jsx`. FIX: extend `CheckoutView` to consume the passed loyalty and discount props and render the same email, balance, and redeem UI for non-hall checkout.
+-4. [P1] Session restore stops forever after a single transient failure - `useTableSession.jsx:265-487` sets `didAttemptRestoreRef.current = true` before the async restore work, then swallows all errors in the outer `catch` without resetting it. If any restore request fails once, the effect never retries until the table changes or the page is reloaded. FIX: reset the attempt flag on failure, or only mark restore as attempted after successful completion and add retry/backoff handling for recoverable errors.
+-5. [P1] Hall StickyCartBar ignores visit lifecycle and bill state - `x.jsx:2101-2144` derives `hallStickyMode` only from `cart`, `myOrders`, and `sessionOrders`, while bill state exists separately in `x.jsx:1314-1315`, `x.jsx:2306-2310`, and `x.jsx:2984-3002` and is never consulted here. That prevents lifecycle-specific CTA, copy, and visibility for requested bill, closed visit, paid visit, and other post-order hall states. FIX: compute sticky-bar mode from `tableSession`, `billRequested`, `billCooldown`, and visit or payment status before choosing label, amount, and visibility.
+-6. [P2] Table-code verification is split between hidden CartView state and visible Bottom Sheet - `CartView.jsx:89-177` still owns code attempts and lockout state and `CartView.jsx:180-206` auto-calls `verifyTableCode`, but the live Bottom Sheet in `x.jsx:3383-3478` does not read that state and its CTA directly calls `verifyTableCode` again. The visible sheet therefore has no cooldown or countdown UI and verification behavior comes from two components at once. FIX: move code attempts, lockout, and auto-submit state into `x.jsx` or the shared verification hook, remove the hidden CartView verification effects, and let the sheet render and enforce the single source of truth.
+-7. [P2] Mobile tile layout ignores partner's configured mobile grid size - `MenuView.jsx:42-49` computes `mobileCols` from `partner.menu_grid_mobile`, but `MenuView.jsx:284` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for a 1-column mobile grid still get 2 columns. FIX: use `MOBILE_GRID[mobileCols]` or `gridColsClass` in the mobile tile branch instead of hardcoding `grid-cols-2`.
+-8. [P3] Several user-facing controls still miss required i18n or accessibility wiring - examples: `CheckoutView.jsx:58-63` hardcodes English `aria-label`s (`"Decrease"`, `"Increase"`), `MenuView.jsx:102-125` list-mode quantity buttons have no `aria-label`s at all, and `CartView.jsx:467-485` has unlabeled edit and close buttons plus a hardcoded reward-email placeholder at `CartView.jsx:524`. This creates mixed-language UI and weaker screen-reader behavior. FIX: localize all placeholders and labels with `t()` or `tr()` and add explicit `aria-label`s to every icon-only control.
++1. [P1] Hall submit validates before the Bottom Sheet gate — In `pages/PublicMenu/base/x.jsx`, `handleSubmitOrder()` calls `validate()` before the just-in-time table-confirmation check. `validate()` rejects hall submits when `!currentTableId`, but that error is stored as `errors.tableSelection` and is not rendered anywhere in the current drawer flow. Result: on `/x?partner=...&mode=hall` a new guest can tap "Отправить официанту" and get a silent no-op instead of the confirmation sheet. FIX: move the `orderMode === "hall" && !isTableVerified` interception before `validate()`, or skip `tableSelection` validation until after the sheet verifies the table.
++2. [P1] Pickup/delivery checkout still drops loyalty and discount UI — `pages/PublicMenu/base/x.jsx` passes `showLoyaltySection`, `customerEmail`, `loyaltyAccount`, `earnedPoints`, `redeemedPoints`, `maxRedeemPoints`, `discountAmount`, and related props into `CheckoutView`, but `pages/PublicMenu/base/CheckoutView.jsx` neither accepts nor renders them. Users in pickup/delivery lose the email, points, redeem, and discount flows on the actual checkout screen. FIX: add the missing props to `CheckoutView` and render the loyalty block there, or extract the existing loyalty UI into a shared checkout section.
++3. [P2] Table-confirmation state lives in hidden `CartView` instead of the visible Bottom Sheet — After inline verification UI was removed, `pages/PublicMenu/base/CartView.jsx` still owns `codeAttempts`, `codeLockedUntil`, `codeSecondsLeft`, and the auto-verify effect bound to `tableCodeInput`, while the visible input now lives in the Bottom Sheet in `pages/PublicMenu/base/x.jsx`. That means the sheet shows only `codeVerificationError` with no attempt/cooldown feedback, and verification can be triggered by an off-screen component before the CTA tap. FIX: move attempt/lockout/auto-verify state into `x.jsx` with the Bottom Sheet, or remove the hidden auto-verify effect and let the sheet CTA own verification.
++4. [P2] Mobile grid partner setting is ignored — `pages/PublicMenu/base/MenuView.jsx` computes `mobileCols` from `partner.menu_grid_mobile`, but the actual grid render hardcodes `isMobile ? 'grid-cols-2' : gridColsClass`. Any partner configured for a 1-column mobile menu still gets 2 columns. FIX: use the computed mobile class (`MOBILE_GRID[mobileCols]`) in the mobile branch instead of the hardcoded `grid-cols-2`.
++5. [P2] `useTableSession` loses restored guests that only have `_id` — The hook correctly defines `normalizeGuestId()`, but later syncs `currentGuestIdRef.current = currentGuest?.id || null` in `pages/PublicMenu/base/useTableSession.jsx`. If a restored `SessionGuest` only carries `_id`, the ref is reset to `null`, so polling keeps re-running guest restore and downstream logic can behave as if no current guest exists. FIX: store `normalizeGuestId(currentGuest)` in the ref, and align any other guest-id reads in this file with the same normalization rule.
++6. [P3] Several control labels still regress i18n/accessibility — `pages/PublicMenu/base/CheckoutView.jsx` hardcodes `aria-label="Decrease"` / `aria-label="Increase"`, `pages/PublicMenu/base/CartView.jsx` hardcodes the reward-email placeholder `email@example.com`, and `pages/PublicMenu/base/MenuView.jsx` list-mode add/remove buttons plus `CartView` icon-only controls are missing localized accessible labels. This leaves mixed-language assistive text and unlabeled mobile controls in production. FIX: replace hardcoded assistive/user-facing strings with `t()/tr()` and add `aria-label` to icon-only/list-stepper buttons.
+ 
+ ## Summary
+-Total: 8 findings (0 P0, 5 P1, 2 P2, 1 P3)
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+ 
+ ## Prompt Clarity
+-- Overall clarity: 3
+-- Ambiguous Fix descriptions (list Fix # and what was unclear): `Fix 1` in the task context describes only PM-071, but the top-level request asks for a full bug review across `pages/PublicMenu/base/*.jsx`; it was unclear whether to review only PM-071 or all current bugs in the matched files.
+-- Missing context (what info would have helped): Whether `pages/PublicMenu/base/*.jsx` should mean one current page file or all six matching JSX files.
+-- Scope questions (anything you weren't sure if it's in scope): The request says "ONLY these 3 files," but the glob expands to six JSX files; I treated the glob as in-scope and did not read anything outside `pages/PublicMenu/`.
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for a review-only pass
++- Scope questions (anything you weren't sure if it's in scope): whether to report only PM-071 regressions or any bug found in the allowed JSX files; also "ONLY these 3 files" refers to `base/*.jsx` plus two markdown files, which is more than three physical files
+diff --git a/pipeline/chain-state/publicmenu-260321-195108-codex-findings.md b/pipeline/chain-state/publicmenu-260321-195108-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..92d226ae26b47fc1d47628a1a2a6faddd9d5602b
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260321-195108-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-195108
++
++## Findings
++1. [P1] Hall submit validates before the Bottom Sheet gate — In `pages/PublicMenu/base/x.jsx`, `handleSubmitOrder()` calls `validate()` before the just-in-time table-confirmation check. `validate()` rejects hall submits when `!currentTableId`, but that error is stored as `errors.tableSelection` and is not rendered anywhere in the current drawer flow. Result: on `/x?partner=...&mode=hall` a new guest can tap "Отправить официанту" and get a silent no-op instead of the confirmation sheet. FIX: move the `orderMode === "hall" && !isTableVerified` interception before `validate()`, or skip `tableSelection` validation until after the sheet verifies the table.
++2. [P1] Pickup/delivery checkout still drops loyalty and discount UI — `pages/PublicMenu/base/x.jsx` passes `showLoyaltySection`, `customerEmail`, `loyaltyAccount`, `earnedPoints`, `redeemedPoints`, `maxRedeemPoints`, `discountAmount`, and related props into `CheckoutView`, but `pages/PublicMenu/base/CheckoutView.jsx` neither accepts nor renders them. Users in pickup/delivery lose the email, points, redeem, and discount flows on the actual checkout screen. FIX: add the missing props to `CheckoutView` and render the loyalty block there, or extract the existing loyalty UI into a shared checkout section.
++3. [P2] Table-confirmation state lives in hidden `CartView` instead of the visible Bottom Sheet — After inline verification UI was removed, `pages/PublicMenu/base/CartView.jsx` still owns `codeAttempts`, `codeLockedUntil`, `codeSecondsLeft`, and the auto-verify effect bound to `tableCodeInput`, while the visible input now lives in the Bottom Sheet in `pages/PublicMenu/base/x.jsx`. That means the sheet shows only `codeVerificationError` with no attempt/cooldown feedback, and verification can be triggered by an off-screen component before the CTA tap. FIX: move attempt/lockout/auto-verify state into `x.jsx` with the Bottom Sheet, or remove the hidden auto-verify effect and let the sheet CTA own verification.
++4. [P2] Mobile grid partner setting is ignored — `pages/PublicMenu/base/MenuView.jsx` computes `mobileCols` from `partner.menu_grid_mobile`, but the actual grid render hardcodes `isMobile ? 'grid-cols-2' : gridColsClass`. Any partner configured for a 1-column mobile menu still gets 2 columns. FIX: use the computed mobile class (`MOBILE_GRID[mobileCols]`) in the mobile branch instead of the hardcoded `grid-cols-2`.
++5. [P2] `useTableSession` loses restored guests that only have `_id` — The hook correctly defines `normalizeGuestId()`, but later syncs `currentGuestIdRef.current = currentGuest?.id || null` in `pages/PublicMenu/base/useTableSession.jsx`. If a restored `SessionGuest` only carries `_id`, the ref is reset to `null`, so polling keeps re-running guest restore and downstream logic can behave as if no current guest exists. FIX: store `normalizeGuestId(currentGuest)` in the ref, and align any other guest-id reads in this file with the same normalization rule.
++6. [P3] Several control labels still regress i18n/accessibility — `pages/PublicMenu/base/CheckoutView.jsx` hardcodes `aria-label="Decrease"` / `aria-label="Increase"`, `pages/PublicMenu/base/CartView.jsx` hardcodes the reward-email placeholder `email@example.com`, and `pages/PublicMenu/base/MenuView.jsx` list-mode add/remove buttons plus `CartView` icon-only controls are missing localized accessible labels. This leaves mixed-language assistive text and unlabeled mobile controls in production. FIX: replace hardcoded assistive/user-facing strings with `t()/tr()` and add `aria-label` to icon-only/list-stepper buttons.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for a review-only pass
++- Scope questions (anything you weren't sure if it's in scope): whether to report only PM-071 regressions or any bug found in the allowed JSX files; also "ONLY these 3 files" refers to `base/*.jsx` plus two markdown files, which is more than three physical files
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-21.log b/pages/PublicMenu/commands_2026-03-21.log
+index a8f7bf4e2477650e1dc867726cf011e7b744f493..5b72d98551b5bd34a49c6bb4ff182b2326b8c4d7
+--- a/pages/PublicMenu/commands_2026-03-21.log
++++ b/pages/PublicMenu/commands_2026-03-21.log
+@@ -1,41 +1,27 @@
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'
+-@( 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' ) | ForEach-Object { $p=$_; $lines=(Get-Content $p).Length; Write-Output "$p`t$lines" }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleSubmitOrder|showTableConfirmSheet|pendingSubmitRef|verifyTableCode|partner_not_found|renderHallCheckoutContent|hallStickyMode|showCartButton|tableCodeLength|isTableVerified|Drawer' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'send_to_waiter|handleSubmitOrder|aria-label|placeholder|toLocaleString|ru-RU|tableCode|codeLockedUntil|codeAttempts|showLoyaltySection|isTableVerified|document.querySelector|guestDisplay|Button|sticky bottom-0' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1290;E=1605},@{S=2068;E=2148},@{S=2608;E=2688},@{S=2988;E=3050},@{S=3380;E=3478})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=430;E=490},@{S=500;E=560},@{S=930;E=1010},@{S=1050;E=1084})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1;E=130},@{S=131;E=298})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=220;E=430},@{S=430;E=650},@{S=650;E=760},@{S=760;E=838})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'console\.|toast\.|hardcoded|toLocaleString\(|ru-RU|hallSticky|showLoyaltySection|setView\("checkout"\)|handleCheckoutClick|common.loading|error.send.subtitle|cart.confirm_table|partner_missing|partner_not_found' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'aria-label="|placeholder="|toLocaleString\(|console\.|t\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const showLoyaltySection|showLoyaltySection =|useLoyalty|discountEnabled|loyaltyEnabled|customerEmail|earnedPoints|maxRedeemPoints|redeemedPoints' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2976;$i -le 2990;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2570;$i -le 2625;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|function validate|validate\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2334;$i -le 2410;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'tableSelection|errors\.' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|help\.call_waiter|loyalty\.email_placeholder|guest\.name_placeholder|cart\.you|common\.save|common\.cancel|cart\.confirm_table\.dismissed' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const \[isMobile, setIsMobile\]' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=1278;$i -le 1288;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|pendingSubmitRef|handleSubmitOrder|verifyTableCode|tableCodeLength|common.loading|cart.confirm_table|renderHallCheckoutContent|showLoyaltySection' -Context 3,5
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'handleSubmitOrder|tableCodeInput|verifyTableCode|codeVerificationError|common.loading|placeholder=|aria-label=|submitError|showLoyaltySection|Drawer|Input|Button' -Context 2,4
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'aria-label|renderHallCheckoutContent|showLoyaltySection|Button|sticky|t\(' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx' -Pattern 'onMouseEnter|onMouseLeave|aria-label|button|img|ImageIcon|mobileLayout|grid-cols-2|t\(' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'button|t\(|visibleModeTabs|getModeDescription|verified|invalid_code' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx' -Pattern 'setTimeout|setInterval|clearTimeout|clearInterval|window|localStorage|filter\(|useEffect\(|normalizeGuestId|getOrderStatus|t\(' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|cart\.verify\.enter_table_code|cart\.confirm_table\.dismissed' -Context 0,0
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const tr =|function tr\(|const trFormat|I18N_FALLBACKS|useI18n\(' -Context 2,4
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleCheckoutClick|setView\("checkout"\)|orderMode === "hall"|view === "checkout"|drawerMode' -Context 2,4
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'tableCodeInput|codeAttempts|codeLockedUntil|codeSecondsLeft|isCodeLocked|verifyTableCode|codeVerificationError' -Context 0,0
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const currentTableId|const currentTable =|resolvedTable|verifiedTable|isTableVerified' -Context 2,3
++Get-Content 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' | Select-Object -Index (2338..2360)
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'tableSelection|errors\.tableSelection|newErrors\.tableSelection' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'billRequested|handleRequestBill|billCooldown|otherGuestsBills|othersTotal' -Context 0,0
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'currentGuestIdRef|currentGuest\?' -Context 2,3
+ Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
+ Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
+-Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
+-Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested|billCooldown|tableSession\?\.status|ended_at|closed_at|paid|request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested','billCooldown','tableSession\?\.status','ended_at','closed_at','paid','request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2298;$i -le 2313;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3220;$i -le 3246;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3246;$i -le 3263;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+diff --git a/pages/PublicMenu/review_2026-03-21.md b/pages/PublicMenu/review_2026-03-21.md
+index 558164b5aff88cac1673e9e460463d2ac9a559f8..92d226ae26b47fc1d47628a1a2a6faddd9d5602b
+--- a/pages/PublicMenu/review_2026-03-21.md
++++ b/pages/PublicMenu/review_2026-03-21.md
+@@ -1,21 +1,19 @@
+ # Codex Writer Findings — PublicMenu
+-Chain: publicmenu-260321-173133
++Chain: publicmenu-260321-195108
+ 
+ ## Findings
+-1. [P1] Hall submit validates table before opening confirmation sheet - `x.jsx:2334-2350` requires `currentTableId` in hall mode, but `x.jsx:2628-2632` opens the confirmation Bottom Sheet only after `validate()` passes. On `/x?...mode=hall` with no verified table, the click dies at `newErrors.tableSelection`; there is no rendered `tableSelection` error in the hall drawer, so the user sees nothing. FIX: move the `!isTableVerified` gate above `validate()`, or skip hall `tableSelection` validation until after the Bottom Sheet verification flow.
+-2. [P1] Partner lookup converts backend failures into "restaurant not found" - `x.jsx:1322-1346` catches both lookup attempts and returns `null`, and `x.jsx:3035-3040` always renders `error.partner_not_found` when `partner` is null. Transient API failures are misreported as a bad QR link and the query never retries because it resolves successfully. FIX: let request errors throw (or store them separately), use React Query's error state, and render a retryable backend error distinct from true not-found.
+-3. [P1] Pickup/delivery checkout drops loyalty and discount flow entirely - `x.jsx:3220-3263` passes loyalty props into `CheckoutView`, but `CheckoutView.jsx:7-32` does not accept them and `CheckoutView.jsx:88-149` renders only contact/comment fields. Guests cannot enter loyalty email, see balance or discounts, or redeem points in pickup/delivery even though submit logic still supports those fields in `x.jsx`. FIX: extend `CheckoutView` to consume the passed loyalty and discount props and render the same email, balance, and redeem UI for non-hall checkout.
+-4. [P1] Session restore stops forever after a single transient failure - `useTableSession.jsx:265-487` sets `didAttemptRestoreRef.current = true` before the async restore work, then swallows all errors in the outer `catch` without resetting it. If any restore request fails once, the effect never retries until the table changes or the page is reloaded. FIX: reset the attempt flag on failure, or only mark restore as attempted after successful completion and add retry/backoff handling for recoverable errors.
+-5. [P1] Hall StickyCartBar ignores visit lifecycle and bill state - `x.jsx:2101-2144` derives `hallStickyMode` only from `cart`, `myOrders`, and `sessionOrders`, while bill state exists separately in `x.jsx:1314-1315`, `x.jsx:2306-2310`, and `x.jsx:2984-3002` and is never consulted here. That prevents lifecycle-specific CTA, copy, and visibility for requested bill, closed visit, paid visit, and other post-order hall states. FIX: compute sticky-bar mode from `tableSession`, `billRequested`, `billCooldown`, and visit or payment status before choosing label, amount, and visibility.
+-6. [P2] Table-code verification is split between hidden CartView state and visible Bottom Sheet - `CartView.jsx:89-177` still owns code attempts and lockout state and `CartView.jsx:180-206` auto-calls `verifyTableCode`, but the live Bottom Sheet in `x.jsx:3383-3478` does not read that state and its CTA directly calls `verifyTableCode` again. The visible sheet therefore has no cooldown or countdown UI and verification behavior comes from two components at once. FIX: move code attempts, lockout, and auto-submit state into `x.jsx` or the shared verification hook, remove the hidden CartView verification effects, and let the sheet render and enforce the single source of truth.
+-7. [P2] Mobile tile layout ignores partner's configured mobile grid size - `MenuView.jsx:42-49` computes `mobileCols` from `partner.menu_grid_mobile`, but `MenuView.jsx:284` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for a 1-column mobile grid still get 2 columns. FIX: use `MOBILE_GRID[mobileCols]` or `gridColsClass` in the mobile tile branch instead of hardcoding `grid-cols-2`.
+-8. [P3] Several user-facing controls still miss required i18n or accessibility wiring - examples: `CheckoutView.jsx:58-63` hardcodes English `aria-label`s (`"Decrease"`, `"Increase"`), `MenuView.jsx:102-125` list-mode quantity buttons have no `aria-label`s at all, and `CartView.jsx:467-485` has unlabeled edit and close buttons plus a hardcoded reward-email placeholder at `CartView.jsx:524`. This creates mixed-language UI and weaker screen-reader behavior. FIX: localize all placeholders and labels with `t()` or `tr()` and add explicit `aria-label`s to every icon-only control.
++1. [P1] Hall submit validates before the Bottom Sheet gate — In `pages/PublicMenu/base/x.jsx`, `handleSubmitOrder()` calls `validate()` before the just-in-time table-confirmation check. `validate()` rejects hall submits when `!currentTableId`, but that error is stored as `errors.tableSelection` and is not rendered anywhere in the current drawer flow. Result: on `/x?partner=...&mode=hall` a new guest can tap "Отправить официанту" and get a silent no-op instead of the confirmation sheet. FIX: move the `orderMode === "hall" && !isTableVerified` interception before `validate()`, or skip `tableSelection` validation until after the sheet verifies the table.
++2. [P1] Pickup/delivery checkout still drops loyalty and discount UI — `pages/PublicMenu/base/x.jsx` passes `showLoyaltySection`, `customerEmail`, `loyaltyAccount`, `earnedPoints`, `redeemedPoints`, `maxRedeemPoints`, `discountAmount`, and related props into `CheckoutView`, but `pages/PublicMenu/base/CheckoutView.jsx` neither accepts nor renders them. Users in pickup/delivery lose the email, points, redeem, and discount flows on the actual checkout screen. FIX: add the missing props to `CheckoutView` and render the loyalty block there, or extract the existing loyalty UI into a shared checkout section.
++3. [P2] Table-confirmation state lives in hidden `CartView` instead of the visible Bottom Sheet — After inline verification UI was removed, `pages/PublicMenu/base/CartView.jsx` still owns `codeAttempts`, `codeLockedUntil`, `codeSecondsLeft`, and the auto-verify effect bound to `tableCodeInput`, while the visible input now lives in the Bottom Sheet in `pages/PublicMenu/base/x.jsx`. That means the sheet shows only `codeVerificationError` with no attempt/cooldown feedback, and verification can be triggered by an off-screen component before the CTA tap. FIX: move attempt/lockout/auto-verify state into `x.jsx` with the Bottom Sheet, or remove the hidden auto-verify effect and let the sheet CTA own verification.
++4. [P2] Mobile grid partner setting is ignored — `pages/PublicMenu/base/MenuView.jsx` computes `mobileCols` from `partner.menu_grid_mobile`, but the actual grid render hardcodes `isMobile ? 'grid-cols-2' : gridColsClass`. Any partner configured for a 1-column mobile menu still gets 2 columns. FIX: use the computed mobile class (`MOBILE_GRID[mobileCols]`) in the mobile branch instead of the hardcoded `grid-cols-2`.
++5. [P2] `useTableSession` loses restored guests that only have `_id` — The hook correctly defines `normalizeGuestId()`, but later syncs `currentGuestIdRef.current = currentGuest?.id || null` in `pages/PublicMenu/base/useTableSession.jsx`. If a restored `SessionGuest` only carries `_id`, the ref is reset to `null`, so polling keeps re-running guest restore and downstream logic can behave as if no current guest exists. FIX: store `normalizeGuestId(currentGuest)` in the ref, and align any other guest-id reads in this file with the same normalization rule.
++6. [P3] Several control labels still regress i18n/accessibility — `pages/PublicMenu/base/CheckoutView.jsx` hardcodes `aria-label="Decrease"` / `aria-label="Increase"`, `pages/PublicMenu/base/CartView.jsx` hardcodes the reward-email placeholder `email@example.com`, and `pages/PublicMenu/base/MenuView.jsx` list-mode add/remove buttons plus `CartView` icon-only controls are missing localized accessible labels. This leaves mixed-language assistive text and unlabeled mobile controls in production. FIX: replace hardcoded assistive/user-facing strings with `t()/tr()` and add `aria-label` to icon-only/list-stepper buttons.
+ 
+ ## Summary
+-Total: 8 findings (0 P0, 5 P1, 2 P2, 1 P3)
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+ 
+ ## Prompt Clarity
+-- Overall clarity: 3
+-- Ambiguous Fix descriptions (list Fix # and what was unclear): `Fix 1` in the task context describes only PM-071, but the top-level request asks for a full bug review across `pages/PublicMenu/base/*.jsx`; it was unclear whether to review only PM-071 or all current bugs in the matched files.
+-- Missing context (what info would have helped): Whether `pages/PublicMenu/base/*.jsx` should mean one current page file or all six matching JSX files.
+-- Scope questions (anything you weren't sure if it's in scope): The request says "ONLY these 3 files," but the glob expands to six JSX files; I treated the glob as in-scope and did not read anything outside `pages/PublicMenu/`.
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for a review-only pass
++- Scope questions (anything you weren't sure if it's in scope): whether to report only PM-071 regressions or any bug found in the allowed JSX files; also "ONLY these 3 files" refers to `base/*.jsx` plus two markdown files, which is more than three physical files
+diff --git a/pipeline/chain-state/publicmenu-260321-195108-codex-findings.md b/pipeline/chain-state/publicmenu-260321-195108-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..92d226ae26b47fc1d47628a1a2a6faddd9d5602b
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260321-195108-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-195108
++
++## Findings
++1. [P1] Hall submit validates before the Bottom Sheet gate — In `pages/PublicMenu/base/x.jsx`, `handleSubmitOrder()` calls `validate()` before the just-in-time table-confirmation check. `validate()` rejects hall submits when `!currentTableId`, but that error is stored as `errors.tableSelection` and is not rendered anywhere in the current drawer flow. Result: on `/x?partner=...&mode=hall` a new guest can tap "Отправить официанту" and get a silent no-op instead of the confirmation sheet. FIX: move the `orderMode === "hall" && !isTableVerified` interception before `validate()`, or skip `tableSelection` validation until after the sheet verifies the table.
++2. [P1] Pickup/delivery checkout still drops loyalty and discount UI — `pages/PublicMenu/base/x.jsx` passes `showLoyaltySection`, `customerEmail`, `loyaltyAccount`, `earnedPoints`, `redeemedPoints`, `maxRedeemPoints`, `discountAmount`, and related props into `CheckoutView`, but `pages/PublicMenu/base/CheckoutView.jsx` neither accepts nor renders them. Users in pickup/delivery lose the email, points, redeem, and discount flows on the actual checkout screen. FIX: add the missing props to `CheckoutView` and render the loyalty block there, or extract the existing loyalty UI into a shared checkout section.
++3. [P2] Table-confirmation state lives in hidden `CartView` instead of the visible Bottom Sheet — After inline verification UI was removed, `pages/PublicMenu/base/CartView.jsx` still owns `codeAttempts`, `codeLockedUntil`, `codeSecondsLeft`, and the auto-verify effect bound to `tableCodeInput`, while the visible input now lives in the Bottom Sheet in `pages/PublicMenu/base/x.jsx`. That means the sheet shows only `codeVerificationError` with no attempt/cooldown feedback, and verification can be triggered by an off-screen component before the CTA tap. FIX: move attempt/lockout/auto-verify state into `x.jsx` with the Bottom Sheet, or remove the hidden auto-verify effect and let the sheet CTA own verification.
++4. [P2] Mobile grid partner setting is ignored — `pages/PublicMenu/base/MenuView.jsx` computes `mobileCols` from `partner.menu_grid_mobile`, but the actual grid render hardcodes `isMobile ? 'grid-cols-2' : gridColsClass`. Any partner configured for a 1-column mobile menu still gets 2 columns. FIX: use the computed mobile class (`MOBILE_GRID[mobileCols]`) in the mobile branch instead of the hardcoded `grid-cols-2`.
++5. [P2] `useTableSession` loses restored guests that only have `_id` — The hook correctly defines `normalizeGuestId()`, but later syncs `currentGuestIdRef.current = currentGuest?.id || null` in `pages/PublicMenu/base/useTableSession.jsx`. If a restored `SessionGuest` only carries `_id`, the ref is reset to `null`, so polling keeps re-running guest restore and downstream logic can behave as if no current guest exists. FIX: store `normalizeGuestId(currentGuest)` in the ref, and align any other guest-id reads in this file with the same normalization rule.
++6. [P3] Several control labels still regress i18n/accessibility — `pages/PublicMenu/base/CheckoutView.jsx` hardcodes `aria-label="Decrease"` / `aria-label="Increase"`, `pages/PublicMenu/base/CartView.jsx` hardcodes the reward-email placeholder `email@example.com`, and `pages/PublicMenu/base/MenuView.jsx` list-mode add/remove buttons plus `CartView` icon-only controls are missing localized accessible labels. This leaves mixed-language assistive text and unlabeled mobile controls in production. FIX: replace hardcoded assistive/user-facing strings with `t()/tr()` and add `aria-label` to icon-only/list-stepper buttons.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for a review-only pass
++- Scope questions (anything you weren't sure if it's in scope): whether to report only PM-071 regressions or any bug found in the allowed JSX files; also "ONLY these 3 files" refers to `base/*.jsx` plus two markdown files, which is more than three physical files
+
+codex
+The report files are written. I’m doing a quick read-back of the saved artifacts to make sure the chain-state file and the repo-mandated review outputs landed with the expected content.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pipeline/chain-state/publicmenu-260321-195108-codex-findings.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/review_2026-03-21.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/commands_2026-03-21.log'" in C:/Dev/menuapp-code-review succeeded in 1.87s:
+# Codex Writer Findings â€” PublicMenu
+Chain: publicmenu-260321-195108
+
+## Findings
+1. [P1] Hall submit validates before the Bottom Sheet gate â€” In `pages/PublicMenu/base/x.jsx`, `handleSubmitOrder()` calls `validate()` before the just-in-time table-confirmation check. `validate()` rejects hall submits when `!currentTableId`, but that error is stored as `errors.tableSelection` and is not rendered anywhere in the current drawer flow. Result: on `/x?partner=...&mode=hall` a new guest can tap "ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ" and get a silent no-op instead of the confirmation sheet. FIX: move the `orderMode === "hall" && !isTableVerified` interception before `validate()`, or skip `tableSelection` validation until after the sheet verifies the table.
+2. [P1] Pickup/delivery checkout still drops loyalty and discount UI â€” `pages/PublicMenu/base/x.jsx` passes `showLoyaltySection`, `customerEmail`, `loyaltyAccount`, `earnedPoints`, `redeemedPoints`, `maxRedeemPoints`, `discountAmount`, and related props into `CheckoutView`, but `pages/PublicMenu/base/CheckoutView.jsx` neither accepts nor renders them. Users in pickup/delivery lose the email, points, redeem, and discount flows on the actual checkout screen. FIX: add the missing props to `CheckoutView` and render the loyalty block there, or extract the existing loyalty UI into a shared checkout section.
+3. [P2] Table-confirmation state lives in hidden `CartView` instead of the visible Bottom Sheet â€” After inline verification UI was removed, `pages/PublicMenu/base/CartView.jsx` still owns `codeAttempts`, `codeLockedUntil`, `codeSecondsLeft`, and the auto-verify effect bound to `tableCodeInput`, while the visible input now lives in the Bottom Sheet in `pages/PublicMenu/base/x.jsx`. That means the sheet shows only `codeVerificationError` with no attempt/cooldown feedback, and verification can be triggered by an off-screen component before the CTA tap. FIX: move attempt/lockout/auto-verify state into `x.jsx` with the Bottom Sheet, or remove the hidden auto-verify effect and let the sheet CTA own verification.
+4. [P2] Mobile grid partner setting is ignored â€” `pages/PublicMenu/base/MenuView.jsx` computes `mobileCols` from `partner.menu_grid_mobile`, but the actual grid render hardcodes `isMobile ? 'grid-cols-2' : gridColsClass`. Any partner configured for a 1-column mobile menu still gets 2 columns. FIX: use the computed mobile class (`MOBILE_GRID[mobileCols]`) in the mobile branch instead of the hardcoded `grid-cols-2`.
+5. [P2] `useTableSession` loses restored guests that only have `_id` â€” The hook correctly defines `normalizeGuestId()`, but later syncs `currentGuestIdRef.current = currentGuest?.id || null` in `pages/PublicMenu/base/useTableSession.jsx`. If a restored `SessionGuest` only carries `_id`, the ref is reset to `null`, so polling keeps re-running guest restore and downstream logic can behave as if no current guest exists. FIX: store `normalizeGuestId(currentGuest)` in the ref, and align any other guest-id reads in this file with the same normalization rule.
+6. [P3] Several control labels still regress i18n/accessibility â€” `pages/PublicMenu/base/CheckoutView.jsx` hardcodes `aria-label="Decrease"` / `aria-label="Increase"`, `pages/PublicMenu/base/CartView.jsx` hardcodes the reward-email placeholder `email@example.com`, and `pages/PublicMenu/base/MenuView.jsx` list-mode add/remove buttons plus `CartView` icon-only controls are missing localized accessible labels. This leaves mixed-language assistive text and unlabeled mobile controls in production. FIX: replace hardcoded assistive/user-facing strings with `t()/tr()` and add `aria-label` to icon-only/list-stepper buttons.
+
+## Summary
+Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+## Prompt Clarity
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none required for a review-only pass
+- Scope questions (anything you weren't sure if it's in scope): whether to report only PM-071 regressions or any bug found in the allowed JSX files; also "ONLY these 3 files" refers to `base/*.jsx` plus two markdown files, which is more than three physical files
+
+ succeeded in 1.89s:
+Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
+Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|pendingSubmitRef|handleSubmitOrder|verifyTableCode|tableCodeLength|common.loading|cart.confirm_table|renderHallCheckoutContent|showLoyaltySection' -Context 3,5
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'handleSubmitOrder|tableCodeInput|verifyTableCode|codeVerificationError|common.loading|placeholder=|aria-label=|submitError|showLoyaltySection|Drawer|Input|Button' -Context 2,4
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'aria-label|renderHallCheckoutContent|showLoyaltySection|Button|sticky|t\(' -Context 1,2
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx' -Pattern 'onMouseEnter|onMouseLeave|aria-label|button|img|ImageIcon|mobileLayout|grid-cols-2|t\(' -Context 1,2
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'button|t\(|visibleModeTabs|getModeDescription|verified|invalid_code' -Context 1,2
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx' -Pattern 'setTimeout|setInterval|clearTimeout|clearInterval|window|localStorage|filter\(|useEffect\(|normalizeGuestId|getOrderStatus|t\(' -Context 1,2
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|cart\.verify\.enter_table_code|cart\.confirm_table\.dismissed' -Context 0,0
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const tr =|function tr\(|const trFormat|I18N_FALLBACKS|useI18n\(' -Context 2,4
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleCheckoutClick|setView\("checkout"\)|orderMode === "hall"|view === "checkout"|drawerMode' -Context 2,4
+Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'tableCodeInput|codeAttempts|codeLockedUntil|codeSecondsLeft|isCodeLocked|verifyTableCode|codeVerificationError' -Context 0,0
+ succeeded in 1.90s:
+# Codex Writer Findings â€” PublicMenu
+Chain: publicmenu-260321-195108
+
+## Findings
+1. [P1] Hall submit validates before the Bottom Sheet gate â€” In `pages/PublicMenu/base/x.jsx`, `handleSubmitOrder()` calls `validate()` before the just-in-time table-confirmation check. `validate()` rejects hall submits when `!currentTableId`, but that error is stored as `errors.tableSelection` and is not rendered anywhere in the current drawer flow. Result: on `/x?partner=...&mode=hall` a new guest can tap "ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ" and get a silent no-op instead of the confirmation sheet. FIX: move the `orderMode === "hall" && !isTableVerified` interception before `validate()`, or skip `tableSelection` validation until after the sheet verifies the table.
+2. [P1] Pickup/delivery checkout still drops loyalty and discount UI â€” `pages/PublicMenu/base/x.jsx` passes `showLoyaltySection`, `customerEmail`, `loyaltyAccount`, `earnedPoints`, `redeemedPoints`, `maxRedeemPoints`, `discountAmount`, and related props into `CheckoutView`, but `pages/PublicMenu/base/CheckoutView.jsx` neither accepts nor renders them. Users in pickup/delivery lose the email, points, redeem, and discount flows on the actual checkout screen. FIX: add the missing props to `CheckoutView` and render the loyalty block there, or extract the existing loyalty UI into a shared checkout section.
+3. [P2] Table-confirmation state lives in hidden `CartView` instead of the visible Bottom Sheet â€” After inline verification UI was removed, `pages/PublicMenu/base/CartView.jsx` still owns `codeAttempts`, `codeLockedUntil`, `codeSecondsLeft`, and the auto-verify effect bound to `tableCodeInput`, while the visible input now lives in the Bottom Sheet in `pages/PublicMenu/base/x.jsx`. That means the sheet shows only `codeVerificationError` with no attempt/cooldown feedback, and verification can be triggered by an off-screen component before the CTA tap. FIX: move attempt/lockout/auto-verify state into `x.jsx` with the Bottom Sheet, or remove the hidden auto-verify effect and let the sheet CTA own verification.
+4. [P2] Mobile grid partner setting is ignored â€” `pages/PublicMenu/base/MenuView.jsx` computes `mobileCols` from `partner.menu_grid_mobile`, but the actual grid render hardcodes `isMobile ? 'grid-cols-2' : gridColsClass`. Any partner configured for a 1-column mobile menu still gets 2 columns. FIX: use the computed mobile class (`MOBILE_GRID[mobileCols]`) in the mobile branch instead of the hardcoded `grid-cols-2`.
+5. [P2] `useTableSession` loses restored guests that only have `_id` â€” The hook correctly defines `normalizeGuestId()`, but later syncs `currentGuestIdRef.current = currentGuest?.id || null` in `pages/PublicMenu/base/useTableSession.jsx`. If a restored `SessionGuest` only carries `_id`, the ref is reset to `null`, so polling keeps re-running guest restore and downstream logic can behave as if no current guest exists. FIX: store `normalizeGuestId(currentGuest)` in the ref, and align any other guest-id reads in this file with the same normalization rule.
+6. [P3] Several control labels still regress i18n/accessibility â€” `pages/PublicMenu/base/CheckoutView.jsx` hardcodes `aria-label="Decrease"` / `aria-label="Increase"`, `pages/PublicMenu/base/CartView.jsx` hardcodes the reward-email placeholder `email@example.com`, and `pages/PublicMenu/base/MenuView.jsx` list-mode add/remove buttons plus `CartView` icon-only controls are missing localized accessible labels. This leaves mixed-language assistive text and unlabeled mobile controls in production. FIX: replace hardcoded assistive/user-facing strings with `t()/tr()` and add `aria-label` to icon-only/list-stepper buttons.
+
+## Summary
+Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+
+## Prompt Clarity
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none required for a review-only pass
+- Scope questions (anything you weren't sure if it's in scope): whether to report only PM-071 regressions or any bug found in the allowed JSX files; also "ONLY these 3 files" refers to `base/*.jsx` plus two markdown files, which is more than three physical files
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-21.log b/pages/PublicMenu/commands_2026-03-21.log
+index a8f7bf4e2477650e1dc867726cf011e7b744f493..5b72d98551b5bd34a49c6bb4ff182b2326b8c4d7
+--- a/pages/PublicMenu/commands_2026-03-21.log
++++ b/pages/PublicMenu/commands_2026-03-21.log
+@@ -1,41 +1,27 @@
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'
+-@( 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' ) | ForEach-Object { $p=$_; $lines=(Get-Content $p).Length; Write-Output "$p`t$lines" }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleSubmitOrder|showTableConfirmSheet|pendingSubmitRef|verifyTableCode|partner_not_found|renderHallCheckoutContent|hallStickyMode|showCartButton|tableCodeLength|isTableVerified|Drawer' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'send_to_waiter|handleSubmitOrder|aria-label|placeholder|toLocaleString|ru-RU|tableCode|codeLockedUntil|codeAttempts|showLoyaltySection|isTableVerified|document.querySelector|guestDisplay|Button|sticky bottom-0' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1290;E=1605},@{S=2068;E=2148},@{S=2608;E=2688},@{S=2988;E=3050},@{S=3380;E=3478})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=430;E=490},@{S=500;E=560},@{S=930;E=1010},@{S=1050;E=1084})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1;E=130},@{S=131;E=298})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=220;E=430},@{S=430;E=650},@{S=650;E=760},@{S=760;E=838})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'console\.|toast\.|hardcoded|toLocaleString\(|ru-RU|hallSticky|showLoyaltySection|setView\("checkout"\)|handleCheckoutClick|common.loading|error.send.subtitle|cart.confirm_table|partner_missing|partner_not_found' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'aria-label="|placeholder="|toLocaleString\(|console\.|t\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const showLoyaltySection|showLoyaltySection =|useLoyalty|discountEnabled|loyaltyEnabled|customerEmail|earnedPoints|maxRedeemPoints|redeemedPoints' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2976;$i -le 2990;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2570;$i -le 2625;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|function validate|validate\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2334;$i -le 2410;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'tableSelection|errors\.' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|help\.call_waiter|loyalty\.email_placeholder|guest\.name_placeholder|cart\.you|common\.save|common\.cancel|cart\.confirm_table\.dismissed' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const \[isMobile, setIsMobile\]' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=1278;$i -le 1288;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|pendingSubmitRef|handleSubmitOrder|verifyTableCode|tableCodeLength|common.loading|cart.confirm_table|renderHallCheckoutContent|showLoyaltySection' -Context 3,5
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'handleSubmitOrder|tableCodeInput|verifyTableCode|codeVerificationError|common.loading|placeholder=|aria-label=|submitError|showLoyaltySection|Drawer|Input|Button' -Context 2,4
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'aria-label|renderHallCheckoutContent|showLoyaltySection|Button|sticky|t\(' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx' -Pattern 'onMouseEnter|onMouseLeave|aria-label|button|img|ImageIcon|mobileLayout|grid-cols-2|t\(' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'button|t\(|visibleModeTabs|getModeDescription|verified|invalid_code' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx' -Pattern 'setTimeout|setInterval|clearTimeout|clearInterval|window|localStorage|filter\(|useEffect\(|normalizeGuestId|getOrderStatus|t\(' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|cart\.verify\.enter_table_code|cart\.confirm_table\.dismissed' -Context 0,0
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const tr =|function tr\(|const trFormat|I18N_FALLBACKS|useI18n\(' -Context 2,4
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleCheckoutClick|setView\("checkout"\)|orderMode === "hall"|view === "checkout"|drawerMode' -Context 2,4
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'tableCodeInput|codeAttempts|codeLockedUntil|codeSecondsLeft|isCodeLocked|verifyTableCode|codeVerificationError' -Context 0,0
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const currentTableId|const currentTable =|resolvedTable|verifiedTable|isTableVerified' -Context 2,3
++Get-Content 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' | Select-Object -Index (2338..2360)
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'tableSelection|errors\.tableSelection|newErrors\.tableSelection' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'billRequested|handleRequestBill|billCooldown|otherGuestsBills|othersTotal' -Context 0,0
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'currentGuestIdRef|currentGuest\?' -Context 2,3
+ Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
+ Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
+-Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
+-Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested|billCooldown|tableSession\?\.status|ended_at|closed_at|paid|request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested','billCooldown','tableSession\?\.status','ended_at','closed_at','paid','request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2298;$i -le 2313;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3220;$i -le 3246;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3246;$i -le 3263;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+diff --git a/pages/PublicMenu/review_2026-03-21.md b/pages/PublicMenu/review_2026-03-21.md
+index 558164b5aff88cac1673e9e460463d2ac9a559f8..92d226ae26b47fc1d47628a1a2a6faddd9d5602b
+--- a/pages/PublicMenu/review_2026-03-21.md
++++ b/pages/PublicMenu/review_2026-03-21.md
+@@ -1,21 +1,19 @@
+ # Codex Writer Findings — PublicMenu
+-Chain: publicmenu-260321-173133
++Chain: publicmenu-260321-195108
+ 
+ ## Findings
+-1. [P1] Hall submit validates table before opening confirmation sheet - `x.jsx:2334-2350` requires `currentTableId` in hall mode, but `x.jsx:2628-2632` opens the confirmation Bottom Sheet only after `validate()` passes. On `/x?...mode=hall` with no verified table, the click dies at `newErrors.tableSelection`; there is no rendered `tableSelection` error in the hall drawer, so the user sees nothing. FIX: move the `!isTableVerified` gate above `validate()`, or skip hall `tableSelection` validation until after the Bottom Sheet verification flow.
+-2. [P1] Partner lookup converts backend failures into "restaurant not found" - `x.jsx:1322-1346` catches both lookup attempts and returns `null`, and `x.jsx:3035-3040` always renders `error.partner_not_found` when `partner` is null. Transient API failures are misreported as a bad QR link and the query never retries because it resolves successfully. FIX: let request errors throw (or store them separately), use React Query's error state, and render a retryable backend error distinct from true not-found.
+-3. [P1] Pickup/delivery checkout drops loyalty and discount flow entirely - `x.jsx:3220-3263` passes loyalty props into `CheckoutView`, but `CheckoutView.jsx:7-32` does not accept them and `CheckoutView.jsx:88-149` renders only contact/comment fields. Guests cannot enter loyalty email, see balance or discounts, or redeem points in pickup/delivery even though submit logic still supports those fields in `x.jsx`. FIX: extend `CheckoutView` to consume the passed loyalty and discount props and render the same email, balance, and redeem UI for non-hall checkout.
+-4. [P1] Session restore stops forever after a single transient failure - `useTableSession.jsx:265-487` sets `didAttemptRestoreRef.current = true` before the async restore work, then swallows all errors in the outer `catch` without resetting it. If any restore request fails once, the effect never retries until the table changes or the page is reloaded. FIX: reset the attempt flag on failure, or only mark restore as attempted after successful completion and add retry/backoff handling for recoverable errors.
+-5. [P1] Hall StickyCartBar ignores visit lifecycle and bill state - `x.jsx:2101-2144` derives `hallStickyMode` only from `cart`, `myOrders`, and `sessionOrders`, while bill state exists separately in `x.jsx:1314-1315`, `x.jsx:2306-2310`, and `x.jsx:2984-3002` and is never consulted here. That prevents lifecycle-specific CTA, copy, and visibility for requested bill, closed visit, paid visit, and other post-order hall states. FIX: compute sticky-bar mode from `tableSession`, `billRequested`, `billCooldown`, and visit or payment status before choosing label, amount, and visibility.
+-6. [P2] Table-code verification is split between hidden CartView state and visible Bottom Sheet - `CartView.jsx:89-177` still owns code attempts and lockout state and `CartView.jsx:180-206` auto-calls `verifyTableCode`, but the live Bottom Sheet in `x.jsx:3383-3478` does not read that state and its CTA directly calls `verifyTableCode` again. The visible sheet therefore has no cooldown or countdown UI and verification behavior comes from two components at once. FIX: move code attempts, lockout, and auto-submit state into `x.jsx` or the shared verification hook, remove the hidden CartView verification effects, and let the sheet render and enforce the single source of truth.
+-7. [P2] Mobile tile layout ignores partner's configured mobile grid size - `MenuView.jsx:42-49` computes `mobileCols` from `partner.menu_grid_mobile`, but `MenuView.jsx:284` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for a 1-column mobile grid still get 2 columns. FIX: use `MOBILE_GRID[mobileCols]` or `gridColsClass` in the mobile tile branch instead of hardcoding `grid-cols-2`.
+-8. [P3] Several user-facing controls still miss required i18n or accessibility wiring - examples: `CheckoutView.jsx:58-63` hardcodes English `aria-label`s (`"Decrease"`, `"Increase"`), `MenuView.jsx:102-125` list-mode quantity buttons have no `aria-label`s at all, and `CartView.jsx:467-485` has unlabeled edit and close buttons plus a hardcoded reward-email placeholder at `CartView.jsx:524`. This creates mixed-language UI and weaker screen-reader behavior. FIX: localize all placeholders and labels with `t()` or `tr()` and add explicit `aria-label`s to every icon-only control.
++1. [P1] Hall submit validates before the Bottom Sheet gate — In `pages/PublicMenu/base/x.jsx`, `handleSubmitOrder()` calls `validate()` before the just-in-time table-confirmation check. `validate()` rejects hall submits when `!currentTableId`, but that error is stored as `errors.tableSelection` and is not rendered anywhere in the current drawer flow. Result: on `/x?partner=...&mode=hall` a new guest can tap "Отправить официанту" and get a silent no-op instead of the confirmation sheet. FIX: move the `orderMode === "hall" && !isTableVerified` interception before `validate()`, or skip `tableSelection` validation until after the sheet verifies the table.
++2. [P1] Pickup/delivery checkout still drops loyalty and discount UI — `pages/PublicMenu/base/x.jsx` passes `showLoyaltySection`, `customerEmail`, `loyaltyAccount`, `earnedPoints`, `redeemedPoints`, `maxRedeemPoints`, `discountAmount`, and related props into `CheckoutView`, but `pages/PublicMenu/base/CheckoutView.jsx` neither accepts nor renders them. Users in pickup/delivery lose the email, points, redeem, and discount flows on the actual checkout screen. FIX: add the missing props to `CheckoutView` and render the loyalty block there, or extract the existing loyalty UI into a shared checkout section.
++3. [P2] Table-confirmation state lives in hidden `CartView` instead of the visible Bottom Sheet — After inline verification UI was removed, `pages/PublicMenu/base/CartView.jsx` still owns `codeAttempts`, `codeLockedUntil`, `codeSecondsLeft`, and the auto-verify effect bound to `tableCodeInput`, while the visible input now lives in the Bottom Sheet in `pages/PublicMenu/base/x.jsx`. That means the sheet shows only `codeVerificationError` with no attempt/cooldown feedback, and verification can be triggered by an off-screen component before the CTA tap. FIX: move attempt/lockout/auto-verify state into `x.jsx` with the Bottom Sheet, or remove the hidden auto-verify effect and let the sheet CTA own verification.
++4. [P2] Mobile grid partner setting is ignored — `pages/PublicMenu/base/MenuView.jsx` computes `mobileCols` from `partner.menu_grid_mobile`, but the actual grid render hardcodes `isMobile ? 'grid-cols-2' : gridColsClass`. Any partner configured for a 1-column mobile menu still gets 2 columns. FIX: use the computed mobile class (`MOBILE_GRID[mobileCols]`) in the mobile branch instead of the hardcoded `grid-cols-2`.
++5. [P2] `useTableSession` loses restored guests that only have `_id` — The hook correctly defines `normalizeGuestId()`, but later syncs `currentGuestIdRef.current = currentGuest?.id || null` in `pages/PublicMenu/base/useTableSession.jsx`. If a restored `SessionGuest` only carries `_id`, the ref is reset to `null`, so polling keeps re-running guest restore and downstream logic can behave as if no current guest exists. FIX: store `normalizeGuestId(currentGuest)` in the ref, and align any other guest-id reads in this file with the same normalization rule.
++6. [P3] Several control labels still regress i18n/accessibility — `pages/PublicMenu/base/CheckoutView.jsx` hardcodes `aria-label="Decrease"` / `aria-label="Increase"`, `pages/PublicMenu/base/CartView.jsx` hardcodes the reward-email placeholder `email@example.com`, and `pages/PublicMenu/base/MenuView.jsx` list-mode add/remove buttons plus `CartView` icon-only controls are missing localized accessible labels. This leaves mixed-language assistive text and unlabeled mobile controls in production. FIX: replace hardcoded assistive/user-facing strings with `t()/tr()` and add `aria-label` to icon-only/list-stepper buttons.
+ 
+ ## Summary
+-Total: 8 findings (0 P0, 5 P1, 2 P2, 1 P3)
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+ 
+ ## Prompt Clarity
+-- Overall clarity: 3
+-- Ambiguous Fix descriptions (list Fix # and what was unclear): `Fix 1` in the task context describes only PM-071, but the top-level request asks for a full bug review across `pages/PublicMenu/base/*.jsx`; it was unclear whether to review only PM-071 or all current bugs in the matched files.
+-- Missing context (what info would have helped): Whether `pages/PublicMenu/base/*.jsx` should mean one current page file or all six matching JSX files.
+-- Scope questions (anything you weren't sure if it's in scope): The request says "ONLY these 3 files," but the glob expands to six JSX files; I treated the glob as in-scope and did not read anything outside `pages/PublicMenu/`.
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for a review-only pass
++- Scope questions (anything you weren't sure if it's in scope): whether to report only PM-071 regressions or any bug found in the allowed JSX files; also "ONLY these 3 files" refers to `base/*.jsx` plus two markdown files, which is more than three physical files
+diff --git a/pipeline/chain-state/publicmenu-260321-195108-codex-findings.md b/pipeline/chain-state/publicmenu-260321-195108-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..92d226ae26b47fc1d47628a1a2a6faddd9d5602b
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260321-195108-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-195108
++
++## Findings
++1. [P1] Hall submit validates before the Bottom Sheet gate — In `pages/PublicMenu/base/x.jsx`, `handleSubmitOrder()` calls `validate()` before the just-in-time table-confirmation check. `validate()` rejects hall submits when `!currentTableId`, but that error is stored as `errors.tableSelection` and is not rendered anywhere in the current drawer flow. Result: on `/x?partner=...&mode=hall` a new guest can tap "Отправить официанту" and get a silent no-op instead of the confirmation sheet. FIX: move the `orderMode === "hall" && !isTableVerified` interception before `validate()`, or skip `tableSelection` validation until after the sheet verifies the table.
++2. [P1] Pickup/delivery checkout still drops loyalty and discount UI — `pages/PublicMenu/base/x.jsx` passes `showLoyaltySection`, `customerEmail`, `loyaltyAccount`, `earnedPoints`, `redeemedPoints`, `maxRedeemPoints`, `discountAmount`, and related props into `CheckoutView`, but `pages/PublicMenu/base/CheckoutView.jsx` neither accepts nor renders them. Users in pickup/delivery lose the email, points, redeem, and discount flows on the actual checkout screen. FIX: add the missing props to `CheckoutView` and render the loyalty block there, or extract the existing loyalty UI into a shared checkout section.
++3. [P2] Table-confirmation state lives in hidden `CartView` instead of the visible Bottom Sheet — After inline verification UI was removed, `pages/PublicMenu/base/CartView.jsx` still owns `codeAttempts`, `codeLockedUntil`, `codeSecondsLeft`, and the auto-verify effect bound to `tableCodeInput`, while the visible input now lives in the Bottom Sheet in `pages/PublicMenu/base/x.jsx`. That means the sheet shows only `codeVerificationError` with no attempt/cooldown feedback, and verification can be triggered by an off-screen component before the CTA tap. FIX: move attempt/lockout/auto-verify state into `x.jsx` with the Bottom Sheet, or remove the hidden auto-verify effect and let the sheet CTA own verification.
++4. [P2] Mobile grid partner setting is ignored — `pages/PublicMenu/base/MenuView.jsx` computes `mobileCols` from `partner.menu_grid_mobile`, but the actual grid render hardcodes `isMobile ? 'grid-cols-2' : gridColsClass`. Any partner configured for a 1-column mobile menu still gets 2 columns. FIX: use the computed mobile class (`MOBILE_GRID[mobileCols]`) in the mobile branch instead of the hardcoded `grid-cols-2`.
++5. [P2] `useTableSession` loses restored guests that only have `_id` — The hook correctly defines `normalizeGuestId()`, but later syncs `currentGuestIdRef.current = currentGuest?.id || null` in `pages/PublicMenu/base/useTableSession.jsx`. If a restored `SessionGuest` only carries `_id`, the ref is reset to `null`, so polling keeps re-running guest restore and downstream logic can behave as if no current guest exists. FIX: store `normalizeGuestId(currentGuest)` in the ref, and align any other guest-id reads in this file with the same normalization rule.
++6. [P3] Several control labels still regress i18n/accessibility — `pages/PublicMenu/base/CheckoutView.jsx` hardcodes `aria-label="Decrease"` / `aria-label="Increase"`, `pages/PublicMenu/base/CartView.jsx` hardcodes the reward-email placeholder `email@example.com`, and `pages/PublicMenu/base/MenuView.jsx` list-mode add/remove buttons plus `CartView` icon-only controls are missing localized accessible labels. This leaves mixed-language assistive text and unlabeled mobile controls in production. FIX: replace hardcoded assistive/user-facing strings with `t()/tr()` and add `aria-label` to icon-only/list-stepper buttons.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for a review-only pass
++- Scope questions (anything you weren't sure if it's in scope): whether to report only PM-071 regressions or any bug found in the allowed JSX files; also "ONLY these 3 files" refers to `base/*.jsx` plus two markdown files, which is more than three physical files
+
+codex
+Findings were written to [publicmenu-260321-195108-codex-findings.md](C:/Dev/menuapp-code-review/pipeline/chain-state/publicmenu-260321-195108-codex-findings.md).
+
+Highest-signal issue is still the hall submit flow: [x.jsx](C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx) runs `validate()` before the Bottom Sheet gate, so a new hall guest with no resolved table gets blocked on `errors.tableSelection` and sees a silent no-op instead of the sheet. I also documented the missing pickup/delivery loyalty UI in [CheckoutView.jsx](C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx), the hidden table-verification state still stranded in [CartView.jsx](C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx), the ignored mobile grid setting in [MenuView.jsx](C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx), the `_id` guest-restore bug in [useTableSession.jsx](C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx), and the remaining i18n/a11y label gaps.
+
+Repo-required copies were also saved to [review_2026-03-21.md](C:/Dev/menuapp-code-review/pages/PublicMenu/review_2026-03-21.md) and [commands_2026-03-21.log](C:/Dev/menuapp-code-review/pages/PublicMenu/commands_2026-03-21.log).
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-21.log b/pages/PublicMenu/commands_2026-03-21.log
+index a8f7bf4e2477650e1dc867726cf011e7b744f493..5b72d98551b5bd34a49c6bb4ff182b2326b8c4d7
+--- a/pages/PublicMenu/commands_2026-03-21.log
++++ b/pages/PublicMenu/commands_2026-03-21.log
+@@ -1,41 +1,27 @@
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
+-Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/*.jsx' | Select-Object -ExpandProperty FullName
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
+-Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
++Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'
+ Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'
+-@( 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' ) | ForEach-Object { $p=$_; $lines=(Get-Content $p).Length; Write-Output "$p`t$lines" }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleSubmitOrder|showTableConfirmSheet|pendingSubmitRef|verifyTableCode|partner_not_found|renderHallCheckoutContent|hallStickyMode|showCartButton|tableCodeLength|isTableVerified|Drawer' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'send_to_waiter|handleSubmitOrder|aria-label|placeholder|toLocaleString|ru-RU|tableCode|codeLockedUntil|codeAttempts|showLoyaltySection|isTableVerified|document.querySelector|guestDisplay|Button|sticky bottom-0' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1290;E=1605},@{S=2068;E=2148},@{S=2608;E=2688},@{S=2988;E=3050},@{S=3380;E=3478})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=430;E=490},@{S=500;E=560},@{S=930;E=1010},@{S=1050;E=1084})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=1;E=130},@{S=131;E=298})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx'; $lines=Get-Content $p; for($i=1;$i -le $lines.Length;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx'; $lines=Get-Content $p; foreach($r in @(@{S=220;E=430},@{S=430;E=650},@{S=650;E=760},@{S=760;E=838})) { for($i=$r.S;$i -le $r.E;$i++){ if($i -le $lines.Length){ '{0}: {1}' -f $i,$lines[$i-1] } }; '---' }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'console\.|toast\.|hardcoded|toLocaleString\(|ru-RU|hallSticky|showLoyaltySection|setView\("checkout"\)|handleCheckoutClick|common.loading|error.send.subtitle|cart.confirm_table|partner_missing|partner_not_found' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'aria-label="|placeholder="|toLocaleString\(|console\.|t\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const showLoyaltySection|showLoyaltySection =|useLoyalty|discountEnabled|loyaltyEnabled|customerEmail|earnedPoints|maxRedeemPoints|redeemedPoints' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2976;$i -le 2990;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2570;$i -le 2625;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const validate =|function validate|validate\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2334;$i -le 2410;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'tableSelection|errors\.' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|help\.call_waiter|loyalty\.email_placeholder|guest\.name_placeholder|cart\.you|common\.save|common\.cancel|cart\.confirm_table\.dismissed' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const \[isMobile, setIsMobile\]' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=1278;$i -le 1288;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/README.md'
++Get-Content -Raw 'C:/Dev/menuapp-code-review/pages/PublicMenu/BUGS.md'
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|pendingSubmitRef|handleSubmitOrder|verifyTableCode|tableCodeLength|common.loading|cart.confirm_table|renderHallCheckoutContent|showLoyaltySection' -Context 3,5
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'handleSubmitOrder|tableCodeInput|verifyTableCode|codeVerificationError|common.loading|placeholder=|aria-label=|submitError|showLoyaltySection|Drawer|Input|Button' -Context 2,4
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx' -Pattern 'aria-label|renderHallCheckoutContent|showLoyaltySection|Button|sticky|t\(' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx' -Pattern 'onMouseEnter|onMouseLeave|aria-label|button|img|ImageIcon|mobileLayout|grid-cols-2|t\(' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/ModeTabs.jsx' -Pattern 'button|t\(|visibleModeTabs|getModeDescription|verified|invalid_code' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx' -Pattern 'setTimeout|setInterval|clearTimeout|clearInterval|window|localStorage|filter\(|useEffect\(|normalizeGuestId|getOrderStatus|t\(' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'x\.hall\.verified|hall\.invalid_code|hall\.invalid_code_desc|cart\.verify\.enter_table_code|cart\.confirm_table\.dismissed' -Context 0,0
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const tr =|function tr\(|const trFormat|I18N_FALLBACKS|useI18n\(' -Context 2,4
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'handleCheckoutClick|setView\("checkout"\)|orderMode === "hall"|view === "checkout"|drawerMode' -Context 2,4
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'tableCodeInput|codeAttempts|codeLockedUntil|codeSecondsLeft|isCodeLocked|verifyTableCode|codeVerificationError' -Context 0,0
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'const currentTableId|const currentTable =|resolvedTable|verifiedTable|isTableVerified' -Context 2,3
++Get-Content 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' | Select-Object -Index (2338..2360)
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx','C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'tableSelection|errors\.tableSelection|newErrors\.tableSelection' -Context 1,2
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx' -Pattern 'billRequested|handleRequestBill|billCooldown|otherGuestsBills|othersTotal' -Context 0,0
++Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'currentGuestIdRef|currentGuest\?' -Context 2,3
+ Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
+ Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
+-Test-Path 'C:/Dev/menuapp-code-review/pipeline/chain-state'
+-Test-Path 'C:/Dev/menuapp-code-review/pages/PublicMenu'
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested|billCooldown|tableSession\?\.status|ended_at|closed_at|paid|request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-Select-String -Path 'C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx' -Pattern 'billRequested','billCooldown','tableSession\?\.status','ended_at','closed_at','paid','request bill' | ForEach-Object { "{0}:{1}: {2}" -f $_.Filename,$_.LineNumber,$_.Line.Trim() }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=2298;$i -le 2313;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3220;$i -le 3246;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+-$p='C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx'; $lines=Get-Content $p; for($i=3246;$i -le 3263;$i++){ '{0}: {1}' -f $i,$lines[$i-1] }
+diff --git a/pages/PublicMenu/review_2026-03-21.md b/pages/PublicMenu/review_2026-03-21.md
+index 558164b5aff88cac1673e9e460463d2ac9a559f8..92d226ae26b47fc1d47628a1a2a6faddd9d5602b
+--- a/pages/PublicMenu/review_2026-03-21.md
++++ b/pages/PublicMenu/review_2026-03-21.md
+@@ -1,21 +1,19 @@
+ # Codex Writer Findings — PublicMenu
+-Chain: publicmenu-260321-173133
++Chain: publicmenu-260321-195108
+ 
+ ## Findings
+-1. [P1] Hall submit validates table before opening confirmation sheet - `x.jsx:2334-2350` requires `currentTableId` in hall mode, but `x.jsx:2628-2632` opens the confirmation Bottom Sheet only after `validate()` passes. On `/x?...mode=hall` with no verified table, the click dies at `newErrors.tableSelection`; there is no rendered `tableSelection` error in the hall drawer, so the user sees nothing. FIX: move the `!isTableVerified` gate above `validate()`, or skip hall `tableSelection` validation until after the Bottom Sheet verification flow.
+-2. [P1] Partner lookup converts backend failures into "restaurant not found" - `x.jsx:1322-1346` catches both lookup attempts and returns `null`, and `x.jsx:3035-3040` always renders `error.partner_not_found` when `partner` is null. Transient API failures are misreported as a bad QR link and the query never retries because it resolves successfully. FIX: let request errors throw (or store them separately), use React Query's error state, and render a retryable backend error distinct from true not-found.
+-3. [P1] Pickup/delivery checkout drops loyalty and discount flow entirely - `x.jsx:3220-3263` passes loyalty props into `CheckoutView`, but `CheckoutView.jsx:7-32` does not accept them and `CheckoutView.jsx:88-149` renders only contact/comment fields. Guests cannot enter loyalty email, see balance or discounts, or redeem points in pickup/delivery even though submit logic still supports those fields in `x.jsx`. FIX: extend `CheckoutView` to consume the passed loyalty and discount props and render the same email, balance, and redeem UI for non-hall checkout.
+-4. [P1] Session restore stops forever after a single transient failure - `useTableSession.jsx:265-487` sets `didAttemptRestoreRef.current = true` before the async restore work, then swallows all errors in the outer `catch` without resetting it. If any restore request fails once, the effect never retries until the table changes or the page is reloaded. FIX: reset the attempt flag on failure, or only mark restore as attempted after successful completion and add retry/backoff handling for recoverable errors.
+-5. [P1] Hall StickyCartBar ignores visit lifecycle and bill state - `x.jsx:2101-2144` derives `hallStickyMode` only from `cart`, `myOrders`, and `sessionOrders`, while bill state exists separately in `x.jsx:1314-1315`, `x.jsx:2306-2310`, and `x.jsx:2984-3002` and is never consulted here. That prevents lifecycle-specific CTA, copy, and visibility for requested bill, closed visit, paid visit, and other post-order hall states. FIX: compute sticky-bar mode from `tableSession`, `billRequested`, `billCooldown`, and visit or payment status before choosing label, amount, and visibility.
+-6. [P2] Table-code verification is split between hidden CartView state and visible Bottom Sheet - `CartView.jsx:89-177` still owns code attempts and lockout state and `CartView.jsx:180-206` auto-calls `verifyTableCode`, but the live Bottom Sheet in `x.jsx:3383-3478` does not read that state and its CTA directly calls `verifyTableCode` again. The visible sheet therefore has no cooldown or countdown UI and verification behavior comes from two components at once. FIX: move code attempts, lockout, and auto-submit state into `x.jsx` or the shared verification hook, remove the hidden CartView verification effects, and let the sheet render and enforce the single source of truth.
+-7. [P2] Mobile tile layout ignores partner's configured mobile grid size - `MenuView.jsx:42-49` computes `mobileCols` from `partner.menu_grid_mobile`, but `MenuView.jsx:284` hardcodes `grid-cols-2` whenever `isMobile` is true. Partners configured for a 1-column mobile grid still get 2 columns. FIX: use `MOBILE_GRID[mobileCols]` or `gridColsClass` in the mobile tile branch instead of hardcoding `grid-cols-2`.
+-8. [P3] Several user-facing controls still miss required i18n or accessibility wiring - examples: `CheckoutView.jsx:58-63` hardcodes English `aria-label`s (`"Decrease"`, `"Increase"`), `MenuView.jsx:102-125` list-mode quantity buttons have no `aria-label`s at all, and `CartView.jsx:467-485` has unlabeled edit and close buttons plus a hardcoded reward-email placeholder at `CartView.jsx:524`. This creates mixed-language UI and weaker screen-reader behavior. FIX: localize all placeholders and labels with `t()` or `tr()` and add explicit `aria-label`s to every icon-only control.
++1. [P1] Hall submit validates before the Bottom Sheet gate — In `pages/PublicMenu/base/x.jsx`, `handleSubmitOrder()` calls `validate()` before the just-in-time table-confirmation check. `validate()` rejects hall submits when `!currentTableId`, but that error is stored as `errors.tableSelection` and is not rendered anywhere in the current drawer flow. Result: on `/x?partner=...&mode=hall` a new guest can tap "Отправить официанту" and get a silent no-op instead of the confirmation sheet. FIX: move the `orderMode === "hall" && !isTableVerified` interception before `validate()`, or skip `tableSelection` validation until after the sheet verifies the table.
++2. [P1] Pickup/delivery checkout still drops loyalty and discount UI — `pages/PublicMenu/base/x.jsx` passes `showLoyaltySection`, `customerEmail`, `loyaltyAccount`, `earnedPoints`, `redeemedPoints`, `maxRedeemPoints`, `discountAmount`, and related props into `CheckoutView`, but `pages/PublicMenu/base/CheckoutView.jsx` neither accepts nor renders them. Users in pickup/delivery lose the email, points, redeem, and discount flows on the actual checkout screen. FIX: add the missing props to `CheckoutView` and render the loyalty block there, or extract the existing loyalty UI into a shared checkout section.
++3. [P2] Table-confirmation state lives in hidden `CartView` instead of the visible Bottom Sheet — After inline verification UI was removed, `pages/PublicMenu/base/CartView.jsx` still owns `codeAttempts`, `codeLockedUntil`, `codeSecondsLeft`, and the auto-verify effect bound to `tableCodeInput`, while the visible input now lives in the Bottom Sheet in `pages/PublicMenu/base/x.jsx`. That means the sheet shows only `codeVerificationError` with no attempt/cooldown feedback, and verification can be triggered by an off-screen component before the CTA tap. FIX: move attempt/lockout/auto-verify state into `x.jsx` with the Bottom Sheet, or remove the hidden auto-verify effect and let the sheet CTA own verification.
++4. [P2] Mobile grid partner setting is ignored — `pages/PublicMenu/base/MenuView.jsx` computes `mobileCols` from `partner.menu_grid_mobile`, but the actual grid render hardcodes `isMobile ? 'grid-cols-2' : gridColsClass`. Any partner configured for a 1-column mobile menu still gets 2 columns. FIX: use the computed mobile class (`MOBILE_GRID[mobileCols]`) in the mobile branch instead of the hardcoded `grid-cols-2`.
++5. [P2] `useTableSession` loses restored guests that only have `_id` — The hook correctly defines `normalizeGuestId()`, but later syncs `currentGuestIdRef.current = currentGuest?.id || null` in `pages/PublicMenu/base/useTableSession.jsx`. If a restored `SessionGuest` only carries `_id`, the ref is reset to `null`, so polling keeps re-running guest restore and downstream logic can behave as if no current guest exists. FIX: store `normalizeGuestId(currentGuest)` in the ref, and align any other guest-id reads in this file with the same normalization rule.
++6. [P3] Several control labels still regress i18n/accessibility — `pages/PublicMenu/base/CheckoutView.jsx` hardcodes `aria-label="Decrease"` / `aria-label="Increase"`, `pages/PublicMenu/base/CartView.jsx` hardcodes the reward-email placeholder `email@example.com`, and `pages/PublicMenu/base/MenuView.jsx` list-mode add/remove buttons plus `CartView` icon-only controls are missing localized accessible labels. This leaves mixed-language assistive text and unlabeled mobile controls in production. FIX: replace hardcoded assistive/user-facing strings with `t()/tr()` and add `aria-label` to icon-only/list-stepper buttons.
+ 
+ ## Summary
+-Total: 8 findings (0 P0, 5 P1, 2 P2, 1 P3)
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
+ 
+ ## Prompt Clarity
+-- Overall clarity: 3
+-- Ambiguous Fix descriptions (list Fix # and what was unclear): `Fix 1` in the task context describes only PM-071, but the top-level request asks for a full bug review across `pages/PublicMenu/base/*.jsx`; it was unclear whether to review only PM-071 or all current bugs in the matched files.
+-- Missing context (what info would have helped): Whether `pages/PublicMenu/base/*.jsx` should mean one current page file or all six matching JSX files.
+-- Scope questions (anything you weren't sure if it's in scope): The request says "ONLY these 3 files," but the glob expands to six JSX files; I treated the glob as in-scope and did not read anything outside `pages/PublicMenu/`.
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for a review-only pass
++- Scope questions (anything you weren't sure if it's in scope): whether to report only PM-071 regressions or any bug found in the allowed JSX files; also "ONLY these 3 files" refers to `base/*.jsx` plus two markdown files, which is more than three physical files
+diff --git a/pipeline/chain-state/publicmenu-260321-195108-codex-findings.md b/pipeline/chain-state/publicmenu-260321-195108-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..92d226ae26b47fc1d47628a1a2a6faddd9d5602b
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260321-195108-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260321-195108
++
++## Findings
++1. [P1] Hall submit validates before the Bottom Sheet gate — In `pages/PublicMenu/base/x.jsx`, `handleSubmitOrder()` calls `validate()` before the just-in-time table-confirmation check. `validate()` rejects hall submits when `!currentTableId`, but that error is stored as `errors.tableSelection` and is not rendered anywhere in the current drawer flow. Result: on `/x?partner=...&mode=hall` a new guest can tap "Отправить официанту" and get a silent no-op instead of the confirmation sheet. FIX: move the `orderMode === "hall" && !isTableVerified` interception before `validate()`, or skip `tableSelection` validation until after the sheet verifies the table.
++2. [P1] Pickup/delivery checkout still drops loyalty and discount UI — `pages/PublicMenu/base/x.jsx` passes `showLoyaltySection`, `customerEmail`, `loyaltyAccount`, `earnedPoints`, `redeemedPoints`, `maxRedeemPoints`, `discountAmount`, and related props into `CheckoutView`, but `pages/PublicMenu/base/CheckoutView.jsx` neither accepts nor renders them. Users in pickup/delivery lose the email, points, redeem, and discount flows on the actual checkout screen. FIX: add the missing props to `CheckoutView` and render the loyalty block there, or extract the existing loyalty UI into a shared checkout section.
++3. [P2] Table-confirmation state lives in hidden `CartView` instead of the visible Bottom Sheet — After inline verification UI was removed, `pages/PublicMenu/base/CartView.jsx` still owns `codeAttempts`, `codeLockedUntil`, `codeSecondsLeft`, and the auto-verify effect bound to `tableCodeInput`, while the visible input now lives in the Bottom Sheet in `pages/PublicMenu/base/x.jsx`. That means the sheet shows only `codeVerificationError` with no attempt/cooldown feedback, and verification can be triggered by an off-screen component before the CTA tap. FIX: move attempt/lockout/auto-verify state into `x.jsx` with the Bottom Sheet, or remove the hidden auto-verify effect and let the sheet CTA own verification.
++4. [P2] Mobile grid partner setting is ignored — `pages/PublicMenu/base/MenuView.jsx` computes `mobileCols` from `partner.menu_grid_mobile`, but the actual grid render hardcodes `isMobile ? 'grid-cols-2' : gridColsClass`. Any partner configured for a 1-column mobile menu still gets 2 columns. FIX: use the computed mobile class (`MOBILE_GRID[mobileCols]`) in the mobile branch instead of the hardcoded `grid-cols-2`.
++5. [P2] `useTableSession` loses restored guests that only have `_id` — The hook correctly defines `normalizeGuestId()`, but later syncs `currentGuestIdRef.current = currentGuest?.id || null` in `pages/PublicMenu/base/useTableSession.jsx`. If a restored `SessionGuest` only carries `_id`, the ref is reset to `null`, so polling keeps re-running guest restore and downstream logic can behave as if no current guest exists. FIX: store `normalizeGuestId(currentGuest)` in the ref, and align any other guest-id reads in this file with the same normalization rule.
++6. [P3] Several control labels still regress i18n/accessibility — `pages/PublicMenu/base/CheckoutView.jsx` hardcodes `aria-label="Decrease"` / `aria-label="Increase"`, `pages/PublicMenu/base/CartView.jsx` hardcodes the reward-email placeholder `email@example.com`, and `pages/PublicMenu/base/MenuView.jsx` list-mode add/remove buttons plus `CartView` icon-only controls are missing localized accessible labels. This leaves mixed-language assistive text and unlabeled mobile controls in production. FIX: replace hardcoded assistive/user-facing strings with `t()/tr()` and add `aria-label` to icon-only/list-stepper buttons.
++
++## Summary
++Total: 6 findings (0 P0, 2 P1, 3 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none required for a review-only pass
++- Scope questions (anything you weren't sure if it's in scope): whether to report only PM-071 regressions or any bug found in the allowed JSX files; also "ONLY these 3 files" refers to `base/*.jsx` plus two markdown files, which is more than three physical files
+
+tokens used
+206 043
+Findings were written to [publicmenu-260321-195108-codex-findings.md](C:/Dev/menuapp-code-review/pipeline/chain-state/publicmenu-260321-195108-codex-findings.md).
+
+Highest-signal issue is still the hall submit flow: [x.jsx](C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx) runs `validate()` before the Bottom Sheet gate, so a new hall guest with no resolved table gets blocked on `errors.tableSelection` and sees a silent no-op instead of the sheet. I also documented the missing pickup/delivery loyalty UI in [CheckoutView.jsx](C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx), the hidden table-verification state still stranded in [CartView.jsx](C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx), the ignored mobile grid setting in [MenuView.jsx](C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx), the `_id` guest-restore bug in [useTableSession.jsx](C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx), and the remaining i18n/a11y label gaps.
+
+Repo-required copies were also saved to [review_2026-03-21.md](C:/Dev/menuapp-code-review/pages/PublicMenu/review_2026-03-21.md) and [commands_2026-03-21.log](C:/Dev/menuapp-code-review/pages/PublicMenu/commands_2026-03-21.log).

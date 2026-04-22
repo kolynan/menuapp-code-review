@@ -1,0 +1,236 @@
+# PSSK Review: Draft KS Prompt for SOM-BUG-S270-01 (P0 Rate Limit Fix)
+# Reviewer: Claude Code (CC), Session S271
+# Date: 2026-04-14
+# Source: staffordersmobile.jsx (4538 lines, worktree copy)
+# Codex: Partial (timed out on filesystem scans, confirmed same line numbers but no substantive review)
+
+---
+
+## Per-Question Analysis
+
+### Q1: Root cause coverage — are all 5 fan-out locations correct?
+
+YES for the 5 listed, BUT there is a **6th fan-out location missed**.
+
+Verified locations:
+- (a) `handleOrdersAction` line 1960: `actionable.forEach(...)` -> `advanceMutation.mutate(...)` -- CONFIRMED
+- (b) `startUndoWindow.onUndo` line 1932-1937: `snapshots.forEach(...)` -> `advanceMutation.mutate(...)` -- CONFIRMED
+- (c) Request batch B1, line 639: `tableRequests.forEach(r => onCloseRequest(...))` x2 (allNew + allAccepted branches) -- CONFIRMED
+- (d) Request batch B3, line 1254: identical pattern to B1 -- CONFIRMED
+- (e) Request batch B6, line 2333: `tableRequests.forEach(r => onCloseRequest(...))` in IIFE -- CONFIRMED
+
+**MISSED FAN-OUT (6th location):**
+- (f) `handleCloseAllOrders` line 4132: `await Promise.all(orders.map(o => base44.entities.Order.update(o.id, ...)))` -- This is EXACTLY the `Promise.all` anti-pattern called out in the "НЕ должно быть" section. It fires N concurrent Order.update calls when closing a table. This is triggered from `onCloseAllOrders` prop (line 4397).
+
+**Additional note on B6 (line 2333):** The draft says "line 2333" for the batch button but the actual batch button `onClick` with `tableRequests.forEach` is embedded within a larger IIFE at the END of line 2333 (after the per-item request rendering). The line number is correct but the description of B6 as "inline line" is slightly misleading — it's actually a full request section block with both per-item and batch buttons.
+
+**Rating: (a) OK, (b) OK, (c) OK, (d) OK, (e) OK, (f) MISSING**
+
+### Q2: Ambiguous Fix descriptions
+
+1. **Change A — `batchInFlight` state scope is ambiguous.** The draft says "объявлять в том же scope, где `handleOrdersAction`" but `handleOrdersAction` is defined inside `OrderGroupCard` component (starts ~line 1715). The `useState` for `batchInFlight` needs to be inside THIS component. The Implementation Notes section says "внутри table group component, там же где advanceMutation" which is correct but contradicts the code example that shows it at top level. The BEFORE/AFTER code block doesn't show WHERE the useState goes relative to other hooks.
+
+2. **Change C/D/E — `onCloseRequest` return value dependency.** The draft says "wrap both branches in `async () => { await runBatchSequential(...) }`" but `onCloseRequest` currently returns `undefined` (`.mutate()` returns void). The fix requires ALSO changing the prop to use `.mutateAsync()` — this is mentioned but buried in a separate paragraph. The implementer might miss it. Should be highlighted as a PREREQUISITE for C/D/E.
+
+3. **"disabled={advanceMutation.isPending || batchInFlight}" line list** — The draft lists lines 671, 694, 709, 1286, 1309, 1324, 1394, 2335, 2337, 2339. But these are buttons calling `handleOrdersAction` which ALREADY returns early if `batchInFlight` is true (the guard at top). The `disabled` prop is for visual feedback only. This is fine but should be stated explicitly — "for UX disabled state, not for logic safety."
+
+4. **Invalidate-once `skipInvalidate` approach** — the draft shows modifying `advanceMutation` to accept `skipInvalidate` in vars, but the `onSettled` callback signature is `(_data, _err, vars)` where `vars` is the mutation variables. The code shows `vars?.skipInvalidate` — this works but the implementer needs to pass `{ id, payload, skipInvalidate: true }` which changes the shape of vars. The `mutationFn` would receive `{ id, payload, skipInvalidate }` too, which is harmless (extra field ignored by `Order.update`), but could be cleaner with destructuring.
+
+### Q3: Wrong/missing line numbers
+
+All 5 main line numbers verified against actual code:
+- Line 516-520 `isRateLimitError`: CORRECT
+- Line 1956-1965 `handleOrdersAction`: CORRECT
+- Line 1920-1941 `startUndoWindow`: CORRECT (onUndo specifically 1932-1938)
+- Line 639 B1: CORRECT
+- Line 1254 B3: CORRECT
+- Line 2333 B6: CORRECT
+- Line 1882-1898 `advanceMutation`: CORRECT
+- Line 3513-3522 `updateRequestMutation`: CORRECT
+- Line 4399 `onCloseRequest` prop: CORRECT
+
+**Wrong/missing:**
+- Line 4132 `handleCloseAllOrders` with `Promise.all`: NOT REFERENCED in the draft at all (missed fan-out)
+- The draft references "260414-01 StaffOrdersMobile RELEASE.jsx" but the worktree working copy is `staffordersmobile.jsx`. Both are 4538 lines — they appear to be identical copies. The RELEASE file exists in the main repo (C:\Dev\menuapp-code-review) but NOT in the worktree. This won't confuse the implementer but is technically incorrect in the worktree context.
+
+### Q4: Delay value (120ms) — sufficient?
+
+**120ms is likely sufficient but borderline.** Analysis:
+
+- B44 rate limit triggers at 4 concurrent calls (per S270 diagnostic).
+- With sequential execution + 120ms gap, there's only ever 1 in-flight request.
+- However, if `onSettled` fires invalidateQueries mid-batch (before skipInvalidate is implemented), the invalidation refetch could count against the rate limit too.
+- With skipInvalidate, 120ms should be safe even for 30-item batches (30 * 120ms = 3.6s total).
+
+**p-limit concurrency=2 alternative:** Would cut batch time roughly in half (~1.8s for 30 items) but adds complexity and still risks 429 if B44 counts refetch queries too. NOT recommended over sequential for V1.
+
+**Recommendation: Keep 120ms for V1.** If testing shows it works for 30+ items, great. If not, bump to 150-200ms. The delay is a named constant in `runBatchSequential` defaults, so easy to tune.
+
+### Q5: Sequential vs Promise.all chunks
+
+Sequential `for-of` with `mutateAsync` is the correct architectural choice:
+- Simplest to understand and debug
+- Guaranteed no concurrency
+- 4 items * 120ms delay = 480ms + ~4 * 200ms network = ~1.3s total — acceptable for a batch button
+- 30 items = ~9.6s — getting long but still acceptable with proper visual feedback
+- Promise.all chunks would save time but add complexity for marginal gain
+
+**Verdict: Sequential is correct for V1.** Consider chunks only if users complain about 10+ item batch speed.
+
+### Q6: Invalidate strategy
+
+The draft proposes `skipInvalidate` flag in mutation vars + single invalidate after batch. This is **sound and recommended**.
+
+**Current problem confirmed:** `onSettled` at line 1894-1897 fires `invalidateQueries(["orders"])` AND `invalidateQueries(["servedOrders", group.id])` for EVERY item in batch. For 10 items = 20 invalidation calls during the batch — very likely to amplify 429.
+
+**The "200ms flat" alternative** (from the open question) is WORSE because:
+1. It doubles batch time (10 items: 2s -> 4s)
+2. Each invalidation refetch still races with the next mutation
+3. It doesn't solve the root cause — just increases gap
+
+**Recommendation: `skipInvalidate` + single invalidate.** Also need to handle `updateRequestMutation.onSuccess` (line 3515) the same way — it calls `invalidateQueries(["serviceRequests"])` per item.
+
+**Important detail the draft missed:** `advanceMutation.onMutate` (line 1884-1889) calls `queryClient.cancelQueries({ queryKey: ["orders"] })` on EVERY mutation call. During a batch, this means item N's `onMutate` cancels the query that item N-1's onSettled just tried to refetch. With sequential execution this is actually beneficial (prevents mid-batch refetch), but it should be documented as intentional behavior.
+
+### Q7: Undo window timing
+
+**PARTIALLY CORRECT.** In the draft's Change A AFTER code:
+
+```javascript
+await runBatchSequential(actionable, async ({ order, payload }) => {
+  ...
+});
+if (actionable.every(({ meta }) => meta.willServe)) {
+  startUndoWindow(actionable.map(({ order }) => order), rowId);
+}
+```
+
+`startUndoWindow` IS called AFTER the batch completes (after `await runBatchSequential`). This is correct.
+
+**BUT:** The undo window starts a 3-second timeout (line 1925). If the batch took 3+ seconds (30 items), the undo window starts late but with full 3s — that's fine.
+
+**HOWEVER:** There's a subtle issue — `startUndoWindow` at line 1920 checks `orders.length === 0` and returns early. The orders passed are the original `actionable` orders, which should be non-empty. OK.
+
+**Real concern:** During `runBatchSequential`, each item is already committed to B44 backend via `mutateAsync`. The optimistic update in `onMutate` already moved them in the UI. If the user clicks "Undo" after batch, the onUndo handler (Change B) runs `runBatchSequential` to revert — but during the ORIGINAL batch, the UI already shows items as served (optimistic). If batch takes 3s, user sees "served" for 3s before undo toast appears. This is a UX concern but not a bug.
+
+**Rating: OK** — timing is correct in the code flow.
+
+### Q8: Request fan-out (onCloseRequest prop)
+
+**The draft correctly identifies the problem:** `onCloseRequest` is a prop that wraps `updateRequestMutation.mutate(...)` (line 4399). Simple `forEach -> onCloseRequest(id)` fans out.
+
+**Two options analyzed:**
+
+Option 1 (draft's choice): Change `onCloseRequest` prop to return `mutateAsync` promise, use `await` inside `runBatchSequential`.
+- Pros: Minimal changes, works with existing architecture
+- Cons: Changes prop contract — all callers must handle the returned Promise (or ignore it)
+
+Option 2: New `onBatchRequestAction(ids, status, extraFields)` prop with serialization in parent.
+- Pros: Cleaner separation, single-item callers unchanged
+- Cons: More code, new prop, parent component changes
+
+**Recommendation: Option 1 (draft's choice) is correct.** The `.mutate()` -> `.mutateAsync()` change is safe because:
+- `.mutateAsync()` returns a Promise that resolves/rejects
+- Existing single-item callers at line 658 and 1273 call `onCloseRequest(id, status, ...)` and don't use the return value — returning a Promise instead of undefined is harmless (ignored)
+- Line 4324 `onAction` is a different prop for single requests — NOT affected
+
+**One concern:** The `isRequestPending` prop (line 4404) is `updateRequestMutation.isPending`. This becomes `true` on first call in the batch, so subsequent calls in `runBatchSequential` would see `isPending = true` — but since we're using `mutateAsync` in a sequential loop (not relying on React re-renders between calls), this is fine. The `isRequestPending` check is only in the `disabled` attribute of buttons, which won't re-render during the async loop.
+
+### Q9: Scope creep risks
+
+1. **`handleSingleAction` (line 1966):** Calls `handleOrdersAction([order], rowId)` with a single-item array. With the batch changes, this now: (a) sets `batchInFlight = true`, (b) calls `runBatchSequential` with 1 item (no delay since `i < items.length - 1` is false), (c) awaits mutateAsync, (d) sets `batchInFlight = false`. **Risk: adds ~1 render cycle overhead vs direct mutate.** The `await mutateAsync` adds a Promise resolution tick. **Impact: negligible** — single mutateAsync resolves at same speed as mutate. **No regression.**
+
+2. **Single-request onClick (line 658, 1273):** These call `onCloseRequest(id, status, ...)` directly (not in forEach). With mutateAsync change, they return a Promise that nobody awaits. **No regression.**
+
+3. **`isRateLimitError` (line 516-520):** Draft says "DO NOT remove" — correct. The `runBatchSequential` helper uses it for early `break`. The existing `updateRequestMutation.onError` (line 3516-3521) still fires for individual 429s. No conflict.
+
+4. **Guest batch loading (line 3603):** `Promise.all(guestPromises)` for `SessionGuest.get()` reads — NOT mutations, different entity, lower priority. Could hit read rate limits on large tables but out of scope for this bug.
+
+### Q10: Regressions to verify
+
+The draft's regression checklist is **good but incomplete**. Missing items:
+
+- **(g) Legacy block batch buttons (lines 759, 760, 1374, 1375, 2349-2351):** These call `handleOrdersAction` too. The fix to `handleOrdersAction` covers them automatically, but they should be explicitly tested since they're in a different render path (non-hall / compact-table modes).
+
+- **(h) handleCloseAllOrders (line 4132):** Since this is NOT covered by the fix, it remains a 429 risk when closing tables with many orders. Should be noted as known-gap.
+
+- **(i) inProgressSections batch (line 2337):** The `handleOrdersAction(section.orders)` call in the inProgress sub-group batch button should be tested.
+
+---
+
+## Fix Part Ratings
+
+### Fix Helper (runBatchSequential): 4.5/5 -- CLEAR
+- Well-designed utility with proper error handling and early break on 429
+- Minor suggestion: add `AbortSignal` support for cancellation (optional, not blocking)
+
+### Fix A (handleOrdersAction): 3.5/5 -- NEEDS CLARIFICATION
+Issues:
+1. `batchInFlight` useState placement not explicit enough in the code example
+2. `startUndoWindow` timing is correct but should be explicitly documented as "runs AFTER batch"
+3. The deps array in the AFTER code includes `batchInFlight` — this is a stale closure risk since `batchInFlight` is a state variable read inside useCallback. But since the early-return check `|| batchInFlight` happens at call time (when React has re-rendered), it should work. Still, could use `useRef` for the inflight flag to avoid re-creating the callback.
+4. Missing: what happens if `mutateAsync` rejects mid-batch? The `runBatchSequential` catches it, but `finally { setBatchInFlight(false) }` runs — does the UI update correctly for partial batch? Need to document expected behavior.
+Rating: NEEDS CLARIFICATION on useState placement and partial failure behavior.
+
+### Fix B (startUndoWindow.onUndo): 5/5 -- CLEAR
+- Simple, correct transformation from forEach->mutate to await runBatchSequential->mutateAsync
+- onUndo is called from user action, not in a hot path
+
+### Fix C (Request batch B1): 4/5 -- CLEAR
+- Straightforward but needs explicit note about the PREREQUISITE: onCloseRequest must return Promise (mutateAsync change)
+- Has 2 sub-branches (allNew, allAccepted) — both need rewriting
+
+### Fix D (Request batch B3): 4/5 -- CLEAR
+- Mirror of C, same notes apply
+
+### Fix E (Request batch B6): 4/5 -- CLEAR
+- Same pattern but more complex JSX structure
+- The batch button is nested inside an IIFE at the end of the request section — implementer needs to be careful not to break the per-item request buttons above it
+
+### Fix F (MISSING — handleCloseAllOrders): NOT IN DRAFT
+- This is a gap. `Promise.all(orders.map(...))` at line 4132 will 429 on tables with 4+ orders.
+- Needs to be added as Fix F with `runBatchSequential` wrapper.
+- Lower urgency than A-E (close-table is less frequent than serve-all) but still P0 material.
+
+### Invalidate-once optimization: 4/5 -- CLEAR
+- Sound approach, well-explained
+- Minor: `updateRequestMutation.onSuccess` (not `onSettled`) at line 3515 — draft mentions it but should be more explicit about the different callback name
+
+---
+
+## Summary Verdict
+
+| Part | Rating | Status |
+|------|--------|--------|
+| Helper | 4.5/5 | CLEAR |
+| Fix A | 3.5/5 | NEEDS CLARIFICATION |
+| Fix B | 5/5 | CLEAR |
+| Fix C | 4/5 | CLEAR |
+| Fix D | 4/5 | CLEAR |
+| Fix E | 4/5 | CLEAR |
+| Fix F (missing) | 0/5 | REWRITE NEEDED (add to prompt) |
+| Invalidate-once | 4/5 | CLEAR |
+
+**Overall: 4 of 5 parts >= 4/5. Fix A needs clarification. Fix F must be added.**
+
+**Blocking issues for implementation round:**
+1. Add Fix F (`handleCloseAllOrders` line 4132) — `Promise.all` fan-out
+2. Clarify Fix A `batchInFlight` useState placement (explicit line number range)
+3. Clarify Fix A partial failure behavior
+4. Make onCloseRequest mutateAsync prerequisite more prominent (before Fix C, not after)
+
+**Non-blocking improvements:**
+- Consider `useRef` for `batchInFlight` instead of `useState` to avoid stale closure
+- Add legacy block batch buttons to regression checklist
+- Note `handleCloseAllOrders` gap in scope lock if intentionally deferred
+
+---
+
+## Codex Comparison
+
+Codex partially ran but timed out during filesystem scanning. It confirmed the same line numbers (639, 1254, 2333, 1883, 3515, 4132, 4399) via ripgrep but produced no substantive review analysis. The 6th fan-out (`handleCloseAllOrders` line 4132) was visible in Codex's grep output but not called out.
+
+**Agreed:** Line numbers are correct (both CC and Codex grep confirmed)
+**CC only:** All 10 review questions analyzed, Fix F identified as missing, ambiguity analysis
+**Codex only:** Nothing substantive beyond grep output
+**Disputes:** None

@@ -1,0 +1,561 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d86d6-cebc-7a73-ba3a-9ee0480465d6
+--------
+user
+**MANDATORY FIRST STEP — run this before anything else:** ``` git fetch origin 2>/dev/null; git reset --hard origin/main ``` This ensures your working copy is in sync with the remote repository (prevents KB-095 stale-copy issue). --- Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260413-173504-b1a1-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260413-173504-b1a1 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # UX Batch: WS-SOS Quick-Fix (#285 + #284 + #286 + #232) Reference: `ux-concepts/HelpDrawer/260407-00 HelpDrawer UX S234 FINAL.md` v6.0, `BUGS_MASTER.md`. CONTEXT FILES: - `ux-concepts/HelpDrawer/260407-00 HelpDrawer UX S234 FINAL.md` — SOS v6.0 UX spec (FINAL) - `ux-concepts/HelpDrawer/260407-01 SOS HelpDrawer Mockup S235.html` — visual reference --- ## Fix 1 — #285 (P2) [MUST-FIX]: "Something else?" link — show disabled instead of hidden when custom request is active ### Сейчас (текущее поведение) When any 'other' type request is active, the "Другой запрос?" link is fully hidden (condition: `!activeRequests.some(r => r.type === 'other') && !showOtherForm`). The user cannot see that re-sending is blocked. ### Должно быть (ожидаемое поведение) The link is always visible, but when an 'other' request is active it appears disabled: - Visual: grey text (`text-gray-300`), cursor default, no underline, no hover effect — button is not `disabled` attribute (must remain tappable for potential gate use later) - Below the disabled link: helper text `"Можно только 1 такой запрос одновременно"` / `"Only 1 custom request at a time"` in `text-[11px] text-gray-300` - When no active 'other' request: link looks exactly as before (grey underlined, clickable) Ref: `ux-concepts/HelpDrawer/260407-00 HelpDrawer UX S234 FINAL.md` §«Другое» ### НЕ должно быть (анти-паттерны) - Do NOT use `disabled` HTML attribute — link must remain tappable - Do NOT hide the link when 'other' request is active - Do NOT change the visual of the link when no active 'other' request exists - Do NOT remove the condition that hides the link while `showOtherForm` is open (keep hiding it then) ### Файл и локация `pages/PublicMenu/x.jsx`, line ~5048–5056: ```jsx {/* "Другой запрос?" link — hidden while any 'other' request is active */} {!activeRequests.some(r => r.type === 'other') && !showOtherForm && ( <div className="px-3.5 pb-3"> <button onClick={() => setShowOtherForm(true)} className="text-sm text-gray-400 underline underline-offset-2 bg-transparent border-none cursor-pointer"> {tr('help.other_request_link', 'Другой запрос?')} </button> </div> )} ``` Replace the condition so the link is visible (but disabled) when `activeRequests.some(r => r.type === 'other')` is true. New i18n keys needed (use `tr(key, fallback)`): - `tr('help.other_only_one', 'Можно только 1 такой запрос одновременно')` ### Проверка 1. Open Help Drawer → send a custom "other" request → verify "Другой запрос?" link stays visible but looks grey and unclickable visually, with helper text below. 2. No active 'other' request → link looks normal (grey, underlined). --- ## Fix 2 — #284 (P2) [MUST-FIX]: Auto-resolve requests older than 24h + stale timer display ### Сейчас (текущее поведение) (a) Requests older than 24h remain active in the drawer forever — no auto-cleanup. (b) `getHelpTimerStr` at line ~1898 shows raw minutes for any elapsed time, so a 7-day-old request shows "10439м" instead of a human-readable stale indicator. ### Должно быть (ожидаемое поведение) **(a) Auto-resolve useEffect:** Add a `useEffect` that runs on every `timerTick` (already ticks every 30s via existing timer) and resolves any `activeRequests` where `Date.now() - sentAt > 24 * 60 * 60 * 1000`. Call `handleResolve(type, id)` for each stale row. **(b) Stale timer display:** In `getHelpTimerStr` (line ~1898), if `elapsedSec >= 24 * 60 * 60` (≥ 24 hours), return `tr('help.stale_status', 'Данные могли устареть')` instead of `${min}м`. Ref: BACKLOG #284, PM-167. ### НЕ должно быть (анти-паттерны) - Do NOT auto-resolve requests younger than 24h - Do NOT change urgency threshold constants (`HELP_URGENCY_THRESHOLDS`) - Do NOT introduce a new polling interval — use the existing `timerTick` dependency - Do NOT call any backend API for auto-resolve — use local `handleResolve` only ### Файл и локация `pages/PublicMenu/x.jsx`: - `getHelpTimerStr` function, line ~1898 — add early return for ≥ 24h - Add new `useEffect` near the other Help-related effects (search comment `// Help / ServiceRequest hook` area, ~line 1811+) - `i18n` key `help.stale_status` already exists in both EN and RU translation objects (lines 572, 643) ### Проверка 1. Verify `getHelpTimerStr` returns `'Данные могли устареть'` (or EN equivalent) when `sentAt` is more than 24h ago. 2. Verify the auto-resolve useEffect fires on timerTick and removes stale rows. --- ## Fix 3 — #286 (P3) [MUST-FIX]: Save textarea draft when drawer closes without sending ### Сейчас (текущее поведение) If the user starts typing in the "Другой запрос?" textarea and closes the Help Drawer (swipe or backdrop tap), the text is lost. ### Должно быть (ожидаемое поведение) - When the Help Drawer closes (`isHelpModalOpen` changes to `false`) and `helpComment.trim()` is non-empty and `showOtherForm` is `true` → save `helpComment` to `localStorage` under key `'sos_draft_' + currentTableId`. - When the Help Drawer opens (`isHelpModalOpen` changes to `true`) and `showOtherForm` is `false` → check localStorage for `'sos_draft_' + currentTableId`. If found and non-empty → restore into `helpComment` and set `showOtherForm(true)`. - Draft is cleared from localStorage on: (1) explicit "Отмена" click (already calls `setHelpComment('')`) — add `localStorage.removeItem` there; (2) successful send (already calls `setHelpComment('')`) — add `localStorage.removeItem` there. ### НЕ должно быть (анти-паттерны) - Do NOT restore draft if there is already an active 'other' request - Do NOT save draft if `helpComment` is empty - Do NOT persist across different table IDs (key includes `currentTableId`) - Do NOT throw if `localStorage` is unavailable — wrap in try/catch (KB-033: localStorage crash in private browsers) ### Файл и локация `pages/PublicMenu/x.jsx`: - Add `useEffect` watching `[isHelpModalOpen]` for save/restore logic — place near other Help drawer effects (~line 2357 area `openHelpDrawer` / `closeHelpDrawer`) - "Отмена" button onClick at line ~5072: add `localStorage.removeItem('sos_draft_' + currentTableId)` - Successful send path at line ~5116 `setShowOtherForm(false); setHelpComment('')`: add `localStorage.removeItem('sos_draft_' + currentTableId)` ### Проверка 1. Open Help Drawer → tap "Другой запрос?" → type text → close drawer by swipe → reopen → textarea should reappear with the typed text. 2. Open → type → click "Отмена" → reopen → textarea should be empty. 3. Open → type → send → reopen → textarea should be empty. --- ## Fix 4 — #232 (P2) [MUST-FIX]: HelpFab — move from right to left side ### Сейчас (текущее поведение) HelpFab is positioned `right-4` (bottom-right corner of the screen). On mobile, this conflicts with common right-side gestures and overlaps with the cart area. ### Должно быть (ожидаемое поведение) Move FAB to the left side: - `right-4` → `left-4` - `md:right-8` → `md:left-8` ### НЕ должно быть (анти-паттерны) - Do NOT change any other styles, sizes, colors, or logic in HelpFab - Do NOT change `bottom-24` or `z-40` values - Do NOT touch x.jsx for this fix — only HelpFab.jsx ### Файл и локация `pages/PublicMenu/HelpFab.jsx`, line 5: ```jsx <div className="fixed bottom-24 right-4 z-40 md:bottom-8 md:right-8"> ``` → replace with: ```jsx <div className="fixed bottom-24 left-4 z-40 md:bottom-8 md:left-8"> ``` ### Проверка Open /x with a verified table (hall mode) → Help FAB should appear in bottom-LEFT corner. --- ## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано выше - Edit ONLY the code described in Fix 1–4. - ALL other Help Drawer logic, state, hooks, and UI — DO NOT TOUCH. - If you see any other issue outside this scope — log it in your report as "Out of scope", do NOT fix it. - Do NOT refactor, rename, or restructure any existing functions. - **Exception — i18n dictionary:** Fix 1 adds 1 new key. Find the RU and EN translation objects in x.jsx (grep `"help.other_request_link"` to locate them) and add: - RU: `"help.other_only_one": "Можно только 1 такой запрос одновременно"` - EN: `"help.other_only_one": "Only 1 custom request at a time"` ## FROZEN UX — НЕ МЕНЯТЬ (утверждено Arman) Source: `ux-concepts/HelpDrawer/260407-00 HelpDrawer UX S234 FINAL.md` v6.0 (FINAL) - **FROZEN**: 6-button 3×2 grid layout and button order — DO NOT change - **FROZEN**: In-place state model (idle → sending → active → urgent) — DO NOT change - **FROZEN**: Header: «Нужна помощь?» left + table pill right — DO NOT change - **FROZEN**: Subtitle «Выберите, что нужно» visible only when 0 active requests — DO NOT change - **FROZEN**: ✕ cancel button on active cards (with confirm panel for red urgency) — DO NOT change - **FROZEN**: LOCK-PM-001: Cart FAB "+" in ListView — fixed bottom-right — DO NOT change (this is a DIFFERENT FAB from HelpFab) ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Verify at 375px width: - [ ] Fix 1: disabled "Другой запрос?" link is readable and touch target ≥ 44px - [ ] Fix 1: helper text fits on 1-2 lines, no overflow - [ ] Fix 4: HelpFab visible in bottom-LEFT corner, not obscured by other UI elements - [ ] No excessive whitespace introduced on small screens ## Regression Check (MANDATORY after implementation) Existing features that MUST continue to work after these changes: - [ ] Help Drawer opens via HelpFab bell icon tap - [ ] All 6 SOS buttons (call_waiter, bill, plate, napkins, utensils, clear_table) function normally - [ ] Active SOS cards show timer + ✕ cancel button - [ ] Cancel confirm panel works (red urgency cards) - [ ] Undo toast works after sending an "other" request - [ ] Closing Help Drawer via swipe/backdrop still works correctly ## FROZEN UX grep verification (run BEFORE commit) ```bash grep -n "grid grid-cols-2 gap-\[9px\]" pages/PublicMenu/x.jsx # 3x2 grid — must exist grep -n "help.modal_title" pages/PublicMenu/x.jsx # Header title — must exist grep -n "cancelConfirmType" pages/PublicMenu/x.jsx # Cancel confirm — must exist grep -n "isHelpModalOpen" pages/PublicMenu/HelpFab.jsx # HelpFab props — must exist ``` ## Implementation Notes - Files to edit: `pages/PublicMenu/x.jsx`, `pages/PublicMenu/HelpFab.jsx` - Do NOT edit any other files - For all new user-facing strings: use `tr(key, fallback)` — NOT `t(key)` (PQ-035) - localStorage usage: always wrap in try/catch (KB-033) - i18n function in x.jsx: use `tr()` (confirmed: grep shows `tr(` throughout the file) - git add pages/PublicMenu/x.jsx pages/PublicMenu/HelpFab.jsx - git commit -m "fix: SOS quick-fix #285 #284 #286 #232" === END ===
+mcp startup: no servers
+codex
+I’m syncing the working copy first as requested, then I’ll inspect only `pages/PublicMenu/x.jsx`, `pages/PublicMenu/HelpFab.jsx`, and `README.md`/`BUGS.md` in that page folder, and write a findings-only report for Fix 1–4.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git fetch origin 2>$null; git reset --hard origin/main' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 28.64s:
+HEAD is now at 6527085 feat(SOM): implement collapsed table card (скс) — identity block + status chips (#288)
+codex
+The repo reset completed. Next I’m checking the PublicMenu folder contents and reading only the target files plus local context files, then I’ll compare the implemented code against Fix 1–4 without expanding scope.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content BUGS.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content README.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu succeeded in 18.41s:
+components
+screenshots
+versions
+260320-01 useTableSession RELEASE.jsx
+260321-02 CartView RELEASE.jsx
+260321-02 x RELEASE.jsx
+260323-02 CartView RELEASE.jsx
+260323-02 MenuView RELEASE.jsx
+260323-02 x RELEASE.jsx
+260323-03 CheckoutView RELEASE.jsx
+260327-01 ModeTabs RELEASE.jsx
+260328-01 CartView RELEASE.jsx
+260328-01 x RELEASE.jsx
+260329-01 MenuView RELEASE.jsx
+260329-01 StickyCartBar RELEASE.jsx
+260330-02 CartView RELEASE.jsx
+260330-09 PublicMenu x RELEASE.jsx
+260331-01 PublicMenu x RELEASE.jsx
+260403-00 PublicMenu x RELEASE.jsx
+260403-ROLLBACK PublicMenu x.jsx
+ succeeded in 18.49s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 18.94s:
+---
+version: "41.0"
+updated: "2026-04-01"
+session: 214
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*9 active bugs remaining (0x P0, 4x P1, 4x P2, 0x P3, 1x suggestion).*
+
+### BUG-PM-132: List mode stepper buttons use w-9 h-9 (36px) instead of w-11 h-11 (44px) (P2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P2
+- **ÐšÐ¾Ð³Ð´Ð°:** S177 (found by Codex in chain 74b9, confirmed by CC)
+codex
+I’ve loaded the PublicMenu page context files. Now I’m pulling only the specific code regions tied to Fix 1–4 so the review stays inside the task’s scope lock.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$c = Get-Content HelpFab.jsx; $ranges = @(0..30); foreach ($i in $ranges) { if ($i -lt $c.Length) { '"'{0,6}: {1}' -f ("'$i+1), $c[$i] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$c = Get-Content x.jsx; $ranges = @(560..585 + 635..650 + 1888..1912 + 2338..2388 + 5038..5095 + 5108..5124); foreach ($i in $ranges) { if ($i -lt $c.Length) { '"'{0,6}: {1}' -f ("'$i+1), $c[$i] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"help\\.other_request_link|help\\.other_only_one|help\\.stale_status|getHelpTimerStr|timerTick|sos_draft_|setShowOtherForm\\(false\\); setHelpComment\\(''\\)|Отмена|right-4|left-4|isHelpModalOpen|showOtherForm|activeRequests\\.some\\(r => r\\.type === 'other'\\)\" x.jsx HelpFab.jsx" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu succeeded in 21.66s:
+     1: import React from "react";
+     2: import { Button } from "@/components/ui/button";
+     3: import { CheckCircle2, Bell } from "lucide-react";
+     4: 
+     5: export default function HelpFab({ fabSuccess, isSendingHelp, isHelpModalOpen, onOpen, t }) {
+     6:   return (
+     7:     <div className="fixed bottom-24 right-4 z-40 md:bottom-8 md:right-8">
+     8:       <Button
+     9:         variant={fabSuccess ? "default" : "secondary"}
+    10:         onClick={onOpen}
+    11:         disabled={isSendingHelp && isHelpModalOpen}
+    12:         className={`shadow-lg rounded-full transition-all duration-300 flex items-center justify-center
+    13:           w-12 h-12 p-0
+    14:           md:w-auto md:h-14 md:px-6 md:gap-2
+    15:           ${fabSuccess ? "bg-green-600 hover:bg-green-700 text-white" : "bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"}`}
+    16:       >
+    17:         {fabSuccess ? (
+    18:           <>
+    19:             <CheckCircle2 className="w-5 h-5" />
+    20:             <span className="hidden md:inline font-medium">{t('help.sent')}</span>
+ succeeded in 22.45s:
+   561:   "help.resolved_call_waiter": "âœ… Waiter came Â· Thank you!",
+   562:   "help.resolved_bill": "âœ… Bill brought Â· Thank you!",
+   563:   "help.resolved_napkins": "âœ… Napkins brought Â· Thank you!",
+   564:   "help.resolved_menu": "âœ… Menu brought Â· Thank you!",
+   565:   "help.resolved_other": "âœ… Done Â· Thank you!",
+   566:   "help.no_connection": "No connection",
+   567:   "help.try_again": "Try again",
+   568:   "help.remind_failed": "Failed to send reminder",
+   569:   "help.send_failed": "Failed to send",
+   570:   "help.restoring_status": "Restoring statusâ€¦",
+   571:   "help.offline_status": "No connection Â· will retry automatically",
+   572:   "help.stale_status": "Data may be outdated Â· no update",
+   573:   "help.seconds_short": "sec",
+   574:   "help.updated_label": "Updated",
+   575:   "help.ago": "ago",
+   576:   "help.reminder": "reminder",
+   577:   "help.reminders": "reminders",
+   578:   // SOS v6.0 new keys
+   579:   "help.get_bill": "Bill",
+   580:   "help.plate": "Extra plate",
+ succeeded in 30.45s:
+x.jsx:572:  "help.stale_status": "Data may be outdated · no update",
+x.jsx:594:  "help.other_request_link": "Something else?",
+x.jsx:610:  "help.cancel": "Отмена",
+x.jsx:643:  "help.stale_status": "Данные могли устареть",
+x.jsx:669:  "help.other_request_link": "Другой запрос?",
+x.jsx:1813:    isHelpModalOpen,
+x.jsx:1898:  const getHelpTimerStr = useCallback((sentAt) => {
+x.jsx:1909:  const [showOtherForm, setShowOtherForm] = useState(false);
+x.jsx:1910:  const [timerTick, setTimerTick] = useState(0);
+x.jsx:2034:  }, [getNormalizedHelpState, requestStates, timerTick]);
+x.jsx:2135:  }, [getNormalizedHelpState, requestStates, timerTick]);
+x.jsx:2137:  const helpSyncEnabled = Boolean(partner?.id && currentTableId && (isHelpModalOpen || hasAnyHelpState || isHelpRestoring));
+x.jsx:2743:    const shouldTick = isHelpModalOpen || !!undoToast || ticketRows.length > 0 || isHelpRestoring;
+x.jsx:2747:  }, [isHelpModalOpen, isHelpRestoring, ticketRows.length, undoToast]);
+x.jsx:4909:            isHelpModalOpen={isHelpModalOpen}
+x.jsx:4923:      <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
+x.jsx:4956:                const timerText = isActive ? getHelpTimerStr(sentAt) : '';
+x.jsx:5046:                  <span className={`text-[12px] font-bold ${s.timer} whitespace-nowrap`}>⏱ {getHelpTimerStr(row.sentAt)}</span>
+x.jsx:5054:            {!activeRequests.some(r => r.type === 'other') && !showOtherForm && (
+x.jsx:5058:                  {tr('help.other_request_link', 'Другой запрос?')}
+codex
+I have the primary hotspots. I’m reading the small amount of surrounding state/effect code needed to validate behavior, especially for stale cleanup and drawer close/open handling, before I write the findings file.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$c = Get-Content x.jsx; $ranges = @(1800..1855 + 1910..1945 + 2718..2755 + 2830..2895 + 2988..3045); foreach ($i in $ranges) { if ($i -lt $c.Length) { '"'{0,6}: {1}' -f ("'$i+1), $c[$i] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"const activeRequests|const ticketRows|const handleResolve|useEffect\\(|setInterval|setTimerTick|closeHelpDrawer|openHelpDrawer|handlePresetSelect\\(|currentTableIdRef|helpComment\" x.jsx" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu succeeded in 15.68s:
+1132:  useEffect(() => {
+1134:    const id = setInterval(async () => {
+1144:  useEffect(() => {
+1149:  useEffect(() => {
+1153:    const id = setInterval(tick, 1000);
+1570:  useEffect(() => {
+1585:  useEffect(() => {
+1627:  useEffect(() => {
+1634:  useEffect(() => {
+1641:  useEffect(() => {
+1663:  useEffect(() => {
+1706:  useEffect(() => {
+1750:  useEffect(() => {
+1777:  useEffect(() => {
+1816:    helpComment,
+1910:  const [timerTick, setTimerTick] = useState(0);
+1913:  const currentTableIdRef = useRef(currentTableId);
+1920:  useEffect(() => {
+1921:    currentTableIdRef.current = currentTableId;
+1924:  useEffect(() => {
+ succeeded in 16.30s:
+  1801:   }, [partner?.table_code_length]);
+  1802: 
+  1803:   // P0-7: Removed activeTables query - no dropdown needed
+  1804: 
+  1805:   // P0-2: currentTableId only from resolved table or code verification
+  1806:   const currentTableId = resolvedTable?.id || verifiedTableId || null;
+  1807:   
+  1808:   // Current table object for display (from QR resolve or code verify)
+  1809:   const currentTable = resolvedTable || verifiedTable || null;
+  1810: 
+  1811:   // Help / ServiceRequest hook
+  1812:   const {
+  1813:     isHelpModalOpen,
+  1814:     setIsHelpModalOpen,
+  1815:     selectedHelpType,
+  1816:     helpComment,
+  1817:     setHelpComment,
+  1818:     isSendingHelp,
+  1819:     helpSubmitError,
+  1820:     fabSuccess,
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$c = Get-Content x.jsx; $ranges = @(2000..2055 + 2455..2498 + 2755..2820); foreach ($i in $ranges) { if ($i -lt $c.Length) { '"'{0,6}: {1}' -f ("'$i+1), $c[$i] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content x.jsx -Encoding utf8 | Select-Object -Index (560..585 + 635..650 + 1888..1912 + 2338..2388 + 5038..5124)' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu succeeded in 17.91s:
+  2001:       lastReminderAt,
+  2002:       remindCooldownUntil,
+  2003:       isActive: true,
+  2004:       isVisible: true,
+  2005:     };
+  2006:   }, [getHelpCooldownMs, normalizeHelpMessage, parseHelpTimestamp]);
+  2007: 
+  2008:   const ticketRows = useMemo(() => {
+  2009:     const now = Date.now();
+  2010:     const list = [];
+  2011: 
+  2012:     Object.entries(requestStates).forEach(([type, state]) => {
+  2013:       if (type === 'other') {
+  2014:         const rows = Array.isArray(state) ? state : [state].filter(Boolean);
+  2015:         rows.forEach((entry) => {
+  2016:           const normalized = getNormalizedHelpState('other', entry, now);
+  2017:           if (normalized && (normalized.isVisible || normalized.isActive)) {
+  2018:             list.push({ ...normalized, type: 'other', id: normalized.id });
+  2019:           }
+  2020:         });
+ succeeded in 18.29s:
+  "help.resolved_call_waiter": "✅ Waiter came · Thank you!",
+  "help.resolved_bill": "✅ Bill brought · Thank you!",
+  "help.resolved_napkins": "✅ Napkins brought · Thank you!",
+  "help.resolved_menu": "✅ Menu brought · Thank you!",
+  "help.resolved_other": "✅ Done · Thank you!",
+  "help.no_connection": "No connection",
+  "help.try_again": "Try again",
+  "help.remind_failed": "Failed to send reminder",
+  "help.send_failed": "Failed to send",
+  "help.restoring_status": "Restoring status…",
+  "help.offline_status": "No connection · will retry automatically",
+  "help.stale_status": "Data may be outdated · no update",
+  "help.seconds_short": "sec",
+  "help.updated_label": "Updated",
+  "help.ago": "ago",
+  "help.reminder": "reminder",
+  "help.reminders": "reminders",
+  // SOS v6.0 new keys
+  "help.get_bill": "Bill",
+  "help.plate": "Extra plate",
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$c = Get-Content x.jsx; $ranges = @(2510..2660); foreach ($i in $ranges) { if ($i -lt $c.Length) { '"'{0,6}: {1}' -f ("'$i+1), $c[$i] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"24 \\* 60 \\* 60|24\\*60\\*60|24h|stale|other_only_one|sos_draft_|handleResolve\\(|timerTick\\]\" x.jsx" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu succeeded in 12.25s:
+  2511:     } else {
+  2512:       handleResolve(type, type === 'other' ? activeRow.id : undefined);
+  2513:     }
+  2514:   }, [activeRequests, getHelpUrgency, handleResolve]);
+  2515: 
+  2516:   useEffect(() => {
+  2517:     if (!cancelConfirmType) return;
+  2518:     const exists = activeRequests.some(r => r.type === cancelConfirmType);
+  2519:     if (!exists) setCancelConfirmType(null);
+  2520:   }, [activeRequests, cancelConfirmType]);
+  2521: 
+  2522:   // HD-01: Auto-submit when selectedHelpType matches pending quick send
+  2523:   useEffect(() => {
+  2524:     const action = pendingQuickSendRef.current;
+  2525:     if (!action) return;
+  2526:     if (selectedHelpType !== action.type) return;
+  2527:     if (action.type === 'other' && action.message && normalizeHelpMessage(helpComment) !== normalizeHelpMessage(action.message)) return;
+  2528: 
+  2529:     pendingQuickSendRef.current = null;
+  2530: 
+ succeeded in 11.74s:
+572:  "help.stale_status": "Data may be outdated · no update",
+643:  "help.stale_status": "Данные могли устареть",
+1073:    staleTime: OS_POLL_INTERVAL_MS,
+1108:    staleTime: Infinity,
+1118:    staleTime: Infinity,
+1640:  // BUG-PM-005: mark restored before setCart to prevent save effect from firing on stale empty cart
+2034:  }, [getNormalizedHelpState, requestStates, timerTick]);
+2135:  }, [getNormalizedHelpState, requestStates, timerTick]);
+2512:      handleResolve(type, type === 'other' ? activeRow.id : undefined);
+2818:    staleTime: 5 * 60 * 1000,
+2908:    staleTime: 5 * 60 * 1000,
+2966:    staleTime: 5 * 60 * 1000,
+3704:  // Process hall order (P0-2: accepts validatedSession to avoid stale closure)
+4115:        // Process the order (pass validated session to avoid stale closure)
+5012:                        handleResolve(cancelConfirmType);
+5047:                  <button onClick={(e) => { e.stopPropagation(); handleResolve('other', row.id); }}
+codex
+I have enough context. I’m writing the findings report to the required pipeline path, and I’m also saving the review snapshot and the executed command log in `pages/PublicMenu` to satisfy the repo’s review-output rules.
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-04-13.log
+git fetch origin 2>$null; git reset --hard origin/main
+Get-ChildItem -Name
+Get-Content README.md
+Get-Content BUGS.md
+rg -n "help\.other_request_link|help\.other_only_one|help\.stale_status|getHelpTimerStr|timerTick|sos_draft_|setShowOtherForm\(false\); setHelpComment\(''\)|Отмена|right-4|left-4|isHelpModalOpen|showOtherForm|activeRequests\.some\(r => r\.type === 'other'\)" x.jsx HelpFab.jsx
+$c = Get-Content x.jsx; $ranges = @(560..585 + 635..650 + 1888..1912 + 2338..2388 + 5038..5095 + 5108..5124); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
+$c = Get-Content HelpFab.jsx; $ranges = @(0..30); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
+rg -n "const activeRequests|const ticketRows|const handleResolve|useEffect\(|setInterval|setTimerTick|closeHelpDrawer|openHelpDrawer|handlePresetSelect\(|currentTableIdRef|helpComment" x.jsx
+$c = Get-Content x.jsx; $ranges = @(1800..1855 + 1910..1945 + 2718..2755 + 2830..2895 + 2988..3045); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
+$c = Get-Content x.jsx; $ranges = @(2000..2055 + 2455..2498 + 2755..2820); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
+Get-Content x.jsx -Encoding utf8 | Select-Object -Index (560..585 + 635..650 + 1888..1912 + 2338..2388 + 5038..5124)
+rg -n "24 \* 60 \* 60|24\*60\*60|24h|stale|other_only_one|sos_draft_|handleResolve\(|timerTick\]" x.jsx
+$c = Get-Content x.jsx; $ranges = @(2510..2660); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-04-13.md
+# Codex Writer Findings — PublicMenu Review
+
+## Findings
+1. [P2] Fix 1 not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5054) still hides the `"Другой запрос?"` control whenever any active `other` request exists via `!activeRequests.some(r => r.type === 'other') && !showOtherForm`. The required disabled-visible state is missing, no helper text is rendered, and the new `tr('help.other_only_one', ...)` key is absent from both translation objects. FIX: keep the existing `!showOtherForm` hide rule, but always render the link when the form is closed; compute `hasActiveOther`, switch the classes to the disabled visual (`text-gray-300`, no underline/hover, default cursor) when true, render the helper text under it, and add `help.other_only_one` to both EN and RU dictionaries.
+2. [P2] Fix 2 stale timer text not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:1898) still returns raw minutes for every elapsed time after 60 seconds and never branches to `tr('help.stale_status', ...)`. A 24h+ request will therefore keep showing a large minute count instead of the required stale label. FIX: in `getHelpTimerStr`, add an early return for `elapsedSec >= 24 * 60 * 60` that returns `tr('help.stale_status', 'Данные могли устареть')`.
+3. [P2] Fix 2 auto-resolve effect is missing — the Help drawer effect block around [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2742) only increments `timerTick`; there is no `useEffect` tied to `timerTick` that scans `activeRequests` and calls `handleResolve(type, id)` for rows older than 24 hours. Stale requests therefore remain active indefinitely. FIX: add a Help-scoped `useEffect` that runs on `timerTick`, filters `activeRequests` by `Date.now() - sentAt > 24 * 60 * 60 * 1000`, and resolves each stale row through local `handleResolve(type, otherId)` without introducing a new polling interval or backend call.
+4. [P3] Fix 3 draft persistence on drawer close/open is not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2357) resets `showOtherForm` and `helpComment` in `openHelpDrawer`, and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2370) clears both again in `closeHelpDrawer`. There is no `sos_draft_${currentTableId}` save/restore effect around `isHelpModalOpen`, so closing the drawer by swipe or backdrop still discards the unsent textarea draft. FIX: add the requested `useEffect` for save/restore keyed by `isHelpModalOpen`, wrap `localStorage` access in `try/catch`, and skip restore when an active `other` request already exists.
+5. [P3] Fix 3 draft cleanup paths are also missing — the Cancel button at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5077) only calls `setShowOtherForm(false); setHelpComment('');`, and the successful `other` send path clears UI state at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2588) and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5121) without removing `sos_draft_${currentTableId}`. Once draft persistence is added, both flows would leave stale drafts behind. FIX: remove `localStorage` draft state on explicit cancel and on successful send, both behind `try/catch`.
+6. [P2] Fix 4 HelpFab position has not changed — [HelpFab.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/HelpFab.jsx:7) still uses `right-4 md:right-8`, so the FAB remains on the bottom-right instead of the required bottom-left. FIX: replace only those classes with `left-4 md:left-8` and keep the rest of the component unchanged.
+
+## Summary
+Total: 6 findings (0 P0, 0 P1, 4 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none
+- Scope questions (anything you weren't sure if it's in scope): none
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260413-173504-b1a1-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260413-173504-b1a1
+
+## Findings
+1. [P2] Fix 1 not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5054) still hides the `"Другой запрос?"` control whenever any active `other` request exists via `!activeRequests.some(r => r.type === 'other') && !showOtherForm`. The required disabled-visible state is missing, no helper text is rendered, and the new `tr('help.other_only_one', ...)` key is absent from both translation objects. FIX: keep the existing `!showOtherForm` hide rule, but always render the link when the form is closed; compute `hasActiveOther`, switch the classes to the disabled visual (`text-gray-300`, no underline/hover, default cursor) when true, render the helper text under it, and add `help.other_only_one` to both EN and RU dictionaries.
+2. [P2] Fix 2 stale timer text not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:1898) still returns raw minutes for every elapsed time after 60 seconds and never branches to `tr('help.stale_status', ...)`. A 24h+ request will therefore keep showing a large minute count instead of the required stale label. FIX: in `getHelpTimerStr`, add an early return for `elapsedSec >= 24 * 60 * 60` that returns `tr('help.stale_status', 'Данные могли устареть')`.
+3. [P2] Fix 2 auto-resolve effect is missing — the Help drawer effect block around [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2742) only increments `timerTick`; there is no `useEffect` tied to `timerTick` that scans `activeRequests` and calls `handleResolve(type, id)` for rows older than 24 hours. Stale requests therefore remain active indefinitely. FIX: add a Help-scoped `useEffect` that runs on `timerTick`, filters `activeRequests` by `Date.now() - sentAt > 24 * 60 * 60 * 1000`, and resolves each stale row through local `handleResolve(type, otherId)` without introducing a new polling interval or backend call.
+4. [P3] Fix 3 draft persistence on drawer close/open is not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2357) resets `showOtherForm` and `helpComment` in `openHelpDrawer`, and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2370) clears both again in `closeHelpDrawer`. There is no `sos_draft_${currentTableId}` save/restore effect around `isHelpModalOpen`, so closing the drawer by swipe or backdrop still discards the unsent textarea draft. FIX: add the requested `useEffect` for save/restore keyed by `isHelpModalOpen`, wrap `localStorage` access in `try/catch`, and skip restore when an active `other` request already exists.
+5. [P3] Fix 3 draft cleanup paths are also missing — the Cancel button at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5077) only calls `setShowOtherForm(false); setHelpComment('');`, and the successful `other` send path clears UI state at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2588) and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5121) without removing `sos_draft_${currentTableId}`. Once draft persistence is added, both flows would leave stale drafts behind. FIX: remove `localStorage` draft state on explicit cancel and on successful send, both behind `try/catch`.
+6. [P2] Fix 4 HelpFab position has not changed — [HelpFab.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/HelpFab.jsx:7) still uses `right-4 md:right-8`, so the FAB remains on the bottom-right instead of the required bottom-left. FIX: replace only those classes with `left-4 md:left-8` and keep the rest of the component unchanged.
+
+## Summary
+Total: 6 findings (0 P0, 0 P1, 4 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none
+- Scope questions (anything you weren't sure if it's in scope): none
+apply_patch(auto_approved=true) exited 0 in 722ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260413-173504-b1a1-codex-findings.md
+A pages/PublicMenu/review_2026-04-13.md
+A pages/PublicMenu/commands_2026-04-13.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-04-13.log b/pages/PublicMenu/commands_2026-04-13.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..6742db59f023d0032dfc9bcf31da0faa2bc0b1e1
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-04-13.log
+@@ -0,0 +1,13 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Name
++Get-Content README.md
++Get-Content BUGS.md
++rg -n "help\.other_request_link|help\.other_only_one|help\.stale_status|getHelpTimerStr|timerTick|sos_draft_|setShowOtherForm\(false\); setHelpComment\(''\)|Отмена|right-4|left-4|isHelpModalOpen|showOtherForm|activeRequests\.some\(r => r\.type === 'other'\)" x.jsx HelpFab.jsx
++$c = Get-Content x.jsx; $ranges = @(560..585 + 635..650 + 1888..1912 + 2338..2388 + 5038..5095 + 5108..5124); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
++$c = Get-Content HelpFab.jsx; $ranges = @(0..30); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
++rg -n "const activeRequests|const ticketRows|const handleResolve|useEffect\(|setInterval|setTimerTick|closeHelpDrawer|openHelpDrawer|handlePresetSelect\(|currentTableIdRef|helpComment" x.jsx
++$c = Get-Content x.jsx; $ranges = @(1800..1855 + 1910..1945 + 2718..2755 + 2830..2895 + 2988..3045); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
++$c = Get-Content x.jsx; $ranges = @(2000..2055 + 2455..2498 + 2755..2820); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
++Get-Content x.jsx -Encoding utf8 | Select-Object -Index (560..585 + 635..650 + 1888..1912 + 2338..2388 + 5038..5124)
++rg -n "24 \* 60 \* 60|24\*60\*60|24h|stale|other_only_one|sos_draft_|handleResolve\(|timerTick\]" x.jsx
++$c = Get-Content x.jsx; $ranges = @(2510..2660); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
+diff --git a/pages/PublicMenu/review_2026-04-13.md b/pages/PublicMenu/review_2026-04-13.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6e4e2aad3146a9edb6013ad8c7612a0aeb25cb18
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-04-13.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu Review
++
++## Findings
++1. [P2] Fix 1 not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5054) still hides the `"Другой запрос?"` control whenever any active `other` request exists via `!activeRequests.some(r => r.type === 'other') && !showOtherForm`. The required disabled-visible state is missing, no helper text is rendered, and the new `tr('help.other_only_one', ...)` key is absent from both translation objects. FIX: keep the existing `!showOtherForm` hide rule, but always render the link when the form is closed; compute `hasActiveOther`, switch the classes to the disabled visual (`text-gray-300`, no underline/hover, default cursor) when true, render the helper text under it, and add `help.other_only_one` to both EN and RU dictionaries.
++2. [P2] Fix 2 stale timer text not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:1898) still returns raw minutes for every elapsed time after 60 seconds and never branches to `tr('help.stale_status', ...)`. A 24h+ request will therefore keep showing a large minute count instead of the required stale label. FIX: in `getHelpTimerStr`, add an early return for `elapsedSec >= 24 * 60 * 60` that returns `tr('help.stale_status', 'Данные могли устареть')`.
++3. [P2] Fix 2 auto-resolve effect is missing — the Help drawer effect block around [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2742) only increments `timerTick`; there is no `useEffect` tied to `timerTick` that scans `activeRequests` and calls `handleResolve(type, id)` for rows older than 24 hours. Stale requests therefore remain active indefinitely. FIX: add a Help-scoped `useEffect` that runs on `timerTick`, filters `activeRequests` by `Date.now() - sentAt > 24 * 60 * 60 * 1000`, and resolves each stale row through local `handleResolve(type, otherId)` without introducing a new polling interval or backend call.
++4. [P3] Fix 3 draft persistence on drawer close/open is not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2357) resets `showOtherForm` and `helpComment` in `openHelpDrawer`, and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2370) clears both again in `closeHelpDrawer`. There is no `sos_draft_${currentTableId}` save/restore effect around `isHelpModalOpen`, so closing the drawer by swipe or backdrop still discards the unsent textarea draft. FIX: add the requested `useEffect` for save/restore keyed by `isHelpModalOpen`, wrap `localStorage` access in `try/catch`, and skip restore when an active `other` request already exists.
++5. [P3] Fix 3 draft cleanup paths are also missing — the Cancel button at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5077) only calls `setShowOtherForm(false); setHelpComment('');`, and the successful `other` send path clears UI state at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2588) and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5121) without removing `sos_draft_${currentTableId}`. Once draft persistence is added, both flows would leave stale drafts behind. FIX: remove `localStorage` draft state on explicit cancel and on successful send, both behind `try/catch`.
++6. [P2] Fix 4 HelpFab position has not changed — [HelpFab.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/HelpFab.jsx:7) still uses `right-4 md:right-8`, so the FAB remains on the bottom-right instead of the required bottom-left. FIX: replace only those classes with `left-4 md:left-8` and keep the rest of the component unchanged.
++
++## Summary
++Total: 6 findings (0 P0, 0 P1, 4 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+diff --git a/pipeline/chain-state/publicmenu-260413-173504-b1a1-codex-findings.md b/pipeline/chain-state/publicmenu-260413-173504-b1a1-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..41e52fc74f4c2c1160a436b197e85abe68db0810
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260413-173504-b1a1-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260413-173504-b1a1
++
++## Findings
++1. [P2] Fix 1 not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5054) still hides the `"Другой запрос?"` control whenever any active `other` request exists via `!activeRequests.some(r => r.type === 'other') && !showOtherForm`. The required disabled-visible state is missing, no helper text is rendered, and the new `tr('help.other_only_one', ...)` key is absent from both translation objects. FIX: keep the existing `!showOtherForm` hide rule, but always render the link when the form is closed; compute `hasActiveOther`, switch the classes to the disabled visual (`text-gray-300`, no underline/hover, default cursor) when true, render the helper text under it, and add `help.other_only_one` to both EN and RU dictionaries.
++2. [P2] Fix 2 stale timer text not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:1898) still returns raw minutes for every elapsed time after 60 seconds and never branches to `tr('help.stale_status', ...)`. A 24h+ request will therefore keep showing a large minute count instead of the required stale label. FIX: in `getHelpTimerStr`, add an early return for `elapsedSec >= 24 * 60 * 60` that returns `tr('help.stale_status', 'Данные могли устареть')`.
++3. [P2] Fix 2 auto-resolve effect is missing — the Help drawer effect block around [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2742) only increments `timerTick`; there is no `useEffect` tied to `timerTick` that scans `activeRequests` and calls `handleResolve(type, id)` for rows older than 24 hours. Stale requests therefore remain active indefinitely. FIX: add a Help-scoped `useEffect` that runs on `timerTick`, filters `activeRequests` by `Date.now() - sentAt > 24 * 60 * 60 * 1000`, and resolves each stale row through local `handleResolve(type, otherId)` without introducing a new polling interval or backend call.
++4. [P3] Fix 3 draft persistence on drawer close/open is not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2357) resets `showOtherForm` and `helpComment` in `openHelpDrawer`, and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2370) clears both again in `closeHelpDrawer`. There is no `sos_draft_${currentTableId}` save/restore effect around `isHelpModalOpen`, so closing the drawer by swipe or backdrop still discards the unsent textarea draft. FIX: add the requested `useEffect` for save/restore keyed by `isHelpModalOpen`, wrap `localStorage` access in `try/catch`, and skip restore when an active `other` request already exists.
++5. [P3] Fix 3 draft cleanup paths are also missing — the Cancel button at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5077) only calls `setShowOtherForm(false); setHelpComment('');`, and the successful `other` send path clears UI state at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2588) and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5121) without removing `sos_draft_${currentTableId}`. Once draft persistence is added, both flows would leave stale drafts behind. FIX: remove `localStorage` draft state on explicit cancel and on successful send, both behind `try/catch`.
++6. [P2] Fix 4 HelpFab position has not changed — [HelpFab.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/HelpFab.jsx:7) still uses `right-4 md:right-8`, so the FAB remains on the bottom-right instead of the required bottom-left. FIX: replace only those classes with `left-4 md:left-8` and keep the rest of the component unchanged.
++
++## Summary
++Total: 6 findings (0 P0, 0 P1, 4 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-04-13.log b/pages/PublicMenu/commands_2026-04-13.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..6742db59f023d0032dfc9bcf31da0faa2bc0b1e1
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-04-13.log
+@@ -0,0 +1,13 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Name
++Get-Content README.md
++Get-Content BUGS.md
++rg -n "help\.other_request_link|help\.other_only_one|help\.stale_status|getHelpTimerStr|timerTick|sos_draft_|setShowOtherForm\(false\); setHelpComment\(''\)|Отмена|right-4|left-4|isHelpModalOpen|showOtherForm|activeRequests\.some\(r => r\.type === 'other'\)" x.jsx HelpFab.jsx
++$c = Get-Content x.jsx; $ranges = @(560..585 + 635..650 + 1888..1912 + 2338..2388 + 5038..5095 + 5108..5124); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
++$c = Get-Content HelpFab.jsx; $ranges = @(0..30); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
++rg -n "const activeRequests|const ticketRows|const handleResolve|useEffect\(|setInterval|setTimerTick|closeHelpDrawer|openHelpDrawer|handlePresetSelect\(|currentTableIdRef|helpComment" x.jsx
++$c = Get-Content x.jsx; $ranges = @(1800..1855 + 1910..1945 + 2718..2755 + 2830..2895 + 2988..3045); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
++$c = Get-Content x.jsx; $ranges = @(2000..2055 + 2455..2498 + 2755..2820); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
++Get-Content x.jsx -Encoding utf8 | Select-Object -Index (560..585 + 635..650 + 1888..1912 + 2338..2388 + 5038..5124)
++rg -n "24 \* 60 \* 60|24\*60\*60|24h|stale|other_only_one|sos_draft_|handleResolve\(|timerTick\]" x.jsx
++$c = Get-Content x.jsx; $ranges = @(2510..2660); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
+diff --git a/pages/PublicMenu/review_2026-04-13.md b/pages/PublicMenu/review_2026-04-13.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6e4e2aad3146a9edb6013ad8c7612a0aeb25cb18
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-04-13.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu Review
++
++## Findings
++1. [P2] Fix 1 not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5054) still hides the `"Другой запрос?"` control whenever any active `other` request exists via `!activeRequests.some(r => r.type === 'other') && !showOtherForm`. The required disabled-visible state is missing, no helper text is rendered, and the new `tr('help.other_only_one', ...)` key is absent from both translation objects. FIX: keep the existing `!showOtherForm` hide rule, but always render the link when the form is closed; compute `hasActiveOther`, switch the classes to the disabled visual (`text-gray-300`, no underline/hover, default cursor) when true, render the helper text under it, and add `help.other_only_one` to both EN and RU dictionaries.
++2. [P2] Fix 2 stale timer text not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:1898) still returns raw minutes for every elapsed time after 60 seconds and never branches to `tr('help.stale_status', ...)`. A 24h+ request will therefore keep showing a large minute count instead of the required stale label. FIX: in `getHelpTimerStr`, add an early return for `elapsedSec >= 24 * 60 * 60` that returns `tr('help.stale_status', 'Данные могли устареть')`.
++3. [P2] Fix 2 auto-resolve effect is missing — the Help drawer effect block around [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2742) only increments `timerTick`; there is no `useEffect` tied to `timerTick` that scans `activeRequests` and calls `handleResolve(type, id)` for rows older than 24 hours. Stale requests therefore remain active indefinitely. FIX: add a Help-scoped `useEffect` that runs on `timerTick`, filters `activeRequests` by `Date.now() - sentAt > 24 * 60 * 60 * 1000`, and resolves each stale row through local `handleResolve(type, otherId)` without introducing a new polling interval or backend call.
++4. [P3] Fix 3 draft persistence on drawer close/open is not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2357) resets `showOtherForm` and `helpComment` in `openHelpDrawer`, and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2370) clears both again in `closeHelpDrawer`. There is no `sos_draft_${currentTableId}` save/restore effect around `isHelpModalOpen`, so closing the drawer by swipe or backdrop still discards the unsent textarea draft. FIX: add the requested `useEffect` for save/restore keyed by `isHelpModalOpen`, wrap `localStorage` access in `try/catch`, and skip restore when an active `other` request already exists.
++5. [P3] Fix 3 draft cleanup paths are also missing — the Cancel button at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5077) only calls `setShowOtherForm(false); setHelpComment('');`, and the successful `other` send path clears UI state at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2588) and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5121) without removing `sos_draft_${currentTableId}`. Once draft persistence is added, both flows would leave stale drafts behind. FIX: remove `localStorage` draft state on explicit cancel and on successful send, both behind `try/catch`.
++6. [P2] Fix 4 HelpFab position has not changed — [HelpFab.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/HelpFab.jsx:7) still uses `right-4 md:right-8`, so the FAB remains on the bottom-right instead of the required bottom-left. FIX: replace only those classes with `left-4 md:left-8` and keep the rest of the component unchanged.
++
++## Summary
++Total: 6 findings (0 P0, 0 P1, 4 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+diff --git a/pipeline/chain-state/publicmenu-260413-173504-b1a1-codex-findings.md b/pipeline/chain-state/publicmenu-260413-173504-b1a1-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..41e52fc74f4c2c1160a436b197e85abe68db0810
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260413-173504-b1a1-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260413-173504-b1a1
++
++## Findings
++1. [P2] Fix 1 not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5054) still hides the `"Другой запрос?"` control whenever any active `other` request exists via `!activeRequests.some(r => r.type === 'other') && !showOtherForm`. The required disabled-visible state is missing, no helper text is rendered, and the new `tr('help.other_only_one', ...)` key is absent from both translation objects. FIX: keep the existing `!showOtherForm` hide rule, but always render the link when the form is closed; compute `hasActiveOther`, switch the classes to the disabled visual (`text-gray-300`, no underline/hover, default cursor) when true, render the helper text under it, and add `help.other_only_one` to both EN and RU dictionaries.
++2. [P2] Fix 2 stale timer text not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:1898) still returns raw minutes for every elapsed time after 60 seconds and never branches to `tr('help.stale_status', ...)`. A 24h+ request will therefore keep showing a large minute count instead of the required stale label. FIX: in `getHelpTimerStr`, add an early return for `elapsedSec >= 24 * 60 * 60` that returns `tr('help.stale_status', 'Данные могли устареть')`.
++3. [P2] Fix 2 auto-resolve effect is missing — the Help drawer effect block around [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2742) only increments `timerTick`; there is no `useEffect` tied to `timerTick` that scans `activeRequests` and calls `handleResolve(type, id)` for rows older than 24 hours. Stale requests therefore remain active indefinitely. FIX: add a Help-scoped `useEffect` that runs on `timerTick`, filters `activeRequests` by `Date.now() - sentAt > 24 * 60 * 60 * 1000`, and resolves each stale row through local `handleResolve(type, otherId)` without introducing a new polling interval or backend call.
++4. [P3] Fix 3 draft persistence on drawer close/open is not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2357) resets `showOtherForm` and `helpComment` in `openHelpDrawer`, and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2370) clears both again in `closeHelpDrawer`. There is no `sos_draft_${currentTableId}` save/restore effect around `isHelpModalOpen`, so closing the drawer by swipe or backdrop still discards the unsent textarea draft. FIX: add the requested `useEffect` for save/restore keyed by `isHelpModalOpen`, wrap `localStorage` access in `try/catch`, and skip restore when an active `other` request already exists.
++5. [P3] Fix 3 draft cleanup paths are also missing — the Cancel button at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5077) only calls `setShowOtherForm(false); setHelpComment('');`, and the successful `other` send path clears UI state at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2588) and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5121) without removing `sos_draft_${currentTableId}`. Once draft persistence is added, both flows would leave stale drafts behind. FIX: remove `localStorage` draft state on explicit cancel and on successful send, both behind `try/catch`.
++6. [P2] Fix 4 HelpFab position has not changed — [HelpFab.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/HelpFab.jsx:7) still uses `right-4 md:right-8`, so the FAB remains on the bottom-right instead of the required bottom-left. FIX: replace only those classes with `left-4 md:left-8` and keep the rest of the component unchanged.
++
++## Summary
++Total: 6 findings (0 P0, 0 P1, 4 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+
+codex
+Saved the findings to [publicmenu-260413-173504-b1a1-codex-findings.md](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260413-173504-b1a1-codex-findings.md>). I also saved the mirrored page review to [review_2026-04-13.md](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-04-13.md>) and the executed command log to [commands_2026-04-13.log](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-04-13.log>).
+
+The review found 6 in-scope issues: Fix 1 is not implemented, Fix 2 is missing both the stale timer label and the 24h auto-resolve effect, Fix 3 is missing both draft persistence and draft cleanup on cancel/send, and Fix 4 still leaves `HelpFab` on the right. No product code was changed.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-04-13.log b/pages/PublicMenu/commands_2026-04-13.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..6742db59f023d0032dfc9bcf31da0faa2bc0b1e1
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-04-13.log
+@@ -0,0 +1,13 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Name
++Get-Content README.md
++Get-Content BUGS.md
++rg -n "help\.other_request_link|help\.other_only_one|help\.stale_status|getHelpTimerStr|timerTick|sos_draft_|setShowOtherForm\(false\); setHelpComment\(''\)|Отмена|right-4|left-4|isHelpModalOpen|showOtherForm|activeRequests\.some\(r => r\.type === 'other'\)" x.jsx HelpFab.jsx
++$c = Get-Content x.jsx; $ranges = @(560..585 + 635..650 + 1888..1912 + 2338..2388 + 5038..5095 + 5108..5124); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
++$c = Get-Content HelpFab.jsx; $ranges = @(0..30); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
++rg -n "const activeRequests|const ticketRows|const handleResolve|useEffect\(|setInterval|setTimerTick|closeHelpDrawer|openHelpDrawer|handlePresetSelect\(|currentTableIdRef|helpComment" x.jsx
++$c = Get-Content x.jsx; $ranges = @(1800..1855 + 1910..1945 + 2718..2755 + 2830..2895 + 2988..3045); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
++$c = Get-Content x.jsx; $ranges = @(2000..2055 + 2455..2498 + 2755..2820); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
++Get-Content x.jsx -Encoding utf8 | Select-Object -Index (560..585 + 635..650 + 1888..1912 + 2338..2388 + 5038..5124)
++rg -n "24 \* 60 \* 60|24\*60\*60|24h|stale|other_only_one|sos_draft_|handleResolve\(|timerTick\]" x.jsx
++$c = Get-Content x.jsx; $ranges = @(2510..2660); foreach ($i in $ranges) { if ($i -lt $c.Length) { '{0,6}: {1}' -f ($i+1), $c[$i] } }
+diff --git a/pages/PublicMenu/review_2026-04-13.md b/pages/PublicMenu/review_2026-04-13.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6e4e2aad3146a9edb6013ad8c7612a0aeb25cb18
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-04-13.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu Review
++
++## Findings
++1. [P2] Fix 1 not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5054) still hides the `"Другой запрос?"` control whenever any active `other` request exists via `!activeRequests.some(r => r.type === 'other') && !showOtherForm`. The required disabled-visible state is missing, no helper text is rendered, and the new `tr('help.other_only_one', ...)` key is absent from both translation objects. FIX: keep the existing `!showOtherForm` hide rule, but always render the link when the form is closed; compute `hasActiveOther`, switch the classes to the disabled visual (`text-gray-300`, no underline/hover, default cursor) when true, render the helper text under it, and add `help.other_only_one` to both EN and RU dictionaries.
++2. [P2] Fix 2 stale timer text not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:1898) still returns raw minutes for every elapsed time after 60 seconds and never branches to `tr('help.stale_status', ...)`. A 24h+ request will therefore keep showing a large minute count instead of the required stale label. FIX: in `getHelpTimerStr`, add an early return for `elapsedSec >= 24 * 60 * 60` that returns `tr('help.stale_status', 'Данные могли устареть')`.
++3. [P2] Fix 2 auto-resolve effect is missing — the Help drawer effect block around [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2742) only increments `timerTick`; there is no `useEffect` tied to `timerTick` that scans `activeRequests` and calls `handleResolve(type, id)` for rows older than 24 hours. Stale requests therefore remain active indefinitely. FIX: add a Help-scoped `useEffect` that runs on `timerTick`, filters `activeRequests` by `Date.now() - sentAt > 24 * 60 * 60 * 1000`, and resolves each stale row through local `handleResolve(type, otherId)` without introducing a new polling interval or backend call.
++4. [P3] Fix 3 draft persistence on drawer close/open is not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2357) resets `showOtherForm` and `helpComment` in `openHelpDrawer`, and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2370) clears both again in `closeHelpDrawer`. There is no `sos_draft_${currentTableId}` save/restore effect around `isHelpModalOpen`, so closing the drawer by swipe or backdrop still discards the unsent textarea draft. FIX: add the requested `useEffect` for save/restore keyed by `isHelpModalOpen`, wrap `localStorage` access in `try/catch`, and skip restore when an active `other` request already exists.
++5. [P3] Fix 3 draft cleanup paths are also missing — the Cancel button at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5077) only calls `setShowOtherForm(false); setHelpComment('');`, and the successful `other` send path clears UI state at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2588) and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5121) without removing `sos_draft_${currentTableId}`. Once draft persistence is added, both flows would leave stale drafts behind. FIX: remove `localStorage` draft state on explicit cancel and on successful send, both behind `try/catch`.
++6. [P2] Fix 4 HelpFab position has not changed — [HelpFab.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/HelpFab.jsx:7) still uses `right-4 md:right-8`, so the FAB remains on the bottom-right instead of the required bottom-left. FIX: replace only those classes with `left-4 md:left-8` and keep the rest of the component unchanged.
++
++## Summary
++Total: 6 findings (0 P0, 0 P1, 4 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+diff --git a/pipeline/chain-state/publicmenu-260413-173504-b1a1-codex-findings.md b/pipeline/chain-state/publicmenu-260413-173504-b1a1-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..41e52fc74f4c2c1160a436b197e85abe68db0810
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260413-173504-b1a1-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260413-173504-b1a1
++
++## Findings
++1. [P2] Fix 1 not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5054) still hides the `"Другой запрос?"` control whenever any active `other` request exists via `!activeRequests.some(r => r.type === 'other') && !showOtherForm`. The required disabled-visible state is missing, no helper text is rendered, and the new `tr('help.other_only_one', ...)` key is absent from both translation objects. FIX: keep the existing `!showOtherForm` hide rule, but always render the link when the form is closed; compute `hasActiveOther`, switch the classes to the disabled visual (`text-gray-300`, no underline/hover, default cursor) when true, render the helper text under it, and add `help.other_only_one` to both EN and RU dictionaries.
++2. [P2] Fix 2 stale timer text not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:1898) still returns raw minutes for every elapsed time after 60 seconds and never branches to `tr('help.stale_status', ...)`. A 24h+ request will therefore keep showing a large minute count instead of the required stale label. FIX: in `getHelpTimerStr`, add an early return for `elapsedSec >= 24 * 60 * 60` that returns `tr('help.stale_status', 'Данные могли устареть')`.
++3. [P2] Fix 2 auto-resolve effect is missing — the Help drawer effect block around [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2742) only increments `timerTick`; there is no `useEffect` tied to `timerTick` that scans `activeRequests` and calls `handleResolve(type, id)` for rows older than 24 hours. Stale requests therefore remain active indefinitely. FIX: add a Help-scoped `useEffect` that runs on `timerTick`, filters `activeRequests` by `Date.now() - sentAt > 24 * 60 * 60 * 1000`, and resolves each stale row through local `handleResolve(type, otherId)` without introducing a new polling interval or backend call.
++4. [P3] Fix 3 draft persistence on drawer close/open is not implemented — [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2357) resets `showOtherForm` and `helpComment` in `openHelpDrawer`, and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2370) clears both again in `closeHelpDrawer`. There is no `sos_draft_${currentTableId}` save/restore effect around `isHelpModalOpen`, so closing the drawer by swipe or backdrop still discards the unsent textarea draft. FIX: add the requested `useEffect` for save/restore keyed by `isHelpModalOpen`, wrap `localStorage` access in `try/catch`, and skip restore when an active `other` request already exists.
++5. [P3] Fix 3 draft cleanup paths are also missing — the Cancel button at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5077) only calls `setShowOtherForm(false); setHelpComment('');`, and the successful `other` send path clears UI state at [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:2588) and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx:5121) without removing `sos_draft_${currentTableId}`. Once draft persistence is added, both flows would leave stale drafts behind. FIX: remove `localStorage` draft state on explicit cancel and on successful send, both behind `try/catch`.
++6. [P2] Fix 4 HelpFab position has not changed — [HelpFab.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/HelpFab.jsx:7) still uses `right-4 md:right-8`, so the FAB remains on the bottom-right instead of the required bottom-left. FIX: replace only those classes with `left-4 md:left-8` and keep the rest of the component unchanged.
++
++## Summary
++Total: 6 findings (0 P0, 0 P1, 4 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+
+tokens used
+72 390
+Saved the findings to [publicmenu-260413-173504-b1a1-codex-findings.md](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260413-173504-b1a1-codex-findings.md>). I also saved the mirrored page review to [review_2026-04-13.md](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-04-13.md>) and the executed command log to [commands_2026-04-13.log](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-04-13.log>).
+
+The review found 6 in-scope issues: Fix 1 is not implemented, Fix 2 is missing both the stale timer label and the 24h auto-resolve effect, Fix 3 is missing both draft persistence and draft cleanup on cancel/send, and Fix 4 still leaves `HelpFab` on the right. No product code was changed.

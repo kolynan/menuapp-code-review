@@ -1,0 +1,26 @@
+CC Writer Analysis — StaffOrdersMobile B1 (Close Table + Rate Limit)
+Chain: staffordersmobile-260415-161942-d5a3
+Date: 2026-04-15
+Files analyzed: 260414-02 StaffOrdersMobile RELEASE.jsx (4575 lines), sessionHelpers.js (214 lines)
+
+=== FINDINGS SUMMARY ===
+
+Fix 1a (P1) CONFIRMED — activeOrders filter at line 3580 excludes closed orders. One-line fix: remove `&& o.status !== 'closed'`. Shift cutoff prevents historical leak.
+
+Fix 1b (P1) CONFIRMED WITH CAVEAT — closeSession needs ServiceRequest cleanup, BUT task's proposed code uses getLinkId() which is NOT available in sessionHelpers.js. RECOMMENDATION: pass tableId as parameter to closeSession() instead of re-fetching session. Cleaner, no extra API call, no dependency issue.
+
+Fix 1c (P1) CONFIRMED — Missing refetchRequests() after closeSession in confirmCloseTable. One-line addition.
+
+Fix 2 (P0) CONFIRMED — Promise.all in sessionHelpers.js:166-170 fires parallel API calls. Replace with sequential loop + 120ms delay (inline, cannot import runBatchSequential from RELEASE.jsx).
+
+Fix 3 (P1) NO-OP / DEAD CODE — Lines 657 and 1272 with tableRequests.forEach are inside /* */ comment blocks (dead code: lines 564-803, 1169-1436). Active expanded card at 2369 already uses correct runBatchSequential pattern. No fix needed.
+
+Fix 4 (P2) CONFIRMED — Missing __batch guard on updateStatusMutation.onSettled at line 1606. Latent issue (not currently triggered). Three-line change for consistency.
+
+=== KEY DISCOVERY ===
+Fix 3 targets dead code only. The task description incorrectly identifies lines 657/1272 as active collapsed card code. Both are inside multi-line /* */ comment blocks. This is a significant finding that changes the scope of work.
+
+=== TOTALS ===
+Confirmed actionable: 4 (Fix 1a, 1b, 1c, Fix 2, Fix 4)
+Dead code / no-op: 1 (Fix 3)
+Implementation notes: Fix 1b needs design adjustment (getLinkId unavailable in sessionHelpers.js)

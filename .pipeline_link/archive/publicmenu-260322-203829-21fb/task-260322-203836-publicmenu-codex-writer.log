@@ -1,0 +1,484 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d1632-cf80-7f72-adad-cdbc5c745007
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260322-203829-21fb-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260322-203829-21fb ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Bug Fix: CartView mobile UX — 5 bugs (#90) Reference: `BUGS_MASTER.md`, `pages/PublicMenu/BUGS.md`, `pages/PublicMenu/README.md`. Production page. **TARGET FILES (modify):** `pages/PublicMenu/CartView.jsx` **CONTEXT FILES (read-only):** `pages/PublicMenu/README.md`, `pages/PublicMenu/BUGS.md` **Context:** CartView.jsx (986 lines) is the drawer component for the restaurant cart. It opens as a bottom drawer on mobile (375px primary viewport). These 5 bugs were found during mobile testing (S161) — all are visual/layout issues at the top and bottom of the drawer. The file uses `tr(key, fallback)` and `trFormat(key, params, fallback)` for i18n (both defined inside the component, ~lines 232-260). --- ## Fix 1 — PM-083 (P2) [MUST-FIX]: Chevron ˅ must be right-aligned, not centered ### Now (current behavior) The close chevron (˅) at the top of the cart drawer is centered horizontally (`mx-auto`). Search: `<ChevronDown` at ~line 427. ### Expected (correct behavior) The chevron must be right-aligned (top-right area of the drawer). UX convention: close/dismiss controls belong in the top-right corner. ### Must NOT be - ❌ Centered chevron (`mx-auto`) - ❌ Left-aligned chevron ### File and location `CartView.jsx` ~line 427-430. The `<ChevronDown>` element has `className="w-5 h-5 mx-auto mb-2 cursor-pointer ..."`. Change `mx-auto` to right-alignment (e.g. `ml-auto` or wrap in a `flex justify-end` container). ### Verification Open cart drawer on 375px viewport → chevron ˅ is in the top-right area, not centered. --- ## Fix 2 — PM-084 (P2) [MUST-FIX]: Remove duplicate gray line (drag handle + chevron) ### Now (current behavior) Two visually similar gray elements at the top of the drawer: 1. A drag handle bar: `<div className="w-8 h-1 bg-gray-300 rounded-full mx-auto mt-2 mb-1" />` at ~line 426 2. The ChevronDown icon (also gray, centered) at ~line 427-430 Both look like gray horizontal lines to the user → confusing. ### Expected (correct behavior) Keep the drag handle bar (standard mobile drawer pattern) + keep the ChevronDown icon but make them visually distinct. The chevron should be right-aligned (Fix 1) and clearly an interactive icon, not a second gray bar. ### Must NOT be - ❌ Two centered gray horizontal elements that look identical - ❌ Removing the drag handle (it's a standard mobile UX pattern for drawers) ### File and location `CartView.jsx` ~lines 426-430. The drag handle div and ChevronDown are adjacent. After applying Fix 1 (right-align chevron), the visual duplication should be resolved — the drag handle stays centered, the chevron moves to the right. ### Verification Open cart drawer → only ONE centered gray bar (drag handle). Chevron is a distinct icon in the top-right. --- ## Fix 3 — PM-085 (P1) [MUST-FIX]: Chevron must be sticky at the top when scrolling ### Now (current behavior) When the cart has many items, the user scrolls down. The chevron (˅) scrolls away with the content → the user cannot close the drawer without scrolling back to the top. The entire CartView content is inside `<div className="max-w-2xl mx-auto px-4 mt-2 pb-4">` (~line 424) which scrolls as a whole. ### Expected (correct behavior) The chevron (and drag handle) must remain sticky at the top of the drawer during scroll. When the user scrolls down through a long cart, the chevron stays visible and tappable. ### Must NOT be - ❌ Chevron scrolling away with content - ❌ Sticky element without `z-index` (could be overlapped by card content) - ❌ Breaking the existing sticky submit button at the bottom (~line 951) ### File and location `CartView.jsx` ~lines 424-430. Extract the drag handle + chevron into a sticky container: - Wrap lines 426-430 (drag handle div + ChevronDown) in a `<div className="sticky top-0 z-10 bg-white ...">` container - Keep the rest of the content below it scrollable - NOTE: The submit button at ~line 951 is already `sticky bottom-0` — both sticky elements must coexist. ### Verification 1. Add 5+ items to cart → open drawer → scroll down 2. Chevron ˅ remains visible at the top → tap it → drawer closes --- ## Fix 4 — PM-086 (P2) [MUST-FIX]: Remove email field from loyalty section ### Now (current behavior) The loyalty section (~lines 886-917) shows an email input field ("Email для бонусов") when `showLoyaltySection` is true. This was supposed to be removed in #87 KS-1 (the comment at line 886 says "compact email + motivation line") but the email input block survived. Search: `showLoyaltySection && (` at ~line 887. ### Expected (correct behavior) Remove the entire loyalty email section (lines 886-917). The motivation text already exists at the bottom near the submit button (~lines 952-960) and is the only loyalty UI needed. ### Must NOT be - ❌ Any email input in the pre-checkout cart view - ❌ Removing the post-order reward email form (~lines 491-550, search `showRewardEmailForm`) — that one is DIFFERENT and must stay - ❌ Removing the motivation text near submit button (~lines 952-960) ⚠️ **Important distinction:** There are TWO email-related sections in this file: 1. **Pre-checkout loyalty email** (~lines 886-917, guarded by `showLoyaltySection`) — REMOVE THIS ONE 2. **Post-order reward email** (~lines 491-550, guarded by `showRewardEmailForm`) — KEEP THIS ONE ### File and location `CartView.jsx` ~lines 886-917. The block is `{showLoyaltySection && (<div className="mt-4 pt-4 border-t space-y-3">...</div>)}`. Remove this entire conditional block. ### Verification Open cart with items → no email input field visible above ИТОГО. The motivation text below the submit button still shows. --- ## Fix 5 — PM-087 (P3) [MUST-FIX]: Compact gap between ИТОГО and motivation text ### Now (current behavior) Large vertical gap between "ИТОГО: XX₸" (~line 922) and the motivation text "Отправьте заказ и получите +N бонусов" (~line 956). The gap is caused by: - `mt-4 pt-4` on the subtotal wrapper (~line 920) - `h-20` spacer div (~line 937) - `mt-2 mb-2` on the motivation `<p>` (~line 956) On a small mobile screen this creates excessive whitespace. ### Expected (correct behavior) Compact vertical spacing: ИТОГО → 8-12px gap → motivation text → submit button. Reduce: - The `h-20` spacer at ~line 937 to `h-16` (enough for sticky button clearance) - The motivation text margins from `mt-2 mb-2` to `mt-1 mb-1` (~line 956) - Optionally reduce `mt-4 pt-4` at ~line 920 to `mt-3 pt-3` ### Must NOT be - ❌ Large empty space between ИТОГО and the submit button on 375px viewport - ❌ Spacer so small that sticky button overlaps content (keep some clearance) ### File and location `CartView.jsx`: - Spacer: ~line 937 (`<div className="h-20" />`) - Motivation text: ~line 956 (`className="text-sm text-gray-500 text-center mt-2 mb-2"`) - Subtotal wrapper: ~line 920 (`className="mt-4 pt-4 border-t space-y-3"`) ### Verification Open cart with items on 375px viewport → ИТОГО and motivation text are visually close (8-12px gap), no large empty space. --- ## ⛔ SCOPE LOCK — change ONLY what is described above - Modify ONLY the code described in Fix 1-5 above. - Everything else — DO NOT TOUCH. - If you see other "problems" not in this task — SKIP them, do not fix. - Locked UX decisions: submit button styling, guest name editing, call waiter button, order list layout. ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Primary usage: customer phone at the table. Before committing, verify ALL changes at 375px viewport width: - [ ] Close/chevron: RIGHT-ALIGNED (not centered), sticky top - [ ] Touch targets >= 44x44px (h-11 w-11) - [ ] No excessive whitespace/gaps on small screens - [ ] Bottom sheet content scrollable without losing close button - [ ] No duplicate visual indicators (e.g. two gray lines that look the same) - [ ] Text truncation: long item names don't overflow - [ ] Sticky footer buttons don't overlap content ## Implementation Notes - TARGET: `pages/PublicMenu/CartView.jsx` (986 lines) - CONTEXT: `pages/PublicMenu/README.md`, `pages/PublicMenu/BUGS.md` - `tr()` and `trFormat()` are available inside the component (~lines 232-260) - Do NOT break: sticky submit button (~line 951), reward email form (~lines 491-550), order list sections - git add pages/PublicMenu/CartView.jsx && git commit -m "fix: CartView mobile UX — chevron, email, spacing (PM-083-087)" && git push === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/PublicMenu/CartView.jsx` against the five scoped fixes, and I’ll only read `README.md` and `BUGS.md` in that same folder for context. After that I’ll write the findings file in the requested pipeline path and save the required review artifacts in `pages/PublicMenu/`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'pages/PublicMenu/CartView.jsx'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'pages/PublicMenu/README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'pages/PublicMenu/BUGS.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 2.43s:
+
+ exited 124 in 2.80s:
+
+ exited 124 in 3.01s:
+
+codex
+The initial file reads timed out; I’m rerunning them with a longer timeout and then I’ll inspect only the sections tied to Fix 1-5 so the review stays inside scope.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw -Path 'pages/PublicMenu/README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw -Path 'pages/PublicMenu/CartView.jsx'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw -Path 'pages/PublicMenu/BUGS.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 16.50s:
+
+ exited 124 in 16.32s:
+
+ exited 124 in 16.52s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'pages/PublicMenu/README.md' -TotalCount 250" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'pages/PublicMenu/BUGS.md' -TotalCount 250" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Path 'pages/PublicMenu' | Select-Object Name,Length" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 11.36s:
+
+ exited 124 in 11.51s:
+
+ exited 124 in 10.99s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command pwd in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Get-ChildItem -Name 'pages/PublicMenu'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 5.33s:
+
+ exited 124 in 5.37s:
+
+codex
+The shell is unusually slow even for trivial reads, so I’m increasing the timeout and probing with a minimal command before continuing. If that works, I’ll pull only the relevant file sections instead of loading entire files.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Write-Output 'ok'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 6.01s:
+ok
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Get-Content -Path 'pages/PublicMenu/BUGS.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Get-Content -Path 'pages/PublicMenu/README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Get-Content -Path 'pages/PublicMenu/CartView.jsx' | Select-Object -Index (420..435)" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.50s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 11.42s:
+  // loyaltySummary + reviewRewardLabel removed â€” loyalty section simplified (#87 KS-1)
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 mt-2 pb-4">
+      {/* Drag handle + chevron close (#87 KS-2) */}
+      <div className="w-8 h-1 bg-gray-300 rounded-full mx-auto mt-2 mb-1" />
+      <ChevronDown
+        className={`w-5 h-5 mx-auto mb-2 cursor-pointer ${isSubmitting ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400'}`}
+        onClick={() => { if (isSubmitting) return; onClose ? onClose() : setView("menu"); }}
+      />
+      {/* P0 Header: [ðŸ””] Ð¡Ñ‚Ð¾Ð» Â· Ð“Ð¾ÑÑ‚ÑŒ */}
+      <div className="bg-white rounded-lg shadow-sm border p-3 mb-4">
+        <div className="flex items-center justify-between">
+          {/* Left: Call waiter */}
+          {onCallWaiter && (
+            <button
+ succeeded in 11.60s:
+---
+version: "30.0"
+updated: "2026-03-22"
+session: 161
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*13 active bugs remaining (0x P0, 7x P1, 4x P2, 1x P3, 1x suggestion).*
+
+### BUG-PM-056: Drawer layout not visit-state-driven (P1 â€” Batch 2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P1
+- **ÐšÐ¾Ð³Ð´Ð°:** S153 (consensus chain publicmenu-260321-093745)
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$i=1; Get-Content '"'pages/PublicMenu/CartView.jsx' | ForEach-Object { if("'$i -ge 485 -and $i -le 555){ '"'{0,4}: {1}' -f "'$i, $_ }; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$i=1; Get-Content '"'pages/PublicMenu/CartView.jsx' | ForEach-Object { if("'$i -ge 420 -and $i -le 435){ '"'{0,4}: {1}' -f "'$i, $_ }; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$i=1; Get-Content '"'pages/PublicMenu/CartView.jsx' | ForEach-Object { if("'$i -ge 880 -and $i -le 965){ '"'{0,4}: {1}' -f "'$i, $_ }; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.95s:
+ 420: 
+ 421:   // loyaltySummary + reviewRewardLabel removed â€” loyalty section simplified (#87 KS-1)
+ 422: 
+ 423:   return (
+ 424:     <div className="max-w-2xl mx-auto px-4 mt-2 pb-4">
+ 425:       {/* Drag handle + chevron close (#87 KS-2) */}
+ 426:       <div className="w-8 h-1 bg-gray-300 rounded-full mx-auto mt-2 mb-1" />
+ 427:       <ChevronDown
+ 428:         className={`w-5 h-5 mx-auto mb-2 cursor-pointer ${isSubmitting ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400'}`}
+ 429:         onClick={() => { if (isSubmitting) return; onClose ? onClose() : setView("menu"); }}
+ 430:       />
+ 431:       {/* P0 Header: [ðŸ””] Ð¡Ñ‚Ð¾Ð» Â· Ð“Ð¾ÑÑ‚ÑŒ */}
+ 432:       <div className="bg-white rounded-lg shadow-sm border p-3 mb-4">
+ 433:         <div className="flex items-center justify-between">
+ 434:           {/* Left: Call waiter */}
+ 435:           {onCallWaiter && (
+ succeeded in 11.87s:
+ 485:         <div className="mb-4 text-xs text-amber-700 bg-amber-50 rounded-md px-3 py-2 flex items-center gap-2">
+ 486:           <span>â­</span>
+ 487:           <span>{tr('loyalty.review_reward_hint', 'Ð—Ð° Ð¾Ñ‚Ð·Ñ‹Ð²')} +{reviewRewardPoints} {tr('loyalty.points_short', 'Ð±Ð¾Ð½ÑƒÑÐ¾Ð²')}</span>
+ 488:         </div>
+ 489:       )}
+ 490: 
+ 491:       {/* Review reward nudge - Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°ÐµÐ¼ Ð¿Ð¾ÑÐ»Ðµ Ð¿ÐµÑ€Ð²Ð¾Ð¹ Ð¾Ñ†ÐµÐ½ÐºÐ¸ Ñ Ñ„Ð¾Ñ€Ð¼Ð¾Ð¹ email */}
+ 492:       {shouldShowReviewRewardNudge && (
+ 493:         <div className="mb-4 text-sm bg-green-50 border border-green-200 rounded-md p-3">
+ 494:           {!showRewardEmailForm ? (
+ 495:             <div className="flex items-center justify-between">
+ 496:               <span className="text-slate-700">
+ 497:                 âœ… {tr('loyalty.thanks_for_rating', 'Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° Ð¾Ñ†ÐµÐ½ÐºÑƒ!')}
+ 498:               </span>
+ 499:               <button
+ 500:                 type="button"
+ 501:                 className="hover:underline font-medium text-sm"
+ 502:                 style={{color: primaryColor}}
+ 503:                 onClick={() => setShowRewardEmailForm(true)}
+ 504:               >
+ succeeded in 12.16s:
+ 880:                   </label>
+ 881:                 </div>
+ 882:               )}
+ 883:             </div>
+ 884:             )}
+ 885: 
+ 886:             {/* P1: Loyalty â€” compact email + motivation line (#87 KS-1 Fix 1+3) */}
+ 887:             {showLoyaltySection && (
+ 888:               <div className="mt-4 pt-4 border-t space-y-3">
+ 889:                 <div className="space-y-1">
+ 890:                   <label className="text-sm font-medium text-slate-700">
+ 891:                     {tr('loyalty.email_label', 'Email Ð´Ð»Ñ Ð±Ð¾Ð½ÑƒÑÐ¾Ð²')}
+ 892:                   </label>
+ 893:                   <Input
+ 894:                     type="email"
+ 895:                     value={customerEmail}
+ 896:                     onChange={(e) => {
+ 897:                       setCustomerEmail(e.target.value);
+ 898:                       // Clear error on typing
+ 899:                       if (emailError) setEmailError('');
+codex
+I have the relevant code sections now. I’m checking the destination paths, then I’ll write a scoped report that only covers Fix 1-5 and a command log for the review run.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Test-Path 'pages/PublicMenu'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Test-Path 'pipeline/chain-state'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 4.65s:
+True
+ succeeded in 4.75s:
+True
+codex
+Writing three files now: the requested pipeline findings file, a copy of the review report in `pages/PublicMenu/`, and the command log required by this repository.
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-22.log
+1. Get-Content -Path 'pages/PublicMenu/CartView.jsx'  [timed out]
+2. Get-Content -Path 'pages/PublicMenu/README.md'  [timed out]
+3. Get-Content -Path 'pages/PublicMenu/BUGS.md'  [timed out]
+4. Get-Content -Raw -Path 'pages/PublicMenu/CartView.jsx'  [timed out]
+5. Get-Content -Raw -Path 'pages/PublicMenu/README.md'  [timed out]
+6. Get-Content -Raw -Path 'pages/PublicMenu/BUGS.md'  [timed out]
+7. Get-ChildItem -Path 'pages/PublicMenu' | Select-Object Name,Length  [timed out]
+8. Get-Content -Path 'pages/PublicMenu/README.md' -TotalCount 250  [timed out]
+9. Get-Content -Path 'pages/PublicMenu/BUGS.md' -TotalCount 250  [timed out]
+10. pwd  [timed out]
+11. Get-ChildItem -Name 'pages/PublicMenu'  [timed out]
+12. Write-Output 'ok'
+13. Get-Content -Path 'pages/PublicMenu/README.md'
+14. Get-Content -Path 'pages/PublicMenu/BUGS.md'
+15. Get-Content -Path 'pages/PublicMenu/CartView.jsx' | Select-Object -Index (420..435)
+16. $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { if($i -ge 485 -and $i -le 555){ '{0,4}: {1}' -f $i, $_ }; $i++ }
+17. $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { if($i -ge 880 -and $i -le 965){ '{0,4}: {1}' -f $i, $_ }; $i++ }
+18. $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { if($i -ge 420 -and $i -le 435){ '{0,4}: {1}' -f $i, $_ }; $i++ }
+19. Test-Path 'pipeline/chain-state'
+20. Test-Path 'pages/PublicMenu'
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260322-203829-21fb-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260322-203829-21fb
+
+## Findings
+1. [P2] PM-083: Chevron remains centered instead of right-aligned — In [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427), the close chevron still uses `mx-auto`, so it renders in the center of the drawer rather than in the top-right dismiss area required by the task. FIX: replace the centered layout with right alignment, e.g. `ml-auto` or a right-justified wrapper for the chevron.
+2. [P2] PM-084: Drag handle and chevron still read as duplicate centered gray controls — [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426) keeps the centered gray drag handle immediately above a second centered gray chevron at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427). Because both stay centered and visually similar, the duplication called out in the fix request is still present. FIX: keep the drag handle centered, but move the chevron into a distinct right-aligned interactive position.
+3. [P1] PM-085: Top close area is not sticky, so it scrolls out of view — The drag handle and chevron are rendered directly inside the main scroll content at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L424) without any sticky container on [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426). In long carts, the user loses the close affordance while scrolling, which is exactly the regression this fix is meant to remove. FIX: wrap the drag handle and chevron in a `sticky top-0 z-10 bg-white` container and leave the rest of the drawer content below it scrollable.
+4. [P2] PM-086: Pre-checkout loyalty email block is still rendered — The `showLoyaltySection` block is still present at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L887) and includes the pre-checkout email field through [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L916). The task explicitly says to remove this section while keeping the separate post-order reward email form at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L491). FIX: delete the entire `showLoyaltySection && (...)` block and keep the reward-email form unchanged.
+5. [P3] PM-087: Excessive vertical gap above the sticky footer is still present — The current subtotal/footer spacing still uses `mt-4 pt-4` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L920), an `h-20` spacer at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L937), and `mt-2 mb-2` on the motivation text at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L956). On a 375px viewport this preserves the oversized empty gap the task asks to compact. FIX: reduce the subtotal wrapper spacing, shrink the spacer to `h-16`, and tighten the motivation text margins to `mt-1 mb-1` or equivalent.
+
+## Summary
+Total: 5 findings (0 P0, 1 P1, 3 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None for this review; the target lines, expected behavior, and keep/remove boundaries were specific enough.
+- Scope questions (anything you weren't sure if it's in scope): None. The numbered Fix list clearly locked scope to Fix 1-5 only.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-22.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260322-203829-21fb
+
+## Findings
+1. [P2] PM-083: Chevron remains centered instead of right-aligned — In [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427), the close chevron still uses `mx-auto`, so it renders in the center of the drawer rather than in the top-right dismiss area required by the task. FIX: replace the centered layout with right alignment, e.g. `ml-auto` or a right-justified wrapper for the chevron.
+2. [P2] PM-084: Drag handle and chevron still read as duplicate centered gray controls — [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426) keeps the centered gray drag handle immediately above a second centered gray chevron at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427). Because both stay centered and visually similar, the duplication called out in the fix request is still present. FIX: keep the drag handle centered, but move the chevron into a distinct right-aligned interactive position.
+3. [P1] PM-085: Top close area is not sticky, so it scrolls out of view — The drag handle and chevron are rendered directly inside the main scroll content at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L424) without any sticky container on [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426). In long carts, the user loses the close affordance while scrolling, which is exactly the regression this fix is meant to remove. FIX: wrap the drag handle and chevron in a `sticky top-0 z-10 bg-white` container and leave the rest of the drawer content below it scrollable.
+4. [P2] PM-086: Pre-checkout loyalty email block is still rendered — The `showLoyaltySection` block is still present at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L887) and includes the pre-checkout email field through [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L916). The task explicitly says to remove this section while keeping the separate post-order reward email form at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L491). FIX: delete the entire `showLoyaltySection && (...)` block and keep the reward-email form unchanged.
+5. [P3] PM-087: Excessive vertical gap above the sticky footer is still present — The current subtotal/footer spacing still uses `mt-4 pt-4` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L920), an `h-20` spacer at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L937), and `mt-2 mb-2` on the motivation text at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L956). On a 375px viewport this preserves the oversized empty gap the task asks to compact. FIX: reduce the subtotal wrapper spacing, shrink the spacer to `h-16`, and tighten the motivation text margins to `mt-1 mb-1` or equivalent.
+
+## Summary
+Total: 5 findings (0 P0, 1 P1, 3 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None for this review; the target lines, expected behavior, and keep/remove boundaries were specific enough.
+- Scope questions (anything you weren't sure if it's in scope): None. The numbered Fix list clearly locked scope to Fix 1-5 only.
+apply_patch(auto_approved=true) exited 0 in 340ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260322-203829-21fb-codex-findings.md
+A pages/PublicMenu/review_2026-03-22.md
+A pages/PublicMenu/commands_2026-03-22.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-22.log b/pages/PublicMenu/commands_2026-03-22.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..b8f6c0b5357ba3f28ddb095e3fb0e9b85638e918
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-22.log
+@@ -0,0 +1,20 @@
++1. Get-Content -Path 'pages/PublicMenu/CartView.jsx'  [timed out]
++2. Get-Content -Path 'pages/PublicMenu/README.md'  [timed out]
++3. Get-Content -Path 'pages/PublicMenu/BUGS.md'  [timed out]
++4. Get-Content -Raw -Path 'pages/PublicMenu/CartView.jsx'  [timed out]
++5. Get-Content -Raw -Path 'pages/PublicMenu/README.md'  [timed out]
++6. Get-Content -Raw -Path 'pages/PublicMenu/BUGS.md'  [timed out]
++7. Get-ChildItem -Path 'pages/PublicMenu' | Select-Object Name,Length  [timed out]
++8. Get-Content -Path 'pages/PublicMenu/README.md' -TotalCount 250  [timed out]
++9. Get-Content -Path 'pages/PublicMenu/BUGS.md' -TotalCount 250  [timed out]
++10. pwd  [timed out]
++11. Get-ChildItem -Name 'pages/PublicMenu'  [timed out]
++12. Write-Output 'ok'
++13. Get-Content -Path 'pages/PublicMenu/README.md'
++14. Get-Content -Path 'pages/PublicMenu/BUGS.md'
++15. Get-Content -Path 'pages/PublicMenu/CartView.jsx' | Select-Object -Index (420..435)
++16. $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { if($i -ge 485 -and $i -le 555){ '{0,4}: {1}' -f $i, $_ }; $i++ }
++17. $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { if($i -ge 880 -and $i -le 965){ '{0,4}: {1}' -f $i, $_ }; $i++ }
++18. $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { if($i -ge 420 -and $i -le 435){ '{0,4}: {1}' -f $i, $_ }; $i++ }
++19. Test-Path 'pipeline/chain-state'
++20. Test-Path 'pages/PublicMenu'
+diff --git a/pages/PublicMenu/review_2026-03-22.md b/pages/PublicMenu/review_2026-03-22.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..92ae34752bd7272c1b8a9022f70002ed612a176c
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-22.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260322-203829-21fb
++
++## Findings
++1. [P2] PM-083: Chevron remains centered instead of right-aligned — In [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427), the close chevron still uses `mx-auto`, so it renders in the center of the drawer rather than in the top-right dismiss area required by the task. FIX: replace the centered layout with right alignment, e.g. `ml-auto` or a right-justified wrapper for the chevron.
++2. [P2] PM-084: Drag handle and chevron still read as duplicate centered gray controls — [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426) keeps the centered gray drag handle immediately above a second centered gray chevron at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427). Because both stay centered and visually similar, the duplication called out in the fix request is still present. FIX: keep the drag handle centered, but move the chevron into a distinct right-aligned interactive position.
++3. [P1] PM-085: Top close area is not sticky, so it scrolls out of view — The drag handle and chevron are rendered directly inside the main scroll content at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L424) without any sticky container on [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426). In long carts, the user loses the close affordance while scrolling, which is exactly the regression this fix is meant to remove. FIX: wrap the drag handle and chevron in a `sticky top-0 z-10 bg-white` container and leave the rest of the drawer content below it scrollable.
++4. [P2] PM-086: Pre-checkout loyalty email block is still rendered — The `showLoyaltySection` block is still present at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L887) and includes the pre-checkout email field through [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L916). The task explicitly says to remove this section while keeping the separate post-order reward email form at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L491). FIX: delete the entire `showLoyaltySection && (...)` block and keep the reward-email form unchanged.
++5. [P3] PM-087: Excessive vertical gap above the sticky footer is still present — The current subtotal/footer spacing still uses `mt-4 pt-4` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L920), an `h-20` spacer at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L937), and `mt-2 mb-2` on the motivation text at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L956). On a 375px viewport this preserves the oversized empty gap the task asks to compact. FIX: reduce the subtotal wrapper spacing, shrink the spacer to `h-16`, and tighten the motivation text margins to `mt-1 mb-1` or equivalent.
++
++## Summary
++Total: 5 findings (0 P0, 1 P1, 3 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None for this review; the target lines, expected behavior, and keep/remove boundaries were specific enough.
++- Scope questions (anything you weren't sure if it's in scope): None. The numbered Fix list clearly locked scope to Fix 1-5 only.
+diff --git a/pipeline/chain-state/publicmenu-260322-203829-21fb-codex-findings.md b/pipeline/chain-state/publicmenu-260322-203829-21fb-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..92ae34752bd7272c1b8a9022f70002ed612a176c
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260322-203829-21fb-codex-findings.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260322-203829-21fb
++
++## Findings
++1. [P2] PM-083: Chevron remains centered instead of right-aligned — In [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427), the close chevron still uses `mx-auto`, so it renders in the center of the drawer rather than in the top-right dismiss area required by the task. FIX: replace the centered layout with right alignment, e.g. `ml-auto` or a right-justified wrapper for the chevron.
++2. [P2] PM-084: Drag handle and chevron still read as duplicate centered gray controls — [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426) keeps the centered gray drag handle immediately above a second centered gray chevron at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427). Because both stay centered and visually similar, the duplication called out in the fix request is still present. FIX: keep the drag handle centered, but move the chevron into a distinct right-aligned interactive position.
++3. [P1] PM-085: Top close area is not sticky, so it scrolls out of view — The drag handle and chevron are rendered directly inside the main scroll content at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L424) without any sticky container on [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426). In long carts, the user loses the close affordance while scrolling, which is exactly the regression this fix is meant to remove. FIX: wrap the drag handle and chevron in a `sticky top-0 z-10 bg-white` container and leave the rest of the drawer content below it scrollable.
++4. [P2] PM-086: Pre-checkout loyalty email block is still rendered — The `showLoyaltySection` block is still present at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L887) and includes the pre-checkout email field through [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L916). The task explicitly says to remove this section while keeping the separate post-order reward email form at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L491). FIX: delete the entire `showLoyaltySection && (...)` block and keep the reward-email form unchanged.
++5. [P3] PM-087: Excessive vertical gap above the sticky footer is still present — The current subtotal/footer spacing still uses `mt-4 pt-4` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L920), an `h-20` spacer at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L937), and `mt-2 mb-2` on the motivation text at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L956). On a 375px viewport this preserves the oversized empty gap the task asks to compact. FIX: reduce the subtotal wrapper spacing, shrink the spacer to `h-16`, and tighten the motivation text margins to `mt-1 mb-1` or equivalent.
++
++## Summary
++Total: 5 findings (0 P0, 1 P1, 3 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None for this review; the target lines, expected behavior, and keep/remove boundaries were specific enough.
++- Scope questions (anything you weren't sure if it's in scope): None. The numbered Fix list clearly locked scope to Fix 1-5 only.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-22.log b/pages/PublicMenu/commands_2026-03-22.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..b8f6c0b5357ba3f28ddb095e3fb0e9b85638e918
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-22.log
+@@ -0,0 +1,20 @@
++1. Get-Content -Path 'pages/PublicMenu/CartView.jsx'  [timed out]
++2. Get-Content -Path 'pages/PublicMenu/README.md'  [timed out]
++3. Get-Content -Path 'pages/PublicMenu/BUGS.md'  [timed out]
++4. Get-Content -Raw -Path 'pages/PublicMenu/CartView.jsx'  [timed out]
++5. Get-Content -Raw -Path 'pages/PublicMenu/README.md'  [timed out]
++6. Get-Content -Raw -Path 'pages/PublicMenu/BUGS.md'  [timed out]
++7. Get-ChildItem -Path 'pages/PublicMenu' | Select-Object Name,Length  [timed out]
++8. Get-Content -Path 'pages/PublicMenu/README.md' -TotalCount 250  [timed out]
++9. Get-Content -Path 'pages/PublicMenu/BUGS.md' -TotalCount 250  [timed out]
++10. pwd  [timed out]
++11. Get-ChildItem -Name 'pages/PublicMenu'  [timed out]
++12. Write-Output 'ok'
++13. Get-Content -Path 'pages/PublicMenu/README.md'
++14. Get-Content -Path 'pages/PublicMenu/BUGS.md'
++15. Get-Content -Path 'pages/PublicMenu/CartView.jsx' | Select-Object -Index (420..435)
++16. $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { if($i -ge 485 -and $i -le 555){ '{0,4}: {1}' -f $i, $_ }; $i++ }
++17. $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { if($i -ge 880 -and $i -le 965){ '{0,4}: {1}' -f $i, $_ }; $i++ }
++18. $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { if($i -ge 420 -and $i -le 435){ '{0,4}: {1}' -f $i, $_ }; $i++ }
++19. Test-Path 'pipeline/chain-state'
++20. Test-Path 'pages/PublicMenu'
+diff --git a/pages/PublicMenu/review_2026-03-22.md b/pages/PublicMenu/review_2026-03-22.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..92ae34752bd7272c1b8a9022f70002ed612a176c
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-22.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260322-203829-21fb
++
++## Findings
++1. [P2] PM-083: Chevron remains centered instead of right-aligned — In [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427), the close chevron still uses `mx-auto`, so it renders in the center of the drawer rather than in the top-right dismiss area required by the task. FIX: replace the centered layout with right alignment, e.g. `ml-auto` or a right-justified wrapper for the chevron.
++2. [P2] PM-084: Drag handle and chevron still read as duplicate centered gray controls — [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426) keeps the centered gray drag handle immediately above a second centered gray chevron at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427). Because both stay centered and visually similar, the duplication called out in the fix request is still present. FIX: keep the drag handle centered, but move the chevron into a distinct right-aligned interactive position.
++3. [P1] PM-085: Top close area is not sticky, so it scrolls out of view — The drag handle and chevron are rendered directly inside the main scroll content at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L424) without any sticky container on [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426). In long carts, the user loses the close affordance while scrolling, which is exactly the regression this fix is meant to remove. FIX: wrap the drag handle and chevron in a `sticky top-0 z-10 bg-white` container and leave the rest of the drawer content below it scrollable.
++4. [P2] PM-086: Pre-checkout loyalty email block is still rendered — The `showLoyaltySection` block is still present at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L887) and includes the pre-checkout email field through [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L916). The task explicitly says to remove this section while keeping the separate post-order reward email form at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L491). FIX: delete the entire `showLoyaltySection && (...)` block and keep the reward-email form unchanged.
++5. [P3] PM-087: Excessive vertical gap above the sticky footer is still present — The current subtotal/footer spacing still uses `mt-4 pt-4` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L920), an `h-20` spacer at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L937), and `mt-2 mb-2` on the motivation text at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L956). On a 375px viewport this preserves the oversized empty gap the task asks to compact. FIX: reduce the subtotal wrapper spacing, shrink the spacer to `h-16`, and tighten the motivation text margins to `mt-1 mb-1` or equivalent.
++
++## Summary
++Total: 5 findings (0 P0, 1 P1, 3 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None for this review; the target lines, expected behavior, and keep/remove boundaries were specific enough.
++- Scope questions (anything you weren't sure if it's in scope): None. The numbered Fix list clearly locked scope to Fix 1-5 only.
+diff --git a/pipeline/chain-state/publicmenu-260322-203829-21fb-codex-findings.md b/pipeline/chain-state/publicmenu-260322-203829-21fb-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..92ae34752bd7272c1b8a9022f70002ed612a176c
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260322-203829-21fb-codex-findings.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260322-203829-21fb
++
++## Findings
++1. [P2] PM-083: Chevron remains centered instead of right-aligned — In [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427), the close chevron still uses `mx-auto`, so it renders in the center of the drawer rather than in the top-right dismiss area required by the task. FIX: replace the centered layout with right alignment, e.g. `ml-auto` or a right-justified wrapper for the chevron.
++2. [P2] PM-084: Drag handle and chevron still read as duplicate centered gray controls — [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426) keeps the centered gray drag handle immediately above a second centered gray chevron at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427). Because both stay centered and visually similar, the duplication called out in the fix request is still present. FIX: keep the drag handle centered, but move the chevron into a distinct right-aligned interactive position.
++3. [P1] PM-085: Top close area is not sticky, so it scrolls out of view — The drag handle and chevron are rendered directly inside the main scroll content at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L424) without any sticky container on [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426). In long carts, the user loses the close affordance while scrolling, which is exactly the regression this fix is meant to remove. FIX: wrap the drag handle and chevron in a `sticky top-0 z-10 bg-white` container and leave the rest of the drawer content below it scrollable.
++4. [P2] PM-086: Pre-checkout loyalty email block is still rendered — The `showLoyaltySection` block is still present at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L887) and includes the pre-checkout email field through [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L916). The task explicitly says to remove this section while keeping the separate post-order reward email form at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L491). FIX: delete the entire `showLoyaltySection && (...)` block and keep the reward-email form unchanged.
++5. [P3] PM-087: Excessive vertical gap above the sticky footer is still present — The current subtotal/footer spacing still uses `mt-4 pt-4` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L920), an `h-20` spacer at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L937), and `mt-2 mb-2` on the motivation text at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L956). On a 375px viewport this preserves the oversized empty gap the task asks to compact. FIX: reduce the subtotal wrapper spacing, shrink the spacer to `h-16`, and tighten the motivation text margins to `mt-1 mb-1` or equivalent.
++
++## Summary
++Total: 5 findings (0 P0, 1 P1, 3 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None for this review; the target lines, expected behavior, and keep/remove boundaries were specific enough.
++- Scope questions (anything you weren't sure if it's in scope): None. The numbered Fix list clearly locked scope to Fix 1-5 only.
+
+codex
+Scoped review is complete. I found 5 in-scope issues, all matching Fix 1-5: centered chevron, duplicate centered top indicators, non-sticky close area, leftover pre-checkout loyalty email block, and oversized subtotal/footer spacing. The findings were written to [publicmenu-260322-203829-21fb-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260322-203829-21fb-codex-findings.md).
+
+Per repo rules, I also saved the review copy to [review_2026-03-22.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-22.md) and the executed command log to [commands_2026-03-22.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-22.log).
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-22.log b/pages/PublicMenu/commands_2026-03-22.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..b8f6c0b5357ba3f28ddb095e3fb0e9b85638e918
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-22.log
+@@ -0,0 +1,20 @@
++1. Get-Content -Path 'pages/PublicMenu/CartView.jsx'  [timed out]
++2. Get-Content -Path 'pages/PublicMenu/README.md'  [timed out]
++3. Get-Content -Path 'pages/PublicMenu/BUGS.md'  [timed out]
++4. Get-Content -Raw -Path 'pages/PublicMenu/CartView.jsx'  [timed out]
++5. Get-Content -Raw -Path 'pages/PublicMenu/README.md'  [timed out]
++6. Get-Content -Raw -Path 'pages/PublicMenu/BUGS.md'  [timed out]
++7. Get-ChildItem -Path 'pages/PublicMenu' | Select-Object Name,Length  [timed out]
++8. Get-Content -Path 'pages/PublicMenu/README.md' -TotalCount 250  [timed out]
++9. Get-Content -Path 'pages/PublicMenu/BUGS.md' -TotalCount 250  [timed out]
++10. pwd  [timed out]
++11. Get-ChildItem -Name 'pages/PublicMenu'  [timed out]
++12. Write-Output 'ok'
++13. Get-Content -Path 'pages/PublicMenu/README.md'
++14. Get-Content -Path 'pages/PublicMenu/BUGS.md'
++15. Get-Content -Path 'pages/PublicMenu/CartView.jsx' | Select-Object -Index (420..435)
++16. $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { if($i -ge 485 -and $i -le 555){ '{0,4}: {1}' -f $i, $_ }; $i++ }
++17. $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { if($i -ge 880 -and $i -le 965){ '{0,4}: {1}' -f $i, $_ }; $i++ }
++18. $i=1; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { if($i -ge 420 -and $i -le 435){ '{0,4}: {1}' -f $i, $_ }; $i++ }
++19. Test-Path 'pipeline/chain-state'
++20. Test-Path 'pages/PublicMenu'
+diff --git a/pages/PublicMenu/review_2026-03-22.md b/pages/PublicMenu/review_2026-03-22.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..92ae34752bd7272c1b8a9022f70002ed612a176c
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-22.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260322-203829-21fb
++
++## Findings
++1. [P2] PM-083: Chevron remains centered instead of right-aligned — In [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427), the close chevron still uses `mx-auto`, so it renders in the center of the drawer rather than in the top-right dismiss area required by the task. FIX: replace the centered layout with right alignment, e.g. `ml-auto` or a right-justified wrapper for the chevron.
++2. [P2] PM-084: Drag handle and chevron still read as duplicate centered gray controls — [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426) keeps the centered gray drag handle immediately above a second centered gray chevron at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427). Because both stay centered and visually similar, the duplication called out in the fix request is still present. FIX: keep the drag handle centered, but move the chevron into a distinct right-aligned interactive position.
++3. [P1] PM-085: Top close area is not sticky, so it scrolls out of view — The drag handle and chevron are rendered directly inside the main scroll content at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L424) without any sticky container on [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426). In long carts, the user loses the close affordance while scrolling, which is exactly the regression this fix is meant to remove. FIX: wrap the drag handle and chevron in a `sticky top-0 z-10 bg-white` container and leave the rest of the drawer content below it scrollable.
++4. [P2] PM-086: Pre-checkout loyalty email block is still rendered — The `showLoyaltySection` block is still present at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L887) and includes the pre-checkout email field through [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L916). The task explicitly says to remove this section while keeping the separate post-order reward email form at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L491). FIX: delete the entire `showLoyaltySection && (...)` block and keep the reward-email form unchanged.
++5. [P3] PM-087: Excessive vertical gap above the sticky footer is still present — The current subtotal/footer spacing still uses `mt-4 pt-4` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L920), an `h-20` spacer at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L937), and `mt-2 mb-2` on the motivation text at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L956). On a 375px viewport this preserves the oversized empty gap the task asks to compact. FIX: reduce the subtotal wrapper spacing, shrink the spacer to `h-16`, and tighten the motivation text margins to `mt-1 mb-1` or equivalent.
++
++## Summary
++Total: 5 findings (0 P0, 1 P1, 3 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None for this review; the target lines, expected behavior, and keep/remove boundaries were specific enough.
++- Scope questions (anything you weren't sure if it's in scope): None. The numbered Fix list clearly locked scope to Fix 1-5 only.
+diff --git a/pipeline/chain-state/publicmenu-260322-203829-21fb-codex-findings.md b/pipeline/chain-state/publicmenu-260322-203829-21fb-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..92ae34752bd7272c1b8a9022f70002ed612a176c
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260322-203829-21fb-codex-findings.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260322-203829-21fb
++
++## Findings
++1. [P2] PM-083: Chevron remains centered instead of right-aligned — In [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427), the close chevron still uses `mx-auto`, so it renders in the center of the drawer rather than in the top-right dismiss area required by the task. FIX: replace the centered layout with right alignment, e.g. `ml-auto` or a right-justified wrapper for the chevron.
++2. [P2] PM-084: Drag handle and chevron still read as duplicate centered gray controls — [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426) keeps the centered gray drag handle immediately above a second centered gray chevron at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L427). Because both stay centered and visually similar, the duplication called out in the fix request is still present. FIX: keep the drag handle centered, but move the chevron into a distinct right-aligned interactive position.
++3. [P1] PM-085: Top close area is not sticky, so it scrolls out of view — The drag handle and chevron are rendered directly inside the main scroll content at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L424) without any sticky container on [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L426). In long carts, the user loses the close affordance while scrolling, which is exactly the regression this fix is meant to remove. FIX: wrap the drag handle and chevron in a `sticky top-0 z-10 bg-white` container and leave the rest of the drawer content below it scrollable.
++4. [P2] PM-086: Pre-checkout loyalty email block is still rendered — The `showLoyaltySection` block is still present at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L887) and includes the pre-checkout email field through [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L916). The task explicitly says to remove this section while keeping the separate post-order reward email form at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L491). FIX: delete the entire `showLoyaltySection && (...)` block and keep the reward-email form unchanged.
++5. [P3] PM-087: Excessive vertical gap above the sticky footer is still present — The current subtotal/footer spacing still uses `mt-4 pt-4` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L920), an `h-20` spacer at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L937), and `mt-2 mb-2` on the motivation text at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L956). On a 375px viewport this preserves the oversized empty gap the task asks to compact. FIX: reduce the subtotal wrapper spacing, shrink the spacer to `h-16`, and tighten the motivation text margins to `mt-1 mb-1` or equivalent.
++
++## Summary
++Total: 5 findings (0 P0, 1 P1, 3 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None for this review; the target lines, expected behavior, and keep/remove boundaries were specific enough.
++- Scope questions (anything you weren't sure if it's in scope): None. The numbered Fix list clearly locked scope to Fix 1-5 only.
+
+tokens used
+73 944
+Scoped review is complete. I found 5 in-scope issues, all matching Fix 1-5: centered chevron, duplicate centered top indicators, non-sticky close area, leftover pre-checkout loyalty email block, and oversized subtotal/footer spacing. The findings were written to [publicmenu-260322-203829-21fb-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260322-203829-21fb-codex-findings.md).
+
+Per repo rules, I also saved the review copy to [review_2026-03-22.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-22.md) and the executed command log to [commands_2026-03-22.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-22.log).

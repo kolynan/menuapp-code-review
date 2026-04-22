@@ -1,0 +1,55 @@
+CC Writer Analysis — StaffOrdersMobile (SOM Batch B2)
+Chain: staffordersmobile-260415-225055-2937
+Task: task-260415-225056-014
+Date: 2026-04-15
+
+== SUMMARY ==
+Analyzed 2 files for Fix B + Fix C + Fix A (closed table stays in Active tab).
+All 3 Fixes verified against current code. 9 findings total (all P1).
+
+== FILES ANALYZED ==
+1. components/sessionHelpers.js (230 lines) — Fix B target
+2. pages/StaffOrdersMobile/260415-00 StaffOrdersMobile RELEASE.jsx (4579 lines) — Fix C + Fix A targets
+
+== FINDINGS ==
+Fix B (1 finding):
+  1. [P1] sessionHelpers.js:177 — ServiceRequest.filter uses table link instead of table_session.
+       FIX: Primary filter by table_session: sessionId, fallback to table: tableId for legacy.
+
+Fix C (2 findings):
+  2. [P1] SOM:3583 — activeOrders finish-stage passes status='closed' orders through.
+       FIX: Change to `o.status !== 'closed' && o.status !== 'cancelled'`.
+  3. [P1] SOM:2164-2171 — handleCloseTableClick find(Boolean) picks wrong session from mixed orders.
+       FIX: Prefer group.openSessionId, fallback to non-closed order's table_session.
+
+Fix A (6 findings):
+  4. [P1] SOM:~3526 — No useQuery for open TableSessions (ground truth missing).
+       FIX: Add useQuery with queryKey ["openSessions", partnerId], staleTime 30s.
+  5. [P1] SOM:~3528 — No derived map openSessionByTableId.
+       FIX: Add useMemo indexing openSessions by getLinkId(s.table).
+  6. [P1] SOM:4154 — confirmCloseTable doesn't invalidate openSessions.
+       FIX: Add queryClient.invalidateQueries({ queryKey: ["openSessions"] }) after refetch calls.
+  7. [P1] SOM:3752 — orderGroups lacks openSessionId field for table groups.
+       FIX: Add openSessionId: openSessionByTableId[tableId]?.id || null to group object.
+  8. [P1] SOM:3832-3850 — filteredGroups has no session-based override.
+       FIX: Add early return for table groups with no open session -> force to Completed tab.
+  9. [P1] SOM:3853-3871 — tabCounts has no session-based override.
+       FIX: Mirror filteredGroups session-first logic for consistent counts.
+
+== CODE VERIFICATION ==
+- closeSession signature: closeSession(sessionId, tableId) at line 158 — confirmed.
+- base44.entities.TableSession: used in sessionHelpers.js, accessible via base44 import in SOM.
+- canFetch, partnerId, rateLimitHit: in scope at insertion point (~line 3526).
+- queryClient: available in confirmCloseTable scope (used at line 4175 for orders invalidation).
+- getLinkId: used throughout SOM file (lines 2165, 3572, 3748, etc.).
+- confirmCloseTable pattern: uses refetchOrders()/refetchRequests() (NOT invalidateQueries for orders).
+  Fix A.3 correctly uses invalidateQueries for new query since no refetch ref exists.
+
+== PROMPT CLARITY ==
+Overall: 5/5
+Ambiguous descriptions: None
+Missing context: sessionHelpers.js actual line count is 230 (not 203 as stated), but target line 177 was accurate.
+Scope questions: None — FROZEN UX and "do NOT" boundaries are clear.
+
+== OUTPUT ==
+Findings file: pipeline/chain-state/staffordersmobile-260415-225055-2937-cc-findings.md

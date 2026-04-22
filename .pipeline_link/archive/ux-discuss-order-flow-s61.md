@@ -1,0 +1,163 @@
+---
+task_id: ux-discuss-order-flow-s61
+type: discussion
+priority: high
+created: 2026-03-01
+session: S61
+budget: 4.50
+---
+
+# UX Discussion: Order Flow & Table Lifecycle — S61
+
+Use @discussion-moderator agent to run this CC+Codex discussion.
+
+Read `references/menuapp-prd.md` and `references/menuapp-architecture.md` for project context before starting.
+
+---
+
+## Background
+
+In Session 61, we tested the full guest→staff order flow end-to-end in the browser:
+
+**Current flow observed:**
+1. Guest scans QR code at table → arrives at menu page
+2. Guest adds items to cart → taps "Отправить официанту"
+3. System asks for table code (format: unified code 753 + table number = e.g. "75301" for Table 1)
+4. Guest enters code → system confirms "Стол 1" + assigns guest number (e.g. "Гость 68 #8368")
+5. Order appears in `/staffordersmobile` under "Свободные" counter
+6. Waiter sees order card: table name, zone, guest name, item list
+7. Waiter clicks "→ Принято" → order moves to "Мои", counter updates
+8. Waiter clicks "→ [Готовится]" → status changes
+9. Waiter clicks "→ Выдан гостю" → order moves to "Завершённые"
+10. Waiter sees "Закрыть стол" button in the completed orders view
+
+**Key screens:**
+- Guest: cart bottom sheet → table code entry → post-order confirmation dialog
+- Staff: `/staffordersmobile` with Мои/Чужие/Свободные counters + Активные/Завершённые tabs
+
+---
+
+## Discussion Questions
+
+### Q1: Table Lifecycle — What does "Закрыть стол" actually do?
+
+**Current behavior observed:** After all orders reach "Выдан гостю", a "Закрыть стол" button appears in the Завершённые tab.
+
+**Questions:**
+- What should "Закрыть стол" do exactly?
+  - Option A: Just marks the table as "free" in the partner's view (partnertables page)
+  - Option B: Clears the guest link — if the same guest scans the QR again, they start fresh
+  - Option C: Closes the bill — triggers payment process
+  - Option D: Something else?
+- After "Закрыть стол", if a NEW guest sits at the same table and scans the QR, what should happen? Should they see the previous guest's orders or start completely fresh?
+- Is there a concept of a "table session" — a period from first order to table closure? If yes, should it be tracked?
+
+### Q2: Guest Return — What happens when guest scans QR again?
+
+**Scenario:** Guest 68 placed an order (Стейк). Waiter processed it. Now Guest 68 wants to add more dishes and scans the QR again (or refreshes the page).
+
+**Questions:**
+- Should Guest 68 see their previous order history ("Заказы стола (7)" shows their past orders)?
+- Should the table code still be remembered (no re-entry needed)?
+- What if Guest 68 was assigned number #8368 — should this persist for the whole table session?
+- ЛМП: In real restaurant QR-ordering systems (e.g., QR Tiger, Flipdish, Yumm), how is guest identity handled without accounts?
+
+### Q3: Table Code UX — Is "753 + table number" the right approach?
+
+**Current:** Guest must know the "unified code" (753) AND their table number (e.g., 01) to form "75301".
+Observed issue: guest must enter this manually — it's not obvious.
+
+**Questions:**
+- ЛМП: How do other QR-menu systems handle table identification?
+  - Option A: QR code contains the full table code (guest just scans, no manual entry)
+  - Option B: QR code goes to URL with table ID embedded (e.g., `/menu?table=75301`)
+  - Option C: Manual code entry (current) — but then it should be clearer
+  - Option D: Guest just enters a short visible number from the table (e.g., "01")
+- If the QR code already encodes the table (as the test URL suggests with `?mode=hall`), why does the guest still need to manually enter the code?
+- Is the manual code entry a fallback for when QR isn't available, or is it the primary method?
+
+### Q4: "Мои / Чужие / Свободные" — is this the right mental model for waiters?
+
+**Current counters:**
+- **Свободные** — new orders not yet claimed by any waiter
+- **Мои** — orders this waiter accepted ("→ Принято")
+- **Чужие** — orders accepted by other waiters
+
+**Questions:**
+- ЛМП: Is the "claim" model (waiter picks up free orders) the right approach for restaurants?
+  - Alternative: Manager assigns orders to specific waiters
+  - Alternative: Zone-based — each waiter serves specific tables automatically
+- What happens if a waiter goes on break? Should their "Мои" orders be returnable to "Свободные"?
+- Is "Чужие" a useful category? What would a waiter do with it — just ignore? Or can they "help" with another waiter's order?
+
+### Q5: Post-order Dialog UX — what should the guest see after ordering?
+
+**Current behavior:**
+- After "Отправить официанту", a dialog appears showing:
+  - "✅ Спасибо за оценку!" (strange — rating appears before order is served)
+  - "Заказы стола (7)" — all orders from all guests at the table
+  - Total: 362 T
+- **Bug:** Dialog scroll position starts at the bottom (star rating area), not at top. Content is not immediately visible.
+
+**Questions:**
+- What should the guest see IMMEDIATELY after placing an order?
+  - Their own order confirmation ("Your order: 1× Стейк — placed!")
+  - All table orders (current behavior)
+  - Just a "Your order is received" message + close button
+- When should the rating prompt appear? After order is served? At table closure? Never?
+- Should the guest be able to track order status (Принято → Готовится → Выдан) in real-time?
+- ЛМП: What do leading QR-ordering apps show post-order?
+
+### Q6: Order Status Transparency for Guest
+
+**Current:** Guest sees no order status updates. They place order and see the "Заказы стола" list with static "Заказано" status.
+
+**Questions:**
+- Should the guest see live status updates (Принято / Готовится / Выдан)?
+- Should there be a push notification or sound when order status changes?
+- ЛМП: In fast-casual restaurants (McDonalds kiosk, Shake Shack QR), what do guests see after ordering?
+
+### Q7: Table Naming — "Стол Стол 1" double prefix
+
+**Observed:** Order card in staffordersmobile shows "Стол Стол 1" — the word "Стол" appears twice.
+
+This suggests the table is stored as "Стол 1" in the database but the component also adds a "Стол" prefix when rendering.
+
+**Questions:**
+- Should table names be stored as "1", "2", "A", "VIP" (without "Стол" prefix)?
+- Or should the component not add the "Стол" prefix?
+- What's the recommended naming convention for tables in a restaurant context?
+
+---
+
+## What Arman Needs
+
+A clear written discussion with recommendations covering:
+
+1. **Table lifecycle architecture** — how tables open, how they close, what data persists
+2. **Guest identity model** — how to handle returning guest within same table session
+3. **Table code UX** — recommended approach for linking guest to table
+4. **Waiter workflow** — is Мои/Чужие/Свободные the right model or something better?
+5. **Post-order guest experience** — ЛМП for what to show after order is placed
+6. **Status transparency** — should guests see order status? How?
+
+For each question: CC answer, Codex answer, then synthesis/recommendation.
+
+---
+
+## Deliverables
+
+1. `outputs/UX_Discussion_OrderFlow_S61.md` — full CC+Codex discussion results
+2. A clear **prioritized recommendation list** of what to implement first
+3. If any recommendation requires code changes — describe in enough detail for a future VSC task
+
+**Git:** Start with `git add . && git commit -m "S61 pre-task snapshot" && git push`
+
+---
+
+## Notes for Discussion Moderator
+
+- Focus on ЛМП (best world practices) from real restaurant ordering systems
+- Context: MenuApp is for **Kazakhstani** restaurants — keep in mind local context (multilingual RU/KZ/EN, simpler is better for staff who may not be tech-savvy)
+- Priority: **guest experience** and **waiter ease of use** are most important
+- This is a no-code platform (Base44) — solution complexity must be achievable

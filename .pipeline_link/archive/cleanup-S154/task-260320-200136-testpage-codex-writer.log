@@ -1,0 +1,799 @@
+OpenAI Codex v0.115.0 (research preview)
+--------
+workdir: C:/Dev/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d0bc4-2ed4-7f40-af08-85aaef849eac
+--------
+user
+Review the file pages/TestPage/base/*.jsx for bugs in a React restaurant QR-menu app on Base44 platform. Also check pages/TestPage/README.md and pages/TestPage/BUGS.md for context (ONLY these 3 files, nothing else). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the 3 files above. Do NOT search the repo, do NOT read old findings, do NOT read files outside pages/TestPage/. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. Find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/testpage-260320-200136-codex-findings.md FORMAT: # Codex Writer Findings — TestPage Chain: testpage-260320-200136 ## Findings 1. [P0] Title — Description. FIX: ... 2. [P1] Title — Description. FIX: ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) Do NOT apply fixes — only document findings. === TASK CONTEXT === Review the TestPage page code — all files in pages/TestPage/base/. Focus on: 1. React best practices — hooks usage, missing deps in useEffect, stale closures 2. UX bugs — broken navigation, missing error states 3. Performance — unnecessary re-renders, missing memoization Update BUGS.md with any new findings. Update README.md with changes summary. IMPORTANT — git commit at the end: git add pages/TestPage/base/*.jsx pages/TestPage/BUGS.md pages/TestPage/README.md git commit -m "fix: TestPage code review S5 smoke test S152" git push === END ===
+mcp startup: no servers
+codex
+Reviewing only `pages/TestPage/base/*.jsx`, `pages/TestPage/README.md`, and `pages/TestPage/BUGS.md`. I’ll read those files directly, identify bugs without changing the page code, then write the findings report and update the two Markdown files with the review summary.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Dev/menuapp-code-review/pages/TestPage/BUGS.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Dev/menuapp-code-review/pages/TestPage/README.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Path 'C:/Dev/menuapp-code-review/pages/TestPage/base' -Filter '*.jsx' | Select-Object -ExpandProperty FullName" in C:/Dev/menuapp-code-review succeeded in 8.67s:
+# TestPage
+
+Fake page for pipeline smoke testing. Contains intentional bugs.
+Not a real MenuApp page â€” safe to modify/delete.
+<!-- smoke-parallel-v3-testpage -->
+<!-- smoke-parallel-v3-testpage-b -->
+<!-- smoke-d-tp -->
+<!-- smoke-e-tp -->
+<!-- smoke-f-tp -->
+ succeeded in 10.81s:
+# TestPage â€” Known Bugs
+
+## Fixed
+- **[P0] Missing await on response.json()** (line ~17) â€” `response.json()` returns a Promise; without `await`, `setItems` receives a Promise object instead of data. Fixed: added `await`.
+- **[P1] No error handling in fetchItems** (line ~15) â€” Network errors crash silently, `loading` stays true forever. Fixed: added try/catch/finally.
+- **[P1] No error handling in deleteItem** (line ~23) â€” Failed DELETE removes item from UI optimistically with no rollback. Fixed: added try/catch, check `res.ok`.
+
+- **[P1] Hardcoded user-facing strings** (lines 36,40,44) â€” No i18n. Fixed: added useI18n, replaced with t() keys.
+- **[P1] Stale closure in deleteItem** (line 30) â€” `setItems(items.filter(...))` loses concurrent deletes. Fixed: functional updater `setItems(prev => ...)`.
+- **[P1] No response.ok check in fetchItems** (line 17) â€” Non-2xx responses treated as success. Fixed: added `if (!response.ok) throw`.
+- **[P2] Inline styles instead of Tailwind** (line 39) â€” `style={{ padding: 16 }}`. Fixed: replaced with `className="p-4"`.
+- **[P2] console.error in production** (lines 20,32) â€” No user feedback. Fixed: removed console.error, added error state display.
+- **[P2] No minimum touch target for Delete** (line 44) â€” Below 44x44px. Fixed: added min-h/min-w classes.
+- **[P2] No empty state** â€” Empty items shows nothing. Fixed: added empty state message.
+- **[P2] No user-facing error feedback** â€” Errors only in console. Fixed: added error state and UI display.
+
+- **[P1] Hardcoded error strings** (lines 20,33) â€” "Fetch failed"/"Delete failed" not using i18n. Fixed: replaced with `t('test_page.fetch_failed')` / `t('test_page.delete_failed')`.
+- **[P2] No loading/disabled state on Delete button** (lines 50-55) â€” Double-click causes duplicate DELETEs. Fixed: added `deletingId` state, disabled button during delete.
+- **[P2] Error state never cleared on success** (lines 24,36) â€” Stale error persists after successful actions. Fixed: added `setError(null)` at start of fetchItems and deleteItem.
+- **[P2] List items lack flex layout** (line 48) â€” Name and button stack vertically on mobile. Fixed: added `flex items-center justify-between` to item div.
+ succeeded in 10.75s:
+C:\Dev\menuapp-code-review\pages\TestPage\base\testpage.jsx
+codex
+I’ve confirmed there is a single target page file under `pages/TestPage/base`. Reading that code now and then I’ll collapse the findings into the requested pipeline report plus concise updates in `BUGS.md` and `README.md`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx'" in C:/Dev/menuapp-code-review succeeded in 720ms:
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useI18n } from "@/components/i18n";
+import { Loader2 } from "lucide-react";
+
+// TestPage â€” minimal fake page for pipeline smoke testing
+
+export default function TestPage() {
+  const { t } = useI18n();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorKey, setErrorKey] = useState(null);
+  const abortRef = useRef(null);
+
+  const fetchItems = useCallback((signal) => {
+    setLoading(true);
+    setErrorKey(null);
+    fetch("/api/items", { signal })
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+codex
+I have the code context now. One defect is already clear in the async cleanup path after retries; I’m numbering the file next so the report can stay precise and then I’ll write the three requested documents without touching the JSX.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content -Path '"'C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx' | ForEach-Object { '{0,4}: {1}' -f "'$i, $_; $i++ }' in C:/Dev/menuapp-code-review succeeded in 411ms:
+   1: import React, { useState, useEffect, useCallback, useRef } from "react";
+   2: import { useI18n } from "@/components/i18n";
+   3: import { Loader2 } from "lucide-react";
+   4: 
+   5: // TestPage â€” minimal fake page for pipeline smoke testing
+   6: 
+   7: export default function TestPage() {
+   8:   const { t } = useI18n();
+   9:   const [items, setItems] = useState([]);
+  10:   const [loading, setLoading] = useState(true);
+  11:   const [errorKey, setErrorKey] = useState(null);
+  12:   const abortRef = useRef(null);
+  13: 
+  14:   const fetchItems = useCallback((signal) => {
+  15:     setLoading(true);
+  16:     setErrorKey(null);
+  17:     fetch("/api/items", { signal })
+  18:       .then(res => {
+  19:         if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  20:         return res.json();
+codex
+I’ve narrowed the review to a small set of concrete defects in the page itself. Next I’m writing the findings into the pipeline report, marking the active issues in `BUGS.md`, and adding a short review summary in `README.md`; after that I’ll make the requested git commit and attempt the push.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "New-Item -ItemType Directory -Force -Path 'C:/Dev/menuapp-code-review/pipeline/chain-state' | Out-Null" in C:/Dev/menuapp-code-review succeeded in 420ms:
+
+codex
+I’m writing the report now. The code file stays unchanged; only the requested Markdown outputs are being updated to capture the active defects and the review summary.
+file update
+A C:/Dev/menuapp-code-review\pipeline/chain-state/testpage-260320-200136-codex-findings.md
+# Codex Writer Findings — TestPage
+Chain: testpage-260320-200136
+
+## Findings
+1. [P1] Delete action is UI-only and falls out of sync with server data — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1), `handleDelete` only filters local state and never calls a backend delete endpoint. The row disappears immediately, but it will come back on the next fetch or reload, and there is no way to report a delete failure to the user. FIX: replace the local-only filter with an async DELETE flow, disable the button while the request is in flight, and only remove the row after success or rollback on failure.
+2. [P2] Retry requests are not cleaned up on unmount — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1), retries replace `abortRef.current`, but the effect cleanup still aborts only the first `controller`. If the user taps retry and then leaves the page, the last request can keep running and still call `setItems` / `setLoading` after unmount. FIX: make the cleanup abort the latest controller from `abortRef.current` and guard post-fetch state updates.
+3. [P2] Partially invalid payloads are silently rendered as an empty menu — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1), the code checks only that the response is an array, then quietly drops any bad rows with `data.filter(item => item && item.id)`. A malformed API response can therefore hide dishes and fall through to the empty-state message instead of surfacing a fetch error. FIX: validate each row shape explicitly and set an error state when required fields are missing instead of silently filtering the payload.
+
+## Summary
+Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+M C:/Dev/menuapp-code-review\pages/TestPage/BUGS.md
+@@ -77,2 +77,5 @@
+ ## Active
+-(none)
++### Review 2026-03-20 (chain `testpage-260320-200136`)
++- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) — `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
++- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) — retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
++- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) — invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+apply_patch(auto_approved=true) exited 0 in 542ms:
+Success. Updated the following files:
+A pipeline/chain-state/testpage-260320-200136-codex-findings.md
+M pages/TestPage/BUGS.md
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index c0b8c3e85f13c5797fd99cb2767c4be863b13093..5f21dcff0ddd9012fd72bb6e2a7cf6baee601ba2
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -75,4 +75,7 @@
+ - **[P2] Error banner not mobile-safe** (line ~54) — Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
+ 
+ ## Active
+-(none)
++### Review 2026-03-20 (chain `testpage-260320-200136`)
++- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) — `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
++- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) — retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
++- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) — invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+diff --git a/pipeline/chain-state/testpage-260320-200136-codex-findings.md b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a59f19c79c0015e09b9e52b80ce518a42360c65
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+@@ -0,0 +1,10 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260320-200136
++
++## Findings
++1. [P1] Delete action is UI-only and falls out of sync with server data — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1), `handleDelete` only filters local state and never calls a backend delete endpoint. The row disappears immediately, but it will come back on the next fetch or reload, and there is no way to report a delete failure to the user. FIX: replace the local-only filter with an async DELETE flow, disable the button while the request is in flight, and only remove the row after success or rollback on failure.
++2. [P2] Retry requests are not cleaned up on unmount — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1), retries replace `abortRef.current`, but the effect cleanup still aborts only the first `controller`. If the user taps retry and then leaves the page, the last request can keep running and still call `setItems` / `setLoading` after unmount. FIX: make the cleanup abort the latest controller from `abortRef.current` and guard post-fetch state updates.
++3. [P2] Partially invalid payloads are silently rendered as an empty menu — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1), the code checks only that the response is an array, then quietly drops any bad rows with `data.filter(item => item && item.id)`. A malformed API response can therefore hide dishes and fall through to the empty-state message instead of surfacing a fetch error. FIX: validate each row shape explicitly and set an error state when required fields are missing instead of silently filtering the payload.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index c0b8c3e85f13c5797fd99cb2767c4be863b13093..5f21dcff0ddd9012fd72bb6e2a7cf6baee601ba2
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -75,4 +75,7 @@
+ - **[P2] Error banner not mobile-safe** (line ~54) — Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
+ 
+ ## Active
+-(none)
++### Review 2026-03-20 (chain `testpage-260320-200136`)
++- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) — `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
++- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) — retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
++- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) — invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+diff --git a/pipeline/chain-state/testpage-260320-200136-codex-findings.md b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a59f19c79c0015e09b9e52b80ce518a42360c65
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+@@ -0,0 +1,10 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260320-200136
++
++## Findings
++1. [P1] Delete action is UI-only and falls out of sync with server data — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1), `handleDelete` only filters local state and never calls a backend delete endpoint. The row disappears immediately, but it will come back on the next fetch or reload, and there is no way to report a delete failure to the user. FIX: replace the local-only filter with an async DELETE flow, disable the button while the request is in flight, and only remove the row after success or rollback on failure.
++2. [P2] Retry requests are not cleaned up on unmount — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1), retries replace `abortRef.current`, but the effect cleanup still aborts only the first `controller`. If the user taps retry and then leaves the page, the last request can keep running and still call `setItems` / `setLoading` after unmount. FIX: make the cleanup abort the latest controller from `abortRef.current` and guard post-fetch state updates.
++3. [P2] Partially invalid payloads are silently rendered as an empty menu — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1), the code checks only that the response is an array, then quietly drops any bad rows with `data.filter(item => item && item.id)`. A malformed API response can therefore hide dishes and fall through to the empty-state message instead of surfacing a fetch error. FIX: validate each row shape explicitly and set an error state when required fields are missing instead of silently filtering the payload.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index c0b8c3e85f13c5797fd99cb2767c4be863b13093..5f21dcff0ddd9012fd72bb6e2a7cf6baee601ba2
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -75,4 +75,7 @@
+ - **[P2] Error banner not mobile-safe** (line ~54) — Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
+ 
+ ## Active
+-(none)
++### Review 2026-03-20 (chain `testpage-260320-200136`)
++- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) — `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
++- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) — retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
++- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) — invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+diff --git a/pipeline/chain-state/testpage-260320-200136-codex-findings.md b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a59f19c79c0015e09b9e52b80ce518a42360c65
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+@@ -0,0 +1,10 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260320-200136
++
++## Findings
++1. [P1] Delete action is UI-only and falls out of sync with server data — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1), `handleDelete` only filters local state and never calls a backend delete endpoint. The row disappears immediately, but it will come back on the next fetch or reload, and there is no way to report a delete failure to the user. FIX: replace the local-only filter with an async DELETE flow, disable the button while the request is in flight, and only remove the row after success or rollback on failure.
++2. [P2] Retry requests are not cleaned up on unmount — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1), retries replace `abortRef.current`, but the effect cleanup still aborts only the first `controller`. If the user taps retry and then leaves the page, the last request can keep running and still call `setItems` / `setLoading` after unmount. FIX: make the cleanup abort the latest controller from `abortRef.current` and guard post-fetch state updates.
++3. [P2] Partially invalid payloads are silently rendered as an empty menu — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1), the code checks only that the response is an array, then quietly drops any bad rows with `data.filter(item => item && item.id)`. A malformed API response can therefore hide dishes and fall through to the empty-state message instead of surfacing a fetch error. FIX: validate each row shape explicitly and set an error state when required fields are missing instead of silently filtering the payload.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+
+codex
+The report and BUGS update are written. I hit an encoding mismatch while patching `README.md`, so I’m reading that one file again to patch it against the exact text and then I’ll do the requested git operations.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content -Path '"'C:/Dev/menuapp-code-review/pages/TestPage/README.md' | ForEach-Object { '{0,4}: {1}' -f "'$i, $_; $i++ }' in C:/Dev/menuapp-code-review succeeded in 396ms:
+   1: # TestPage
+   2: 
+   3: Fake page for pipeline smoke testing. Contains intentional bugs.
+   4: Not a real MenuApp page â€” safe to modify/delete.
+   5: <!-- smoke-parallel-v3-testpage -->
+   6: <!-- smoke-parallel-v3-testpage-b -->
+   7: <!-- smoke-d-tp -->
+   8: <!-- smoke-e-tp -->
+   9: <!-- smoke-f-tp -->
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index c0b8c3e85f13c5797fd99cb2767c4be863b13093..5f21dcff0ddd9012fd72bb6e2a7cf6baee601ba2
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -75,4 +75,7 @@
+ - **[P2] Error banner not mobile-safe** (line ~54) — Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
+ 
+ ## Active
+-(none)
++### Review 2026-03-20 (chain `testpage-260320-200136`)
++- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) — `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
++- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) — retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
++- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) — invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+diff --git a/pipeline/chain-state/testpage-260320-200136-codex-findings.md b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a59f19c79c0015e09b9e52b80ce518a42360c65
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+@@ -0,0 +1,10 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260320-200136
++
++## Findings
++1. [P1] Delete action is UI-only and falls out of sync with server data — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1), `handleDelete` only filters local state and never calls a backend delete endpoint. The row disappears immediately, but it will come back on the next fetch or reload, and there is no way to report a delete failure to the user. FIX: replace the local-only filter with an async DELETE flow, disable the button while the request is in flight, and only remove the row after success or rollback on failure.
++2. [P2] Retry requests are not cleaned up on unmount — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1), retries replace `abortRef.current`, but the effect cleanup still aborts only the first `controller`. If the user taps retry and then leaves the page, the last request can keep running and still call `setItems` / `setLoading` after unmount. FIX: make the cleanup abort the latest controller from `abortRef.current` and guard post-fetch state updates.
++3. [P2] Partially invalid payloads are silently rendered as an empty menu — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1), the code checks only that the response is an array, then quietly drops any bad rows with `data.filter(item => item && item.id)`. A malformed API response can therefore hide dishes and fall through to the empty-state message instead of surfacing a fetch error. FIX: validate each row shape explicitly and set an error state when required fields are missing instead of silently filtering the payload.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+
+file update
+M C:/Dev/menuapp-code-review\pages/TestPage/README.md
+@@ -4,3 +4,4 @@
+ Not a real MenuApp page — safe to modify/delete.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-20 (`testpage-260320-200136`): current page review found 3 active issues in `base/testpage.jsx` (1 P1, 2 P2). Findings were written to `pipeline/chain-state/testpage-260320-200136-codex-findings.md` and mirrored in `BUGS.md`.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+apply_patch(auto_approved=true) exited 0 in 228ms:
+Success. Updated the following files:
+M pages/TestPage/README.md
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index c0b8c3e85f13c5797fd99cb2767c4be863b13093..5f21dcff0ddd9012fd72bb6e2a7cf6baee601ba2
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -75,4 +75,7 @@
+ - **[P2] Error banner not mobile-safe** (line ~54) — Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
+ 
+ ## Active
+-(none)
++### Review 2026-03-20 (chain `testpage-260320-200136`)
++- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) — `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
++- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) — retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
++- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) — invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 24398c80bb979af68a7b42f289ec6e8a1c7926fb..6474ea59bda14cd0ad537d3f98e72eda6eaccf2e
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -2,7 +2,8 @@
+ 
+ Fake page for pipeline smoke testing. Contains intentional bugs.
+ Not a real MenuApp page — safe to modify/delete.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-20 (`testpage-260320-200136`): current page review found 3 active issues in `base/testpage.jsx` (1 P1, 2 P2). Findings were written to `pipeline/chain-state/testpage-260320-200136-codex-findings.md` and mirrored in `BUGS.md`.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260320-200136-codex-findings.md b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a59f19c79c0015e09b9e52b80ce518a42360c65
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+@@ -0,0 +1,10 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260320-200136
++
++## Findings
++1. [P1] Delete action is UI-only and falls out of sync with server data — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1), `handleDelete` only filters local state and never calls a backend delete endpoint. The row disappears immediately, but it will come back on the next fetch or reload, and there is no way to report a delete failure to the user. FIX: replace the local-only filter with an async DELETE flow, disable the button while the request is in flight, and only remove the row after success or rollback on failure.
++2. [P2] Retry requests are not cleaned up on unmount — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1), retries replace `abortRef.current`, but the effect cleanup still aborts only the first `controller`. If the user taps retry and then leaves the page, the last request can keep running and still call `setItems` / `setLoading` after unmount. FIX: make the cleanup abort the latest controller from `abortRef.current` and guard post-fetch state updates.
++3. [P2] Partially invalid payloads are silently rendered as an empty menu — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1), the code checks only that the response is an array, then quietly drops any bad rows with `data.filter(item => item && item.id)`. A malformed API response can therefore hide dishes and fall through to the empty-state message instead of surfacing a fetch error. FIX: validate each row shape explicitly and set an error state when required fields are missing instead of silently filtering the payload.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index c0b8c3e85f13c5797fd99cb2767c4be863b13093..5f21dcff0ddd9012fd72bb6e2a7cf6baee601ba2
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -75,4 +75,7 @@
+ - **[P2] Error banner not mobile-safe** (line ~54) — Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
+ 
+ ## Active
+-(none)
++### Review 2026-03-20 (chain `testpage-260320-200136`)
++- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) — `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
++- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) — retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
++- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) — invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 24398c80bb979af68a7b42f289ec6e8a1c7926fb..6474ea59bda14cd0ad537d3f98e72eda6eaccf2e
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -2,7 +2,8 @@
+ 
+ Fake page for pipeline smoke testing. Contains intentional bugs.
+ Not a real MenuApp page — safe to modify/delete.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-20 (`testpage-260320-200136`): current page review found 3 active issues in `base/testpage.jsx` (1 P1, 2 P2). Findings were written to `pipeline/chain-state/testpage-260320-200136-codex-findings.md` and mirrored in `BUGS.md`.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260320-200136-codex-findings.md b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a59f19c79c0015e09b9e52b80ce518a42360c65
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+@@ -0,0 +1,10 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260320-200136
++
++## Findings
++1. [P1] Delete action is UI-only and falls out of sync with server data — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1), `handleDelete` only filters local state and never calls a backend delete endpoint. The row disappears immediately, but it will come back on the next fetch or reload, and there is no way to report a delete failure to the user. FIX: replace the local-only filter with an async DELETE flow, disable the button while the request is in flight, and only remove the row after success or rollback on failure.
++2. [P2] Retry requests are not cleaned up on unmount — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1), retries replace `abortRef.current`, but the effect cleanup still aborts only the first `controller`. If the user taps retry and then leaves the page, the last request can keep running and still call `setItems` / `setLoading` after unmount. FIX: make the cleanup abort the latest controller from `abortRef.current` and guard post-fetch state updates.
++3. [P2] Partially invalid payloads are silently rendered as an empty menu — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1), the code checks only that the response is an array, then quietly drops any bad rows with `data.filter(item => item && item.id)`. A malformed API response can therefore hide dishes and fall through to the empty-state message instead of surfacing a fetch error. FIX: validate each row shape explicitly and set an error state when required fields are missing instead of silently filtering the payload.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Dev/menuapp-code-review/pipeline/chain-state/testpage-260320-200136-codex-findings.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Dev/menuapp-code-review/pages/TestPage/README.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Dev/menuapp-code-review/pages/TestPage/BUGS.md' -Tail 12" in C:/Dev/menuapp-code-review succeeded in 415ms:
+# Codex Writer Findings â€” TestPage
+Chain: testpage-260320-200136
+
+## Findings
+1. [P1] Delete action is UI-only and falls out of sync with server data â€” In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1), `handleDelete` only filters local state and never calls a backend delete endpoint. The row disappears immediately, but it will come back on the next fetch or reload, and there is no way to report a delete failure to the user. FIX: replace the local-only filter with an async DELETE flow, disable the button while the request is in flight, and only remove the row after success or rollback on failure.
+2. [P2] Retry requests are not cleaned up on unmount â€” In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1), retries replace `abortRef.current`, but the effect cleanup still aborts only the first `controller`. If the user taps retry and then leaves the page, the last request can keep running and still call `setItems` / `setLoading` after unmount. FIX: make the cleanup abort the latest controller from `abortRef.current` and guard post-fetch state updates.
+3. [P2] Partially invalid payloads are silently rendered as an empty menu â€” In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1), the code checks only that the response is an array, then quietly drops any bad rows with `data.filter(item => item && item.id)`. A malformed API response can therefore hide dishes and fall through to the empty-state message instead of surfacing a fetch error. FIX: validate each row shape explicitly and set an error state when required fields are missing instead of silently filtering the payload.
+
+## Summary
+Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+ succeeded in 408ms:
+# TestPage
+
+Fake page for pipeline smoke testing. Contains intentional bugs.
+Not a real MenuApp page â€” safe to modify/delete.
+Review update 2026-03-20 (`testpage-260320-200136`): current page review found 3 active issues in `base/testpage.jsx` (1 P1, 2 P2). Findings were written to `pipeline/chain-state/testpage-260320-200136-codex-findings.md` and mirrored in `BUGS.md`.
+<!-- smoke-parallel-v3-testpage -->
+<!-- smoke-parallel-v3-testpage-b -->
+<!-- smoke-d-tp -->
+<!-- smoke-e-tp -->
+<!-- smoke-f-tp -->
+ succeeded in 431ms:
+- **[P1] Delete action is UI-only** (line ~70) â€” Delete only removes from local state, no backend call. Fixed: added TODO comment for backend DELETE; kept as UI-only since TestPage has no real persistence.
+- **[P2] Error div missing role="alert"** (line ~54) â€” Screen readers won't announce errors. Fixed: added `role="alert"`.
+- **[P2] item.name null safety** (line ~67) â€” No fallback for null/undefined names. Fixed: `item.name || t('test_page.unnamed_item')`.
+- **[P2] Loading early return hides content during retry** (line ~41) â€” Full-page spinner replaces visible items on retry. Fixed: inline loader when items exist, full-page only on initial load.
+- **[P2] Delete button aria-label missing** (line ~68) â€” No accessible label identifying which item. Fixed: added `aria-label={t('test_page.delete_item', { name: ... })}`.
+- **[P2] Error banner not mobile-safe** (line ~54) â€” Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
+
+## Active
+### Review 2026-03-20 (chain `testpage-260320-200136`)
+- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) â€” `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
+- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) â€” retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
+- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) â€” invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index c0b8c3e85f13c5797fd99cb2767c4be863b13093..5f21dcff0ddd9012fd72bb6e2a7cf6baee601ba2
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -75,4 +75,7 @@
+ - **[P2] Error banner not mobile-safe** (line ~54) — Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
+ 
+ ## Active
+-(none)
++### Review 2026-03-20 (chain `testpage-260320-200136`)
++- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) — `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
++- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) — retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
++- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) — invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 24398c80bb979af68a7b42f289ec6e8a1c7926fb..6474ea59bda14cd0ad537d3f98e72eda6eaccf2e
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -2,7 +2,8 @@
+ 
+ Fake page for pipeline smoke testing. Contains intentional bugs.
+ Not a real MenuApp page — safe to modify/delete.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-20 (`testpage-260320-200136`): current page review found 3 active issues in `base/testpage.jsx` (1 P1, 2 P2). Findings were written to `pipeline/chain-state/testpage-260320-200136-codex-findings.md` and mirrored in `BUGS.md`.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260320-200136-codex-findings.md b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a59f19c79c0015e09b9e52b80ce518a42360c65
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+@@ -0,0 +1,10 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260320-200136
++
++## Findings
++1. [P1] Delete action is UI-only and falls out of sync with server data — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1), `handleDelete` only filters local state and never calls a backend delete endpoint. The row disappears immediately, but it will come back on the next fetch or reload, and there is no way to report a delete failure to the user. FIX: replace the local-only filter with an async DELETE flow, disable the button while the request is in flight, and only remove the row after success or rollback on failure.
++2. [P2] Retry requests are not cleaned up on unmount — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1), retries replace `abortRef.current`, but the effect cleanup still aborts only the first `controller`. If the user taps retry and then leaves the page, the last request can keep running and still call `setItems` / `setLoading` after unmount. FIX: make the cleanup abort the latest controller from `abortRef.current` and guard post-fetch state updates.
++3. [P2] Partially invalid payloads are silently rendered as an empty menu — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1), the code checks only that the response is an array, then quietly drops any bad rows with `data.filter(item => item && item.id)`. A malformed API response can therefore hide dishes and fall through to the empty-state message instead of surfacing a fetch error. FIX: validate each row shape explicitly and set an error state when required fields are missing instead of silently filtering the payload.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+
+codex
+The documentation updates are in place. I’m checking the git staging state before committing so I don’t accidentally include unrelated work, then I’ll run the requested add/commit/push sequence.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git status --short --untracked-files=all' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff --cached --name-only' in C:/Dev/menuapp-code-review succeeded in 435ms:
+ M "pages/MenuManage/260306-00 menumanage RELEASE.jsx"
+ M pages/PageHelpButton/PageHelpButton_v1.1_BASE.jsx
+ M pages/PartnerShell/PartnerShell_v1.0_BASE.jsx
+ D "pages/PublicMenu/260302-06 useTableSession RELEASE.jsx"
+ D "pages/PublicMenu/260305-02 MenuView RELEASE.jsx"
+ D "pages/PublicMenu/260305-03 CartView RELEASE.jsx"
+ D "pages/PublicMenu/260306-01 x RELEASE.jsx"
+ M pages/PublicMenu/base/x.jsx.bak
+ M pages/TestPage/BUGS.md
+ M pages/TestPage/README.md
+ M scripts/__pycache__/task-watcher.cpython-313.pyc
+ M scripts/task-watcher-config.json
+ M scripts/task-watcher.py
+?? AGENTS.md
+?? menuapp-code-review/
+?? "pages/PartnerContacts/versions/260301-01 partnercontacts RELEASE.jsx"
+?? pages/Profile/commands_2026-03-16.log
+?? pages/Profile/commands_2026-03-18.log
+?? pages/Profile/review_2026-03-16.md
+?? pages/Profile/review_2026-03-18.md
+ succeeded in 485ms:
+
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index c0b8c3e85f13c5797fd99cb2767c4be863b13093..5f21dcff0ddd9012fd72bb6e2a7cf6baee601ba2
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -75,4 +75,7 @@
+ - **[P2] Error banner not mobile-safe** (line ~54) — Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
+ 
+ ## Active
+-(none)
++### Review 2026-03-20 (chain `testpage-260320-200136`)
++- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) — `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
++- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) — retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
++- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) — invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 24398c80bb979af68a7b42f289ec6e8a1c7926fb..6474ea59bda14cd0ad537d3f98e72eda6eaccf2e
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -2,7 +2,8 @@
+ 
+ Fake page for pipeline smoke testing. Contains intentional bugs.
+ Not a real MenuApp page — safe to modify/delete.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-20 (`testpage-260320-200136`): current page review found 3 active issues in `base/testpage.jsx` (1 P1, 2 P2). Findings were written to `pipeline/chain-state/testpage-260320-200136-codex-findings.md` and mirrored in `BUGS.md`.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260320-200136-codex-findings.md b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a59f19c79c0015e09b9e52b80ce518a42360c65
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+@@ -0,0 +1,10 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260320-200136
++
++## Findings
++1. [P1] Delete action is UI-only and falls out of sync with server data — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1), `handleDelete` only filters local state and never calls a backend delete endpoint. The row disappears immediately, but it will come back on the next fetch or reload, and there is no way to report a delete failure to the user. FIX: replace the local-only filter with an async DELETE flow, disable the button while the request is in flight, and only remove the row after success or rollback on failure.
++2. [P2] Retry requests are not cleaned up on unmount — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1), retries replace `abortRef.current`, but the effect cleanup still aborts only the first `controller`. If the user taps retry and then leaves the page, the last request can keep running and still call `setItems` / `setLoading` after unmount. FIX: make the cleanup abort the latest controller from `abortRef.current` and guard post-fetch state updates.
++3. [P2] Partially invalid payloads are silently rendered as an empty menu — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1), the code checks only that the response is an array, then quietly drops any bad rows with `data.filter(item => item && item.id)`. A malformed API response can therefore hide dishes and fall through to the empty-state message instead of surfacing a fetch error. FIX: validate each row shape explicitly and set an error state when required fields are missing instead of silently filtering the payload.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "git add -- 'pages/TestPage/base/*.jsx' 'pages/TestPage/BUGS.md' 'pages/TestPage/README.md' 'pipeline/chain-state/testpage-260320-200136-codex-findings.md'" in C:/Dev/menuapp-code-review succeeded in 394ms:
+warning: in the working copy of 'pages/TestPage/README.md', CRLF will be replaced by LF the next time Git touches it
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index c0b8c3e85f13c5797fd99cb2767c4be863b13093..5f21dcff0ddd9012fd72bb6e2a7cf6baee601ba2
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -75,4 +75,7 @@
+ - **[P2] Error banner not mobile-safe** (line ~54) — Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
+ 
+ ## Active
+-(none)
++### Review 2026-03-20 (chain `testpage-260320-200136`)
++- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) — `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
++- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) — retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
++- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) — invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 24398c80bb979af68a7b42f289ec6e8a1c7926fb..6474ea59bda14cd0ad537d3f98e72eda6eaccf2e
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -2,7 +2,8 @@
+ 
+ Fake page for pipeline smoke testing. Contains intentional bugs.
+ Not a real MenuApp page — safe to modify/delete.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-20 (`testpage-260320-200136`): current page review found 3 active issues in `base/testpage.jsx` (1 P1, 2 P2). Findings were written to `pipeline/chain-state/testpage-260320-200136-codex-findings.md` and mirrored in `BUGS.md`.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260320-200136-codex-findings.md b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a59f19c79c0015e09b9e52b80ce518a42360c65
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+@@ -0,0 +1,10 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260320-200136
++
++## Findings
++1. [P1] Delete action is UI-only and falls out of sync with server data — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1), `handleDelete` only filters local state and never calls a backend delete endpoint. The row disappears immediately, but it will come back on the next fetch or reload, and there is no way to report a delete failure to the user. FIX: replace the local-only filter with an async DELETE flow, disable the button while the request is in flight, and only remove the row after success or rollback on failure.
++2. [P2] Retry requests are not cleaned up on unmount — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1), retries replace `abortRef.current`, but the effect cleanup still aborts only the first `controller`. If the user taps retry and then leaves the page, the last request can keep running and still call `setItems` / `setLoading` after unmount. FIX: make the cleanup abort the latest controller from `abortRef.current` and guard post-fetch state updates.
++3. [P2] Partially invalid payloads are silently rendered as an empty menu — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1), the code checks only that the response is an array, then quietly drops any bad rows with `data.filter(item => item && item.id)`. A malformed API response can therefore hide dishes and fall through to the empty-state message instead of surfacing a fetch error. FIX: validate each row shape explicitly and set an error state when required fields are missing instead of silently filtering the payload.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+
+codex
+I’ve staged only the TestPage review artifacts and I’m verifying the staged set before committing. If that looks clean, the next step is the commit and then the push attempt.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff --cached --stat' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff --cached --name-only' in C:/Dev/menuapp-code-review succeeded in 651ms:
+pages/TestPage/BUGS.md
+pages/TestPage/README.md
+pipeline/chain-state/testpage-260320-200136-codex-findings.md
+ succeeded in 876ms:
+ pages/TestPage/BUGS.md                                        |  5 ++++-
+ pages/TestPage/README.md                                      |  1 +
+ pipeline/chain-state/testpage-260320-200136-codex-findings.md | 10 ++++++++++
+ 3 files changed, 15 insertions(+), 1 deletion(-)
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index c0b8c3e85f13c5797fd99cb2767c4be863b13093..5f21dcff0ddd9012fd72bb6e2a7cf6baee601ba2
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -75,4 +75,7 @@
+ - **[P2] Error banner not mobile-safe** (line ~54) — Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
+ 
+ ## Active
+-(none)
++### Review 2026-03-20 (chain `testpage-260320-200136`)
++- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) — `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
++- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) — retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
++- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) — invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 24398c80bb979af68a7b42f289ec6e8a1c7926fb..6474ea59bda14cd0ad537d3f98e72eda6eaccf2e
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -2,7 +2,8 @@
+ 
+ Fake page for pipeline smoke testing. Contains intentional bugs.
+ Not a real MenuApp page — safe to modify/delete.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-20 (`testpage-260320-200136`): current page review found 3 active issues in `base/testpage.jsx` (1 P1, 2 P2). Findings were written to `pipeline/chain-state/testpage-260320-200136-codex-findings.md` and mirrored in `BUGS.md`.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260320-200136-codex-findings.md b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a59f19c79c0015e09b9e52b80ce518a42360c65
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+@@ -0,0 +1,10 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260320-200136
++
++## Findings
++1. [P1] Delete action is UI-only and falls out of sync with server data — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1), `handleDelete` only filters local state and never calls a backend delete endpoint. The row disappears immediately, but it will come back on the next fetch or reload, and there is no way to report a delete failure to the user. FIX: replace the local-only filter with an async DELETE flow, disable the button while the request is in flight, and only remove the row after success or rollback on failure.
++2. [P2] Retry requests are not cleaned up on unmount — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1), retries replace `abortRef.current`, but the effect cleanup still aborts only the first `controller`. If the user taps retry and then leaves the page, the last request can keep running and still call `setItems` / `setLoading` after unmount. FIX: make the cleanup abort the latest controller from `abortRef.current` and guard post-fetch state updates.
++3. [P2] Partially invalid payloads are silently rendered as an empty menu — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1), the code checks only that the response is an array, then quietly drops any bad rows with `data.filter(item => item && item.id)`. A malformed API response can therefore hide dishes and fall through to the empty-state message instead of surfacing a fetch error. FIX: validate each row shape explicitly and set an error state when required fields are missing instead of silently filtering the payload.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git commit -m "fix: TestPage code review S5 smoke test S152"' in C:/Dev/menuapp-code-review succeeded in 768ms:
+[main 7ece639] fix: TestPage code review S5 smoke test S152
+ 3 files changed, 15 insertions(+), 1 deletion(-)
+ create mode 100644 pipeline/chain-state/testpage-260320-200136-codex-findings.md
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index c0b8c3e85f13c5797fd99cb2767c4be863b13093..5f21dcff0ddd9012fd72bb6e2a7cf6baee601ba2
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -75,4 +75,7 @@
+ - **[P2] Error banner not mobile-safe** (line ~54) — Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
+ 
+ ## Active
+-(none)
++### Review 2026-03-20 (chain `testpage-260320-200136`)
++- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) — `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
++- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) — retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
++- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) — invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 24398c80bb979af68a7b42f289ec6e8a1c7926fb..6474ea59bda14cd0ad537d3f98e72eda6eaccf2e
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -2,7 +2,8 @@
+ 
+ Fake page for pipeline smoke testing. Contains intentional bugs.
+ Not a real MenuApp page — safe to modify/delete.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-20 (`testpage-260320-200136`): current page review found 3 active issues in `base/testpage.jsx` (1 P1, 2 P2). Findings were written to `pipeline/chain-state/testpage-260320-200136-codex-findings.md` and mirrored in `BUGS.md`.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260320-200136-codex-findings.md b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a59f19c79c0015e09b9e52b80ce518a42360c65
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+@@ -0,0 +1,10 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260320-200136
++
++## Findings
++1. [P1] Delete action is UI-only and falls out of sync with server data — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1), `handleDelete` only filters local state and never calls a backend delete endpoint. The row disappears immediately, but it will come back on the next fetch or reload, and there is no way to report a delete failure to the user. FIX: replace the local-only filter with an async DELETE flow, disable the button while the request is in flight, and only remove the row after success or rollback on failure.
++2. [P2] Retry requests are not cleaned up on unmount — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1), retries replace `abortRef.current`, but the effect cleanup still aborts only the first `controller`. If the user taps retry and then leaves the page, the last request can keep running and still call `setItems` / `setLoading` after unmount. FIX: make the cleanup abort the latest controller from `abortRef.current` and guard post-fetch state updates.
++3. [P2] Partially invalid payloads are silently rendered as an empty menu — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1), the code checks only that the response is an array, then quietly drops any bad rows with `data.filter(item => item && item.id)`. A malformed API response can therefore hide dishes and fall through to the empty-state message instead of surfacing a fetch error. FIX: validate each row shape explicitly and set an error state when required fields are missing instead of silently filtering the payload.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git push' in C:/Dev/menuapp-code-review succeeded in 5.40s:
+To https://github.com/kolynan/menuapp-code-review.git
+   bab70cf..7ece639  main -> main
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index c0b8c3e85f13c5797fd99cb2767c4be863b13093..5f21dcff0ddd9012fd72bb6e2a7cf6baee601ba2
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -75,4 +75,7 @@
+ - **[P2] Error banner not mobile-safe** (line ~54) — Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
+ 
+ ## Active
+-(none)
++### Review 2026-03-20 (chain `testpage-260320-200136`)
++- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) — `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
++- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) — retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
++- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) — invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 24398c80bb979af68a7b42f289ec6e8a1c7926fb..6474ea59bda14cd0ad537d3f98e72eda6eaccf2e
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -2,7 +2,8 @@
+ 
+ Fake page for pipeline smoke testing. Contains intentional bugs.
+ Not a real MenuApp page — safe to modify/delete.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-20 (`testpage-260320-200136`): current page review found 3 active issues in `base/testpage.jsx` (1 P1, 2 P2). Findings were written to `pipeline/chain-state/testpage-260320-200136-codex-findings.md` and mirrored in `BUGS.md`.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260320-200136-codex-findings.md b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a59f19c79c0015e09b9e52b80ce518a42360c65
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+@@ -0,0 +1,10 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260320-200136
++
++## Findings
++1. [P1] Delete action is UI-only and falls out of sync with server data — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1), `handleDelete` only filters local state and never calls a backend delete endpoint. The row disappears immediately, but it will come back on the next fetch or reload, and there is no way to report a delete failure to the user. FIX: replace the local-only filter with an async DELETE flow, disable the button while the request is in flight, and only remove the row after success or rollback on failure.
++2. [P2] Retry requests are not cleaned up on unmount — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1), retries replace `abortRef.current`, but the effect cleanup still aborts only the first `controller`. If the user taps retry and then leaves the page, the last request can keep running and still call `setItems` / `setLoading` after unmount. FIX: make the cleanup abort the latest controller from `abortRef.current` and guard post-fetch state updates.
++3. [P2] Partially invalid payloads are silently rendered as an empty menu — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1), the code checks only that the response is an array, then quietly drops any bad rows with `data.filter(item => item && item.id)`. A malformed API response can therefore hide dishes and fall through to the empty-state message instead of surfacing a fetch error. FIX: validate each row shape explicitly and set an error state when required fields are missing instead of silently filtering the payload.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+
+codex
+**Findings**
+
+1. [P1] Delete action is UI-only at [testpage.jsx](/C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1) - `handleDelete` only removes the row from local state. The item comes back on the next fetch/reload, and delete failures can never be surfaced. FIX: use a real async DELETE flow and only finalize removal on success.
+
+2. [P2] Retry requests are not cleaned up on unmount at [testpage.jsx](/C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](/C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1) - retries replace `abortRef.current`, but the effect cleanup still aborts only the first controller. A retry can outlive the component and still hit state setters after unmount. FIX: abort the latest controller from cleanup and guard post-fetch updates.
+
+3. [P2] Partially invalid payloads are hidden as an empty state at [testpage.jsx](/C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1) - the code only verifies that the response is an array, then silently filters bad rows. Broken API data can therefore look like a normal “no items” result instead of an error. FIX: validate row shape and fail into error state when required fields are missing.
+
+Findings were written to [testpage-260320-200136-codex-findings.md](/C:/Dev/menuapp-code-review/pipeline/chain-state/testpage-260320-200136-codex-findings.md), and I updated [BUGS.md](/C:/Dev/menuapp-code-review/pages/TestPage/BUGS.md) and [README.md](/C:/Dev/menuapp-code-review/pages/TestPage/README.md). No JSX fixes were applied.
+
+Commit `7ece639` was created and pushed to `main`.
+file update:
+diff --git a/pages/TestPage/BUGS.md b/pages/TestPage/BUGS.md
+index c0b8c3e85f13c5797fd99cb2767c4be863b13093..5f21dcff0ddd9012fd72bb6e2a7cf6baee601ba2
+--- a/pages/TestPage/BUGS.md
++++ b/pages/TestPage/BUGS.md
+@@ -75,4 +75,7 @@
+ - **[P2] Error banner not mobile-safe** (line ~54) — Horizontal flex overflows on narrow screens. Fixed: `flex-col sm:flex-row` layout.
+ 
+ ## Active
+-(none)
++### Review 2026-03-20 (chain `testpage-260320-200136`)
++- **[P1] Delete action is UI-only and falls out of sync with server data** (lines 48-50) — `handleDelete` only filters local state and never calls a backend delete endpoint, so deleted rows come back after the next fetch/reload and no delete failure can be surfaced.
++- **[P2] Retry requests are not cleaned up on unmount** (lines 34-45) — retry replaces `abortRef.current`, but the effect cleanup still aborts only the initial controller, so the last request can outlive the component and still call state setters after unmount.
++- **[P2] Partially invalid payloads are silently rendered as an empty menu** (lines 22-24) — invalid rows are filtered out instead of treated as an error, which can hide backend/data issues behind the normal `no_items` empty state.
+diff --git a/pages/TestPage/README.md b/pages/TestPage/README.md
+index 24398c80bb979af68a7b42f289ec6e8a1c7926fb..6474ea59bda14cd0ad537d3f98e72eda6eaccf2e
+--- a/pages/TestPage/README.md
++++ b/pages/TestPage/README.md
+@@ -2,7 +2,8 @@
+ 
+ Fake page for pipeline smoke testing. Contains intentional bugs.
+ Not a real MenuApp page — safe to modify/delete.
+-<!-- smoke-parallel-v3-testpage -->
++Review update 2026-03-20 (`testpage-260320-200136`): current page review found 3 active issues in `base/testpage.jsx` (1 P1, 2 P2). Findings were written to `pipeline/chain-state/testpage-260320-200136-codex-findings.md` and mirrored in `BUGS.md`.
++<!-- smoke-parallel-v3-testpage -->
+ <!-- smoke-parallel-v3-testpage-b -->
+ <!-- smoke-d-tp -->
+ <!-- smoke-e-tp -->
+diff --git a/pipeline/chain-state/testpage-260320-200136-codex-findings.md b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a59f19c79c0015e09b9e52b80ce518a42360c65
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260320-200136-codex-findings.md
+@@ -0,0 +1,10 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260320-200136
++
++## Findings
++1. [P1] Delete action is UI-only and falls out of sync with server data — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1), `handleDelete` only filters local state and never calls a backend delete endpoint. The row disappears immediately, but it will come back on the next fetch or reload, and there is no way to report a delete failure to the user. FIX: replace the local-only filter with an async DELETE flow, disable the button while the request is in flight, and only remove the row after success or rollback on failure.
++2. [P2] Retry requests are not cleaned up on unmount — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1), retries replace `abortRef.current`, but the effect cleanup still aborts only the first `controller`. If the user taps retry and then leaves the page, the last request can keep running and still call `setItems` / `setLoading` after unmount. FIX: make the cleanup abort the latest controller from `abortRef.current` and guard post-fetch state updates.
++3. [P2] Partially invalid payloads are silently rendered as an empty menu — In [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1), the code checks only that the response is an array, then quietly drops any bad rows with `data.filter(item => item && item.id)`. A malformed API response can therefore hide dishes and fall through to the empty-state message instead of surfacing a fetch error. FIX: validate each row shape explicitly and set an error state when required fields are missing instead of silently filtering the payload.
++
++## Summary
++Total: 3 findings (0 P0, 1 P1, 2 P2, 0 P3)
+
+tokens used
+59 252
+**Findings**
+
+1. [P1] Delete action is UI-only at [testpage.jsx](/C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L48C1) - `handleDelete` only removes the row from local state. The item comes back on the next fetch/reload, and delete failures can never be surfaced. FIX: use a real async DELETE flow and only finalize removal on success.
+
+2. [P2] Retry requests are not cleaned up on unmount at [testpage.jsx](/C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L34C1) and [testpage.jsx](/C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L41C1) - retries replace `abortRef.current`, but the effect cleanup still aborts only the first controller. A retry can outlive the component and still hit state setters after unmount. FIX: abort the latest controller from cleanup and guard post-fetch updates.
+
+3. [P2] Partially invalid payloads are hidden as an empty state at [testpage.jsx](/C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx#L22C1) - the code only verifies that the response is an array, then silently filters bad rows. Broken API data can therefore look like a normal “no items” result instead of an error. FIX: validate row shape and fail into error state when required fields are missing.
+
+Findings were written to [testpage-260320-200136-codex-findings.md](/C:/Dev/menuapp-code-review/pipeline/chain-state/testpage-260320-200136-codex-findings.md), and I updated [BUGS.md](/C:/Dev/menuapp-code-review/pages/TestPage/BUGS.md) and [README.md](/C:/Dev/menuapp-code-review/pages/TestPage/README.md). No JSX fixes were applied.
+
+Commit `7ece639` was created and pushed to `main`.

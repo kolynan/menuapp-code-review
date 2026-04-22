@@ -1,0 +1,216 @@
+# PSSK v4: CC Analysis of Draft KS Prompt -- SOM Batch A Android Quick-Fix
+# Task: task-260414-055856 | Session: S267 | Date: 2026-04-14
+
+## EXECUTIVE SUMMARY
+
+**BLOCKER FOUND.** The prompt contains a fundamental structural error: ALL four render branches B1/B2/B3/B4 referenced in Fix1 and Fix4 are inside `/* */` block comments and are NOT live code. This invalidates Fix4 entirely and reduces Fix1 from 10 targets to 4.
+
+---
+
+## P0 BLOCKER: B1/B2/B3/B4 Line Ranges Are Inside Block Comments
+
+### Evidence
+
+Two large block comments in staffordersmobile.jsx (4524 lines):
+
+1. **Block comment 1:** `/*` at line 546, `*/` at line 785
+   - Contains B1 (lines 670-708) and B2 (lines 761-769)
+
+2. **Block comment 2:** `/*` at line 1148, `*/` at line 1414
+   - Contains B3 (lines 1288-1314) and B4 (lines 1374-1398)
+
+### Verification
+```
+grep -n "^/\*$\|^/\*[^*]" staffordersmobile.jsx
+# 546:/*
+# 1148:/* ...
+
+grep -n "^\*/" staffordersmobile.jsx
+# 785:*/
+# 1414:*/
+```
+
+Lines 546-785 = block comment (240 lines of dead code)
+Lines 1148-1414 = block comment (267 lines of dead code)
+
+### Impact on prompt
+
+The prompt explicitly states: "Lines 670-708 и 1281-1319 -- это ЖИВОЙ КОД, не commented-out."
+**This claim is FALSE.** These lines are inside `/* */` block comments.
+
+The prompt also warns Codex: "В v3p Codex ошибочно определил эти строки как dead code."
+**Codex v3p was CORRECT.** The code IS dead/commented-out.
+
+### What IS live code
+
+The file structure (component boundaries):
+- Lines 1-545: utility functions + getLinkId
+- Lines 546-785: BLOCK COMMENT (old render code for expanded table card)
+- Lines 786-1147: more utility functions
+- Lines 1148-1414: BLOCK COMMENT (old render code, another variant)
+- Lines 1416-1504: RateLimitScreen component
+- Lines 1505-1543: RequestCard component
+- Lines 1544-1697: OrderCard component
+- Lines 1698-2832: OrderGroupCard component (THE MAIN LIVE COMPONENT)
+  - Hooks: ~1698-2200
+  - inProgressSections defined at line 2035
+  - subGroups defined at line 1743
+  - JSX return: ~2200+
+  - B6 (live hall view): lines 2329-2342 -- uses inProgressSections.map, NO wrapper
+  - Legacy branch (live): line 2346 -- uses subGroups.map, HAS wrapper, but OUT OF SCOPE
+- Lines 2833-4524: StaffOrdersMobile main component
+  - activeOrders filter: line 3539-3544 (LIVE)
+  - filteredGroups useMemo: lines 3789-3801 (LIVE)
+  - tabCounts: lines 3804-3818 (LIVE)
+
+---
+
+## FIX-BY-FIX RATINGS
+
+### Fix 1 -- Guest counter: 2.5/5 (Needs major rewrite)
+
+**What's correct:**
+- The bug diagnosis is correct (orders.length != unique guests)
+- The helper `uniqueGuests()` design is good
+- B6 targets (lines 2331, 2333, 2335, 2337) are LIVE and correctly identified
+
+**What's wrong:**
+- 6 of 10 targets are in block comments (B1: 670/680/708, B3: 1281/1291/1319)
+- The prompt claims 10 live targets; only 4 are live (all in B6)
+- Grep verification `expect: 0 hits` will FAIL because grep doesn't skip block comments
+- B6 line 2333 uses a DIFFERENT pattern than B1/B3:
+  - B1/B3 pattern: `HALL_UI_TEXT.guests` + suffix concatenation
+  - B6 pattern: hardcoded "гость"/"гостя"/"гостей"
+  The prompt correctly documents both patterns but mixes them in the "10 places" count.
+
+**Recommended fix for the prompt:**
+1. Remove B1/B3 targets entirely (dead code, no point patching)
+2. Reduce to "4 places in B6" (lines 2331, 2333, 2335, 2337)
+3. Update grep verifications to only check live code:
+   `grep -n "pluralRu.*гост" staffordersmobile.jsx | grep -v "^[5-7][0-9][0-9]:\|^1[1-4][0-9][0-9]:"`
+4. Note: B6 line 2333 already uses `section.orders.length` for guest count --
+   this is the correct target to replace with `uniqueGuests(section.orders)`
+
+### Fix 2 -- Table card disappears: 4.5/5 (Clear, minor nit)
+
+**What's correct:**
+- Root cause analysis is solid (finish-stage filter excludes 'served')
+- Change 1 (sessionHelpers.js bulk-close) -- well-specified
+- Change 2 (line 3540, remove 'served' exclusion) -- correct, live code
+- Change 3 (filteredGroups useMemo, lines 3789-3801) -- correct structure
+  - Patch A (v4) correctly targets only lines 3792-3800 (inner filter body)
+  - useMemo wrapper preservation is explicit
+  - Dep array note is correct (getStatusConfig covers hasServedButNotClosed inputs)
+- tabCounts addition (lines 3804-3818) -- correct
+- closeSession callers verified -- correct (SOM + PartnerTables only)
+- PartnerTables semantics verified -- correct (admin close = same intent)
+
+**Minor nit (not a blocker):**
+- tabCounts useMemo dep array (line 3818) also doesn't need new deps, but the prompt
+  only explicitly mentions this for filteredGroups (line 3801). For completeness,
+  add: "tabCounts dep array at line 3818 also does NOT need new deps -- same reasoning."
+
+**Why 4.5 not 5:**
+- The tabCounts dep array nit
+- Promise.all in closeSession: if one order update fails, partial state.
+  Prompt says "Do NOT add try/catch" which is fine (let it propagate),
+  but worth a note about potential partial failure in edge cases.
+
+### Fix 3 -- Star badge stopPropagation: 5/5 (Clear)
+
+**What's correct:**
+- Lines 2249-2252 (star badge) -- LIVE code in OrderGroupCard, verified
+- Lines 2259-2262 (free badge) -- LIVE code, verified
+- Line 2255 (lock badge) -- correctly noted as already having stopPropagation
+- Fix is minimal and precise
+- No scope creep
+
+**No issues found.**
+
+### Fix 4 -- Remove "В РАБОТЕ" wrapper: 1/5 (Rewrite needed -- targets dead code)
+
+**What's wrong:**
+- ALL FOUR branch targets (B1: 677-703, B2: 761-769, B3: 1288-1314, B4: 1374-1398)
+  are inside `/* */` block comments. They are DEAD CODE.
+- The prompt says "4 active branches" -- there are 0 live targets.
+- B6 (line 2333, the ONLY live hall view) already uses `inProgressSections.map`
+  WITHOUT a "В РАБОТЕ" wrapper -- it already has the correct pattern!
+- The legacy branch at line 2346 has the wrapper but is explicitly OUT OF SCOPE.
+- Per-section header changes at lines 692/1303 target commented-out code.
+- The `inProgressExpanded` grep verification is incorrect:
+  - Prompt expects "4-5 hits max after B1-B4 removal"
+  - But since B1-B4 are in comments, grep already shows only live hits (2346, 1780, 1816, 1823)
+  - Removing commented code wouldn't change grep results
+
+**What IS needed (if Fix4 is still desired):**
+1. B6 (line 2333) -- already has correct pattern. Only Fix1's guest count change applies here.
+2. Legacy branch (line 2346) -- currently out of scope but is the ONLY live branch
+   with the "В РАБОТЕ" wrapper + `subGroups.map` pattern.
+3. If the commented-out code represents a FUTURE design that will be uncommented,
+   then the prompt should say so explicitly: "These lines are currently commented out
+   but will be activated in a future step. Patch them now so they're correct when activated."
+4. Otherwise, Fix4 should be removed entirely or redirected to line 2346.
+
+**Per-section header format (Patch B):**
+- The target at B6 line 2333 already has:
+  `${section.orders.length} гость/гостя/гостей . ${section.rowCount} блюдо/блюда/блюд`
+- After Fix1 applies `uniqueGuests()`, this becomes the target format automatically.
+- No separate Fix4 header change is needed for live code.
+
+---
+
+## CC vs CODEX COMPARISON
+
+### Agreed findings:
+1. B1-B4 referenced lines are NOT live code as the prompt claims
+2. Fix3 is the most solid and well-specified fix
+3. closeSession() is shared with PartnerTables (prompt addresses this in v4)
+4. Fix2 needs the activeOrders filter change (line 3540) -- v4 prompt addresses this
+
+### CC additional findings (Codex missed or didn't emphasize):
+1. Exact block comment boundaries (546-785, 1148-1414)
+2. B6 at line 2333 already implements the correct inProgressSections.map pattern
+3. Fix2 Patch A (useMemo wrapper preservation) is well-specified in v4
+4. tabCounts dep array completeness nit
+
+### Codex additional findings:
+1. Codex explored the older 260306-05 RELEASE file (4015 lines) which has
+   different line numbers -- the prompt correctly specifies staffordersmobile.jsx
+   as the target, so this is an artifact of Codex searching multiple files
+2. Codex raised concerns about Fix2's "table still open" detection --
+   v4 prompt resolves this with the served-but-not-closed approach
+
+---
+
+## OVERALL RATINGS
+
+| Fix | CC Rating | Target | Status |
+|-----|-----------|--------|--------|
+| Fix 1 | 2.5/5 | >=4 | FAIL -- 6/10 targets in dead code |
+| Fix 2 | 4.5/5 | >=4 | PASS |
+| Fix 3 | 5/5   | >=4 | PASS |
+| Fix 4 | 1/5   | >=4 | FAIL -- all targets in dead code |
+
+## REQUIRED ACTIONS BEFORE IMPLEMENTATION
+
+### Mandatory (P0):
+1. **Verify with Arman:** Are the block comments (546-785, 1148-1414) intended to
+   become live code? If YES, the prompt should say "uncomment these blocks first,
+   then apply patches." If NO, Fix1 and Fix4 must be rewritten for live code only.
+
+2. **Fix1 rewrite:** Reduce to 4 targets (B6 only: 2331, 2333, 2335, 2337).
+   Update grep verifications. Remove B1/B3 references.
+
+3. **Fix4 decision:** Either:
+   a) Remove Fix4 (B6 already correct), OR
+   b) Bring legacy branch 2346 into scope, OR
+   c) Add "uncomment old code" step before patching
+
+### Recommended (P1):
+4. Fix2: Add tabCounts dep array note for completeness
+5. Fix1: Note that `uniqueGuests()` is called twice per template literal
+   (once for count, once for pluralRu) -- minor perf, acceptable
+
+### Nice-to-have (P2):
+6. Fix4: If B6 line 2333 is the reference model, explicitly mark it as
+   "already correct, no changes needed in Fix4"

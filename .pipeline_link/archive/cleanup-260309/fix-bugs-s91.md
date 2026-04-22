@@ -1,0 +1,95 @@
+---
+task_id: fix-bugs-s91
+status: pending
+page: StaffOrdersMobile
+work_dir: C:/Users/ASUS/OneDrive/002 Menu/Claude AI Cowork/menuapp-code-review
+budget_usd: 12
+fallback_model: sonnet
+system_rules: C:/Users/ASUS/OneDrive/002 Menu/Claude AI Cowork/references/cc-system-rules.txt
+version: "5.0"
+---
+
+# Task: fix-bugs-s91
+
+## Config (v5.0)
+- Budget: $12
+- Fallback model: sonnet
+- System rules: cc-system-rules.txt
+- Progress: per-task TG message via progress-monitor.sh
+
+## Prompt
+IMPORTANT: Your VERY FIRST action must be: echo "started $(date -Iseconds)" > "C:/Users/ASUS/OneDrive/002 Menu/Claude AI Cowork/pipeline/started-fix-bugs-s91.md" — this confirms to Cowork that you started working.
+
+=== TASK SETUP ===
+Progress file: C:/Users/ASUS/OneDrive/002 Menu/Claude AI Cowork/pipeline/progress-fix-bugs-s91.txt
+Task ID: fix-bugs-s91
+=== END TASK SETUP ===
+
+---
+task: fix-bugs-s91
+type: bugfix
+budget: "$12"
+priority: P1+P2
+codex: yes
+---
+
+# Задача: Повторные фиксы S91 — StaffOrdersMobile (P1) + PartnerClients (P2)
+
+⚠️ ВАЖНО: Предыдущий фикс (fix-bugs-s89) НЕ СРАБОТАЛ — баги остались после деплоя в B44. Нужен глубокий анализ причин.
+
+## Баги для починки
+
+### BUG-1: SO-S89-01 — `orderprocess.default.new` сырой i18n ключ (P1) — ПОВТОРНЫЙ ФИКС
+
+- **Файл:** `pages/StaffOrdersMobile/base/staffordersmobile.jsx`
+- **Симптом:** В списке заказов (/staffordersmobile) бейдж статуса у заказов со статусом "Новый" показывает сырой ключ `orderprocess.default.new` вместо переведённого текста.
+- **История:**
+  - SO-S76-01 — первый баг (S76)
+  - 260305-00 — первый RELEASE (3978 строк)
+  - 260306-01 — регрессия (S88, 3042 строки, перезаписал фикс)
+  - 260306-04 — попытка фикса (S90, восстановлено до 3994 строк) — ⚠️ НЕ ПОМОГЛО
+- **Что пробовали:** Предыдущий фикс добавил `getStageName()` с fallback-словарём `STAGE_NAME_FALLBACKS`. Деплоено, но баг остался.
+- **Анализ для CC+Codex:**
+  1. Сначала **внимательно изучить** текущий base файл — какой код РЕАЛЬНО рендерит бейдж статуса
+  2. Проверить: используется ли `getStageName()` в том месте где выводится бейдж? Может фикс добавлен но НЕ ПОДКЛЮЧЁН к рендерингу
+  3. Найти ТОЧНОЕ место в JSX где рендерится бейдж `orderprocess.default.new` — скорее всего это НЕ тот компонент где добавили фикс
+  4. Возможно бейдж берёт текст из другого поля (напрямую из order.status_name или stage.label а не через getStageName())
+  5. Проверить: откуда приходит текст `orderprocess.default.new` — из данных заказа? из конфига stage? из i18n? Нужно найти источник
+  6. **Base44 контекст:** в Base44 i18n работает через InterfaceTranslation entity — переводы хранятся отдельно. Если код вызывает `t('orderprocess.default.new')` и перевод НЕ загружен — отображается сам ключ. Проверить: может нужно добавить перевод в i18n, а не менять код?
+- **RELEASE:** `260306-05 StaffOrdersMobile RELEASE.jsx` в `pages/StaffOrdersMobile/`
+
+### BUG-2: PC-S89-01 — «1 Баллы» неправильное склонение в PartnerClients (P2) — ПОВТОРНЫЙ ФИКС
+
+- **Файл:** `pages/PartnerClients/base/partnerclients.jsx`
+- **Симптом:** В детальном модале клиента показывает "1 Баллы" и "0 Баллы" — pluralization не работает ни для каких значений.
+- **Что пробовали:** Предыдущий фикс добавил `pluralPoints()` в partnerclients.jsx (скопировано из PartnerLoyalty). Деплоено, но баг остался.
+- **Анализ для CC+Codex:**
+  1. Сначала проверить base файл — **есть ли** функция `pluralPoints()` в текущем коде?
+  2. Если функция ЕСТЬ — проверить: вызывается ли она в JSX в правильном месте? Может добавили функцию но не подключили к рендерингу
+  3. Если функции НЕТ — значит base файл устаревший (не обновлялся после RELEASE). Нужно взять код из RELEASE 260306-02 как основу
+  4. Найти ТОЧНОЕ место где выводится "Баллы" — в модале ClientDetailModal/ClientDrawer/подобном
+  5. Подставить `pluralPoints(balance, t)` вместо хардкода "Баллы"
+  6. Проверить ВСЕ места где встречается слово "Баллы" / "Points" в файле
+- **Правила склонения (русский):**
+  - 1 → "Балл"
+  - 2, 3, 4 → "Балла"
+  - 5–20 → "Баллов"
+  - 21 → "Балл", 22–24 → "Балла", 25–30 → "Баллов" (повторяется циклом)
+- **RELEASE:** `260306-03 PartnerClients RELEASE.jsx` в `pages/PartnerClients/`
+
+## Ключевое требование
+
+⚠️ **После каждого фикса — ОБЯЗАТЕЛЬНО ПРОВЕРИТЬ** что исправление РЕАЛЬНО подключено к рендерингу:
+- Найти JSX элемент который рендерит проблемный текст
+- Убедиться что вызов функции-фикса стоит ИМЕННО в этом JSX элементе
+- Не просто добавить утилитарную функцию, а УБЕДИТЬСЯ что она используется в render
+
+## Git & RELEASE
+- git add / commit / push после КАЖДОГО фикса
+- Обновить BUGS.md и README.md для каждой затронутой страницы
+- Архивировать предыдущие RELEASE файлы в versions/
+- Номера RELEASE: StaffOrdersMobile — 260306-05, PartnerClients — 260306-03
+
+## Приоритет выполнения
+1. BUG-1 (SO-S89-01 — P1, критичнее + сложнее — предыдущий фикс не помог)
+2. BUG-2 (PC-S89-01 — P2)

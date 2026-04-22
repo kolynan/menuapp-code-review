@@ -1,0 +1,861 @@
+OpenAI Codex v0.115.0 (research preview)
+--------
+workdir: C:/Dev/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d0b2c-477e-70f0-8fe5-75ed7993a084
+--------
+user
+Review the file pages/PublicMenu/base/*.jsx for bugs in a React restaurant QR-menu app on Base44 platform. Also check pages/PublicMenu/README.md and pages/PublicMenu/BUGS.md for context (ONLY these 3 files, nothing else). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the 3 files above. Do NOT search the repo, do NOT read old findings, do NOT read files outside pages/PublicMenu/. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. Find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260320-171535-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260320-171535 ## Findings 1. [P0] Title — Description. FIX: ... 2. [P1] Title — Description. FIX: ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) Do NOT apply fixes — only document findings. === TASK CONTEXT === # Fix: PM-041 — Polling timer leak in useTableSession (P0) ## Проблема `scheduleNext()` в useTableSession.jsx создаёт рекурсивный цепочку `setTimeout`. При cleanup (unmount компонента) устанавливается `cancelled=true` и вызывается `clearTimeout(intervalId)`. Однако, если `pollSessionData()` ещё выполняется в момент cleanup, коллбэк `scheduleNext` внутри него регистрирует НОВЫЙ timeout, который cleanup уже не может очистить. Это приводит к orphaned polling и spurious state updates на stale компонентах. ## Файл и строки `useTableSession.jsx`, строки ~670-685 (scheduleNext function) ## Воспроизведение 1. Открыть /x (публичное меню) 2. Дождаться пока polling запустится (таблица верифицирована, сессия активна) 3. Быстро перейти на другую страницу или закрыть drawer 4. В console — warnings "state update on unmounted component" ## Ожидаемое поведение - `scheduleNext` ОБЯЗАНА проверять `if (cancelled) return` ПЕРЕД регистрацией нового setTimeout - После unmount — ноль orphaned таймеров, ноль warnings в console - Polling останавливается полностью и немедленно ## Контекст - P0 баг — единственный оставшийся P0 в PublicMenu - Файл useTableSession.jsx отдельный от основного UI — изменения изолированы - Связанные баги: PM-S140-03 (reward setTimeout leak) уже Fixed S148 — аналогичный паттерн - Не трогать другие файлы — только useTableSession.jsx === END ===
+mcp startup: no servers
+codex
+Reviewing only the three allowed `pages/PublicMenu` files and writing a concise findings report to the requested pipeline path. I’ll avoid any repo-wide search or cross-reference and keep this scoped to bugs in the target page code.
+Plan update
+  → Identify the exact three allowed PublicMenu files
+  • Read the three files and inspect for bugs
+  • Write concise findings report to the requested pipeline file
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Name 'pages/PublicMenu/base/*.jsx'" in C:/Dev/menuapp-code-review succeeded in 4.44s:
+CartView.jsx
+CheckoutView.jsx
+MenuView.jsx
+ModeTabs.jsx
+useTableSession.jsx
+x.jsx
+codex
+I found that `pages/PublicMenu/base/*.jsx` expands to six JSX files, so I’m treating the user’s scope literally: those six files plus `README.md` and `BUGS.md`, and nothing outside `pages/PublicMenu/`. Next I’m reading just that set and extracting concrete bugs and fixes.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/base/useTableSession.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/base/CheckoutView.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/BUGS.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/README.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/base/ModeTabs.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/base/MenuView.jsx'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/base/CartView.jsx'" in C:/Dev/menuapp-code-review succeeded in 4.78s:
+import { useEffect, useMemo, useRef, useState } from "react";
+import { base44 } from "@/api/base44Client";
+import {
+  getSessionGuests,
+  getSessionOrders,
+  getDeviceId,
+  findGuestByDevice,
+  isSessionExpired,
+} from "@/components/sessionHelpers";
+
+// Persistence helpers (FIX-260131-01: session + guest, 8h TTL)
+const TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+
+// BUG-PM-004: TTL for optimistic data before server confirms
+const OPTIMISTIC_TTL_MS = 30000; // 30 seconds
+
+// FIX-260131-06: Normalize guest id (support both id and _id)
+const normalizeGuestId = (g) => String(g?.id ?? g?._id ?? "");
+
+// FIX-260131-07: Get menu_guest_code from localStorage
+ succeeded in 9.07s:
+import React from "react";
+import { Plus, Minus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+export default function CheckoutView({
+  t,
+  setView,
+  cart,
+  updateQuantity,
+  formatPrice,
+  finalTotal,
+  activeCurrency,
+  defaultCurrency,
+  orderMode,
+  renderHallCheckoutContent,
+  clientName,
+  setClientName,
+  clientPhone,
+ succeeded in 7.12s:
+import React from "react";
+import { XIcon, Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, X } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import Rating from "@/components/Rating";
+
+export default function CartView({
+  partner,
+  currentTable,
+  currentGuest,
+  t,
+  setView,
+  isEditingName,
+  guestNameInput,
+  setGuestNameInput,
+  handleUpdateGuestName,
+  setIsEditingName,
+  getGuestDisplayName,
+  cart,
+ succeeded in 9.92s:
+---
+version: "24.0"
+updated: "2026-03-20"
+session: 148
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*2 active bugs remaining (1x P0, 1x P2).*
+
+### BUG-PM-035: Verified-table block regresses mobile UX (P2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P2
+- **ÐšÐ¾Ð³Ð´Ð°:** S116 (Codex review)
+ succeeded in 9.67s:
+import React from "react";
+import { CheckCircle2, AlertCircle } from "lucide-react";
+
+export default function ModeTabs({
+  visibleModeTabs,
+  orderMode,
+  onModeChange,
+  getModeDescription,
+  isHallMode,
+  isTableVerified,
+  currentTableId,
+  currentTable,
+  tableCodeParam,
+  resolvedTable,
+  verifiedByCode,
+  t,
+}) {
+  return (
+    <div className="max-w-2xl mx-auto px-4 mt-4">
+      {visibleModeTabs.length > 1 ? (
+ succeeded in 10.15s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 10.37s:
+import React from "react";
+import { Loader2, ImageIcon, Minus, Plus, LayoutGrid, List } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import DishRating from "@/components/publicMenu/DishRating";
+
+// Grid mappings for Tailwind (explicit full class names)
+const DESKTOP_GRID = {
+  1: "md:grid-cols-1",
+  2: "md:grid-cols-2",
+  3: "md:grid-cols-3",
+  4: "md:grid-cols-4",
+  5: "md:grid-cols-5",
+};
+
+const MOBILE_GRID = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+};
+
+export default function MenuView({
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/base/x.jsx'" in C:/Dev/menuapp-code-review succeeded in 742ms:
+// ======================================================
+// pages/x.jsx â€” PUBLIC MENU with i18n + Channels Visibility + Gating
+// UPDATED: Simplified Hall logic (TASK-260123-01b)
+// FIXED: P0-1..P0-7 security and functionality fixes
+// UPDATED: TASK-260127-01 - session restore, UI cleanup
+// PATCHED: 2026-01-28 - P0-1, P0-2, P0-2b, P1-1..P1-4
+// PATCHED: 2026-02-01 - FIX-260131-07 FINAL - guest safeguard in submit
+// PATCHED: 2026-02-01 - TASK-260201-01 - Hall StickyBar always visible
+// PATCHED: 2026-03-03 - GAP-01 - Order Confirmation Screen
+// FIXED: 2026-03-03 - GAP-01 fix - Confirmation as full-screen overlay (z-60)
+// FIXED: 2026-03-03 - GAP-02 fix - Embed OrderStatusScreen inside x.jsx (no /orderstatus route)
+// FIXED: 2026-03-03 - GAP-02 fix - Remove auto-dismiss timer (race condition: ghost click on menu)
+// ======================================================
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { useI18n } from "@/components/i18n";
+import { toast } from "sonner"; // P0-6: sonner instead of custom toast
+codex
+The base files still need a closer pass around the cart flow and polling logic. I’m pulling targeted line ranges inside the allowed files now so the report can cite exact issues and concrete fixes without expanding scope.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+"'$path = '"'pages/PublicMenu/base/x.jsx'
+"'$patterns = @('"'error.send.subtitle','console.error','setView(\"checkout\")','CartView','Drawer','RedirectBanner','setTimeout','isBillOnCooldown','setBillCooldownStorage')
+foreach ("'$p in $patterns) {
+  Select-String -Path $path -Pattern $p | ForEach-Object { '"'{0}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }
+}
+'"'@ | powershell -NoProfile -Command -" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+"'$path = '"'pages/PublicMenu/base/useTableSession.jsx'
+"'$start = 620
+$end = 710
+$i = 0
+Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '"'{0,4}: {1}' -f "'$i, $_ } }
+'"'@ | powershell -NoProfile -Command -" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+"'$path = '"'pages/PublicMenu/base/CheckoutView.jsx'
+"'$patterns = @('"'error.send.subtitle','isTableVerified','renderHallCheckoutContent','sticky','cart.send_order')
+foreach ("'$p in $patterns) {
+  Select-String -Path $path -Pattern $p | ForEach-Object { '"'{0}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }
+}
+'"'@ | powershell -NoProfile -Command -" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+"'$path = '"'pages/PublicMenu/base/CartView.jsx'
+"'$patterns = @('"'table_verified','enter_table_code_hint','infoModal','online_order_title','tableCode','guestDisplay','showRewardEmailForm','error.send.subtitle')
+foreach ("'$p in $patterns) {
+  Select-String -Path $path -Pattern $p | ForEach-Object { '"'{0}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }
+}
+'"'@ | powershell -NoProfile -Command -" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+"'$path = '"'pages/PublicMenu/base/ModeTabs.jsx'
+"'$patterns = @('"'verified','hall.invalid_code','onModeChange','disabled={isDisabled}')
+foreach ("'$p in $patterns) {
+  Select-String -Path $path -Pattern $p | ForEach-Object { '"'{0}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }
+}
+'"'@ | powershell -NoProfile -Command -" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+"'$path = '"'pages/PublicMenu/base/MenuView.jsx'
+"'$patterns = @('"'aria-label','onSetMobileLayout','grid-cols-2','w-10 h-10','w-11 h-11')
+foreach ("'$p in $patterns) {
+  Select-String -Path $path -Pattern $p | ForEach-Object { '"'{0}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }
+}
+'"'@ | powershell -NoProfile -Command -" in C:/Dev/menuapp-code-review succeeded in 10.36s:
+
+ succeeded in 9.75s:
+
+ succeeded in 9.98s:
+
+ succeeded in 10.07s:
+
+ succeeded in 10.82s:
+
+ exited 124 in 11.44s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "cmd /c findstr /n \".*\" pages\\PublicMenu\\base\\ModeTabs.jsx" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "cmd /c findstr /n \".*\" pages\\PublicMenu\\base\\CheckoutView.jsx" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "cmd /c findstr /n \".*\" pages\\PublicMenu\\base\\useTableSession.jsx" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "cmd /c findstr /n \".*\" pages\\PublicMenu\\base\\MenuView.jsx" in C:/Dev/menuapp-code-review succeeded in 2.24s:
+1:import React from "react";
+2:import { CheckCircle2, AlertCircle } from "lucide-react";
+3:
+4:export default function ModeTabs({
+5:  visibleModeTabs,
+6:  orderMode,
+7:  onModeChange,
+8:  getModeDescription,
+9:  isHallMode,
+10:  isTableVerified,
+11:  currentTableId,
+12:  currentTable,
+13:  tableCodeParam,
+14:  resolvedTable,
+15:  verifiedByCode,
+16:  t,
+17:}) {
+18:  return (
+19:    <div className="max-w-2xl mx-auto px-4 mt-4">
+20:      {visibleModeTabs.length > 1 ? (
+ succeeded in 2.94s:
+1:import React from "react";
+2:import { Plus, Minus } from "lucide-react";
+3:import { Card, CardContent } from "@/components/ui/card";
+4:import { Button } from "@/components/ui/button";
+5:import { Input } from "@/components/ui/input";
+6:
+7:export default function CheckoutView({
+8:  t,
+9:  setView,
+10:  cart,
+11:  updateQuantity,
+12:  formatPrice,
+13:  finalTotal,
+14:  activeCurrency,
+15:  defaultCurrency,
+16:  orderMode,
+17:  renderHallCheckoutContent,
+18:  clientName,
+19:  setClientName,
+20:  clientPhone,
+ succeeded in 3.28s:
+1:import { useEffect, useMemo, useRef, useState } from "react";
+2:import { base44 } from "@/api/base44Client";
+3:import {
+4:  getSessionGuests,
+5:  getSessionOrders,
+6:  getDeviceId,
+7:  findGuestByDevice,
+8:  isSessionExpired,
+9:} from "@/components/sessionHelpers";
+10:
+11:// Persistence helpers (FIX-260131-01: session + guest, 8h TTL)
+12:const TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+13:
+14:// BUG-PM-004: TTL for optimistic data before server confirms
+15:const OPTIMISTIC_TTL_MS = 30000; // 30 seconds
+16:
+17:// FIX-260131-06: Normalize guest id (support both id and _id)
+18:const normalizeGuestId = (g) => String(g?.id ?? g?._id ?? "");
+19:
+20:// FIX-260131-07: Get menu_guest_code from localStorage
+ succeeded in 3.49s:
+1:import React from "react";
+2:import { Loader2, ImageIcon, Minus, Plus, LayoutGrid, List } from "lucide-react";
+3:import { Card, CardContent } from "@/components/ui/card";
+4:import DishRating from "@/components/publicMenu/DishRating";
+5:
+6:// Grid mappings for Tailwind (explicit full class names)
+7:const DESKTOP_GRID = {
+8:  1: "md:grid-cols-1",
+9:  2: "md:grid-cols-2",
+10:  3: "md:grid-cols-3",
+11:  4: "md:grid-cols-4",
+12:  5: "md:grid-cols-5",
+13:};
+14:
+15:const MOBILE_GRID = {
+16:  1: "grid-cols-1",
+17:  2: "grid-cols-2",
+18:};
+19:
+20:export default function MenuView({
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "cmd /c findstr /n /c:\"table_verified\" /c:\"info_table_code\" /c:\"online_order_title\" /c:\"enter_table_code_hint\" /c:\"error.send.subtitle\" /c:\"rewardEmail\" /c:\"showRewardEmailForm\" pages\\PublicMenu\\base\\CartView.jsx" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "cmd /c findstr /n /c:\"error.send.subtitle\" /c:\"setView(\\\"checkout\\\")\" /c:\"console.error\" /c:\"setTimeout\" /c:\"RedirectBanner\" /c:\"Drawer\" /c:\"isBillOnCooldown\" /c:\"setBillCooldownStorage\" pages\\PublicMenu\\base\\x.jsx" in C:/Dev/menuapp-code-review succeeded in 892ms:
+91:// TASK-260203-01: Drawer for cart
+92:import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+102:import RedirectBanner from "@/components/publicMenu/refactor/RedirectBanner";
+283:const isBillOnCooldown = (tableId) => {
+292:const setBillCooldownStorage = (tableId) => {
+407:  "error.send.subtitle": "Попробуйте отправить ещё раз",
+1257:  // TASK-260203-01: Drawer state
+1258:  const [drawerMode, setDrawerMode] = useState(null); // 'cart' | null
+1274:  const [redirectBanner, setRedirectBanner] = useState(null);
+1437:    setDrawerMode(null);
+1515:      console.error("Failed to save table", e);
+1870:        setRedirectBanner({
+1875:        const timerId = setTimeout(() => setRedirectBanner(null), 5000);
+2045:      console.error('Failed to save rating:', err);
+2064:    const timer = setTimeout(() => setSessionCheckTimedOut(true), 3000);
+2128:      console.error("Failed to init guest code", e);
+2196:    setTimeout(() => {
+2223:    setRedirectBanner(null);
+2264:      setBillCooldown(isBillOnCooldown(currentTableId));
+2363:      console.error("Rate limit check failed", e);
+ succeeded in 1.22s:
+83:  const [showRewardEmailForm, setShowRewardEmailForm] = React.useState(false);
+84:  const [rewardEmail, setRewardEmail] = React.useState('');
+85:  const [rewardEmailSubmitting, setRewardEmailSubmitting] = React.useState(false);
+499:          {!showRewardEmailForm ? (
+520:                  value={rewardEmail}
+528:                  disabled={!rewardEmail.trim() || rewardEmailSubmitting}
+530:                    if (!rewardEmail.trim()) return;
+532:                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rewardEmail.trim())) {
+538:                    if (setCustomerEmail) setCustomerEmail(rewardEmail);
+547:                  {rewardEmailSubmitting ? '...' : tr('common.save', 'Сохранить')}
+1025:                    {tr('cart.verify.online_order_title', 'Онлайн-заказ официанту')}
+1068:                      ✅ {tr('cart.verify.table_verified', 'Стол подтверждён')}
+1193:                          : tr('cart.verify.info_table_code_title', 'Код стола')}
+1213:                        <li>{tr('cart.verify.info_table_code_point1', 'Код обычно указан на столе')}</li>
+1214:                        <li>{tr('cart.verify.info_table_code_point2', 'Если не видно — спросите у официанта')}</li>
+1237:            {tr('error.send.subtitle', 'Ваш заказ сохранён. Попробуйте снова')}
+1270:              {tr('cart.enter_table_code_hint', 'Введите код стола чтобы отправить заказ')}
+codex
+I’ve isolated the likely bug clusters: recursive polling in `useTableSession`, the cart verification/submit area in `CartView`, and a few timer/error paths in `x.jsx`. I’m reading those exact ranges now to confirm which ones are still real versus already fixed context from `BUGS.md`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/base/x.jsx'; "'$start=1858; $end=1884; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/base/x.jsx'; "'$start=2188; $end=2210; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/base/CartView.jsx'; "'$start=1188; $end=1274; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/base/CartView.jsx'; "'$start=1008; $end=1080; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/base/x.jsx'; "'$start=2056; $end=2074; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Dev/menuapp-code-review succeeded in 3.61s:
+1008:                   <span>{tr('loyalty.online_bonus_label', 'Ð‘Ð¾Ð½ÑƒÑÑ‹ Ð·Ð° Ð¾Ð½Ð»Ð°Ð¹Ð½-Ð·Ð°ÐºÐ°Ð·')}</span>
+1009:                   <span>+{Number(earnedPoints || 0).toLocaleString()}{tr('loyalty.points_suffix', 'Ð‘')}</span>
+1010:                 </div>
+1011:               )}
+1012: 
+1013:               {/* Ð˜Ð¢ÐžÐ“Ðž - bold total */}
+1014:               <div className="flex justify-between items-end pt-2 border-t">
+1015:                 <span className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+1016:                   {tr('cart.total', 'Ð˜Ð¢ÐžÐ“Ðž')}:
+1017:                 </span>
+1018:                 <span className="text-lg font-bold text-slate-900">{formatPrice(Number(cartTotalAmount) || 0)}</span>
+1019:               </div>
+1020: 
+1021:               {/* Online order to waiter (verification + benefits) */}
+1022:               <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+1023:                 <div className="flex items-center justify-between mb-2">
+1024:                   <p className="text-amber-900 font-semibold text-sm">
+1025:                     {tr('cart.verify.online_order_title', 'ÐžÐ½Ð»Ð°Ð¹Ð½-Ð·Ð°ÐºÐ°Ð· Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ')}
+1026:                   </p>
+1027:                   <button
+ succeeded in 4.11s:
+1858:         const originalMode = orderMode;
+1859:         setOrderMode(firstAvailable.id);
+1860:         
+1861:         const url = new URL(window.location.href);
+1862:         url.searchParams.set("mode", firstAvailable.id);
+1863:         window.history.replaceState({}, "", url.toString());
+1864:         
+1865:         const modeLabels = {
+1866:           hall: t('mode.hall'),
+1867:           pickup: t('mode.pickup'),
+1868:           delivery: t('mode.delivery'),
+1869:         };
+1870:         setRedirectBanner({
+1871:           originalMode: modeLabels[originalMode] || originalMode,
+1872:           newMode: modeLabels[firstAvailable.id] || firstAvailable.id,
+1873:         });
+1874: 
+1875:         const timerId = setTimeout(() => setRedirectBanner(null), 5000);
+1876:         return () => clearTimeout(timerId);
+1877:       }
+ succeeded in 4.09s:
+2056:   // Ð­Ñ‚Ð¾ Ñ€ÐµÑˆÐ°ÐµÑ‚ Ð¿Ñ€Ð¾Ð±Ð»ÐµÐ¼Ñƒ F5 â€” Ð½Ðµ Ð½ÑƒÐ¶Ð½Ð¾ Ð¶Ð´Ð°Ñ‚ÑŒ Ð²Ð¾ÑÑÑ‚Ð°Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ñ session/orders
+2057:   const showCartButton = isHallMode && (isTableVerified || (cart?.length || 0) > 0);
+2058: 
+2059:   // After F5, table is verified from localStorage but session data is still loading from server
+2060:   // Time-bounded: after 3s assume no session exists (prevents permanent "loading" for new visits)
+2061:   const [sessionCheckTimedOut, setSessionCheckTimedOut] = useState(false);
+2062:   useEffect(() => {
+2063:     if (!isTableVerified || tableSession) return;
+2064:     const timer = setTimeout(() => setSessionCheckTimedOut(true), 3000);
+2065:     return () => clearTimeout(timer);
+2066:   }, [isTableVerified, tableSession]);
+2067:   const isSessionLoading = isTableVerified && !tableSession && !sessionCheckTimedOut;
+2068: 
+2069:   // Hall StickyBar mode: Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÑÐµÐ¼ Ñ‡Ñ‚Ð¾ Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°Ñ‚ÑŒ
+2070:   const hallStickyMode =
+2071:     (cart?.length || 0) > 0
+2072:       ? "cart"
+2073:       : (myOrders?.length || 0) > 0
+2074:         ? "myBill"
+ succeeded in 4.63s:
+2188: 
+2189:   const handleCategoryClick = (key) => {
+2190:     isManualScroll.current = true;
+2191:     setActiveCategoryKey(key);
+2192: 
+2193:     if (key === "all") listTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+2194:     else sectionRefs.current[key]?.scrollIntoView({ behavior: "smooth", block: "start" });
+2195: 
+2196:     setTimeout(() => {
+2197:       isManualScroll.current = false;
+2198:     }, MANUAL_SCROLL_LOCK_MS);
+2199:   };
+2200: 
+2201: 
+2202: 
+2203:   const handleModeChange = (mode) => {
+2204:     const channel = channels[mode];
+2205:     if (!channel?.available) {
+2206:       return;
+2207:     }
+ succeeded in 4.81s:
+1188:                   >
+1189:                     <div className="flex items-center justify-between mb-3">
+1190:                       <div className="font-semibold text-slate-900">
+1191:                         {infoModal === 'online'
+1192:                           ? tr('cart.verify.info_online_title', 'ÐžÐ½Ð»Ð°Ð¹Ð½-Ð·Ð°ÐºÐ°Ð· Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ')
+1193:                           : tr('cart.verify.info_table_code_title', 'ÐšÐ¾Ð´ ÑÑ‚Ð¾Ð»Ð°')}
+1194:                       </div>
+1195:                       <button
+1196:                         type="button"
+1197:                         className="p-1 rounded hover:bg-slate-100 text-slate-500"
+1198:                         onClick={() => setInfoModal(null)}
+1199:                         aria-label={tr('common.close', 'Ð—Ð°ÐºÑ€Ñ‹Ñ‚ÑŒ')}
+1200:                       >
+1201:                         âœ•
+1202:                       </button>
+1203:                     </div>
+1204: 
+1205:                     {infoModal === 'online' ? (
+1206:                       <ul className="text-sm text-slate-700 list-disc pl-5 space-y-2">
+1207:                         <li>{tr('cart.verify.info_online_point1', 'Ð—Ð°ÐºÐ°Ð· ÑÑ€Ð°Ð·Ñƒ Ð¿Ð¾Ð¿Ð°Ð´Ð°ÐµÑ‚ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ')}</li>
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/base/CartView.jsx'; "'$start=488; $end=550; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Dev/menuapp-code-review succeeded in 990ms:
+ 488:       {/* Review reward hint */}
+ 489:       {shouldShowReviewRewardHint && (
+ 490:         <div className="mb-4 text-xs text-amber-700 bg-amber-50 rounded-md px-3 py-2 flex items-center gap-2">
+ 491:           <span>â­</span>
+ 492:           <span>{tr('loyalty.review_reward_hint', 'Ð—Ð° Ð¾Ñ‚Ð·Ñ‹Ð²')} +{reviewRewardPoints} {tr('loyalty.points_short', 'Ð±Ð¾Ð½ÑƒÑÐ¾Ð²')}</span>
+ 493:         </div>
+ 494:       )}
+ 495: 
+ 496:       {/* Review reward nudge - Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°ÐµÐ¼ Ð¿Ð¾ÑÐ»Ðµ Ð¿ÐµÑ€Ð²Ð¾Ð¹ Ð¾Ñ†ÐµÐ½ÐºÐ¸ Ñ Ñ„Ð¾Ñ€Ð¼Ð¾Ð¹ email */}
+ 497:       {shouldShowReviewRewardNudge && (
+ 498:         <div className="mb-4 text-sm bg-green-50 border border-green-200 rounded-md p-3">
+ 499:           {!showRewardEmailForm ? (
+ 500:             <div className="flex items-center justify-between">
+ 501:               <span className="text-slate-700">
+ 502:                 âœ… {tr('loyalty.thanks_for_rating', 'Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° Ð¾Ñ†ÐµÐ½ÐºÑƒ!')}
+ 503:               </span>
+ 504:               <button
+ 505:                 type="button"
+ 506:                 className="text-indigo-600 hover:underline font-medium text-sm"
+ 507:                 onClick={() => setShowRewardEmailForm(true)}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/base/CartView.jsx'; "'$start=430; $end=486; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Dev/menuapp-code-review succeeded in 2.26s:
+ 430:       {/* P0 Header: [ðŸ””] Ð¡Ñ‚Ð¾Ð» Â· Ð“Ð¾ÑÑ‚ÑŒ [âœ•] */}
+ 431:       <div className="bg-white rounded-lg shadow-sm border p-3 mb-4">
+ 432:         <div className="flex items-center justify-between">
+ 433:           {/* Left: Call waiter */}
+ 434:           {onCallWaiter && (
+ 435:             <button
+ 436:               onClick={onCallWaiter}
+ 437:               className="min-w-[44px] min-h-[44px] p-2 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center"
+ 438:               aria-label={tr('help.call_waiter', 'ÐŸÐ¾Ð·Ð²Ð°Ñ‚ÑŒ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ð°')}
+ 439:             >
+ 440:               <Bell className="w-5 h-5" />
+ 441:             </button>
+ 442:           )}
+ 443: 
+ 444:           {/* Center: Table & Guest */}
+ 445:           <div className="text-center flex-1 mx-2">
+ 446:             <div className="text-sm font-medium text-slate-700">{tableLabel}</div>
+ 447:             <div className="flex items-center justify-center gap-1 text-xs">
+ 448:               <span className="text-slate-500">{tr('cart.you', 'Ð’Ñ‹')}:</span>
+ 449:               {isEditingName ? (
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/base/CartView.jsx'; "'$start=240; $end=276; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Dev/menuapp-code-review succeeded in 2.70s:
+ 240:     if (!status) {
+ 241:       return { icon: 'ðŸ”µ', label: tr('status.new', 'Ð—Ð°ÐºÐ°Ð·Ð°Ð½Ð¾'), color: '#3B82F6' };
+ 242:     }
+ 243: 
+ 244:     let label = status.label || '';
+ 245: 
+ 246:     // Check if label is a raw translation key (contains dots and looks like a key)
+ 247:     if (label.includes('.') && (label.startsWith('orderprocess') || label.startsWith('status'))) {
+ 248:       // Extract code from key like "orderprocess.default.new" â†’ "new"
+ 249:       const parts = label.split('.');
+ 250:       const code = parts[parts.length - 1];
+ 251: 
+ 252:       // Use human-readable fallbacks based on code
+ 253:       const fallbacks = {
+ 254:         'new': tr('status.new', 'Ð—Ð°ÐºÐ°Ð·Ð°Ð½Ð¾'),
+ 255:         'start': tr('status.cooking', 'Ð“Ð¾Ñ‚Ð¾Ð²Ð¸Ñ‚ÑÑ'),
+ 256:         'cook': tr('status.cooking', 'Ð“Ð¾Ñ‚Ð¾Ð²Ð¸Ñ‚ÑÑ'),
+ 257:         'cooking': tr('status.cooking', 'Ð“Ð¾Ñ‚Ð¾Ð²Ð¸Ñ‚ÑÑ'),
+ 258:         'finish': tr('status.ready', 'Ð“Ð¾Ñ‚Ð¾Ð²Ð¾'),
+ 259:         'ready': tr('status.ready', 'Ð“Ð¾Ñ‚Ð¾Ð²Ð¾'),
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/base/CartView.jsx'; "'$start=276; $end=300; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Dev/menuapp-code-review succeeded in 2.88s:
+ 276:   // Guest code from localStorage (e.g., "#6475")
+ 277:   const guestCodeFromStorage = React.useMemo(() => {
+ 278:     if (typeof window === "undefined") return null;
+ 279:     try {
+ 280:       const raw = window.localStorage.getItem("menu_guest_code");
+ 281:       return raw ? String(raw).trim() : null;
+ 282:     } catch {
+ 283:       return null;
+ 284:     }
+ 285:   }, []);
+ 286: 
+ 287:   // Effective guest code: prop takes priority, fallback to localStorage (only if hall guest codes enabled)
+ 288:   const effectiveGuestCode = guestCode || (hallGuestCodeEnabled ? guestCodeFromStorage : null);
+ 289: 
+ 290:   // Guest display: "Ð˜Ð¼Ñ #6475" or "Ð“Ð¾ÑÑ‚ÑŒ #6475"
+ 291:   const guestBaseName = currentGuest
+ 292:     ? (currentGuest.name || getGuestDisplayName(currentGuest))
+ 293:     : tr("cart.guest", "Ð“Ð¾ÑÑ‚ÑŒ");
+ 294: 
+ 295:   const guestDisplay = effectiveGuestCode 
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "cmd /c findstr /n /c:\"menu_guest_code\" pages\\PublicMenu\\base\\x.jsx" in C:/Dev/menuapp-code-review succeeded in 2.77s:
+2121:      let code = localStorage.getItem("menu_guest_code");
+2124:        localStorage.setItem("menu_guest_code", code);
+2691:                const guestCode = localStorage.getItem("menu_guest_code");
+2694:                    const code = g?.guest_code ?? g?.guestCode ?? g?.code ?? g?.menu_guest_code;
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/base/x.jsx'; "'$start=2116; $end=2126; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Dev/menuapp-code-review succeeded in 3.05s:
+2116:   useEffect(() => {
+2117:     if (!isHallMode || !hallGuestCodeEnabled) return;
+2118:     
+2119:     try {
+2120:       // P2-2: Should be tied to partner, but keeping simple for now
+2121:       let code = localStorage.getItem("menu_guest_code");
+2122:       if (!code) {
+2123:         code = String(Math.floor(1000 + Math.random() * 9000));
+2124:         localStorage.setItem("menu_guest_code", code);
+2125:       }
+2126:       setGuestCode(code);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/base/x.jsx'; "'$start=2930; $end=2948; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Dev/menuapp-code-review succeeded in 760ms:
+2930:   };
+2931: 
+2932:   // Request bill (ServiceRequest)
+2933:   const handleCheckoutClick = () => {
+2934:     setView("checkout");
+2935:   };
+2936: 
+2937:   const handleRequestBill = async () => {
+2938:     if (billCooldown || billRequested) {
+2939:       toast.info(tr('cart.bill_already_requested', 'Ð¡Ñ‡Ñ‘Ñ‚ ÑƒÐ¶Ðµ Ð·Ð°Ð¿Ñ€Ð¾ÑˆÐµÐ½'), { id: 'mm1' });
+2940:       return;
+2941:     }
+2942:     
+2943:     setBillRequested(true);
+2944:     try {
+2945:       await base44.entities.ServiceRequest.create({
+2946:         partner: partner.id,
+2947:         table: currentTableId,
+2948:         table_session: tableSession?.id,
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/base/x.jsx'; "'$start=3248; $end=3332; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/base/x.jsx'; "'$start=3140; $end=3210; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/base/x.jsx'; "'$start=3390; $end=3420; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Dev/menuapp-code-review succeeded in 2.07s:
+3390:         dishTitle={selectedDish ? getDishName(selectedDish) : undefined}
+3391:         reviews={selectedDishReviews}
+3392:         loading={loadingDishReviews}
+3393:       />
+3394: 
+3395:       {/* Sticky cart bar - updated for TableSession */}
+3396:       {view === "menu" && (() => {
+3397:         // Hall mode: show if cart has items OR if there are past orders OR table activity
+3398:         if (isHallMode && showCartButton) {
+3399:           return (
+3400:             <StickyCartBar
+3401:               t={t}
+3402:               isHallMode={true}
+3403:               isDrawerOpen={drawerMode === 'cart'}
+3404:               hasCart={(cart?.length || 0) > 0}
+3405:               cartTotalItems={cartTotalItems}
+3406:               formattedCartTotal={formatPrice(cartTotalAmount)}
+3407:               isLoadingBill={hallStickyIsLoadingBill}
+3408:               formattedBillTotal={hallStickyBillTotal}
+3409:               onButtonClick={() => {
+ succeeded in 2.74s:
+3248:       {/* TASK-260203-01: Cart as Bottom Drawer */}
+3249:       <Drawer
+3250:         open={drawerMode === 'cart'}
+3251:         dismissible={!isSubmitting}
+3252:         onOpenChange={(open) => { if (!open && !isSubmitting) setDrawerMode(null); }}
+3253:       >
+3254:         <DrawerContent className="max-h-[85vh] overflow-hidden">
+3255:           <DrawerHeader className="sr-only">
+3256:             <DrawerTitle>{t('cart.title')}</DrawerTitle>
+3257:           </DrawerHeader>
+3258:           <div className="overflow-y-auto max-h-[calc(85vh-2rem)]">
+3259:             <CartView
+3260:               partner={partner}
+3261:               currentTable={currentTable}
+3262:               currentGuest={currentGuest}
+3263:               t={t}
+3264:               setView={setView}
+3265:               isEditingName={isEditingName}
+3266:               guestNameInput={guestNameInput}
+3267:               setGuestNameInput={setGuestNameInput}
+ succeeded in 2.94s:
+3140:           t={t}
+3141:         />
+3142:       )}
+3143: 
+3144:       {/* Menu list */}
+3145:       {view === "menu" && (
+3146:         <MenuView
+3147:           partner={partner}
+3148:           isMobile={isMobile}
+3149:           mobileLayout={mobileLayout}
+3150:           onSetMobileLayout={handleSetMobileLayout}
+3151:           showReviews={showReviews}
+3152:           dishRatings={dishRatings}
+3153:           onOpenReviews={(dishId) => setSelectedDishId(dishId)}
+3154:           listTopRef={listTopRef}
+3155:           loadingDishes={loadingDishes}
+3156:           sortedCategories={sortedCategories}
+3157:           groupedDishes={groupedDishes}
+3158:           getCategoryName={getCategoryName}
+3159:           sectionRefs={sectionRefs}
+codex
+The findings are narrowed down now. I’m writing the report to the exact pipeline path next, using only the scoped evidence from the PublicMenu base files plus `README.md` and `BUGS.md`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pipeline/chain-state'" in C:/Dev/menuapp-code-review succeeded in 409ms:
+True
+file update
+A C:/Dev/menuapp-code-review\pipeline/chain-state/publicmenu-260320-171535-codex-findings.md
+# Codex Writer Findings — PublicMenu
+Chain: publicmenu-260320-171535
+
+## Findings
+1. [P0] Polling timer leak survives unmount in `useTableSession` — `scheduleNext()` in [useTableSession.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx#L670) always registers the next `setTimeout` even after cleanup has set `cancelled=true`. If `pollSessionData()` is still in flight during unmount, the callback at lines 671-674 can create a fresh orphan timer and continue polling a stale component. FIX: guard `scheduleNext()` with `if (cancelled) return` before `setTimeout`, and reschedule only after the current poll finishes and confirms the effect is still active.
+2. [P1] Pickup/delivery checkout regressed back to fullscreen instead of drawer — [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2933) still sends guests to `view === "checkout"` via `setView("checkout")`, and the page renders [CheckoutView](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3171) as a separate screen while the `Drawer` only supports `drawerMode === 'cart'` at [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3249). This reintroduces the mobile UX regression documented in `BUGS.md`: pickup/delivery breaks the bottom-drawer flow and loses the consistent close/submit behavior. FIX: route pickup/delivery checkout through drawer state as well (for example `drawerMode: 'cart' | 'checkout'`) and render checkout inside `DrawerContent` instead of switching the whole page to `view === "checkout"`.
+3. [P2] Verified-table block still duplicates the header after successful verification — [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1021) always renders the amber “online order” card, and when `isTableVerified === true` it still shows a second “Стол подтверждён” status inside that block at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1065). On mobile this repeats information already shown in the drawer header and keeps dead UI visible even when there are no bonus/discount details to show. FIX: restore a `shouldShowOnlineOrderBlock`/`hasOnlineBenefits` gate so the verification card disappears once the table is verified unless there is actual savings/loyalty content to display.
+4. [P2] Partner mobile grid setting is ignored on phones — [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L43) computes `menu_grid_mobile`, but render hardcodes `grid-cols-2` at [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L276). Any partner configuration for 1-column mobile layout is silently dropped. FIX: use `MOBILE_GRID[mobileCols]`/`gridColsClass` in the mobile branch instead of hardcoding `grid-cols-2`.
+5. [P2] Several mobile icon controls are still too small or unlabeled — list-mode quantity controls in [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L102) and [CheckoutView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx#L58) are below the 44px touch target guideline and have no localized `aria-label`; the cart close button at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L478) is icon-only with no `aria-label`; the table-code info button at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1076) is also icon-only and smaller than 44px. This is a real mobile usability/accessibility regression in a QR-menu flow. FIX: make every icon-only control at least `44x44` and add translated `aria-label`s for add/remove/close/info actions.
+6. [P2] Submit-error fallback text falsely claims the order was saved — the cart error state at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1233) still falls back to `Ваш заказ сохранён. Попробуйте снова`, which is the same misleading copy previously tracked in `BUGS.md` as PM-038. If the locale key is missing or stale, the UI tells guests the order exists when it may not. FIX: replace that fallback with neutral retry text matching the safer copy already defined in [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L407).
+7. [P3] Reward-email microcopy still bypasses i18n — the reward-email form in [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L518) hardcodes `"email@example.com"` and `'...'` instead of using translation keys. This leaks English-only copy into localized menus. FIX: move the placeholder and saving/loading text into `t()/tr()` keys, for example `form.email_placeholder` and `common.saving`.
+
+## Summary
+Total: 7 findings (1 P0, 1 P1, 4 P2, 1 P3)
+apply_patch(auto_approved=true) exited 0 in 500ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260320-171535-codex-findings.md
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md b/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..bcbbf23168ffbc82f00cca939392bf3a42e8697c
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260320-171535
++
++## Findings
++1. [P0] Polling timer leak survives unmount in `useTableSession` — `scheduleNext()` in [useTableSession.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx#L670) always registers the next `setTimeout` even after cleanup has set `cancelled=true`. If `pollSessionData()` is still in flight during unmount, the callback at lines 671-674 can create a fresh orphan timer and continue polling a stale component. FIX: guard `scheduleNext()` with `if (cancelled) return` before `setTimeout`, and reschedule only after the current poll finishes and confirms the effect is still active.
++2. [P1] Pickup/delivery checkout regressed back to fullscreen instead of drawer — [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2933) still sends guests to `view === "checkout"` via `setView("checkout")`, and the page renders [CheckoutView](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3171) as a separate screen while the `Drawer` only supports `drawerMode === 'cart'` at [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3249). This reintroduces the mobile UX regression documented in `BUGS.md`: pickup/delivery breaks the bottom-drawer flow and loses the consistent close/submit behavior. FIX: route pickup/delivery checkout through drawer state as well (for example `drawerMode: 'cart' | 'checkout'`) and render checkout inside `DrawerContent` instead of switching the whole page to `view === "checkout"`.
++3. [P2] Verified-table block still duplicates the header after successful verification — [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1021) always renders the amber “online order” card, and when `isTableVerified === true` it still shows a second “Стол подтверждён” status inside that block at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1065). On mobile this repeats information already shown in the drawer header and keeps dead UI visible even when there are no bonus/discount details to show. FIX: restore a `shouldShowOnlineOrderBlock`/`hasOnlineBenefits` gate so the verification card disappears once the table is verified unless there is actual savings/loyalty content to display.
++4. [P2] Partner mobile grid setting is ignored on phones — [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L43) computes `menu_grid_mobile`, but render hardcodes `grid-cols-2` at [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L276). Any partner configuration for 1-column mobile layout is silently dropped. FIX: use `MOBILE_GRID[mobileCols]`/`gridColsClass` in the mobile branch instead of hardcoding `grid-cols-2`.
++5. [P2] Several mobile icon controls are still too small or unlabeled — list-mode quantity controls in [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L102) and [CheckoutView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx#L58) are below the 44px touch target guideline and have no localized `aria-label`; the cart close button at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L478) is icon-only with no `aria-label`; the table-code info button at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1076) is also icon-only and smaller than 44px. This is a real mobile usability/accessibility regression in a QR-menu flow. FIX: make every icon-only control at least `44x44` and add translated `aria-label`s for add/remove/close/info actions.
++6. [P2] Submit-error fallback text falsely claims the order was saved — the cart error state at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1233) still falls back to `Ваш заказ сохранён. Попробуйте снова`, which is the same misleading copy previously tracked in `BUGS.md` as PM-038. If the locale key is missing or stale, the UI tells guests the order exists when it may not. FIX: replace that fallback with neutral retry text matching the safer copy already defined in [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L407).
++7. [P3] Reward-email microcopy still bypasses i18n — the reward-email form in [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L518) hardcodes `"email@example.com"` and `'...'` instead of using translation keys. This leaks English-only copy into localized menus. FIX: move the placeholder and saving/loading text into `t()/tr()` keys, for example `form.email_placeholder` and `common.saving`.
++
++## Summary
++Total: 7 findings (1 P0, 1 P1, 4 P2, 1 P3)
+
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md b/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..bcbbf23168ffbc82f00cca939392bf3a42e8697c
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260320-171535
++
++## Findings
++1. [P0] Polling timer leak survives unmount in `useTableSession` — `scheduleNext()` in [useTableSession.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx#L670) always registers the next `setTimeout` even after cleanup has set `cancelled=true`. If `pollSessionData()` is still in flight during unmount, the callback at lines 671-674 can create a fresh orphan timer and continue polling a stale component. FIX: guard `scheduleNext()` with `if (cancelled) return` before `setTimeout`, and reschedule only after the current poll finishes and confirms the effect is still active.
++2. [P1] Pickup/delivery checkout regressed back to fullscreen instead of drawer — [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2933) still sends guests to `view === "checkout"` via `setView("checkout")`, and the page renders [CheckoutView](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3171) as a separate screen while the `Drawer` only supports `drawerMode === 'cart'` at [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3249). This reintroduces the mobile UX regression documented in `BUGS.md`: pickup/delivery breaks the bottom-drawer flow and loses the consistent close/submit behavior. FIX: route pickup/delivery checkout through drawer state as well (for example `drawerMode: 'cart' | 'checkout'`) and render checkout inside `DrawerContent` instead of switching the whole page to `view === "checkout"`.
++3. [P2] Verified-table block still duplicates the header after successful verification — [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1021) always renders the amber “online order” card, and when `isTableVerified === true` it still shows a second “Стол подтверждён” status inside that block at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1065). On mobile this repeats information already shown in the drawer header and keeps dead UI visible even when there are no bonus/discount details to show. FIX: restore a `shouldShowOnlineOrderBlock`/`hasOnlineBenefits` gate so the verification card disappears once the table is verified unless there is actual savings/loyalty content to display.
++4. [P2] Partner mobile grid setting is ignored on phones — [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L43) computes `menu_grid_mobile`, but render hardcodes `grid-cols-2` at [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L276). Any partner configuration for 1-column mobile layout is silently dropped. FIX: use `MOBILE_GRID[mobileCols]`/`gridColsClass` in the mobile branch instead of hardcoding `grid-cols-2`.
++5. [P2] Several mobile icon controls are still too small or unlabeled — list-mode quantity controls in [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L102) and [CheckoutView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx#L58) are below the 44px touch target guideline and have no localized `aria-label`; the cart close button at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L478) is icon-only with no `aria-label`; the table-code info button at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1076) is also icon-only and smaller than 44px. This is a real mobile usability/accessibility regression in a QR-menu flow. FIX: make every icon-only control at least `44x44` and add translated `aria-label`s for add/remove/close/info actions.
++6. [P2] Submit-error fallback text falsely claims the order was saved — the cart error state at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1233) still falls back to `Ваш заказ сохранён. Попробуйте снова`, which is the same misleading copy previously tracked in `BUGS.md` as PM-038. If the locale key is missing or stale, the UI tells guests the order exists when it may not. FIX: replace that fallback with neutral retry text matching the safer copy already defined in [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L407).
++7. [P3] Reward-email microcopy still bypasses i18n — the reward-email form in [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L518) hardcodes `"email@example.com"` and `'...'` instead of using translation keys. This leaks English-only copy into localized menus. FIX: move the placeholder and saving/loading text into `t()/tr()` keys, for example `form.email_placeholder` and `common.saving`.
++
++## Summary
++Total: 7 findings (1 P0, 1 P1, 4 P2, 1 P3)
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pipeline/chain-state/publicmenu-260320-171535-codex-findings.md'" in C:/Dev/menuapp-code-review succeeded in 372ms:
+# Codex Writer Findings â€” PublicMenu
+Chain: publicmenu-260320-171535
+
+## Findings
+1. [P0] Polling timer leak survives unmount in `useTableSession` â€” `scheduleNext()` in [useTableSession.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx#L670) always registers the next `setTimeout` even after cleanup has set `cancelled=true`. If `pollSessionData()` is still in flight during unmount, the callback at lines 671-674 can create a fresh orphan timer and continue polling a stale component. FIX: guard `scheduleNext()` with `if (cancelled) return` before `setTimeout`, and reschedule only after the current poll finishes and confirms the effect is still active.
+2. [P1] Pickup/delivery checkout regressed back to fullscreen instead of drawer â€” [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2933) still sends guests to `view === "checkout"` via `setView("checkout")`, and the page renders [CheckoutView](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3171) as a separate screen while the `Drawer` only supports `drawerMode === 'cart'` at [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3249). This reintroduces the mobile UX regression documented in `BUGS.md`: pickup/delivery breaks the bottom-drawer flow and loses the consistent close/submit behavior. FIX: route pickup/delivery checkout through drawer state as well (for example `drawerMode: 'cart' | 'checkout'`) and render checkout inside `DrawerContent` instead of switching the whole page to `view === "checkout"`.
+3. [P2] Verified-table block still duplicates the header after successful verification â€” [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1021) always renders the amber â€œonline orderâ€ card, and when `isTableVerified === true` it still shows a second â€œÐ¡Ñ‚Ð¾Ð» Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´Ñ‘Ð½â€ status inside that block at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1065). On mobile this repeats information already shown in the drawer header and keeps dead UI visible even when there are no bonus/discount details to show. FIX: restore a `shouldShowOnlineOrderBlock`/`hasOnlineBenefits` gate so the verification card disappears once the table is verified unless there is actual savings/loyalty content to display.
+4. [P2] Partner mobile grid setting is ignored on phones â€” [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L43) computes `menu_grid_mobile`, but render hardcodes `grid-cols-2` at [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L276). Any partner configuration for 1-column mobile layout is silently dropped. FIX: use `MOBILE_GRID[mobileCols]`/`gridColsClass` in the mobile branch instead of hardcoding `grid-cols-2`.
+5. [P2] Several mobile icon controls are still too small or unlabeled â€” list-mode quantity controls in [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L102) and [CheckoutView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx#L58) are below the 44px touch target guideline and have no localized `aria-label`; the cart close button at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L478) is icon-only with no `aria-label`; the table-code info button at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1076) is also icon-only and smaller than 44px. This is a real mobile usability/accessibility regression in a QR-menu flow. FIX: make every icon-only control at least `44x44` and add translated `aria-label`s for add/remove/close/info actions.
+6. [P2] Submit-error fallback text falsely claims the order was saved â€” the cart error state at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1233) still falls back to `Ð’Ð°Ñˆ Ð·Ð°ÐºÐ°Ð· ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ ÑÐ½Ð¾Ð²Ð°`, which is the same misleading copy previously tracked in `BUGS.md` as PM-038. If the locale key is missing or stale, the UI tells guests the order exists when it may not. FIX: replace that fallback with neutral retry text matching the safer copy already defined in [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L407).
+7. [P3] Reward-email microcopy still bypasses i18n â€” the reward-email form in [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L518) hardcodes `"email@example.com"` and `'...'` instead of using translation keys. This leaks English-only copy into localized menus. FIX: move the placeholder and saving/loading text into `t()/tr()` keys, for example `form.email_placeholder` and `common.saving`.
+
+## Summary
+Total: 7 findings (1 P0, 1 P1, 4 P2, 1 P3)
+
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md b/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..bcbbf23168ffbc82f00cca939392bf3a42e8697c
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260320-171535
++
++## Findings
++1. [P0] Polling timer leak survives unmount in `useTableSession` — `scheduleNext()` in [useTableSession.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx#L670) always registers the next `setTimeout` even after cleanup has set `cancelled=true`. If `pollSessionData()` is still in flight during unmount, the callback at lines 671-674 can create a fresh orphan timer and continue polling a stale component. FIX: guard `scheduleNext()` with `if (cancelled) return` before `setTimeout`, and reschedule only after the current poll finishes and confirms the effect is still active.
++2. [P1] Pickup/delivery checkout regressed back to fullscreen instead of drawer — [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2933) still sends guests to `view === "checkout"` via `setView("checkout")`, and the page renders [CheckoutView](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3171) as a separate screen while the `Drawer` only supports `drawerMode === 'cart'` at [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3249). This reintroduces the mobile UX regression documented in `BUGS.md`: pickup/delivery breaks the bottom-drawer flow and loses the consistent close/submit behavior. FIX: route pickup/delivery checkout through drawer state as well (for example `drawerMode: 'cart' | 'checkout'`) and render checkout inside `DrawerContent` instead of switching the whole page to `view === "checkout"`.
++3. [P2] Verified-table block still duplicates the header after successful verification — [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1021) always renders the amber “online order” card, and when `isTableVerified === true` it still shows a second “Стол подтверждён” status inside that block at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1065). On mobile this repeats information already shown in the drawer header and keeps dead UI visible even when there are no bonus/discount details to show. FIX: restore a `shouldShowOnlineOrderBlock`/`hasOnlineBenefits` gate so the verification card disappears once the table is verified unless there is actual savings/loyalty content to display.
++4. [P2] Partner mobile grid setting is ignored on phones — [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L43) computes `menu_grid_mobile`, but render hardcodes `grid-cols-2` at [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L276). Any partner configuration for 1-column mobile layout is silently dropped. FIX: use `MOBILE_GRID[mobileCols]`/`gridColsClass` in the mobile branch instead of hardcoding `grid-cols-2`.
++5. [P2] Several mobile icon controls are still too small or unlabeled — list-mode quantity controls in [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L102) and [CheckoutView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx#L58) are below the 44px touch target guideline and have no localized `aria-label`; the cart close button at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L478) is icon-only with no `aria-label`; the table-code info button at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1076) is also icon-only and smaller than 44px. This is a real mobile usability/accessibility regression in a QR-menu flow. FIX: make every icon-only control at least `44x44` and add translated `aria-label`s for add/remove/close/info actions.
++6. [P2] Submit-error fallback text falsely claims the order was saved — the cart error state at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1233) still falls back to `Ваш заказ сохранён. Попробуйте снова`, which is the same misleading copy previously tracked in `BUGS.md` as PM-038. If the locale key is missing or stale, the UI tells guests the order exists when it may not. FIX: replace that fallback with neutral retry text matching the safer copy already defined in [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L407).
++7. [P3] Reward-email microcopy still bypasses i18n — the reward-email form in [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L518) hardcodes `"email@example.com"` and `'...'` instead of using translation keys. This leaks English-only copy into localized menus. FIX: move the placeholder and saving/loading text into `t()/tr()` keys, for example `form.email_placeholder` and `common.saving`.
++
++## Summary
++Total: 7 findings (1 P0, 1 P1, 4 P2, 1 P3)
+
+Plan update
+Reviewed only `pages/PublicMenu/base/*.jsx`, `pages/PublicMenu/README.md`, and `pages/PublicMenu/BUGS.md`, then saved the findings report to the requested pipeline path.
+  ✓ Identify the exact three allowed PublicMenu files
+  ✓ Read the three files and inspect for bugs
+  ✓ Write concise findings report to the requested pipeline file
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md b/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..bcbbf23168ffbc82f00cca939392bf3a42e8697c
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260320-171535
++
++## Findings
++1. [P0] Polling timer leak survives unmount in `useTableSession` — `scheduleNext()` in [useTableSession.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx#L670) always registers the next `setTimeout` even after cleanup has set `cancelled=true`. If `pollSessionData()` is still in flight during unmount, the callback at lines 671-674 can create a fresh orphan timer and continue polling a stale component. FIX: guard `scheduleNext()` with `if (cancelled) return` before `setTimeout`, and reschedule only after the current poll finishes and confirms the effect is still active.
++2. [P1] Pickup/delivery checkout regressed back to fullscreen instead of drawer — [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2933) still sends guests to `view === "checkout"` via `setView("checkout")`, and the page renders [CheckoutView](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3171) as a separate screen while the `Drawer` only supports `drawerMode === 'cart'` at [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3249). This reintroduces the mobile UX regression documented in `BUGS.md`: pickup/delivery breaks the bottom-drawer flow and loses the consistent close/submit behavior. FIX: route pickup/delivery checkout through drawer state as well (for example `drawerMode: 'cart' | 'checkout'`) and render checkout inside `DrawerContent` instead of switching the whole page to `view === "checkout"`.
++3. [P2] Verified-table block still duplicates the header after successful verification — [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1021) always renders the amber “online order” card, and when `isTableVerified === true` it still shows a second “Стол подтверждён” status inside that block at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1065). On mobile this repeats information already shown in the drawer header and keeps dead UI visible even when there are no bonus/discount details to show. FIX: restore a `shouldShowOnlineOrderBlock`/`hasOnlineBenefits` gate so the verification card disappears once the table is verified unless there is actual savings/loyalty content to display.
++4. [P2] Partner mobile grid setting is ignored on phones — [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L43) computes `menu_grid_mobile`, but render hardcodes `grid-cols-2` at [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L276). Any partner configuration for 1-column mobile layout is silently dropped. FIX: use `MOBILE_GRID[mobileCols]`/`gridColsClass` in the mobile branch instead of hardcoding `grid-cols-2`.
++5. [P2] Several mobile icon controls are still too small or unlabeled — list-mode quantity controls in [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L102) and [CheckoutView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx#L58) are below the 44px touch target guideline and have no localized `aria-label`; the cart close button at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L478) is icon-only with no `aria-label`; the table-code info button at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1076) is also icon-only and smaller than 44px. This is a real mobile usability/accessibility regression in a QR-menu flow. FIX: make every icon-only control at least `44x44` and add translated `aria-label`s for add/remove/close/info actions.
++6. [P2] Submit-error fallback text falsely claims the order was saved — the cart error state at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1233) still falls back to `Ваш заказ сохранён. Попробуйте снова`, which is the same misleading copy previously tracked in `BUGS.md` as PM-038. If the locale key is missing or stale, the UI tells guests the order exists when it may not. FIX: replace that fallback with neutral retry text matching the safer copy already defined in [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L407).
++7. [P3] Reward-email microcopy still bypasses i18n — the reward-email form in [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L518) hardcodes `"email@example.com"` and `'...'` instead of using translation keys. This leaks English-only copy into localized menus. FIX: move the placeholder and saving/loading text into `t()/tr()` keys, for example `form.email_placeholder` and `common.saving`.
++
++## Summary
++Total: 7 findings (1 P0, 1 P1, 4 P2, 1 P3)
+
+codex
+Findings are saved to [publicmenu-260320-171535-codex-findings.md](/C:/Dev/menuapp-code-review/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md).
+
+I documented 7 findings total: 1 P0, 1 P1, 4 P2, 1 P3. The highest-impact issues are the `useTableSession` polling timer leak, pickup/delivery checkout regressing to fullscreen instead of drawer, and the remaining cart/mobile UX regressions. No fixes were applied.
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md b/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..bcbbf23168ffbc82f00cca939392bf3a42e8697c
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260320-171535
++
++## Findings
++1. [P0] Polling timer leak survives unmount in `useTableSession` — `scheduleNext()` in [useTableSession.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/useTableSession.jsx#L670) always registers the next `setTimeout` even after cleanup has set `cancelled=true`. If `pollSessionData()` is still in flight during unmount, the callback at lines 671-674 can create a fresh orphan timer and continue polling a stale component. FIX: guard `scheduleNext()` with `if (cancelled) return` before `setTimeout`, and reschedule only after the current poll finishes and confirms the effect is still active.
++2. [P1] Pickup/delivery checkout regressed back to fullscreen instead of drawer — [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L2933) still sends guests to `view === "checkout"` via `setView("checkout")`, and the page renders [CheckoutView](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3171) as a separate screen while the `Drawer` only supports `drawerMode === 'cart'` at [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L3249). This reintroduces the mobile UX regression documented in `BUGS.md`: pickup/delivery breaks the bottom-drawer flow and loses the consistent close/submit behavior. FIX: route pickup/delivery checkout through drawer state as well (for example `drawerMode: 'cart' | 'checkout'`) and render checkout inside `DrawerContent` instead of switching the whole page to `view === "checkout"`.
++3. [P2] Verified-table block still duplicates the header after successful verification — [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1021) always renders the amber “online order” card, and when `isTableVerified === true` it still shows a second “Стол подтверждён” status inside that block at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1065). On mobile this repeats information already shown in the drawer header and keeps dead UI visible even when there are no bonus/discount details to show. FIX: restore a `shouldShowOnlineOrderBlock`/`hasOnlineBenefits` gate so the verification card disappears once the table is verified unless there is actual savings/loyalty content to display.
++4. [P2] Partner mobile grid setting is ignored on phones — [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L43) computes `menu_grid_mobile`, but render hardcodes `grid-cols-2` at [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L276). Any partner configuration for 1-column mobile layout is silently dropped. FIX: use `MOBILE_GRID[mobileCols]`/`gridColsClass` in the mobile branch instead of hardcoding `grid-cols-2`.
++5. [P2] Several mobile icon controls are still too small or unlabeled — list-mode quantity controls in [MenuView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/MenuView.jsx#L102) and [CheckoutView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CheckoutView.jsx#L58) are below the 44px touch target guideline and have no localized `aria-label`; the cart close button at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L478) is icon-only with no `aria-label`; the table-code info button at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1076) is also icon-only and smaller than 44px. This is a real mobile usability/accessibility regression in a QR-menu flow. FIX: make every icon-only control at least `44x44` and add translated `aria-label`s for add/remove/close/info actions.
++6. [P2] Submit-error fallback text falsely claims the order was saved — the cart error state at [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L1233) still falls back to `Ваш заказ сохранён. Попробуйте снова`, which is the same misleading copy previously tracked in `BUGS.md` as PM-038. If the locale key is missing or stale, the UI tells guests the order exists when it may not. FIX: replace that fallback with neutral retry text matching the safer copy already defined in [x.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/x.jsx#L407).
++7. [P3] Reward-email microcopy still bypasses i18n — the reward-email form in [CartView.jsx](/C:/Dev/menuapp-code-review/pages/PublicMenu/base/CartView.jsx#L518) hardcodes `"email@example.com"` and `'...'` instead of using translation keys. This leaks English-only copy into localized menus. FIX: move the placeholder and saving/loading text into `t()/tr()` keys, for example `form.email_placeholder` and `common.saving`.
++
++## Summary
++Total: 7 findings (1 P0, 1 P1, 4 P2, 1 P3)
+
+tokens used
+200 252
+Findings are saved to [publicmenu-260320-171535-codex-findings.md](/C:/Dev/menuapp-code-review/pipeline/chain-state/publicmenu-260320-171535-codex-findings.md).
+
+I documented 7 findings total: 1 P0, 1 P1, 4 P2, 1 P3. The highest-impact issues are the `useTableSession` polling timer leak, pickup/delivery checkout regressing to fullscreen instead of drawer, and the remaining cart/mobile UX regressions. No fixes were applied.

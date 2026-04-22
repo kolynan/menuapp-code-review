@@ -1,0 +1,1297 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d19a6-1d95-7cd3-a2d3-24b5f61b0fe0
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260323-124313-bcbe ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Bugfix: Android back button — nested sheet priority (PM-105) Reference: `BUGS_MASTER.md`, `menuapp-code-review/pages/PublicMenu/`. UX Lock: `ux-concepts/UX_LOCKED_PublicMenu.md`. **Production page** — `https://menu-app-mvp-49a4f5b2.base44.app/x?partner=69540a85f2492cff3e46a283&mode=hall&lang=RU` **Context:** PM-S81-15 (Android back button) was partially fixed in a previous KS — `history.pushState` + `popstate` listener was added to x.jsx. The basic scenario works: pressing Android "Back" button from menu view goes back correctly instead of closing the browser. **HOWEVER**, the fix does NOT handle nested overlapping sheets correctly. When multiple sheets are stacked (e.g. order list + table code input sheet), the back button closes them in the WRONG order. TARGET FILES (modify): - `pages/PublicMenu/x.jsx` CONTEXT FILES (read-only, do NOT modify): - `pages/PublicMenu/CartView.jsx` - `pages/PublicMenu/MenuView.jsx` - `pages/PublicMenu/CheckoutView.jsx` --- ## Fix 1 — PM-105 (P1) [MUST-FIX]: Android back button closes nested sheets in wrong order ### Сейчас (текущее поведение) Reproduction on Android Chrome: 1. Open the public menu page 2. Add items to cart 3. Open the order list (bottom sheet / drawer) 4. While order list is open, tap on "enter table code" → table code input sheet opens ON TOP of order list 5. Press Android hardware "Back" button 6. **BUG:** The FIRST back press closes the ORDER LIST (bottom layer) instead of the TABLE CODE INPUT (top layer) 7. A SECOND back press is needed to close the table code input ### Должно быть (ожидаемое поведение) Android "Back" button MUST always close the TOPMOST active sheet/overlay first: 1. If table code input sheet is open (on top of everything) → back closes table code input 2. If order list is open (no other sheet on top) → back closes order list 3. If cart drawer is open → back closes cart drawer 4. If only menu is visible → back navigates to browser history (or does nothing) **Implementation pattern (LMP: stack-based history management):** Each sheet/overlay push should add a unique state to `history.pushState`. The `popstate` listener should check which sheets are open and close the topmost one. Sheet priority stack (top to bottom): - Table code verification sheet (highest priority) - Checkout/order confirmation - Order status screen - Cart drawer / order list - Menu (base level — no close action) Each time a sheet opens: `history.pushState({ sheet: 'tableCode' }, '')`. Each time a sheet closes programmatically: `history.back()` to pop the state. On `popstate` event: check `event.state.sheet` and close the matching sheet. ### НЕ должно быть (анти-паттерны) - Do NOT remove the existing popstate listener — refactor it to support the stack pattern. - Do NOT break the basic scenario: menu → browser back still works. - Do NOT use a single boolean flag. Use a STACK or ordered priority list of active sheets. - Do NOT call `history.pushState` on every re-render — only on sheet OPEN. - Do NOT duplicate state in both React state and history state — React state is the source of truth, history is just the trigger. ### Файл и локация `pages/PublicMenu/x.jsx` - Search for: `popstate` to find the existing listener (added by PM-S81-15 fix). - Search for: `history.pushState` to find where history entries are pushed. - Search for: `showTableCodeSheet` or `setShowTableCodeSheet` — table code BS state. - Search for: `showOrderList` or similar — order list state. - Search for: `showCart` or `isCartOpen` or similar — cart drawer state. - The fix needs to identify ALL sheet/overlay state variables and build a priority-ordered close sequence. ### Проверка (мини тест-кейс) 1. Open menu → add dish → open order list → open table code input → press Back → table code input closes (order list stays open). 2. Press Back again → order list closes (menu stays). 3. Press Back again → standard browser back behavior. 4. Open cart drawer → press Back → cart closes. 5. NO regression: basic menu back still works (no infinite loops, no stuck state). --- ## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано выше - Modify ONLY: `pages/PublicMenu/x.jsx` - Modify ONLY the popstate/history logic and the sheet open/close handlers. - Do NOT touch: CartView.jsx, MenuView.jsx, CheckoutView.jsx, useTableSession.jsx. - Do NOT change any sheet visual design, layout, or CSS. - Do NOT change any business logic (orders, cart, table verification). - Do NOT fix other bugs. Extra findings = task FAILURE. - UX Lock: `ux-concepts/UX_LOCKED_PublicMenu.md` — do NOT change locked decisions. ## Implementation Notes - File: `pages/PublicMenu/x.jsx` (~3500 lines) - НЕ ломать: existing PM-S81-15 basic back behavior, table verification flow, cart submit, order status - This is an H-weight architectural fix: involves coordinating multiple sheet states with browser history API. - git add pages/PublicMenu/x.jsx && git commit -m "fix: android back button nested sheet priority stack (PM-105)" && git push ## MOBILE-FIRST CHECK (MANDATORY before commit) - [ ] Android back: closes topmost sheet first (table code > order list > cart > menu) - [ ] No infinite history loops (pressing back many times eventually reaches browser default) - [ ] Programmatic sheet close (X button, overlay tap) still works without history stack corruption - [ ] No console errors on rapid back button presses === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/PublicMenu/x.jsx` against the Android back-button sheet stack fix only. I’ll read the target file plus the page-local context files and `README.md`/`BUGS.md`, then write a concise findings report without touching code.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 13.42s:
+
+ exited 124 in 13.35s:
+
+ exited 124 in 14.02s:
+
+ exited 124 in 15.55s:
+
+ exited 124 in 14.53s:
+
+ exited 124 in 14.74s:
+
+codex
+The first read timed out on these large files. I’m narrowing to the back-button and sheet-control sections inside `x.jsx`, plus targeted reads of the page-local context files, so the review stays within the page folder and the fix scope.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|pushState|showTableCodeSheet|setShowTableCodeSheet|showOrderList|setShowOrderList|showCart|setShowCart|isCartOpen|setIsCartOpen|checkout|order status|status screen|table code' -Context 6,20" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md' -Raw" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -Pattern 'table code|showTableCode|onClose|drawer|sheet|cart|checkout|order list' -Context 4,12" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx' -Pattern 'cart|onClose|drawer|sheet|checkout|showTableCode|table code|order list' -Context 4,12" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx' -Pattern 'onClose|sheet|drawer|table code|checkout|status|order list' -Context 4,12" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md' -Raw" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 17.40s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 15.52s:
+---
+version: "31.0"
+updated: "2026-03-23"
+session: 164
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*9 active bugs remaining (0x P0, 5x P1, 3x P2, 0x P3, 1x suggestion).*
+
+### BUG-PM-056: Drawer layout not visit-state-driven (P1 â€” Batch 2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P1
+- **ÐšÐ¾Ð³Ð´Ð°:** S153 (consensus chain publicmenu-260321-093745)
+ succeeded in 16.77s:
+
+  pages\PublicMenu\CheckoutView.jsx:3:import { Card, CardContent } from "@/components/ui/card";
+  pages\PublicMenu\CheckoutView.jsx:4:import { Button } from "@/components/ui/button";
+  pages\PublicMenu\CheckoutView.jsx:5:import { Input } from "@/components/ui/input";
+  pages\PublicMenu\CheckoutView.jsx:6:
+> pages\PublicMenu\CheckoutView.jsx:7:export default function CheckoutView({
+  pages\PublicMenu\CheckoutView.jsx:8:  t,
+  pages\PublicMenu\CheckoutView.jsx:9:  setView,
+  pages\PublicMenu\CheckoutView.jsx:10:  cart,
+  pages\PublicMenu\CheckoutView.jsx:11:  updateQuantity,
+  pages\PublicMenu\CheckoutView.jsx:12:  formatPrice,
+  pages\PublicMenu\CheckoutView.jsx:13:  finalTotal,
+  pages\PublicMenu\CheckoutView.jsx:14:  activeCurrency,
+  pages\PublicMenu\CheckoutView.jsx:15:  defaultCurrency,
+  pages\PublicMenu\CheckoutView.jsx:16:  orderMode,
+> pages\PublicMenu\CheckoutView.jsx:17:  renderHallCheckoutContent,
+  pages\PublicMenu\CheckoutView.jsx:18:  clientName,
+  pages\PublicMenu\CheckoutView.jsx:19:  setClientName,
+  pages\PublicMenu\CheckoutView.jsx:20:  clientPhone,
+  pages\PublicMenu\CheckoutView.jsx:21:  handlePhoneChange,
+ succeeded in 18.30s:
+
+  pages\PublicMenu\MenuView.jsx:39:  sortedCategories,
+  pages\PublicMenu\MenuView.jsx:40:  groupedDishes,
+  pages\PublicMenu\MenuView.jsx:41:  getCategoryName,
+  pages\PublicMenu\MenuView.jsx:42:  sectionRefs,
+> pages\PublicMenu\MenuView.jsx:43:  cart,
+  pages\PublicMenu\MenuView.jsx:44:  getDishName,
+  pages\PublicMenu\MenuView.jsx:45:  getDishDescription,
+  pages\PublicMenu\MenuView.jsx:46:  formatPrice,
+> pages\PublicMenu\MenuView.jsx:47:  addToCart,
+  pages\PublicMenu\MenuView.jsx:48:  updateQuantity,
+  pages\PublicMenu\MenuView.jsx:49:  t,
+  pages\PublicMenu\MenuView.jsx:50:}) {
+  pages\PublicMenu\MenuView.jsx:51:  const primaryColor = partner?.primary_color || '#1A1A1A';
+  pages\PublicMenu\MenuView.jsx:52:
+> pages\PublicMenu\MenuView.jsx:53:  // Toast state for add-to-cart feedback (AC-09)
+  pages\PublicMenu\MenuView.jsx:54:  const [toastVisible, setToastVisible] = React.useState(false);
+  pages\PublicMenu\MenuView.jsx:55:  const toastTimerRef = React.useRef(null);
+  pages\PublicMenu\MenuView.jsx:56:
+> pages\PublicMenu\MenuView.jsx:57:  const handleAddToCart = React.useCallback((dish) => {
+ succeeded in 20.71s:
+
+  pages\PublicMenu\CartView.jsx:12:  const b = Math.min(255, (num & 0x0000FF) + Math.round((255 - (num & 0x0000FF)) * 
+amount));
+  pages\PublicMenu\CartView.jsx:13:  return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
+  pages\PublicMenu\CartView.jsx:14:}
+  pages\PublicMenu\CartView.jsx:15:
+> pages\PublicMenu\CartView.jsx:16:export default function CartView({
+  pages\PublicMenu\CartView.jsx:17:  partner,
+  pages\PublicMenu\CartView.jsx:18:  currentTable,
+  pages\PublicMenu\CartView.jsx:19:  currentGuest,
+  pages\PublicMenu\CartView.jsx:20:  t,
+  pages\PublicMenu\CartView.jsx:21:  setView,
+  pages\PublicMenu\CartView.jsx:22:  isEditingName,
+  pages\PublicMenu\CartView.jsx:23:  guestNameInput,
+  pages\PublicMenu\CartView.jsx:24:  setGuestNameInput,
+  pages\PublicMenu\CartView.jsx:25:  handleUpdateGuestName,
+  pages\PublicMenu\CartView.jsx:26:  setIsEditingName,
+  pages\PublicMenu\CartView.jsx:27:  getGuestDisplayName,
+> pages\PublicMenu\CartView.jsx:28:  cart,
+  pages\PublicMenu\CartView.jsx:29:  formatPrice,
+ succeeded in 24.59s:
+
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:103:import DishReviewsModal from 
+"@/components/publicMenu/DishReviewsModal";
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:104:import ModeTabs from 
+"@/components/publicMenu/refactor/ModeTabs";
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:105:import CategoryChips from 
+"@/components/publicMenu/refactor/CategoryChips";
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:106:import HallVerifyBlock from 
+"@/components/publicMenu/refactor/HallVerifyBlock";
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:107:import ErrorState from 
+"@/components/publicMenu/refactor/ErrorState";
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:108:import EmptyMenuState from 
+"@/components/publicMenu/refactor/EmptyMenuState";
+> C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:109:import CheckoutView from 
+"@/components/publicMenu/views/CheckoutView";
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:110:import { useCurrency } from 
+"@/components/publicMenu/refactor/hooks/useCurrency";
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:111:import { useHallTable } from 
+"@/components/publicMenu/refactor/hooks/useHallTable";
+  C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:112:import { useHelpRequests } from 
+codex
+I have the page-local context now. Next I’m pulling just the `x.jsx` ranges that define the current `history.pushState` / `popstate` behavior and the sheet open-close handlers, so the findings can be tied to concrete lines.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|history.pushState|window.history.pushState|history.back|window.history.back|drawerMode|showTableCodeSheet|setShowTableCodeSheet|setDrawerMode\\(|setView\\(\"orderstatus\"\\)|dismissOrderStatus|dismissConfirmation|handleCheckoutClick|renderHallCheckoutContent'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$c=Get-Content -Path $p; $c[3608..3650]' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$c=Get-Content -Path $p; $c[1980..2145]' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$c=Get-Content -Path $p; $c[2470..2605]' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$c=Get-Content -Path $p; $c[3318..3508]' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.41s:
+
+  // Submit order
+  // Process hall order (P0-2: accepts validatedSession to avoid stale closure)
+  const processHallOrder = async (guestToUse, validatedSession) => {
+    try {
+      // Handle loyalty account (find or create if email provided)
+      let loyaltyAccountToUse = loyaltyAccount;
+      if (customerEmail && customerEmail.trim() && !loyaltyAccountToUse) {
+        const emailLower = customerEmail.trim().toLowerCase();
+        const existingAccounts = await base44.entities.LoyaltyAccount.filter({
+          partner: partner.id,
+          email: emailLower
+        });
+        
+        if (existingAccounts && existingAccounts.length > 0) {
+          loyaltyAccountToUse = existingAccounts[0];
+        } else if (loyaltyEnabled) {
+          loyaltyAccountToUse = await base44.entities.LoyaltyAccount.create({
+            partner: partner.id,
+            email: emailLower,
+ succeeded in 11.33s:
+          activeCurrency={activeCurrency}
+          defaultCurrency={defaultCurrency}
+          orderMode={orderMode}
+          renderHallCheckoutContent={renderHallCheckoutContent}
+          clientName={clientName}
+          setClientName={setClientName}
+          clientPhone={clientPhone}
+          handlePhoneChange={handlePhoneChange}
+          handlePhoneFocus={handlePhoneFocus}
+          deliveryAddress={deliveryAddress}
+          setDeliveryAddress={setDeliveryAddress}
+          comment={comment}
+          setComment={setComment}
+          errors={errors}
+          submitError={submitError}
+          isSubmitting={isSubmitting}
+          handleSubmitOrder={handleSubmitOrder}
+          isTableVerified={isTableVerified}
+          currentTableId={currentTableId}
+        />
+ succeeded in 11.52s:
+      />
+
+      {/* Dish Reviews Modal (read-only) */}
+      <DishReviewsModal
+        open={!!selectedDishId}
+        onOpenChange={(open) => !open && setSelectedDishId(null)}
+        dishTitle={selectedDish ? getDishName(selectedDish) : undefined}
+        reviews={selectedDishReviews}
+        loading={loadingDishReviews}
+      />
+
+      {/* Sticky cart bar - updated for TableSession */}
+      {view === "menu" && (() => {
+        // Hall mode: show if cart has items OR if there are past orders OR table activity
+        if (isHallMode && showCartButton) {
+          return (
+            <StickyCartBar
+              t={t}
+              isHallMode={true}
+              isDrawerOpen={drawerMode === 'cart'}
+ succeeded in 11.65s:
+    setLoyaltyAccount,
+    loyaltyLoading,
+    redeemedPoints,
+    setRedeemedPoints,
+    discountAmount,
+    pointsDiscountAmount,
+    finalTotal,
+    earnedPoints,
+    maxRedeemPoints,
+  } = useLoyalty({ partner, cartTotalAmount });
+
+  // Loyalty visibility flags
+  const loyaltyEnabled = partner?.loyalty_enabled === true;
+  const discountEnabled = partner?.discount_enabled === true;
+  const showLoyaltySection = (loyaltyEnabled || discountEnabled) && cart.length > 0;
+
+  // TableSession hook
+  const {
+    tableSession,
+    setTableSession,
+ succeeded in 12.99s:
+
+pages\PublicMenu\x.jsx:1291:  const [drawerMode, setDrawerMode] = useState(null); // 'cart' | null
+pages\PublicMenu\x.jsx:1464:  const dismissConfirmation = useCallback(() => {
+pages\PublicMenu\x.jsx:1474:    setDrawerMode(null);
+pages\PublicMenu\x.jsx:1481:    setView("orderstatus");
+pages\PublicMenu\x.jsx:1489:  const dismissOrderStatus = useCallback(() => {
+pages\PublicMenu\x.jsx:2354:    const handlePopState = () => {
+pages\PublicMenu\x.jsx:2355:      if (drawerMode === 'cart') {
+pages\PublicMenu\x.jsx:2357:          window.history.pushState({ overlay: 'cart' }, '');
+pages\PublicMenu\x.jsx:2360:        setDrawerMode(null);
+pages\PublicMenu\x.jsx:2369:    window.addEventListener('popstate', handlePopState);
+pages\PublicMenu\x.jsx:2370:    return () => window.removeEventListener('popstate', handlePopState);
+pages\PublicMenu\x.jsx:2371:  }, [drawerMode, showTableConfirmSheet, isSubmitting]);
+pages\PublicMenu\x.jsx:2682:      window.history.pushState({ overlay: 'tableConfirm' }, '');
+pages\PublicMenu\x.jsx:3040:  const handleCheckoutClick = () => {
+pages\PublicMenu\x.jsx:3166:  const renderHallCheckoutContent = () => {
+pages\PublicMenu\x.jsx:3322:          renderHallCheckoutContent={renderHallCheckoutContent}
+pages\PublicMenu\x.jsx:3352:          onBackToMenu={dismissConfirmation}
+pages\PublicMenu\x.jsx:3354:            dismissConfirmation();
+pages\PublicMenu\x.jsx:3355:            window.history.pushState({ overlay: 'cart' }, '');
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$c=Get-Content -Path $p; $c[2674..2692]' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$c=Get-Content -Path $p; $c[2346..2376]' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$c=Get-Content -Path $p; $c[1456..1498]' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$c=Get-Content -Path $p; $c[3032..3178]' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 6.95s:
+  useEffect(() => {
+    return () => {
+      if (viewTransitionTimerRef.current) clearTimeout(viewTransitionTimerRef.current);
+    };
+  }, []);
+
+  // GAP-01: Dismiss confirmation screen and return to menu
+  const dismissConfirmation = useCallback(() => {
+    setConfirmationData(null);
+    setOrderStatusToken(null);
+    setView("menu");
+  }, []);
+
+  // GAP-01: Show confirmation screen (no auto-dismiss â€” user navigates via buttons)
+  const showConfirmation = useCallback((data) => {
+    setConfirmationData(data);
+    setView("confirmation");
+    setDrawerMode(null);
+  }, []);
+
+ succeeded in 6.99s:
+  }, [currentTableId]);
+
+  // Debug hook kept as no-op to maintain hook order (BUG-PM-040: removed prod logging)
+  useEffect(() => {}, []);
+
+  // PM-S81-15: Android back button closes topmost overlay instead of browser
+  useEffect(() => {
+    const handlePopState = () => {
+      if (drawerMode === 'cart') {
+        if (isSubmitting) {
+          window.history.pushState({ overlay: 'cart' }, '');
+          return;
+        }
+        setDrawerMode(null);
+        return;
+      }
+      if (showTableConfirmSheet) {
+        setShowTableConfirmSheet(false);
+        return;
+      }
+ succeeded in 7.05s:
+    if (submitLockRef.current) return;
+
+    // PM-071: Just-in-time table confirmation BEFORE validate(),
+    // because validate() rejects hall submits when !currentTableId,
+    // silently blocking the BS trigger.
+    if (orderMode === "hall" && !isTableVerified) {
+      pendingSubmitRef.current = true;
+      window.history.pushState({ overlay: 'tableConfirm' }, '');
+      setShowTableConfirmSheet(true);
+      return;
+    }
+
+    if (!validate()) return;
+
+    // Empty cart guard
+    if (cart.length === 0) {
+      toast.error(tr('cart.empty', 'ÐšÐ¾Ñ€Ð·Ð¸Ð½Ð° Ð¿ÑƒÑÑ‚Ð°'), { id: 'mm1' });
+      return;
+    }
+ succeeded in 7.18s:
+    } catch (err) {
+      // silent
+      toast.error(t('error.save_failed'), { id: 'mm1' });
+    }
+  };
+
+  // Request bill (ServiceRequest)
+  const handleCheckoutClick = () => {
+    setView("checkout");
+  };
+
+  const handleRequestBill = async () => {
+    if (billCooldown || billRequested) {
+      toast.info(tr('cart.bill_already_requested', 'Ð¡Ñ‡Ñ‘Ñ‚ ÑƒÐ¶Ðµ Ð·Ð°Ð¿Ñ€Ð¾ÑˆÐµÐ½'), { id: 'mm1' });
+      return;
+    }
+    
+    setBillRequested(true);
+    try {
+      await base44.entities.ServiceRequest.create({
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$c=Get-Content -Path $p; $c[1278..1310]' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|setView\\(\"confirmation\"\\)|setView\\(\"orderstatus\"\\)|setView\\(\"checkout\"\\)|view === \"checkout\"|view === \"confirmation\"|view === \"orderstatus\"' -Context 2,3" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 7.20s:
+    return p && /^[a-z0-9]{2,20}$/.test(p) ? p : null;
+  }, []);
+
+  const [view, setView] = useState(initialTrackToken ? "orderstatus" : "menu"); /* menu | checkout | confirmation | orderstatus */
+
+  // GAP-01: Order Confirmation Screen state
+  const [confirmationData, setConfirmationData] = useState(null);
+
+  // GAP-02: Order Status tracking token (refresh-safe via ?track= URL param)
+  const [orderStatusToken, setOrderStatusToken] = useState(initialTrackToken);
+  
+  // TASK-260203-01: Drawer state
+  const [drawerMode, setDrawerMode] = useState(null); // 'cart' | null
+
+  // Just-in-time table confirmation (Batch A+5 Fix 1)
+  const [showTableConfirmSheet, setShowTableConfirmSheet] = useState(false);
+  const pendingSubmitRef = useRef(false);
+  
+  const [activeCategoryKey, setActiveCategoryKey] = useState("all");
+  const [cart, setCart] = useState([]); // { dishId, name, price, quantity }
+ succeeded in 7.11s:
+
+  pages\PublicMenu\x.jsx:1292:
+  pages\PublicMenu\x.jsx:1293:  // Just-in-time table confirmation (Batch A+5 Fix 1)
+> pages\PublicMenu\x.jsx:1294:  const [showTableConfirmSheet, setShowTableConfirmSheet] = useState(false);
+  pages\PublicMenu\x.jsx:1295:  const pendingSubmitRef = useRef(false);
+  pages\PublicMenu\x.jsx:1296:  
+  pages\PublicMenu\x.jsx:1297:  const [activeCategoryKey, setActiveCategoryKey] = useState("all");
+  pages\PublicMenu\x.jsx:1471:  const showConfirmation = useCallback((data) => {
+  pages\PublicMenu\x.jsx:1472:    setConfirmationData(data);
+> pages\PublicMenu\x.jsx:1473:    setView("confirmation");
+  pages\PublicMenu\x.jsx:1474:    setDrawerMode(null);
+  pages\PublicMenu\x.jsx:1475:  }, []);
+  pages\PublicMenu\x.jsx:1476:
+  pages\PublicMenu\x.jsx:1479:    setConfirmationData(null);
+  pages\PublicMenu\x.jsx:1480:    setOrderStatusToken(token);
+> pages\PublicMenu\x.jsx:1481:    setView("orderstatus");
+  pages\PublicMenu\x.jsx:1482:    // Mirror token into URL for refresh resilience
+  pages\PublicMenu\x.jsx:1483:    const url = new URL(window.location.href);
+  pages\PublicMenu\x.jsx:1484:    url.searchParams.set("track", token);
+  pages\PublicMenu\x.jsx:1498:  // Change 2a/2c: Scroll to top when switching to checkout, confirmation, or orderstatus
+codex
+The current bug is visible in the `popstate` ordering already, but there’s a second layer to verify: whether non-back closes keep the browser history stack in sync. I’m extracting line-numbered snippets for those handlers before I write the report.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$lines=Get-Content -Path $p; for($i=2679;$i -le 2684;$i++){ '"'{0}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$lines=Get-Content -Path $p; for($i=2352;$i -le 2366;$i++){ '"'{0}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$lines=Get-Content -Path $p; for($i=3461;$i -le 3469;$i++){ '"'{0}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$lines=Get-Content -Path $p; for($i=3039;$i -le 3041;$i++){ '"'{0}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$lines=Get-Content -Path $p; for($i=3374;$i -le 3444;$i+=1){ if($i -le 3379 -or $i -ge 3441){ '"'{0}: {1}' -f ("'$i+1), $lines[$i] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$lines=Get-Content -Path $p; for($i=1459;$i -le 1489;$i++){ '"'{0}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$lines=Get-Content -Path $p; for($i=3638;$i -le 3641;$i++){ '"'{0}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$lines=Get-Content -Path $p; for($i=3352;$i -le 3356;$i++){ '"'{0}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.71s:
+2680:     if (orderMode === "hall" && !isTableVerified) {
+2681:       pendingSubmitRef.current = true;
+2682:       window.history.pushState({ overlay: 'tableConfirm' }, '');
+2683:       setShowTableConfirmSheet(true);
+2684:       return;
+2685:     }
+ succeeded in 8.73s:
+2353:   useEffect(() => {
+2354:     const handlePopState = () => {
+2355:       if (drawerMode === 'cart') {
+2356:         if (isSubmitting) {
+2357:           window.history.pushState({ overlay: 'cart' }, '');
+2358:           return;
+2359:         }
+2360:         setDrawerMode(null);
+2361:         return;
+2362:       }
+2363:       if (showTableConfirmSheet) {
+2364:         setShowTableConfirmSheet(false);
+2365:         return;
+2366:       }
+2367:       // No overlay open â€” let browser handle normally
+ succeeded in 9.09s:
+3462:         open={showTableConfirmSheet}
+3463:         onOpenChange={(open) => {
+3464:           if (!open) {
+3465:             pendingSubmitRef.current = false;
+3466:             setShowTableConfirmSheet(false);
+3467:             if (!isTableVerified) {
+3468:               toast(tr('cart.confirm_table.dismissed', 'Ð”Ð»Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð·Ð°ÐºÐ°Ð·Ð° Ð½ÑƒÐ¶Ð½Ð¾ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ ÑÑ‚Ð¾Ð»'), { id: 'table-dismiss' });
+3469:             }
+3470:           }
+ succeeded in 9.16s:
+3375:         open={drawerMode === 'cart'}
+3376:         dismissible={!isSubmitting}
+3377:         onOpenChange={(open) => { if (!open && !isSubmitting) setDrawerMode(null); }}
+3378:       >
+3379:         <DrawerContent className="max-h-[85vh] overflow-hidden">
+3380:           <DrawerHeader className="sr-only">
+3442:               handleRateDish={handleRateDish}
+3443:               ratingSavingByItemId={ratingSavingByItemId}
+3444:               onClose={() => setDrawerMode(null)}
+3445:               onCallWaiter={handleOpenHelpModal}
+ succeeded in 9.19s:
+3040:   const handleCheckoutClick = () => {
+3041:     setView("checkout");
+3042:   };
+ succeeded in 9.31s:
+3353:           onOpenOrders={() => {
+3354:             dismissConfirmation();
+3355:             window.history.pushState({ overlay: 'cart' }, '');
+3356:             setDrawerMode("cart");
+3357:           }}
+ succeeded in 9.40s:
+1460:     };
+1461:   }, []);
+1462: 
+1463:   // GAP-01: Dismiss confirmation screen and return to menu
+1464:   const dismissConfirmation = useCallback(() => {
+1465:     setConfirmationData(null);
+1466:     setOrderStatusToken(null);
+1467:     setView("menu");
+1468:   }, []);
+1469: 
+1470:   // GAP-01: Show confirmation screen (no auto-dismiss â€” user navigates via buttons)
+1471:   const showConfirmation = useCallback((data) => {
+1472:     setConfirmationData(data);
+1473:     setView("confirmation");
+1474:     setDrawerMode(null);
+1475:   }, []);
+1476: 
+1477:   // GAP-02: Navigate from confirmation to order status tracking
+1478:   const handleTrackOrder = useCallback((token) => {
+1479:     setConfirmationData(null);
+ succeeded in 9.62s:
+3639:                 if (isSubmitting && drawerMode === 'cart') return;
+3640:                 if (drawerMode !== 'cart') window.history.pushState({ overlay: 'cart' }, '');
+3641:                 setDrawerMode(drawerMode === 'cart' ? null : 'cart');
+3642:               }}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'history.back|window.history.back'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.59s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'event.state|state\\.overlay|state\\.sheet'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.45s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$lines=Get-Content -Path $p; for($i=2123;$i -le 2128;$i++){ '"'{0}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.68s:
+2124:     if (pendingSubmitRef.current && isTableVerified && currentTableId) {
+2125:       pendingSubmitRef.current = false;
+2126:       setShowTableConfirmSheet(false);
+2127:       // Slight delay to let state propagate
+2128:       if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+2129:       autoSubmitTimerRef.current = setTimeout(() => handleSubmitOrder(), 100);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; "'$lines=Get-Content -Path $p; for($i=1488;$i -le 1495;$i++){ '"'{0}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.19s:
+1489:   const dismissOrderStatus = useCallback(() => {
+1490:     setOrderStatusToken(null);
+1491:     setView("menu");
+1492:     // Remove track param from URL
+1493:     const url = new URL(window.location.href);
+1494:     url.searchParams.delete("track");
+1495:     window.history.replaceState({}, "", url.toString());
+1496:   }, []);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'pushState' | ForEach-Object { '{0}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.05s:
+2357: window.history.pushState({ overlay: 'cart' }, '');
+2682: window.history.pushState({ overlay: 'tableConfirm' }, '');
+3355: window.history.pushState({ overlay: 'cart' }, '');
+3640: if (drawerMode !== 'cart') window.history.pushState({ overlay: 'cart' }, '');
+codex
+I’ve finished the analysis and identified three fix-scope issues in the current back-stack implementation. I’m writing the required findings file, plus the page-local review report and command log required by this repository.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23.log'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.77s:
+False
+ succeeded in 1.75s:
+False
+ succeeded in 1.80s:
+False
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-124313-bcbe
+## Findings
+1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet — In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
+2. [P1] Programmatic sheet closes leave stale history entries behind — The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
+3. [P1] The history stack is incomplete for the required overlay priority list — Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
+## Summary
+Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
+- Scope questions (anything you weren't sure if it's in scope): None.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-23.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-124313-bcbe
+## Findings
+1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet — In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
+2. [P1] Programmatic sheet closes leave stale history entries behind — The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
+3. [P1] The history stack is incomplete for the required overlay priority list — Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
+## Summary
+Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
+- Scope questions (anything you weren't sure if it's in scope): None.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-23.log
+[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'
+[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'
+[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'
+[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'
+[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx'
+[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx'
+[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|pushState|showTableCodeSheet|setShowTableCodeSheet|showOrderList|setShowOrderList|showCart|setShowCart|isCartOpen|setIsCartOpen|checkout|order status|status screen|table code' -Context 6,20
+[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md' -Raw
+[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md' -Raw
+[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -Pattern 'table code|showTableCode|onClose|drawer|sheet|cart|checkout|order list' -Context 4,12
+[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx' -Pattern 'cart|onClose|drawer|sheet|checkout|showTableCode|table code|order list' -Context 4,12
+[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx' -Pattern 'onClose|sheet|drawer|table code|checkout|status|order list' -Context 4,12
+[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|history.pushState|window.history.pushState|history.back|window.history.back|drawerMode|showTableCodeSheet|setShowTableCodeSheet|setDrawerMode\(|setView\("orderstatus"\)|dismissOrderStatus|dismissConfirmation|handleCheckoutClick|renderHallCheckoutContent'
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1980..2145]
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2470..2605]
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3318..3508]
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3608..3650]
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1456..1498]
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2346..2376]
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2674..2692]
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3032..3178]
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1278..1310]
+[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|setView\("confirmation"\)|setView\("orderstatus"\)|setView\("checkout"\)|view === "checkout"|view === "confirmation"|view === "orderstatus"' -Context 2,3
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2352;$i -le 2366;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2679;$i -le 2684;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3461;$i -le 3469;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3374;$i -le 3444;$i+=1){ if($i -le 3379 -or $i -ge 3441){ '{0}: {1}' -f ($i+1), $lines[$i] } }
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1459;$i -le 1489;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3039;$i -le 3041;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3352;$i -le 3356;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3638;$i -le 3641;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
+[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'history.back|window.history.back'
+[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'event.state|state\.overlay|state\.sheet'
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2123;$i -le 2128;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
+[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1488;$i -le 1495;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
+[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'pushState' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md'
+[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23.md'
+[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23.log'
+apply_patch(auto_approved=true) exited 0 in 822ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+A pages/PublicMenu/review_2026-03-23.md
+A pages/PublicMenu/commands_2026-03-23.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-23.log b/pages/PublicMenu/commands_2026-03-23.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..96d31346f442c75e6f4e940c57010d63e7c8df99
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-23.log
+@@ -0,0 +1,39 @@
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx'
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|pushState|showTableCodeSheet|setShowTableCodeSheet|showOrderList|setShowOrderList|showCart|setShowCart|isCartOpen|setIsCartOpen|checkout|order status|status screen|table code' -Context 6,20
++[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md' -Raw
++[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md' -Raw
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -Pattern 'table code|showTableCode|onClose|drawer|sheet|cart|checkout|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx' -Pattern 'cart|onClose|drawer|sheet|checkout|showTableCode|table code|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx' -Pattern 'onClose|sheet|drawer|table code|checkout|status|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|history.pushState|window.history.pushState|history.back|window.history.back|drawerMode|showTableCodeSheet|setShowTableCodeSheet|setDrawerMode\(|setView\("orderstatus"\)|dismissOrderStatus|dismissConfirmation|handleCheckoutClick|renderHallCheckoutContent'
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1980..2145]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2470..2605]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3318..3508]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3608..3650]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1456..1498]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2346..2376]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2674..2692]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3032..3178]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1278..1310]
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|setView\("confirmation"\)|setView\("orderstatus"\)|setView\("checkout"\)|view === "checkout"|view === "confirmation"|view === "orderstatus"' -Context 2,3
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2352;$i -le 2366;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2679;$i -le 2684;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3461;$i -le 3469;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3374;$i -le 3444;$i+=1){ if($i -le 3379 -or $i -ge 3441){ '{0}: {1}' -f ($i+1), $lines[$i] } }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1459;$i -le 1489;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3039;$i -le 3041;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3352;$i -le 3356;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3638;$i -le 3641;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'history.back|window.history.back'
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'event.state|state\.overlay|state\.sheet'
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2123;$i -le 2128;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1488;$i -le 1495;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'pushState' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md'
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23.md'
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23.log'
+diff --git a/pages/PublicMenu/review_2026-03-23.md b/pages/PublicMenu/review_2026-03-23.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..cfa15865cba258baca5a1efe5a786b8145350e2c
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-23.md
+@@ -0,0 +1,12 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-124313-bcbe
++## Findings
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet — In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind — The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list — Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md b/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..cfa15865cba258baca5a1efe5a786b8145350e2c
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+@@ -0,0 +1,12 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-124313-bcbe
++## Findings
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet — In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind — The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list — Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-23.log b/pages/PublicMenu/commands_2026-03-23.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..96d31346f442c75e6f4e940c57010d63e7c8df99
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-23.log
+@@ -0,0 +1,39 @@
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx'
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|pushState|showTableCodeSheet|setShowTableCodeSheet|showOrderList|setShowOrderList|showCart|setShowCart|isCartOpen|setIsCartOpen|checkout|order status|status screen|table code' -Context 6,20
++[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md' -Raw
++[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md' -Raw
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -Pattern 'table code|showTableCode|onClose|drawer|sheet|cart|checkout|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx' -Pattern 'cart|onClose|drawer|sheet|checkout|showTableCode|table code|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx' -Pattern 'onClose|sheet|drawer|table code|checkout|status|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|history.pushState|window.history.pushState|history.back|window.history.back|drawerMode|showTableCodeSheet|setShowTableCodeSheet|setDrawerMode\(|setView\("orderstatus"\)|dismissOrderStatus|dismissConfirmation|handleCheckoutClick|renderHallCheckoutContent'
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1980..2145]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2470..2605]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3318..3508]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3608..3650]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1456..1498]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2346..2376]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2674..2692]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3032..3178]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1278..1310]
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|setView\("confirmation"\)|setView\("orderstatus"\)|setView\("checkout"\)|view === "checkout"|view === "confirmation"|view === "orderstatus"' -Context 2,3
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2352;$i -le 2366;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2679;$i -le 2684;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3461;$i -le 3469;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3374;$i -le 3444;$i+=1){ if($i -le 3379 -or $i -ge 3441){ '{0}: {1}' -f ($i+1), $lines[$i] } }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1459;$i -le 1489;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3039;$i -le 3041;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3352;$i -le 3356;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3638;$i -le 3641;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'history.back|window.history.back'
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'event.state|state\.overlay|state\.sheet'
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2123;$i -le 2128;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1488;$i -le 1495;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'pushState' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md'
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23.md'
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23.log'
+diff --git a/pages/PublicMenu/review_2026-03-23.md b/pages/PublicMenu/review_2026-03-23.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..cfa15865cba258baca5a1efe5a786b8145350e2c
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-23.md
+@@ -0,0 +1,12 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-124313-bcbe
++## Findings
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet — In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind — The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list — Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md b/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..cfa15865cba258baca5a1efe5a786b8145350e2c
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+@@ -0,0 +1,12 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-124313-bcbe
++## Findings
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet — In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind — The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list — Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+The report files are written. I’m doing one quick readback of the generated markdown so I can confirm the saved output matches the required format before I close out.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23.log' -TotalCount 8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.74s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260323-124313-bcbe
+## Findings
+1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet â€” In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
+2. [P1] Programmatic sheet closes leave stale history entries behind â€” The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
+3. [P1] The history stack is incomplete for the required overlay priority list â€” Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
+## Summary
+Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
+## Prompt Clarity (MANDATORY â€” do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
+- Scope questions (anything you weren't sure if it's in scope): None.
+ succeeded in 1.76s:
+[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'
+[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'
+[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'
+[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'
+[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx'
+[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx'
+[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|pushState|showTableCodeSheet|setShowTableCodeSheet|showOrderList|setShowOrderList|showCart|setShowCart|isCartOpen|setIsCartOpen|checkout|order status|status screen|table code' -Context 6,20
+[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md' -Raw
+ succeeded in 1.76s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260323-124313-bcbe
+## Findings
+1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet â€” In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
+2. [P1] Programmatic sheet closes leave stale history entries behind â€” The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
+3. [P1] The history stack is incomplete for the required overlay priority list â€” Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
+## Summary
+Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
+## Prompt Clarity (MANDATORY â€” do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
+- Scope questions (anything you weren't sure if it's in scope): None.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-23.log b/pages/PublicMenu/commands_2026-03-23.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..96d31346f442c75e6f4e940c57010d63e7c8df99
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-23.log
+@@ -0,0 +1,39 @@
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx'
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|pushState|showTableCodeSheet|setShowTableCodeSheet|showOrderList|setShowOrderList|showCart|setShowCart|isCartOpen|setIsCartOpen|checkout|order status|status screen|table code' -Context 6,20
++[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md' -Raw
++[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md' -Raw
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -Pattern 'table code|showTableCode|onClose|drawer|sheet|cart|checkout|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx' -Pattern 'cart|onClose|drawer|sheet|checkout|showTableCode|table code|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx' -Pattern 'onClose|sheet|drawer|table code|checkout|status|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|history.pushState|window.history.pushState|history.back|window.history.back|drawerMode|showTableCodeSheet|setShowTableCodeSheet|setDrawerMode\(|setView\("orderstatus"\)|dismissOrderStatus|dismissConfirmation|handleCheckoutClick|renderHallCheckoutContent'
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1980..2145]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2470..2605]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3318..3508]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3608..3650]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1456..1498]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2346..2376]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2674..2692]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3032..3178]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1278..1310]
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|setView\("confirmation"\)|setView\("orderstatus"\)|setView\("checkout"\)|view === "checkout"|view === "confirmation"|view === "orderstatus"' -Context 2,3
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2352;$i -le 2366;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2679;$i -le 2684;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3461;$i -le 3469;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3374;$i -le 3444;$i+=1){ if($i -le 3379 -or $i -ge 3441){ '{0}: {1}' -f ($i+1), $lines[$i] } }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1459;$i -le 1489;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3039;$i -le 3041;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3352;$i -le 3356;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3638;$i -le 3641;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'history.back|window.history.back'
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'event.state|state\.overlay|state\.sheet'
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2123;$i -le 2128;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1488;$i -le 1495;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'pushState' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md'
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23.md'
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23.log'
+diff --git a/pages/PublicMenu/review_2026-03-23.md b/pages/PublicMenu/review_2026-03-23.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..cfa15865cba258baca5a1efe5a786b8145350e2c
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-23.md
+@@ -0,0 +1,12 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-124313-bcbe
++## Findings
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet — In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind — The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list — Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md b/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..cfa15865cba258baca5a1efe5a786b8145350e2c
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+@@ -0,0 +1,12 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-124313-bcbe
++## Findings
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet — In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind — The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list — Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+The generated markdown is correct structurally, but the shell’s code page renders em dashes poorly. I’m normalizing the saved report text to plain ASCII separators so the files stay readable in this environment.
+file update
+M C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+@@ -1,9 +1,9 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-124313-bcbe
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260323-124313-bcbe
+ ## Findings
+-1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet — In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
+-2. [P1] Programmatic sheet closes leave stale history entries behind — The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
+-3. [P1] The history stack is incomplete for the required overlay priority list — Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet - In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind - The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list - Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
+ ## Summary
+ Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
+-## Prompt Clarity (MANDATORY — do NOT skip this section)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
+ - Overall clarity: 5
+M C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-23.md
+@@ -1,9 +1,9 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260323-124313-bcbe
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260323-124313-bcbe
+ ## Findings
+-1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet — In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
+-2. [P1] Programmatic sheet closes leave stale history entries behind — The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
+-3. [P1] The history stack is incomplete for the required overlay priority list — Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet - In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind - The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list - Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
+ ## Summary
+ Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
+-## Prompt Clarity (MANDATORY — do NOT skip this section)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
+ - Overall clarity: 5
+apply_patch(auto_approved=true) exited 0 in 240ms:
+Success. Updated the following files:
+M pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+M pages/PublicMenu/review_2026-03-23.md
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-23.log b/pages/PublicMenu/commands_2026-03-23.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..96d31346f442c75e6f4e940c57010d63e7c8df99
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-23.log
+@@ -0,0 +1,39 @@
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx'
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|pushState|showTableCodeSheet|setShowTableCodeSheet|showOrderList|setShowOrderList|showCart|setShowCart|isCartOpen|setIsCartOpen|checkout|order status|status screen|table code' -Context 6,20
++[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md' -Raw
++[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md' -Raw
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -Pattern 'table code|showTableCode|onClose|drawer|sheet|cart|checkout|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx' -Pattern 'cart|onClose|drawer|sheet|checkout|showTableCode|table code|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx' -Pattern 'onClose|sheet|drawer|table code|checkout|status|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|history.pushState|window.history.pushState|history.back|window.history.back|drawerMode|showTableCodeSheet|setShowTableCodeSheet|setDrawerMode\(|setView\("orderstatus"\)|dismissOrderStatus|dismissConfirmation|handleCheckoutClick|renderHallCheckoutContent'
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1980..2145]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2470..2605]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3318..3508]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3608..3650]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1456..1498]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2346..2376]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2674..2692]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3032..3178]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1278..1310]
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|setView\("confirmation"\)|setView\("orderstatus"\)|setView\("checkout"\)|view === "checkout"|view === "confirmation"|view === "orderstatus"' -Context 2,3
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2352;$i -le 2366;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2679;$i -le 2684;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3461;$i -le 3469;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3374;$i -le 3444;$i+=1){ if($i -le 3379 -or $i -ge 3441){ '{0}: {1}' -f ($i+1), $lines[$i] } }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1459;$i -le 1489;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3039;$i -le 3041;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3352;$i -le 3356;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3638;$i -le 3641;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'history.back|window.history.back'
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'event.state|state\.overlay|state\.sheet'
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2123;$i -le 2128;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1488;$i -le 1495;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'pushState' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md'
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23.md'
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23.log'
+diff --git a/pages/PublicMenu/review_2026-03-23.md b/pages/PublicMenu/review_2026-03-23.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6a6cce501d5816741c94e8782ced47f7a319e779
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-23.md
+@@ -0,0 +1,12 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260323-124313-bcbe
++## Findings
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet - In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind - The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list - Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md b/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6a6cce501d5816741c94e8782ced47f7a319e779
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+@@ -0,0 +1,12 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260323-124313-bcbe
++## Findings
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet - In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind - The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list - Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-23.log b/pages/PublicMenu/commands_2026-03-23.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..96d31346f442c75e6f4e940c57010d63e7c8df99
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-23.log
+@@ -0,0 +1,39 @@
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx'
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|pushState|showTableCodeSheet|setShowTableCodeSheet|showOrderList|setShowOrderList|showCart|setShowCart|isCartOpen|setIsCartOpen|checkout|order status|status screen|table code' -Context 6,20
++[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md' -Raw
++[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md' -Raw
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -Pattern 'table code|showTableCode|onClose|drawer|sheet|cart|checkout|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx' -Pattern 'cart|onClose|drawer|sheet|checkout|showTableCode|table code|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx' -Pattern 'onClose|sheet|drawer|table code|checkout|status|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|history.pushState|window.history.pushState|history.back|window.history.back|drawerMode|showTableCodeSheet|setShowTableCodeSheet|setDrawerMode\(|setView\("orderstatus"\)|dismissOrderStatus|dismissConfirmation|handleCheckoutClick|renderHallCheckoutContent'
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1980..2145]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2470..2605]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3318..3508]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3608..3650]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1456..1498]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2346..2376]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2674..2692]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3032..3178]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1278..1310]
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|setView\("confirmation"\)|setView\("orderstatus"\)|setView\("checkout"\)|view === "checkout"|view === "confirmation"|view === "orderstatus"' -Context 2,3
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2352;$i -le 2366;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2679;$i -le 2684;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3461;$i -le 3469;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3374;$i -le 3444;$i+=1){ if($i -le 3379 -or $i -ge 3441){ '{0}: {1}' -f ($i+1), $lines[$i] } }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1459;$i -le 1489;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3039;$i -le 3041;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3352;$i -le 3356;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3638;$i -le 3641;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'history.back|window.history.back'
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'event.state|state\.overlay|state\.sheet'
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2123;$i -le 2128;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1488;$i -le 1495;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'pushState' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md'
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23.md'
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23.log'
+diff --git a/pages/PublicMenu/review_2026-03-23.md b/pages/PublicMenu/review_2026-03-23.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6a6cce501d5816741c94e8782ced47f7a319e779
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-23.md
+@@ -0,0 +1,12 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260323-124313-bcbe
++## Findings
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet - In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind - The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list - Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md b/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6a6cce501d5816741c94e8782ced47f7a319e779
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+@@ -0,0 +1,12 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260323-124313-bcbe
++## Findings
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet - In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind - The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list - Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.44s:
+# Codex Writer Findings - PublicMenu Chain: publicmenu-260323-124313-bcbe
+## Findings
+1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet - In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
+2. [P1] Programmatic sheet closes leave stale history entries behind - The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
+3. [P1] The history stack is incomplete for the required overlay priority list - Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
+## Summary
+Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
+## Prompt Clarity (MANDATORY - do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
+- Scope questions (anything you weren't sure if it's in scope): None.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-23.log b/pages/PublicMenu/commands_2026-03-23.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..96d31346f442c75e6f4e940c57010d63e7c8df99
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-23.log
+@@ -0,0 +1,39 @@
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx'
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|pushState|showTableCodeSheet|setShowTableCodeSheet|showOrderList|setShowOrderList|showCart|setShowCart|isCartOpen|setIsCartOpen|checkout|order status|status screen|table code' -Context 6,20
++[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md' -Raw
++[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md' -Raw
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -Pattern 'table code|showTableCode|onClose|drawer|sheet|cart|checkout|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx' -Pattern 'cart|onClose|drawer|sheet|checkout|showTableCode|table code|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx' -Pattern 'onClose|sheet|drawer|table code|checkout|status|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|history.pushState|window.history.pushState|history.back|window.history.back|drawerMode|showTableCodeSheet|setShowTableCodeSheet|setDrawerMode\(|setView\("orderstatus"\)|dismissOrderStatus|dismissConfirmation|handleCheckoutClick|renderHallCheckoutContent'
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1980..2145]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2470..2605]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3318..3508]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3608..3650]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1456..1498]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2346..2376]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2674..2692]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3032..3178]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1278..1310]
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|setView\("confirmation"\)|setView\("orderstatus"\)|setView\("checkout"\)|view === "checkout"|view === "confirmation"|view === "orderstatus"' -Context 2,3
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2352;$i -le 2366;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2679;$i -le 2684;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3461;$i -le 3469;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3374;$i -le 3444;$i+=1){ if($i -le 3379 -or $i -ge 3441){ '{0}: {1}' -f ($i+1), $lines[$i] } }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1459;$i -le 1489;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3039;$i -le 3041;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3352;$i -le 3356;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3638;$i -le 3641;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'history.back|window.history.back'
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'event.state|state\.overlay|state\.sheet'
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2123;$i -le 2128;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1488;$i -le 1495;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'pushState' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md'
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23.md'
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23.log'
+diff --git a/pages/PublicMenu/review_2026-03-23.md b/pages/PublicMenu/review_2026-03-23.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6a6cce501d5816741c94e8782ced47f7a319e779
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-23.md
+@@ -0,0 +1,12 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260323-124313-bcbe
++## Findings
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet - In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind - The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list - Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md b/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6a6cce501d5816741c94e8782ced47f7a319e779
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+@@ -0,0 +1,12 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260323-124313-bcbe
++## Findings
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet - In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind - The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list - Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+Saved the review to [publicmenu-260323-124313-bcbe-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md), mirrored it in [review_2026-03-23.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23.md), and logged commands in [commands_2026-03-23.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23.log).
+
+The review contains 3 P1 findings, all within Fix 1 only: the current `popstate` order closes the cart before the top table-code sheet, programmatic sheet closes leave stale history entries behind, and the history stack still does not cover `checkout`, `confirmation`, and `orderstatus`, so the required topmost-overlay back behavior is not fully implemented.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-23.log b/pages/PublicMenu/commands_2026-03-23.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..96d31346f442c75e6f4e940c57010d63e7c8df99
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-23.log
+@@ -0,0 +1,39 @@
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx'
++[timeout] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx'
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|pushState|showTableCodeSheet|setShowTableCodeSheet|showOrderList|setShowOrderList|showCart|setShowCart|isCartOpen|setIsCartOpen|checkout|order status|status screen|table code' -Context 6,20
++[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md' -Raw
++[ok] Get-Content -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md' -Raw
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx' -Pattern 'table code|showTableCode|onClose|drawer|sheet|cart|checkout|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx' -Pattern 'cart|onClose|drawer|sheet|checkout|showTableCode|table code|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CheckoutView.jsx' -Pattern 'onClose|sheet|drawer|table code|checkout|status|order list' -Context 4,12
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'popstate|history.pushState|window.history.pushState|history.back|window.history.back|drawerMode|showTableCodeSheet|setShowTableCodeSheet|setDrawerMode\(|setView\("orderstatus"\)|dismissOrderStatus|dismissConfirmation|handleCheckoutClick|renderHallCheckoutContent'
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1980..2145]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2470..2605]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3318..3508]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3608..3650]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1456..1498]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2346..2376]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[2674..2692]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[3032..3178]
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $c=Get-Content -Path $p; $c[1278..1310]
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'showTableConfirmSheet|setShowTableConfirmSheet|setView\("confirmation"\)|setView\("orderstatus"\)|setView\("checkout"\)|view === "checkout"|view === "confirmation"|view === "orderstatus"' -Context 2,3
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2352;$i -le 2366;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2679;$i -le 2684;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3461;$i -le 3469;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3374;$i -le 3444;$i+=1){ if($i -le 3379 -or $i -ge 3441){ '{0}: {1}' -f ($i+1), $lines[$i] } }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1459;$i -le 1489;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3039;$i -le 3041;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3352;$i -le 3356;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=3638;$i -le 3641;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'history.back|window.history.back'
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'event.state|state\.overlay|state\.sheet'
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=2123;$i -le 2128;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] $p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content -Path $p; for($i=1488;$i -le 1495;$i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++[ok] Select-String -Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx' -Pattern 'pushState' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md'
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23.md'
++[ok] Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23.log'
+diff --git a/pages/PublicMenu/review_2026-03-23.md b/pages/PublicMenu/review_2026-03-23.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6a6cce501d5816741c94e8782ced47f7a319e779
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-23.md
+@@ -0,0 +1,12 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260323-124313-bcbe
++## Findings
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet - In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind - The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list - Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md b/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6a6cce501d5816741c94e8782ced47f7a319e779
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md
+@@ -0,0 +1,12 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260323-124313-bcbe
++## Findings
++1. [P1] `popstate` closes the lower cart drawer before the top table-code sheet - In `pages/PublicMenu/x.jsx:2354-2364`, the back handler checks `drawerMode === 'cart'` before `showTableConfirmSheet`. When both layers are open, the first Android Back consumes the top sheet's history entry but closes the lower order-list drawer instead, which is the exact wrong-order regression described in Fix 1. FIX: make the back handler state-aware and close the highest-priority active layer first, ideally by matching `event.state.sheet` to the exact close action so `tableConfirm` is popped before `cart`.
++2. [P1] Programmatic sheet closes leave stale history entries behind - The cart and table-code sheet close paths in `pages/PublicMenu/x.jsx:2124-2129`, `pages/PublicMenu/x.jsx:3375-3377`, `pages/PublicMenu/x.jsx:3444`, and `pages/PublicMenu/x.jsx:3462-3469` only call `setDrawerMode(null)` / `setShowTableConfirmSheet(false)`. Because none of these paths call `history.back()`, dismissing a sheet via chevron, overlay tap, or successful verification leaves its pushed history entry on the stack, so later Back presses pop stale entries and require extra presses or close the wrong remaining layer. FIX: centralize non-`popstate` sheet closes and pair each one with a guarded `history.back()` for the matching pushed state instead of mutating React state alone.
++3. [P1] The history stack is incomplete for the required overlay priority list - Only cart and table-confirm ever push history entries (`pages/PublicMenu/x.jsx:2682`, `pages/PublicMenu/x.jsx:3355`, `pages/PublicMenu/x.jsx:3640`). Checkout, confirmation, and order-status transitions only change `view` / URL replacement (`pages/PublicMenu/x.jsx:1464-1485`, `pages/PublicMenu/x.jsx:3040-3041`), so Android Back cannot uniformly close `checkout`, `confirmation`, or `orderstatus` as topmost layers. That means the required `table code > checkout/confirmation > order status > cart > menu` stack contract is still not implemented. FIX: assign every overlay/view in that priority list a unique pushed history state on open and close the popped state in `popstate` instead of inferring behavior from a couple of booleans.
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, reproduction, expected priority order, and anti-patterns were all specified.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+tokens used
+94 470
+Saved the review to [publicmenu-260323-124313-bcbe-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260323-124313-bcbe-codex-findings.md), mirrored it in [review_2026-03-23.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-23.md), and logged commands in [commands_2026-03-23.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-23.log).
+
+The review contains 3 P1 findings, all within Fix 1 only: the current `popstate` order closes the cart before the top table-code sheet, programmatic sheet closes leave stale history entries behind, and the history stack still does not cover `checkout`, `confirmation`, and `orderstatus`, so the required topmost-overlay back behavior is not fully implemented.

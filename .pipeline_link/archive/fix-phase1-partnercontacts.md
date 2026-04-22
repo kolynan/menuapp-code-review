@@ -1,0 +1,35 @@
+---
+page: partnercontacts
+budget: 5.00
+type: fix
+phase: 1
+created: 2026-02-28
+session: 52
+---
+
+# Phase 1 Fix: PartnerContacts Page — i18n Keys Fix
+
+## Context
+UX discussion (CC+Codex) identified Phase 1 mobile fixes for the partner cabinet.
+Full discussion result: pipeline/result-discussion-partner-cabinet-ux.md
+
+## Problems to Fix
+
+### 1. i18n keys showing as raw text
+PartnerContacts page shows raw i18n keys like "partnercontacts.page_title" instead of translated text. This makes the page completely unusable.
+**Fix:** Add all missing translation strings to the locale/translation setup.
+Add a fallback that shows the last part of the key as human-readable text (e.g., "page_title" → "Page Title") rather than the full dot-path key.
+
+### 2. Touch targets
+Any icon buttons or small interactive elements should be at least 44x44px with 8px spacing between adjacent targets.
+
+## Note
+The UX discussion recommended eventually deprecating this page and redirecting to PartnerSettings > Contacts. But for now, just fix i18n so it's usable.
+
+## Instructions
+1. git add -A && git commit -m "before phase1 partnercontacts fixes" && git push
+2. Read the current partnercontacts page code in pages/PartnerContacts/
+3. Fix i18n keys and touch targets
+4. Create RELEASE
+5. Update BUGS.md and PartnerContacts README.md
+6. git add -A && git commit -m "Phase1 partnercontacts: i18n fix, touch targets" && git push

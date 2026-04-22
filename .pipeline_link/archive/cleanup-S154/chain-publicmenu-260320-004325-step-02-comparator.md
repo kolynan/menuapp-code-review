@@ -1,0 +1,85 @@
+---
+chain: publicmenu-260320-004325
+chain_step: 2
+chain_total: 4
+chain_step_name: comparator
+page: PublicMenu
+budget: 1.50
+runner: cc
+type: chain-step
+---
+=== CHAIN STEP: Comparator (2/4) ===
+Chain: publicmenu-260320-004325
+Page: PublicMenu
+
+You are the Comparator in a modular consensus pipeline.
+Your job: compare CC Writer and Codex Writer findings and produce a merge plan.
+
+INSTRUCTIONS:
+1. Read CC findings: pipeline/chain-state/publicmenu-260320-004325-cc-findings.md
+2. Read Codex findings: pipeline/chain-state/publicmenu-260320-004325-codex-findings.md
+3. Compare both analyses and categorize:
+
+Write comparison to: pipeline/chain-state/publicmenu-260320-004325-comparison.md
+
+FORMAT:
+# Comparison Report — PublicMenu
+Chain: publicmenu-260320-004325
+
+## Agreed (both found)
+Items found by both CC and Codex — HIGH confidence, apply all.
+
+## CC Only (Codex missed)
+Items found only by CC — evaluate validity, include if solid.
+
+## Codex Only (CC missed)
+Items found only by Codex — evaluate validity, include if solid.
+
+## Disputes (disagree)
+Items where CC and Codex disagree — explain reasoning, pick best solution.
+
+## Final Fix Plan
+Ordered list of all fixes to apply, with priority and source:
+1. [P0] Fix title — Source: agreed/CC/Codex — Description of change
+2. ...
+
+## Summary
+- Agreed: N items
+- CC only: N items (N accepted, N rejected)
+- Codex only: N items (N accepted, N rejected)
+- Disputes: N items
+- Total fixes to apply: N
+
+4. Do NOT apply any fixes yet — only document the comparison
+
+=== TASK CONTEXT ===
+Fix BUG-PM-031: Cart can be closed while order is being submitted.
+
+## Problem
+When the user presses "Send to waiter" (submit order), the cart drawer can still be closed (swiped down or closed via button) while the async submit request is in progress. This can cause:
+- A submitted order that the user doesn't see confirmation for (they already closed the cart)
+- Potential duplicate submissions if the user re-opens the cart and presses submit again
+- React state updates on unmounted/hidden component
+
+## Reproduction
+1. Open the public menu at https://menu-app-mvp-49a4f5b2.base44.app/x
+2. Add items to the cart
+3. Enter the table code
+4. Press "Send to waiter" — immediately try to swipe down or close the cart drawer
+5. The cart closes mid-submission
+
+## Expected Behavior
+While an order submission is in progress (loading state), the cart drawer should be non-closeable:
+- Swipe-to-close gesture should be disabled
+- Close button (if any) should be disabled or hidden
+- UI should show a clear loading indicator
+- Drawer closes automatically only after successful submission (or stays open on error)
+
+## Context
+- File: pages/PublicMenu/base/CartView.jsx
+- Related state: likely an `isSubmitting` / `isLoading` boolean flag already exists for the submit button
+- The fix should use this existing flag to gate close gestures
+- Check if the drawer close handler is passed as a prop (e.g., `onClose`) — it should be wrapped: `if (!isSubmitting) onClose()`
+- Also check the drag handle / swipe gesture handler for the same guard
+- Do NOT change the overall drawer architecture — minimal targeted fix only
+=== END ===

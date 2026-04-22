@@ -1,0 +1,33 @@
+## CC Analysis: task-260315-063840 — Fix null exit_code in parallel-write supervisor (KB-039)
+
+### Problem
+PS 5.1 returns $null for Process.ExitCode and $LASTEXITCODE on normal process completion.
+The parallel-write supervisor set worker state to 'failed' when ExitCode was $null (since
+$null -eq 0 is $false in PS 5.1), causing the reconciler guard on line 2053 to throw even
+though both writers completed successfully with commits.
+
+### Root Cause
+Line 2042/2045: `$writerProc.ExitCode -eq 0` evaluates to $false when ExitCode is $null.
+This sets state='failed', and line 2053 checks state != 'completed' -> throws.
+
+### Fix Applied
+1. Added `Get-V7NormalizedExitCode` helper to V7.Common.ps1 — converts $null to 0 via `-as [int]`
+2. Applied to 15 exit code comparisons across 5 files:
+   - Start-TaskSupervisor.ps1: 10 comparisons (parallel-write, review-write, merge, cleanup)
+   - V7.Common.ps1: 4 comparisons (Invoke-V7CapturedCommand, Invoke-V7Git, Test-V7BranchExists, Remove-V7Branch, Remove-V7Worktree)
+   - Merge-ParallelWrite.ps1: 2 comparisons (cherry-pick, reconcile)
+   - Invoke-CodexWriter.ps1: 4 comparisons (status, error detection, result, exit)
+3. Added 5 test cases to Test-V7Pipeline.ps1
+
+### Validation
+- Parser check: ALL 15 .ps1 files OK
+- Runtime tests: 22/22 PASS (5 new)
+- Static analysis: no .Contains()/.ContainsKey() violations
+- Regression check: all functions preserved (63 in V7.Common, +1 new)
+- Diff: +58/-26 lines across 5 files
+
+### Commit
+e3ef0cd — fix: handle null exit_code in parallel-write supervisor (KB-039) S128
+
+### Permissions Requested
+None — all operations were local file edits, terminal commands, and git push.

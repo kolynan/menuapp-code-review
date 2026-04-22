@@ -1,0 +1,85 @@
+---
+type: discussion
+topic: "Контакты партнёра — отдельная страница или вкладка в Settings?"
+budget: 10
+---
+
+# Discussion: Контакты партнёра — архитектура
+
+## INSTRUCTIONS FOR CC
+
+You are a discussion moderator. Your PRIMARY goal is to get Codex's perspective AND your own, then synthesize.
+
+⚠️ CRITICAL: You MUST call Codex. Do NOT skip Codex. The previous attempt skipped Codex — this is NOT acceptable. If Codex call fails, retry once. If it fails twice, write "CODEX FAILED" in the result file with the error — do NOT silently skip.
+
+### The Discussion Topic
+
+MenuApp has a separate page /partnercontacts for partner contact info — address, phone, email, social media, working hours. There's also /partnersettings with settings — restaurant name, language, currency, working hours toggle. Working hours are DUPLICATED in both places — that's a problem.
+
+**Question:** Should contacts remain a separate page, or merge into Settings as a tab?
+
+**Options:**
+1. Keep /partnercontacts separate — less code changes, but duplication remains
+2. Merge contacts INTO Settings as a "Contacts" tab — single source of truth, but Settings gets bigger
+3. Merge Settings into Contacts — unlikely but for completeness
+
+**Context:**
+- MenuApp = QR-menu for restaurants. Target user: restaurant owner, non-technical
+- Navigation: hamburger menu, ~8 items. Each page = separate menu item
+- Mobile-first — 90% usage on phone
+- Discussed since S54 2026-03-01, decision kept postponing
+- CW recommendation was option 2 — merge into Settings
+
+### Step-by-Step Workflow
+
+1. Read references if they exist:
+   ```bash
+   ls references/ 2>/dev/null
+   ```
+   Read PRD and Architecture if available for context.
+
+2. Form YOUR OWN position first. Write it down before calling Codex.
+
+3. Call Codex Round 1 via powershell.exe:
+   ```bash
+   powershell.exe -Command "codex exec -C 'C:/Dev/menuapp-code-review' --full-auto 'You are a senior product consultant for MenuApp — a QR-menu and ordering system for small restaurants in Kazakhstan. Discussion topic: Should partner contact info - address, phone, email, social media, working hours - be a separate page /partnercontacts, or merged into Settings as a tab? Currently working hours are duplicated in both /partnercontacts and /partnersettings. Target user is non-technical restaurant owner. Mobile-first, 90 percent phone usage. Navigation has ~8 hamburger menu items. Options: 1 - keep separate page, 2 - merge contacts into Settings as a tab, 3 - merge settings into contacts. Give your recommendation with reasoning. Think about UX best practices, mobile navigation, and what busy restaurant owners prefer.'" > codex-round1-discussion.md 2>&1
+   echo "Codex Round 1 done"
+   ```
+
+4. Read codex-round1-discussion.md. Compare with your position.
+
+5. If disagreements exist, call Codex Round 2 with your counter-arguments.
+
+6. Max 3 rounds.
+
+7. Write synthesis to `pipeline/discussion-result-contacts.md` using this format:
+   ```
+   ---
+   topic: Contacts Architecture
+   date: 2026-03-09
+   rounds: N
+   status: completed
+   participants: Claude CC, Codex GPT
+   ---
+   # Discussion: Contacts Architecture
+   ## Summary
+   ## Agreed points
+   ## Claude's perspective
+   ## Codex's perspective
+   ## Disagreements
+   ## Recommendation for Arman
+   ## Next steps
+   ```
+
+8. MANDATORY at the end:
+   ```bash
+   git add codex-round*-discussion.md pipeline/discussion-result-contacts.md
+   git commit -m "discussion: contacts architecture CC+Codex"
+   git push
+   ```
+
+### Progress Updates
+After each round:
+```bash
+echo "[CC] $(date +%H:%M) Round N complete" >> "[PROGRESS_FILE]"
+```

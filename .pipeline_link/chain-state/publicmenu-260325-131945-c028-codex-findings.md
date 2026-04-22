@@ -1,0 +1,15 @@
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-131945-c028
+
+## Findings
+1. [P2] Fix 1: Help drawer still ships the old multi-step selector flow — In [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) at lines 3687-3737, the four preset options only call `handlePresetSelect(opt.id)`, the textarea is always rendered, and the footer still uses separate `Отмена` + `Отправить` buttons. That is the pre-redesign flow the task explicitly removes, so preset requests are still not one-tap cards, `Другое` is not the only path that expands a form, and the standalone cancel CTA remains. `Другое` also keeps `sm:col-span-1` instead of the required persistent `col-span-2` card layout. FIX: Replace the selector flow with five cards, wire the four preset cards to `submitHelpRequest(typeOverride)` directly, keep `Другое` as the only expandable inline form, and remove the standalone cancel button/default-visible textarea.
+2. [P2] Fix 1: Quick-send success state and auto-close/reset path are missing — In [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) at lines 1649-1657, `closeHelpDrawer()` only closes the drawer; there is no `helpQuickSent` state anywhere in `x.jsx`, no success-state render in the drawer body, and no 2-second auto-close flow after a successful preset tap. That means the required `✅ Запрос отправлен` confirmation and state reset behavior for the redesigned quick actions are not implemented. FIX: Add `const [helpQuickSent, setHelpQuickSent] = useState(false)`, render the required success state with `help.quick_sent_title` / `help.quick_sent_desc`, auto-close via `setTimeout(() => { closeHelpDrawer(); setHelpQuickSent(false); }, 2000)`, and reset `helpQuickSent`, `selectedHelpType`, and `helpComment` on drawer close.
+3. [P2] Fix 2: `Другое` submit button is still blocked by `!currentTableId` instead of comment validation — In [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) at lines 3727-3735, the submit CTA still uses `disabled={isSendingHelp || !currentTableId}`. This preserves the exact PM-131 failure mode described in the task and does not implement the required behavior where the button is disabled only when sending or when `helpComment.trim()` is empty. I did not find `pointer-events-none` in this drawer slice, so the current concrete blocker is the disabled condition itself. FIX: Change the expanded `Другое` submit button to `disabled={isSendingHelp || !helpComment.trim()}` only, keeping the CTA enabled as soon as the textarea contains text.
+
+## Summary
+Total: 3 findings (0 P0, 0 P1, 3 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None needed; the task named the target file, exact UI area, frozen UX constraints, and expected behaviors.
+- Scope questions (anything you weren't sure if it's in scope): None.

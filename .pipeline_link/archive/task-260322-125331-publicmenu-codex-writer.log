@@ -1,0 +1,1012 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d1488-fe1a-7e03-8768-c5f150f351c9
+--------
+user
+Review the file pages/PublicMenu/*.jsx for bugs in a React restaurant QR-menu app on Base44 platform. Also check pages/PublicMenu/README.md and pages/PublicMenu/BUGS.md for context (ONLY these 3 files, nothing else). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the 3 files above. Do NOT search the repo, do NOT read old findings, do NOT read files outside pages/PublicMenu/. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. Find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260322-125326-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260322-125326 ## Findings 1. [P0] Title — Description. FIX: ... 2. [P1] Title — Description. FIX: ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... Do NOT apply fixes — only document findings. === TASK CONTEXT === # UX Batch: Checkout motivation text + table code BS (#87 KS-1) Reference: `ux-concepts/UX_LOCKED_PublicMenu.md`, `BUGS_MASTER.md`. Production page. **Context:** The checkout drawer currently shows a full loyalty section before order submission: "Лояльность +3, за отзыв +10, Бонусы за онлайн-заказ +3Б". The client hasn't earned anything yet — this is premature and clutters checkout. Also the term "онлайн-заказ" confuses dine-in customers. Decision: replace with compact motivational text + fix the table code bottom sheet. TARGET FILES (modify): CartView.jsx, x.jsx CONTEXT FILES (read-only): README.md, BUGS.md --- ## Fix 1 — #87a (P1) [MUST-FIX]: Replace loyalty section with motivational text in checkout drawer ### Сейчас (текущее поведение) In the checkout drawer (CartView), before submitting the order, a full loyalty section is displayed: - "Лояльность" header with expandable details (+3 points, за отзыв +10) - "Бонусы за онлайн-заказ +3Б" line - Full loyalty breakdown UI This appears BEFORE the client has placed any order — premature and cluttering. ### Должно быть (ожидаемое поведение) Replace the entire loyalty section with a compact motivational block (1-2 lines, small font, visually secondary) positioned above the "Отправить официанту" CTA button. Dynamic text based on partner settings: - **Bonuses only:** Line 1: "Начислим +3 бонуса за этот заказ" / Line 2 (small, gray): "Официант сразу увидит его" - **Discount only:** Line 1: "Скидка 10% на этот заказ" / Line 2 (small, gray): "Официант сразу увидит его" - **Both:** Line 1: "Скидка 10% и +3 бонуса за этот заказ" / Line 2 (small, gray): "Официант сразу увидит его" - **Nothing configured:** Single line: "Официант сразу увидит заказ" OR hide the block entirely The motivational block should use small text (text-sm), secondary color (text-slate-500 for line 2), and NOT compete visually with the item list, total, or CTA button. Read partner settings: `partner.loyalty_enabled`, `partner.loyalty_points_per_order` (or similar), `partner.discount_percentage` (or similar) to determine which variant to show. ### НЕ должно быть (анти-паттерны) - NO full loyalty section (expandable details, "+3", "за отзыв +10", etc.) in pre-checkout - NO "Бонусы за онлайн-заказ" line anywhere - NO word "онлайн" in any client-facing UI text - NO large/prominent loyalty UI before order submission - Do NOT remove loyalty logic from post-order screens (reward after submission should stay) ### Файл и локация File: `pages/PublicMenu/CartView.jsx` Look for: loyalty section rendering in the checkout/cart drawer (the section with "Лояльность", expandable bonus details, "Бонусы за онлайн-заказ"). Remove this entire section and replace with the motivational block described above. ### Проверка (мини тест-кейс) 1. Open cart drawer with items → see compact motivational text (1-2 lines) above CTA, NOT full loyalty section 2. If partner has bonuses configured → see "Начислим +X бонуса за этот заказ" 3. No word "онлайн" visible anywhere --- ## Fix 2 — #87b (P1) [MUST-FIX]: Redesign table code verification bottom sheet ### Сейчас (текущее поведение) The "Подтвердите стол" bottom sheet shows: - Title "Подтвердите стол" - Subtitle "Чтобы отправить заказ официанту" - Green text "По онлайн-заказу вы получите бонусы / скидку" - "Введите код стола" label - 4 input cells for code - A separate field showing "0000" below the cells (confusing duplicate) - Button "Подтвердить и отправить" - Link "Не тот стол? Изменить" ### Должно быть (ожидаемое поведение) Simplified bottom sheet (shown ONLY when table is NOT bound via QR): 1. **Title:** "Введите код стола" (replaces "Подтвердите стол") 2. **Helper text** (visible, NOT hidden behind tooltip): "Код указан на табличке на столе. Если не нашли — спросите у официанта." (text-sm, text-slate-500) 3. **4 empty input cells** (no pre-filled "0000", no separate duplicate field) 4. **Compact motivation line** near button: "Начислим +X бонуса" (text-sm, accent color text-[#B5543A]) — dynamic based on partner settings, same logic as Fix 1 5. **Button:** "Отправить" (single word, replaces "Подтвердить и отправить") 6. **Remove** "Не тот стол? Изменить" link 7. **Remove** "По онлайн-заказу вы получите бонусы / скидку" text 8. **Remove** the duplicate "0000" display field Input behavior requirements: - Auto-focus on first cell when BS opens - Numeric keyboard (inputMode="numeric") - Auto-advance to next cell after digit entry - Backspace returns to previous cell - Paste of 4 digits fills all cells - Submit button enabled ONLY after all 4 digits entered - Error message below input cells: "Неверный код. Проверьте цифры или спросите у официанта" (text-sm, text-red-500) ### НЕ должно быть (анти-паттерны) - NO "Подтвердите стол" as title - NO "По онлайн-заказу..." text - NO "0000" pre-filled or displayed as separate field - NO "Подтвердить и отправить" (too long) - NO "Не тот стол? Изменить" link - NO word "онлайн" anywhere ### Файл и локация File: `pages/PublicMenu/x.jsx` Look for: Bottom Sheet component for table verification / code entry. Contains "Подтвердите стол", code input cells, "0000" display, "Не тот стол?" link. ### Проверка (мини тест-кейс) 1. Click "Отправить официанту" without table bound → BS opens with "Введите код стола" title 2. Helper text visible immediately (no tooltip needed) 3. 4 empty cells, numeric keyboard appears 4. Enter wrong code → error message below cells 5. No "0000", no "Не тот стол?" link, no "онлайн" word --- ## Fix 3 — PM-150-01 (P2) [NICE-TO-HAVE]: Check if email validation in loyalty is still needed ### Сейчас (текущее поведение) PM-150-01 reported: no email validation in loyalty section — "abc" accepted. Since Fix 1 removes the loyalty section from pre-checkout, this bug may become irrelevant. ### Должно быть If any email input remains in CartView after removing the loyalty section — add proper validation (input type="email" or regex). If the email input was part of the removed loyalty section — this fix is automatically resolved by Fix 1. ### НЕ должно быть No unvalidated email inputs remaining in CartView. ### Файл и локация File: `pages/PublicMenu/CartView.jsx` — check if email input exists outside the loyalty section. ### Проверка After Fix 1: search CartView for any remaining email input. If none → PM-150-01 resolved. If exists → validate it. --- ## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано выше - Изменяй ТОЛЬКО код, описанный в Fix-секциях выше. - ВСЁ остальное (позиции элементов, цвета не описанные выше, layout, маршрутизация) — НЕ ТРОГАТЬ. - Если видишь «проблему» не из этой задачи — ПРОПУСТИ, не чини. - Locked UX decisions (см. `ux-concepts/UX_LOCKED_PublicMenu.md`) — ЗАПРЕЩЕНО менять. - Do NOT modify post-order loyalty/reward screens — only pre-checkout. ## Implementation Notes - TARGET FILES: `CartView.jsx`, `x.jsx` - CONTEXT FILES: `README.md`, `BUGS.md` - НЕ ломать: PM-063 (stepper −/+), PM-064 (BS trigger), PM-071 (BS z-index) - After all fixes: `git add pages/PublicMenu/CartView.jsx pages/PublicMenu/x.jsx && git commit -m "feat: checkout motivation text + BS redesign #87-KS1" && git push` === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/PublicMenu` within the scope lock you set. I’ll read only the PublicMenu page files and the two context docs, then write a concise findings report to the requested pipeline file and the repo-mandated review artifacts.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/CartView.jsx'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/x.jsx'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/BUGS.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 2.51s:
+
+ exited 124 in 2.94s:
+
+ exited 124 in 2.57s:
+
+ exited 124 in 4.00s:
+
+codex
+The files are larger than the first read timeout allowed for. I’m re-running the same four direct reads with a longer timeout, still staying inside `pages/PublicMenu` only.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/CartView.jsx'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/x.jsx'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/BUGS.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 16.35s:
+
+ exited 124 in 16.22s:
+
+ exited 124 in 17.05s:
+
+ exited 124 in 17.27s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "(Get-Content 'pages/PublicMenu/x.jsx' | Measure-Object -Line).Lines" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "(Get-Content 'pages/PublicMenu/BUGS.md' | Measure-Object -Line).Lines" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "(Get-Content 'pages/PublicMenu/README.md' | Measure-Object -Line).Lines" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "(Get-Content 'pages/PublicMenu/CartView.jsx' | Measure-Object -Line).Lines" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 10.94s:
+
+ exited 124 in 10.84s:
+
+ exited 124 in 10.99s:
+
+ exited 124 in 11.19s:
+
+codex
+I’m switching to chunked reads with a much larger timeout. The direct full-file reads are timing out at the tool boundary, so I’m pulling the files in smaller sections from the same four paths instead of broad repo search.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/README.md' | Select-Object -First 250" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PublicMenu/BUGS.md' | Select-Object -First 250" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 6.17s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 6.22s:
+---
+version: "29.0"
+updated: "2026-03-21"
+session: 153
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*18 active bugs remaining (0x P0, 8x P1, 7x P2, 2x P3, 1x suggestion).*
+
+### BUG-PM-056: Drawer layout not visit-state-driven (P1 â€” Batch 2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P1
+- **ÐšÐ¾Ð³Ð´Ð°:** S153 (consensus chain publicmenu-260321-093745)
+codex
+Context docs are loaded. I’m drilling into the exact checkout and table-confirmation sections in `CartView.jsx` and `x.jsx` now, so the report stays limited to the current batch instead of turning into a whole-file audit.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'loyal|онлайн|online|email|bonus|discount|Отправить официанту|send to waiter|Лояльность' -Encoding UTF8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'Подтвердите стол|Введите код стола|0000|Не тот стол|онлайн|online|codeVerification|table code|Отправить|confirm' -Encoding UTF8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 7.67s:
+
+pages\PublicMenu\CartView.jsx:35:  customerEmail,
+pages\PublicMenu\CartView.jsx:36:  setCustomerEmail,
+pages\PublicMenu\CartView.jsx:37:  loyaltyLoading,
+pages\PublicMenu\CartView.jsx:38:  loyaltyAccount,
+pages\PublicMenu\CartView.jsx:45:  discountAmount,
+pages\PublicMenu\CartView.jsx:46:  pointsDiscountAmount,
+pages\PublicMenu\CartView.jsx:81:  showLoyaltySection,
+pages\PublicMenu\CartView.jsx:91:  const [loyaltyExpanded, setLoyaltyExpanded] = React.useState(false);
+pages\PublicMenu\CartView.jsx:93:  const [showRewardEmailForm, setShowRewardEmailForm] = React.useState(false);
+pages\PublicMenu\CartView.jsx:94:  const [rewardEmail, setRewardEmail] = React.useState('');
+pages\PublicMenu\CartView.jsx:95:  const [rewardEmailSubmitting, setRewardEmailSubmitting] = React.useState(false);
+pages\PublicMenu\CartView.jsx:98:  const [infoModal, setInfoModal] = React.useState(null); // 'online' | 'tableCode' | 
+null
+pages\PublicMenu\CartView.jsx:109:  // Cleanup reward-email timer on unmount (PM-S140-03)
+pages\PublicMenu\CartView.jsx:322:  // Cart grand total (after discounts)
+pages\PublicMenu\CartView.jsx:325:    (Number(cartTotalAmount) || 0) - (Number(discountAmount) || 0) - 
+(Number(pointsDiscountAmount) || 0)
+pages\PublicMenu\CartView.jsx:391:  const reviewRewardPoints = Number(partner?.loyalty_review_points || 0);
+pages\PublicMenu\CartView.jsx:406:    loyaltyAccount?.id || loyaltyAccount?._id || loyaltyAccount?.email || 
+ succeeded in 7.56s:
+
+pages\PublicMenu\x.jsx:9:// PATCHED: 2026-03-03 - GAP-01 - Order Confirmation Screen
+pages\PublicMenu\x.jsx:10:// FIXED: 2026-03-03 - GAP-01 fix - Confirmation as full-screen overlay (z-60)
+pages\PublicMenu\x.jsx:368:  "hall.verify.online_benefits": "Бонусы и скидки за онлайн-заказы",
+pages\PublicMenu\x.jsx:406:  "error.send.title": "Не удалось отправить",
+pages\PublicMenu\x.jsx:407:  "error.send.subtitle": "Попробуйте отправить ещё раз",
+pages\PublicMenu\x.jsx:409:  "cart.send_to_waiter": "Отправить официанту",
+pages\PublicMenu\x.jsx:410:  "cart.send_order": "Отправить заказ",
+pages\PublicMenu\x.jsx:428:  // Confirmation screen
+pages\PublicMenu\x.jsx:429:  "confirmation.title": "Заказ отправлен!",
+pages\PublicMenu\x.jsx:430:  "confirmation.your_order": "Ваш заказ",
+pages\PublicMenu\x.jsx:431:  "confirmation.total": "Итого",
+pages\PublicMenu\x.jsx:432:  "confirmation.guest_label": "Гость",
+pages\PublicMenu\x.jsx:433:  "confirmation.client_name": "Имя",
+pages\PublicMenu\x.jsx:434:  "confirmation.back_to_menu": "Вернуться в меню",
+pages\PublicMenu\x.jsx:435:  "confirmation.my_orders": "Мои заказы",
+pages\PublicMenu\x.jsx:436:  "confirmation.track_order": "Отследить заказ",
+pages\PublicMenu\x.jsx:452:  "cart.enter_table_code_hint": "Введите код стола чтобы отправить заказ",
+pages\PublicMenu\x.jsx:467:  "cart.verify.bonus_label": "Бонусы за онлайн-заказ",
+pages\PublicMenu\x.jsx:468:  "cart.verify.discount_label": "Скидка за онлайн-заказ",
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=500; $count=70; $i=$start; Get-Content '"'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ("'$start-1) -First $count | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=3388; $count=120; $i=$start; Get-Content '"'pages/PublicMenu/x.jsx' | Select-Object -Skip ("'$start-1) -First $count | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=1510; $count=120; $i=$start; Get-Content '"'pages/PublicMenu/x.jsx' | Select-Object -Skip ("'$start-1) -First $count | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=880; $count=180; $i=$start; Get-Content '"'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ("'$start-1) -First $count | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.90s:
+ 1510:   // Hall table verification hook
+ 1511:   const {
+ 1512:     tableCodeParam,
+ 1513:     resolvedTable,
+ 1514:     isHallMode,
+ 1515:     tableCodeInput,
+ 1516:     setTableCodeInput,
+ 1517:     isVerifyingCode,
+ 1518:     verifiedByCode,
+ 1519:     verifiedTableId,
+ 1520:     verifiedTable,
+ 1521:     codeVerificationError,
+ 1522:     verifyTableCode,
+ 1523:   } = useHallTable({ partner, location, orderMode, t });
+ 1524: 
+ 1525:   // Helper for saving table selection (used by help requests and other features)
+ 1526:   const saveTableSelection = (partnerId, tableId) => {
+ 1527:     if (!partnerId || !tableId) return;
+ 1528:     try {
+ 1529:       const key = `menuApp_table_${partnerId}`;
+ succeeded in 11.83s:
+  500:       {shouldShowReviewRewardHint && (
+  501:         <div className="mb-4 text-xs text-amber-700 bg-amber-50 rounded-md px-3 py-2 flex items-center gap-2">
+  502:           <span>â­</span>
+  503:           <span>{tr('loyalty.review_reward_hint', 'Ð—Ð° Ð¾Ñ‚Ð·Ñ‹Ð²')} +{reviewRewardPoints} {tr('loyalty.points_short', 'Ð±Ð¾Ð½ÑƒÑÐ¾Ð²')}</span>
+  504:         </div>
+  505:       )}
+  506: 
+  507:       {/* Review reward nudge - Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°ÐµÐ¼ Ð¿Ð¾ÑÐ»Ðµ Ð¿ÐµÑ€Ð²Ð¾Ð¹ Ð¾Ñ†ÐµÐ½ÐºÐ¸ Ñ Ñ„Ð¾Ñ€Ð¼Ð¾Ð¹ email */}
+  508:       {shouldShowReviewRewardNudge && (
+  509:         <div className="mb-4 text-sm bg-green-50 border border-green-200 rounded-md p-3">
+  510:           {!showRewardEmailForm ? (
+  511:             <div className="flex items-center justify-between">
+  512:               <span className="text-slate-700">
+  513:                 âœ… {tr('loyalty.thanks_for_rating', 'Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° Ð¾Ñ†ÐµÐ½ÐºÑƒ!')}
+  514:               </span>
+  515:               <button
+  516:                 type="button"
+  517:                 className="hover:underline font-medium text-sm"
+  518:                 style={{color: primaryColor}}
+  519:                 onClick={() => setShowRewardEmailForm(true)}
+ succeeded in 12.04s:
+ 3388:         </DrawerContent>
+ 3389:       </Drawer>
+ 3390: 
+ 3391:       {/* Just-in-time Table Confirmation Bottom Sheet (PM-064) */}
+ 3392:       {/* PM-071: z-[60] on DrawerContent ensures BS renders above cart Drawer (z-50) */}
+ 3393:       <Drawer
+ 3394:         open={showTableConfirmSheet}
+ 3395:         onOpenChange={(open) => {
+ 3396:           if (!open) {
+ 3397:             pendingSubmitRef.current = false;
+ 3398:             setShowTableConfirmSheet(false);
+ 3399:             if (!isTableVerified) {
+ 3400:               toast(tr('cart.confirm_table.dismissed', 'Ð”Ð»Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð·Ð°ÐºÐ°Ð·Ð° Ð½ÑƒÐ¶Ð½Ð¾ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ ÑÑ‚Ð¾Ð»'), { id: 'table-dismiss' });
+ 3401:             }
+ 3402:           }
+ 3403:         }}
+ 3404:       >
+ 3405:         <DrawerContent className="max-h-[85dvh] rounded-t-3xl z-[60]">
+ 3406:           <DrawerHeader className="text-center pb-2">
+ 3407:             <div className="mx-auto w-12 h-1.5 bg-slate-300 rounded-full mb-4" />
+ succeeded in 12.34s:
+  880:                       checked={splitType === 'all'}
+  881:                       onChange={() => setSplitType('all')}
+  882:                       className="w-4 h-4" style={{accentColor: primaryColor}}
+  883:                     />
+  884:                     <span className="text-sm text-slate-700">{tr('cart.for_all', 'ÐÐ° Ð²ÑÐµÑ…')} (Ã·{guestCount})</span>
+  885:                   </label>
+  886:                   {/* P2 placeholder - disabled until data model supports custom split */}
+  887:                   <label className="flex items-center gap-2 opacity-50 cursor-not-allowed">
+  888:                     <input
+  889:                       type="radio"
+  890:                       disabled
+  891:                       className="w-4 h-4"
+  892:                     />
+  893:                     <span className="text-sm text-slate-400">
+  894:                       {tr('cart.split_pick_guests_soon', 'Ð’Ñ‹Ð±Ñ€Ð°Ñ‚ÑŒ Ð³Ð¾ÑÑ‚ÐµÐ¹ (ÑÐºÐ¾Ñ€Ð¾)')}
+  895:                     </span>
+  896:                   </label>
+  897:                 </div>
+  898:               )}
+  899:             </div>
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=1196; $count=220; $i=$start; Get-Content '"'pages/PublicMenu/x.jsx' | Select-Object -Skip ("'$start-1) -First $count | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'function useHallTable|const useHallTable|onKeyDown|onPaste|setTableCodeInput|verifyTableCode|codeVerificationError|codeLockedUntil|codeAttempts' -Encoding UTF8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 6.07s:
+ 1196:    TABLE CODE VERIFICATION HELPERS (simplified)
+ 1197:    P0-3: Only use Table.code for verification
+ 1198:    ============================================================ */
+ 1199: 
+ 1200: // Extract digits only from any value
+ 1201: const digits = (v) => String(v || "").replace(/\D/g, "");
+ 1202: 
+ 1203: // Normalize link fields from Base44 (CODE-026)
+ 1204: function getLinkId(field) {
+ 1205:   if (field == null) return null;
+ 1206:   if (typeof field === "string" || typeof field === "number") return String(field);
+ 1207:   if (typeof field === "object") {
+ 1208:     const v = field.id ?? field._id ?? field.value ?? null;
+ 1209:     if (typeof v === "string" || typeof v === "number") return String(v);
+ 1210:     if (v && typeof v === "object") {
+ 1211:       const vv = v.id ?? v._id ?? null;
+ 1212:       if (typeof vv === "string" || typeof vv === "number") return String(vv);
+ 1213:     }
+ 1214:   }
+ 1215:   return null;
+ succeeded in 6.04s:
+
+pages\PublicMenu\x.jsx:1516:    setTableCodeInput,
+pages\PublicMenu\x.jsx:1521:    codeVerificationError,
+pages\PublicMenu\x.jsx:1522:    verifyTableCode,
+pages\PublicMenu\x.jsx:3123:          setTableCodeInput={setTableCodeInput}
+pages\PublicMenu\x.jsx:3125:          codeVerificationError={codeVerificationError}
+pages\PublicMenu\x.jsx:3380:              setTableCodeInput={setTableCodeInput}
+pages\PublicMenu\x.jsx:3382:              verifyTableCode={verifyTableCode}
+pages\PublicMenu\x.jsx:3383:              codeVerificationError={codeVerificationError}
+pages\PublicMenu\x.jsx:3449:                  if (typeof setTableCodeInput === 'function') setTableCodeInput(next);
+pages\PublicMenu\x.jsx:3461:              {codeVerificationError && !isVerifyingCode && (
+pages\PublicMenu\x.jsx:3462:                <p className="text-sm text-red-600 text-center">{codeVerificationError}</p>
+pages\PublicMenu\x.jsx:3472:                if (code.length === tableCodeLength && typeof verifyTableCode === 
+'function') {
+pages\PublicMenu\x.jsx:3473:                  verifyTableCode(code);
+pages\PublicMenu\x.jsx:3486:                setTableCodeInput('');
+
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=1; $count=180; $i=$start; Get-Content '"'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ("'$start-1) -First $count | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'placeholder=|aria-label=|inputMode=|onKeyDown=|online_bonus_label|showLoyaltySection|showRewardEmailForm|customerEmail|rewardEmail' -Encoding UTF8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 5.90s:
+    1: import React from "react";
+    2: import { XIcon, Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, X, Minus, Plus } from "lucide-react";
+    3: import { Card, CardContent } from "@/components/ui/card";
+    4: import { Button } from "@/components/ui/button";
+    5: import { Input } from "@/components/ui/input";
+    6: import Rating from "@/components/Rating";
+    7: 
+    8: function lightenColor(hex, amount) {
+    9:   const num = parseInt(hex.replace('#', ''), 16);
+   10:   const r = Math.min(255, (num >> 16) + Math.round((255 - (num >> 16)) * amount));
+   11:   const g = Math.min(255, ((num >> 8) & 0x00FF) + Math.round((255 - ((num >> 8) & 0x00FF)) * amount));
+   12:   const b = Math.min(255, (num & 0x0000FF) + Math.round((255 - (num & 0x0000FF)) * amount));
+   13:   return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
+   14: }
+   15: 
+   16: export default function CartView({
+   17:   partner,
+   18:   currentTable,
+   19:   currentGuest,
+   20:   t,
+ succeeded in 5.93s:
+
+pages\PublicMenu\CartView.jsx:35:  customerEmail,
+pages\PublicMenu\CartView.jsx:36:  setCustomerEmail,
+pages\PublicMenu\CartView.jsx:81:  showLoyaltySection,
+pages\PublicMenu\CartView.jsx:93:  const [showRewardEmailForm, setShowRewardEmailForm] = React.useState(false);
+pages\PublicMenu\CartView.jsx:94:  const [rewardEmail, setRewardEmail] = React.useState('');
+pages\PublicMenu\CartView.jsx:95:  const [rewardEmailSubmitting, setRewardEmailSubmitting] = React.useState(false);
+pages\PublicMenu\CartView.jsx:406:    loyaltyAccount?.id || loyaltyAccount?._id || loyaltyAccount?.email || 
+(customerEmail && String(customerEmail).trim())
+pages\PublicMenu\CartView.jsx:448:              aria-label={tr('help.call_waiter', 'Позвать официанта')}
+pages\PublicMenu\CartView.jsx:465:                    placeholder={tr('guest.name_placeholder', 'Имя')}
+pages\PublicMenu\CartView.jsx:468:                    onKeyDown={(e) => {
+pages\PublicMenu\CartView.jsx:473:                  <button onClick={handleUpdateGuestName} 
+disabled={!guestNameInput.trim()} className="text-green-600 min-w-[44px] min-h-[44px] flex items-center 
+justify-center" aria-label={tr('common.save', 'Сохранить')}>✓</button>
+pages\PublicMenu\CartView.jsx:474:                  <button onClick={() => { setIsEditingName(false); 
+setGuestNameInput(''); }} className="text-slate-400 min-w-[44px] min-h-[44px] flex items-center justify-center" 
+aria-label={tr('common.cancel', 'Отмена')}>✕</button>
+pages\PublicMenu\CartView.jsx:510:          {!showRewardEmailForm ? (
+pages\PublicMenu\CartView.jsx:519:                onClick={() => setShowRewardEmailForm(true)}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=180; $count=140; $i=$start; Get-Content '"'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ("'$start-1) -First $count | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'isCodeLocked|codeSecondsLeft|tableCodeInput|verifyTableCode|codeVerificationError|infoModal|tableCodeLength|hallGuestCodeEnabled|guestCode' -Encoding UTF8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 6.49s:
+  180:         if (codeCooldownSeconds > 0) {
+  181:           setCodeLockedUntil(Date.now() + codeCooldownSeconds * 1000);
+  182:         }
+  183:         return maxCodeAttempts;
+  184:       }
+  185:       return next;
+  186:     });
+  187:   }, [codeVerificationError, isVerifyingCode, maxCodeAttempts, codeCooldownSeconds]);
+  188: 
+  189:   // Auto-verify when code is fully entered (debounced)
+  190:   React.useEffect(() => {
+  191:     if (typeof verifyTableCode !== "function") return;
+  192:     if (isTableVerified === true) return;
+  193:     if (isCodeLocked) return;
+  194: 
+  195:     const safe = String(tableCodeInput || "").replace(/\D/g, "").slice(0, tableCodeLength);
+  196:     if (safe.length !== tableCodeLength) return;
+  197:     if (safe === String(lastSentVerifyCodeRef.current || "")) return;
+  198: 
+  199:     const id = setTimeout(() => {
+ succeeded in 6.93s:
+
+pages\PublicMenu\CartView.jsx:74:  tableCodeInput,
+pages\PublicMenu\CartView.jsx:75:  setTableCodeInput,
+pages\PublicMenu\CartView.jsx:77:  verifyTableCode,
+pages\PublicMenu\CartView.jsx:78:  codeVerificationError,
+pages\PublicMenu\CartView.jsx:79:  hallGuestCodeEnabled,
+pages\PublicMenu\CartView.jsx:80:  guestCode,
+pages\PublicMenu\CartView.jsx:98:  const [infoModal, setInfoModal] = React.useState(null); // 'online' | 'tableCode' | 
+null
+pages\PublicMenu\CartView.jsx:113:  const tableCodeLength = React.useMemo(() => {
+pages\PublicMenu\CartView.jsx:131:  const isCodeLocked = Boolean(codeLockedUntil && nowTs < codeLockedUntil);
+pages\PublicMenu\CartView.jsx:132:  const codeSecondsLeft = isCodeLocked ? Math.max(0, Math.ceil((codeLockedUntil - 
+nowTs) / 1000)) : 0;
+pages\PublicMenu\CartView.jsx:136:    if (!isCodeLocked) return;
+pages\PublicMenu\CartView.jsx:140:  }, [isCodeLocked]);
+pages\PublicMenu\CartView.jsx:165:    if (!codeVerificationError) return;
+pages\PublicMenu\CartView.jsx:187:  }, [codeVerificationError, isVerifyingCode, maxCodeAttempts, codeCooldownSeconds]);
+pages\PublicMenu\CartView.jsx:191:    if (typeof verifyTableCode !== "function") return;
+pages\PublicMenu\CartView.jsx:193:    if (isCodeLocked) return;
+pages\PublicMenu\CartView.jsx:195:    const safe = String(tableCodeInput || "").replace(/\D/g, "").slice(0, 
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=3098; $count=45; $i=$start; Get-Content '"'pages/PublicMenu/x.jsx' | Select-Object -Skip ("'$start-1) -First $count | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=3358; $count=35; $i=$start; Get-Content '"'pages/PublicMenu/x.jsx' | Select-Object -Skip ("'$start-1) -First $count | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 7.83s:
+ 3098:   // ============================================================
+ 3099:   const renderHallCheckoutContent = () => {
+ 3100:     // Table already verified - nothing special needed here
+ 3101:     // (table info shown in menu header, comment field below)
+ 3102:     if (isTableVerified && currentTableId) {
+ 3103:       return null;
+ 3104:     }
+ 3105: 
+ 3106:     // Table NOT verified - show verification options (NO dropdown per P0-7)
+ 3107:     const showHallOnlineBenefitsHint = !!(partner?.discount_enabled || partner?.loyalty_enabled);
+ 3108: 
+ 3109:     return (
+ 3110:       <div className="space-y-3">
+ 3111:         <div className="text-sm text-slate-700 text-center">
+ 3112:           {t('hall.verify.title')}
+ 3113:         </div>
+ 3114:         <div className="text-xs text-slate-500 text-center">
+ 3115:           {t('hall.verify.subtitle')}
+ 3116:         </div>
+ 3117:         <div className="text-xs text-slate-500 text-center">
+ succeeded in 7.79s:
+ 3358:               sessionItems={sessionItems}
+ 3359:               sessionOrders={sessionOrders}
+ 3360:               myBill={myBill}
+ 3361:               reviewableItems={reviewableItems}
+ 3362:               openReviewDialog={openReviewDialog}
+ 3363:               handleRequestBill={handleRequestBill}
+ 3364:               billRequested={billRequested}
+ 3365:               billCooldown={billCooldown}
+ 3366:               otherGuestsBills={otherGuestsBills}
+ 3367:               othersTotal={othersTotal}
+ 3368:               setOtherGuestsExpanded={setOtherGuestsExpanded}
+ 3369:               otherGuestsExpanded={otherGuestsExpanded}
+ 3370:               getLinkId={getLinkId}
+ 3371:               otherGuestsReviewableItems={otherGuestsReviewableItems}
+ 3372:               tableTotal={tableTotal}
+ 3373:               formatOrderTime={formatOrderTime}
+ 3374:               handleRateDish={handleRateDish}
+ 3375:               ratingSavingByItemId={ratingSavingByItemId}
+ 3376:               onClose={() => setDrawerMode(null)}
+ 3377:               onCallWaiter={handleOpenHelpModal}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'function HallVerifyBlock|const HallVerifyBlock' -Encoding UTF8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'hall.verify|infoModal|codeSecondsLeft|codeAttempts|codeLockedUntil|verifyTableCode\\(' -Encoding UTF8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 5.82s:
+
+ succeeded in 5.94s:
+
+pages\PublicMenu\CartView.jsx:98:  const [infoModal, setInfoModal] = React.useState(null); // 'online' | 'tableCode' | 
+null
+pages\PublicMenu\CartView.jsx:99:  const [codeAttempts, setCodeAttempts] = React.useState(0);
+pages\PublicMenu\CartView.jsx:100:  const [codeLockedUntil, setCodeLockedUntil] = React.useState(null); // timestamp ms
+pages\PublicMenu\CartView.jsx:119:  const maxCodeAttempts = React.useMemo(() => {
+pages\PublicMenu\CartView.jsx:131:  const isCodeLocked = Boolean(codeLockedUntil && nowTs < codeLockedUntil);
+pages\PublicMenu\CartView.jsx:132:  const codeSecondsLeft = isCodeLocked ? Math.max(0, Math.ceil((codeLockedUntil - 
+nowTs) / 1000)) : 0;
+pages\PublicMenu\CartView.jsx:144:    if (!codeLockedUntil) return;
+pages\PublicMenu\CartView.jsx:145:    if (nowTs < codeLockedUntil) return;
+pages\PublicMenu\CartView.jsx:146:    setCodeLockedUntil(null);
+pages\PublicMenu\CartView.jsx:147:    setCodeAttempts(0);
+pages\PublicMenu\CartView.jsx:150:  }, [nowTs, codeLockedUntil]);
+pages\PublicMenu\CartView.jsx:155:      setCodeAttempts(0);
+pages\PublicMenu\CartView.jsx:156:      setCodeLockedUntil(null);
+pages\PublicMenu\CartView.jsx:177:    setCodeAttempts((prev) => {
+pages\PublicMenu\CartView.jsx:179:      if (maxCodeAttempts > 0 && next >= maxCodeAttempts) {
+pages\PublicMenu\CartView.jsx:181:          setCodeLockedUntil(Date.now() + codeCooldownSeconds * 1000);
+pages\PublicMenu\CartView.jsx:183:        return maxCodeAttempts;
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'renderHallCheckoutContent|hallContent|HallVerifyBlock|showTableConfirmSheet' -Encoding UTF8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'renderHallCheckoutContent|hallContent|checkoutExtra|HallVerifyBlock' -Encoding UTF8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 6.86s:
+
+ succeeded in 6.83s:
+
+pages\PublicMenu\x.jsx:106:import HallVerifyBlock from "@/components/publicMenu/refactor/HallVerifyBlock";
+pages\PublicMenu\x.jsx:3099:  const renderHallCheckoutContent = () => {
+pages\PublicMenu\x.jsx:3121:        <HallVerifyBlock
+pages\PublicMenu\x.jsx:3255:          renderHallCheckoutContent={renderHallCheckoutContent}
+
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=3238; $count=25; $i=$start; Get-Content '"'pages/PublicMenu/x.jsx' | Select-Object -Skip ("'$start-1) -First $count | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'renderHallCheckoutContent' -Encoding UTF8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.35s:
+ 3238:           customerEmail={customerEmail}
+ 3239:           setCustomerEmail={setCustomerEmail}
+ 3240:           loyaltyLoading={loyaltyLoading}
+ 3241:           loyaltyAccount={loyaltyAccount}
+ 3242:           partner={partner}
+ 3243:           earnedPoints={earnedPoints}
+ 3244:           redeemedPoints={redeemedPoints}
+ 3245:           setRedeemedPoints={setRedeemedPoints}
+ 3246:           maxRedeemPoints={maxRedeemPoints}
+ 3247:           discountEnabled={discountEnabled}
+ 3248:           discountAmount={discountAmount}
+ 3249:           pointsDiscountAmount={pointsDiscountAmount}
+ 3250:           finalTotal={finalTotal}
+ 3251:           loyaltyEnabled={loyaltyEnabled}
+ 3252:           activeCurrency={activeCurrency}
+ 3253:           defaultCurrency={defaultCurrency}
+ 3254:           orderMode={orderMode}
+ 3255:           renderHallCheckoutContent={renderHallCheckoutContent}
+ 3256:           clientName={clientName}
+ 3257:           setClientName={setClientName}
+ succeeded in 10.82s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=350; $count=180; $i=$start; Get-Content '"'pages/PublicMenu/x.jsx' | Select-Object -Skip ("'$start-1) -First $count | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'discount_percent|discount_percentage|loyalty_points_per_order|loyalty_review_points|loyalty_enabled|discount_enabled|loyaltyEnabled|discountEnabled' -Encoding UTF8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 9.61s:
+  350:   "order_status.your_order": "Ð’Ð°Ñˆ Ð·Ð°ÐºÐ°Ð·",
+  351:   "order_status.total": "Ð˜Ñ‚Ð¾Ð³Ð¾",
+  352:   "order_status.discount": "Ð¡ÐºÐ¸Ð´ÐºÐ°",
+  353:   "order_status.questions": "Ð•ÑÑ‚ÑŒ Ð²Ð¾Ð¿Ñ€Ð¾ÑÑ‹?",
+  354:   "order_status.order_cancelled_info": "Ð—Ð°ÐºÐ°Ð· Ð¾Ñ‚Ð¼ÐµÐ½Ñ‘Ð½",
+  355:   "order_status.order_complete_info": "Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾! Ð’Ð°Ñˆ Ð·Ð°ÐºÐ°Ð· Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½",
+  356:   "order_status.refresh": "ÐžÐ±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ",
+  357:   // Mode labels
+  358:   "mode.hall": "Ð’ Ð·Ð°Ð»Ðµ",
+  359:   "mode.pickup": "Ð¡ ÑÐ¾Ð±Ð¾Ð¹",
+  360:   "mode.delivery": "Ð”Ð¾ÑÑ‚Ð°Ð²ÐºÐ°",
+  361:   "mode.hall.desc": "Ð—Ð°ÐºÐ°Ð· Ð² Ð·Ð°Ð»Ðµ",
+  362:   "mode.pickup.desc": "Ð—Ð°Ð±ÐµÑ€Ñƒ Ñ ÑÐ¾Ð±Ð¾Ð¹",
+  363:   "mode.delivery.desc": "Ð”Ð¾ÑÑ‚Ð°Ð²ÐºÐ° Ð¿Ð¾ Ð°Ð´Ñ€ÐµÑÑƒ",
+  364:   // Hall verification
+  365:   "hall.verify.title": "Ð§Ñ‚Ð¾Ð±Ñ‹ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚ Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ð» Ð·Ð°ÐºÐ°Ð· ÑÑ€Ð°Ð·Ñƒ",
+  366:   "hall.verify.subtitle": "Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÐºÐ¾Ð´ ÑÐ¾ ÑÑ‚Ð¾Ð»Ð° Ð¸Ð»Ð¸ Ð½Ð°Ð·Ð¾Ð²Ð¸Ñ‚Ðµ ÐµÐ³Ð¾ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ",
+  367:   "hall.verify.benefit": "ÐŸÐ¾ÑÐ»Ðµ ÑÑ‚Ð¾Ð³Ð¾ Ð·Ð°ÐºÐ°Ð·Ñ‹ Ð±ÑƒÐ´ÑƒÑ‚ Ð¿Ñ€Ð¸Ñ…Ð¾Ð´Ð¸Ñ‚ÑŒ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ Ð½Ð°Ð¿Ñ€ÑÐ¼ÑƒÑŽ",
+  368:   "hall.verify.online_benefits": "Ð‘Ð¾Ð½ÑƒÑÑ‹ Ð¸ ÑÐºÐ¸Ð´ÐºÐ¸ Ð·Ð° Ð¾Ð½Ð»Ð°Ð¹Ð½-Ð·Ð°ÐºÐ°Ð·Ñ‹",
+  369:   // Errors
+ succeeded in 9.27s:
+
+pages\PublicMenu\x.jsx:1966:  const loyaltyEnabled = partner?.loyalty_enabled === true;
+pages\PublicMenu\x.jsx:1967:  const discountEnabled = partner?.discount_enabled === true;
+pages\PublicMenu\x.jsx:1968:  const showLoyaltySection = (loyaltyEnabled || discountEnabled) && cart.length > 0;
+pages\PublicMenu\x.jsx:2040:  const showLoginPromptAfterRating = loyaltyEnabled && !loyaltyAccount && showRatingBlock 
+&& hasAnyDraftRating;
+pages\PublicMenu\x.jsx:2435:        } else if (loyaltyEnabled) {
+pages\PublicMenu\x.jsx:2522:        if (loyaltyAccountToUse && loyaltyEnabled && earnedPoints > 0) {
+pages\PublicMenu\x.jsx:2819:          } else if (loyaltyEnabled) {
+pages\PublicMenu\x.jsx:2899:          if (loyaltyAccountToUse && loyaltyEnabled && earnedPoints > 0) {
+pages\PublicMenu\x.jsx:3107:    const showHallOnlineBenefitsHint = !!(partner?.discount_enabled || 
+partner?.loyalty_enabled);
+pages\PublicMenu\x.jsx:3247:          discountEnabled={discountEnabled}
+pages\PublicMenu\x.jsx:3251:          loyaltyEnabled={loyaltyEnabled}
+pages\PublicMenu\x.jsx:3415:              {loyaltyEnabled
+
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=1948; $count=40; $i=$start; Get-Content '"'pages/PublicMenu/x.jsx' | Select-Object -Skip ("'$start-1) -First $count | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'earnedPoints|discountAmount|finalTotal|maxRedeemPoints|discountPercent|points_per_order|discount_percent|discount_percentage' -Encoding UTF8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 7.32s:
+ 1948: 
+ 1949:   // Loyalty hook
+ 1950:   const {
+ 1951:     customerEmail,
+ 1952:     setCustomerEmail,
+ 1953:     loyaltyAccount,
+ 1954:     setLoyaltyAccount,
+ 1955:     loyaltyLoading,
+ 1956:     redeemedPoints,
+ 1957:     setRedeemedPoints,
+ 1958:     discountAmount,
+ 1959:     pointsDiscountAmount,
+ 1960:     finalTotal,
+ 1961:     earnedPoints,
+ 1962:     maxRedeemPoints,
+ 1963:   } = useLoyalty({ partner, cartTotalAmount });
+ 1964: 
+ 1965:   // Loyalty visibility flags
+ 1966:   const loyaltyEnabled = partner?.loyalty_enabled === true;
+ 1967:   const discountEnabled = partner?.discount_enabled === true;
+ succeeded in 7.28s:
+
+pages\PublicMenu\x.jsx:1958:    discountAmount,
+pages\PublicMenu\x.jsx:1959:    pointsDiscountAmount,
+pages\PublicMenu\x.jsx:1960:    finalTotal,
+pages\PublicMenu\x.jsx:1961:    earnedPoints,
+pages\PublicMenu\x.jsx:1962:    maxRedeemPoints,
+pages\PublicMenu\x.jsx:2468:        total_amount: finalTotal,
+pages\PublicMenu\x.jsx:2479:        discount_amount: discountAmount + pointsDiscountAmount,
+pages\PublicMenu\x.jsx:2522:        if (loyaltyAccountToUse && loyaltyEnabled && earnedPoints > 0) {
+pages\PublicMenu\x.jsx:2529:            amount: earnedPoints,
+pages\PublicMenu\x.jsx:2535:          const newBalance = (loyaltyAccountToUse.balance - redeemedPoints) + earnedPoints;
+pages\PublicMenu\x.jsx:2538:            total_earned: (loyaltyAccountToUse.total_earned || 0) + earnedPoints,
+pages\PublicMenu\x.jsx:2544:            points_earned: earnedPoints
+pages\PublicMenu\x.jsx:2588:      // FIX P1: Use finalTotal (post-discount) instead of raw cart.reduce
+pages\PublicMenu\x.jsx:2590:      const confirmedTotal = finalTotal;
+pages\PublicMenu\x.jsx:2851:          total_amount: finalTotal,
+pages\PublicMenu\x.jsx:2860:          discount_amount: discountAmount + pointsDiscountAmount,
+pages\PublicMenu\x.jsx:2899:          if (loyaltyAccountToUse && loyaltyEnabled && earnedPoints > 0) {
+pages\PublicMenu\x.jsx:2906:              amount: earnedPoints,
+pages\PublicMenu\x.jsx:2912:            const newBalance = (loyaltyAccountToUse.balance - redeemedPoints) + 
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=316; $count=30; $i=$start; Get-Content '"'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ("'$start-1) -First $count | ForEach-Object { '"'{0,5}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'finalTotal|grandTotal|discountAmount|pointsDiscountAmount|cartTotalAmount' -Encoding UTF8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 9.04s:
+
+pages\PublicMenu\CartView.jsx:44:  cartTotalAmount,
+pages\PublicMenu\CartView.jsx:45:  discountAmount,
+pages\PublicMenu\CartView.jsx:46:  pointsDiscountAmount,
+pages\PublicMenu\CartView.jsx:323:  const cartGrandTotal = Math.max(
+pages\PublicMenu\CartView.jsx:325:    (Number(cartTotalAmount) || 0) - (Number(discountAmount) || 0) - 
+(Number(pointsDiscountAmount) || 0)
+pages\PublicMenu\CartView.jsx:1042:                <span className="text-lg font-bold 
+text-slate-900">{formatPrice(Number(cartTotalAmount) || 0)}</span>
+
+
+ succeeded in 9.52s:
+  316:     if (rawTableLabel.trim().toLowerCase().startsWith(tablePrefix.trim().toLowerCase())) {
+  317:       return rawTableLabel;
+  318:     }
+  319:     return `${tablePrefix} ${rawTableLabel}`;
+  320:   }, [rawTableLabel, tablePrefix]);
+  321: 
+  322:   // Cart grand total (after discounts)
+  323:   const cartGrandTotal = Math.max(
+  324:     0,
+  325:     (Number(cartTotalAmount) || 0) - (Number(discountAmount) || 0) - (Number(pointsDiscountAmount) || 0)
+  326:   );
+  327: 
+  328:   // ===== Guest count (stable, from orders OR guests) =====
+  329:   const guestCountFromOrders = React.useMemo(() => {
+  330:     try {
+  331:       const ids = new Set(
+  332:         (sessionOrders || [])
+  333:           .map(o => (getLinkId ? getLinkId(o.guest) : o.guest))
+  334:           .filter(Boolean)
+  335:           .map(x => String(x))
+codex
+I have the specific checkout/BS line ranges now. I’m turning that into a short findings set with only concrete, file-backed issues and then writing the report plus the required review artifacts.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'showLoyaltySection=' -Encoding UTF8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'cartGrandTotal|formatPrice\\(Number\\(cartTotalAmount\\)' -Encoding UTF8" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.06s:
+
+pages\PublicMenu\CartView.jsx:323:  const cartGrandTotal = Math.max(
+pages\PublicMenu\CartView.jsx:1042:                <span className="text-lg font-bold 
+text-slate-900">{formatPrice(Number(cartTotalAmount) || 0)}</span>
+
+
+ succeeded in 2.19s:
+
+pages\PublicMenu\x.jsx:3237:          showLoyaltySection={showLoyaltySection}
+pages\PublicMenu\x.jsx:3334:              showLoyaltySection={showLoyaltySection}
+
+
+codex
+I’m writing three outputs now: the requested pipeline findings file, the matching review file under `pages/PublicMenu`, and the command log required by this repo. The content will be the same concise finding set, without applying any code changes.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pipeline/chain-state/publicmenu-260322-125326-codex-findings.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pages/PublicMenu/commands_2026-03-22.log'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pages/PublicMenu/review_2026-03-22.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 13.91s:
+False
+ succeeded in 13.66s:
+False
+ succeeded in 13.75s:
+False
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-22.log
+Get-Content -Raw 'pages/PublicMenu/CartView.jsx'
+Get-Content -Raw 'pages/PublicMenu/x.jsx'
+Get-Content -Raw 'pages/PublicMenu/README.md'
+Get-Content -Raw 'pages/PublicMenu/BUGS.md'
+(Get-Content 'pages/PublicMenu/CartView.jsx' | Measure-Object -Line).Lines
+(Get-Content 'pages/PublicMenu/x.jsx' | Measure-Object -Line).Lines
+(Get-Content 'pages/PublicMenu/README.md' | Measure-Object -Line).Lines
+(Get-Content 'pages/PublicMenu/BUGS.md' | Measure-Object -Line).Lines
+Get-Content 'pages/PublicMenu/README.md' | Select-Object -First 250
+Get-Content 'pages/PublicMenu/BUGS.md' | Select-Object -First 250
+Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'loyal|онлайн|online|email|bonus|discount|Отправить официанту|send to waiter|Лояльность' -Encoding UTF8
+Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'Подтвердите стол|Введите код стола|0000|Не тот стол|онлайн|online|codeVerification|table code|Отправить|confirm' -Encoding UTF8
+$start=880; $count=180; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+$start=500; $count=70; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+$start=3388; $count=120; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+$start=1510; $count=120; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'function useHallTable|const useHallTable|onKeyDown|onPaste|setTableCodeInput|verifyTableCode|codeVerificationError|codeLockedUntil|codeAttempts' -Encoding UTF8
+$start=1196; $count=220; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+$start=1; $count=180; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'placeholder=|aria-label=|inputMode=|onKeyDown=|online_bonus_label|showLoyaltySection|showRewardEmailForm|customerEmail|rewardEmail' -Encoding UTF8
+Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'isCodeLocked|codeSecondsLeft|tableCodeInput|verifyTableCode|codeVerificationError|infoModal|tableCodeLength|hallGuestCodeEnabled|guestCode' -Encoding UTF8
+$start=180; $count=140; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+$start=3098; $count=45; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+$start=3358; $count=35; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'function HallVerifyBlock|const HallVerifyBlock' -Encoding UTF8
+Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'hall.verify|infoModal|codeSecondsLeft|codeAttempts|codeLockedUntil|verifyTableCode\(' -Encoding UTF8
+Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'renderHallCheckoutContent|hallContent|checkoutExtra|HallVerifyBlock' -Encoding UTF8
+Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'renderHallCheckoutContent|hallContent|HallVerifyBlock|showTableConfirmSheet' -Encoding UTF8
+$start=3238; $count=25; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'renderHallCheckoutContent' -Encoding UTF8
+$start=350; $count=180; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'discount_percent|discount_percentage|loyalty_points_per_order|loyalty_review_points|loyalty_enabled|discount_enabled|loyaltyEnabled|discountEnabled' -Encoding UTF8
+$start=1948; $count=40; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'earnedPoints|discountAmount|finalTotal|maxRedeemPoints|discountPercent|points_per_order|discount_percent|discount_percentage' -Encoding UTF8
+$start=316; $count=30; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
+Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'finalTotal|grandTotal|discountAmount|pointsDiscountAmount|cartTotalAmount' -Encoding UTF8
+Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'showLoyaltySection=' -Encoding UTF8
+Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'cartGrandTotal|formatPrice\(Number\(cartTotalAmount\)' -Encoding UTF8
+Test-Path 'pipeline/chain-state/publicmenu-260322-125326-codex-findings.md'
+Test-Path 'pages/PublicMenu/review_2026-03-22.md'
+Test-Path 'pages/PublicMenu/commands_2026-03-22.log'
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-22.md
+# Codex Writer Findings — PublicMenu
+Chain: publicmenu-260322-125326
+
+## Findings
+1. [P1] Pre-checkout loyalty accordion still renders old UI - `x.jsx:1966-1968,3237,3334` still enables `showLoyaltySection`, and `CartView.jsx:902-1034` still renders the full bonus/email/redeem/discount block plus the extra pre-submit loyalty row. This directly conflicts with the batch requirement to remove the pre-checkout loyalty section and replace it with a compact motivational text block above the CTA. FIX: stop rendering the pre-submit loyalty section in `CartView.jsx`; replace it with a small 1-2 line motivational block driven by partner loyalty/discount settings, and keep reward logic only in post-submit surfaces.
+2. [P1] Banned "онлайн" wording is still visible in the active checkout flow - `CartView.jsx:1032` shows `Бонусы за онлайн-заказ`, and `x.jsx:3415-3417` shows `По онлайн-заказу вы получите бонусы / скидку`. The task explicitly forbids the word `онлайн` in this dine-in UI because it confuses hall guests. FIX: replace the active pre-submit copy with the new dine-in-safe text variants and remove the old `онлайн` messaging from this flow.
+3. [P1] Table confirmation Bottom Sheet is still the old design and still shows a duplicate code field - `x.jsx:3409-3417` keeps the old title/subtitle/benefit copy, `x.jsx:3441-3453` renders a separate visible input with a `0000` placeholder under the visual cells, `x.jsx:3479` keeps `Подтвердить и отправить`, and `x.jsx:3482-3489` keeps `Не тот стол? Изменить`. That preserves the exact confusing UX this batch is supposed to remove. FIX: redesign the sheet to the new IA: title `Введите код стола`, always-visible helper text, four empty cells only, no duplicate field, no change-table link, compact motivation line near the CTA, and button text `Отправить`.
+4. [P1] Table verification still auto-submits as soon as the last digit is entered - `CartView.jsx:189-225` calls `verifyTableCode()` automatically on full-length input, while `x.jsx:3466-3475` also exposes a submit button in the Bottom Sheet. In practice the request can fire before the user taps the CTA, so the new button is not authoritative and the redesigned flow cannot behave as specified. FIX: disable the `CartView.jsx` auto-verify effect for the just-in-time Bottom Sheet flow and trigger verification only from the Bottom Sheet submit action after entry is complete.
+5. [P1] Motivation text logic is not driven by actual partner configuration - `x.jsx:3415-3417` branches only on `loyaltyEnabled`, so discount-only partners fall back to generic copy, and loyalty partners never see the required dynamic `%` or `+X` values. `CartView.jsx` also has no replacement motivation block at all after removing the old loyalty UI. FIX: derive one source of truth from partner bonus/discount settings and render the four required variants: bonus only, discount only, both, or none.
+6. [P2] Cart drawer total still shows the raw cart sum instead of the discounted total - `CartView.jsx:323-326` computes `cartGrandTotal`, but `CartView.jsx:1042` renders `cartTotalAmount`. When discount or redeemed points are active, the amount shown immediately above submit is higher than the amount actually sent. FIX: render `cartGrandTotal` or pass `finalTotal` into the total row so the checkout summary matches the submitted order total.
+
+## Summary
+Total: 6 findings (0 P0, 5 P1, 1 P2, 0 P3)
+
+## Prompt Clarity
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 and Fix 2 rely on partner fields described as `or similar`, so the exact source fields for points/discount text were not fully specified from the prompt alone.
+- Missing context (what info would have helped): The prompt says `ONLY these 3 files` but names four paths (`CartView.jsx`, `x.jsx`, `README.md`, `BUGS.md`). It also uses `pages/PublicMenu/*.jsx`, which could imply more JSX files than the two named in the task context.
+- Scope questions (anything you weren't sure if it's in scope): Whether to treat this as only `CartView.jsx` + `x.jsx` review or every JSX file in `pages/PublicMenu`; whether existing items already listed in `BUGS.md` should be re-reported or only current batch blockers.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260322-125326-codex-findings.md
+# Codex Writer Findings — PublicMenu
+Chain: publicmenu-260322-125326
+
+## Findings
+1. [P1] Pre-checkout loyalty accordion still renders old UI - `x.jsx:1966-1968,3237,3334` still enables `showLoyaltySection`, and `CartView.jsx:902-1034` still renders the full bonus/email/redeem/discount block plus the extra pre-submit loyalty row. This directly conflicts with the batch requirement to remove the pre-checkout loyalty section and replace it with a compact motivational text block above the CTA. FIX: stop rendering the pre-submit loyalty section in `CartView.jsx`; replace it with a small 1-2 line motivational block driven by partner loyalty/discount settings, and keep reward logic only in post-submit surfaces.
+2. [P1] Banned "онлайн" wording is still visible in the active checkout flow - `CartView.jsx:1032` shows `Бонусы за онлайн-заказ`, and `x.jsx:3415-3417` shows `По онлайн-заказу вы получите бонусы / скидку`. The task explicitly forbids the word `онлайн` in this dine-in UI because it confuses hall guests. FIX: replace the active pre-submit copy with the new dine-in-safe text variants and remove the old `онлайн` messaging from this flow.
+3. [P1] Table confirmation Bottom Sheet is still the old design and still shows a duplicate code field - `x.jsx:3409-3417` keeps the old title/subtitle/benefit copy, `x.jsx:3441-3453` renders a separate visible input with a `0000` placeholder under the visual cells, `x.jsx:3479` keeps `Подтвердить и отправить`, and `x.jsx:3482-3489` keeps `Не тот стол? Изменить`. That preserves the exact confusing UX this batch is supposed to remove. FIX: redesign the sheet to the new IA: title `Введите код стола`, always-visible helper text, four empty cells only, no duplicate field, no change-table link, compact motivation line near the CTA, and button text `Отправить`.
+4. [P1] Table verification still auto-submits as soon as the last digit is entered - `CartView.jsx:189-225` calls `verifyTableCode()` automatically on full-length input, while `x.jsx:3466-3475` also exposes a submit button in the Bottom Sheet. In practice the request can fire before the user taps the CTA, so the new button is not authoritative and the redesigned flow cannot behave as specified. FIX: disable the `CartView.jsx` auto-verify effect for the just-in-time Bottom Sheet flow and trigger verification only from the Bottom Sheet submit action after entry is complete.
+5. [P1] Motivation text logic is not driven by actual partner configuration - `x.jsx:3415-3417` branches only on `loyaltyEnabled`, so discount-only partners fall back to generic copy, and loyalty partners never see the required dynamic `%` or `+X` values. `CartView.jsx` also has no replacement motivation block at all after removing the old loyalty UI. FIX: derive one source of truth from partner bonus/discount settings and render the four required variants: bonus only, discount only, both, or none.
+6. [P2] Cart drawer total still shows the raw cart sum instead of the discounted total - `CartView.jsx:323-326` computes `cartGrandTotal`, but `CartView.jsx:1042` renders `cartTotalAmount`. When discount or redeemed points are active, the amount shown immediately above submit is higher than the amount actually sent. FIX: render `cartGrandTotal` or pass `finalTotal` into the total row so the checkout summary matches the submitted order total.
+
+## Summary
+Total: 6 findings (0 P0, 5 P1, 1 P2, 0 P3)
+
+## Prompt Clarity
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 and Fix 2 rely on partner fields described as `or similar`, so the exact source fields for points/discount text were not fully specified from the prompt alone.
+- Missing context (what info would have helped): The prompt says `ONLY these 3 files` but names four paths (`CartView.jsx`, `x.jsx`, `README.md`, `BUGS.md`). It also uses `pages/PublicMenu/*.jsx`, which could imply more JSX files than the two named in the task context.
+- Scope questions (anything you weren't sure if it's in scope): Whether to treat this as only `CartView.jsx` + `x.jsx` review or every JSX file in `pages/PublicMenu`; whether existing items already listed in `BUGS.md` should be re-reported or only current batch blockers.
+apply_patch(auto_approved=true) exited 0 in 325ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260322-125326-codex-findings.md
+A pages/PublicMenu/review_2026-03-22.md
+A pages/PublicMenu/commands_2026-03-22.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-22.log b/pages/PublicMenu/commands_2026-03-22.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..10bd509bada588fc60dd6a28eff9c006346910f0
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-22.log
+@@ -0,0 +1,41 @@
++Get-Content -Raw 'pages/PublicMenu/CartView.jsx'
++Get-Content -Raw 'pages/PublicMenu/x.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++(Get-Content 'pages/PublicMenu/CartView.jsx' | Measure-Object -Line).Lines
++(Get-Content 'pages/PublicMenu/x.jsx' | Measure-Object -Line).Lines
++(Get-Content 'pages/PublicMenu/README.md' | Measure-Object -Line).Lines
++(Get-Content 'pages/PublicMenu/BUGS.md' | Measure-Object -Line).Lines
++Get-Content 'pages/PublicMenu/README.md' | Select-Object -First 250
++Get-Content 'pages/PublicMenu/BUGS.md' | Select-Object -First 250
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'loyal|онлайн|online|email|bonus|discount|Отправить официанту|send to waiter|Лояльность' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'Подтвердите стол|Введите код стола|0000|Не тот стол|онлайн|online|codeVerification|table code|Отправить|confirm' -Encoding UTF8
++$start=880; $count=180; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=500; $count=70; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=3388; $count=120; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=1510; $count=120; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'function useHallTable|const useHallTable|onKeyDown|onPaste|setTableCodeInput|verifyTableCode|codeVerificationError|codeLockedUntil|codeAttempts' -Encoding UTF8
++$start=1196; $count=220; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=1; $count=180; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'placeholder=|aria-label=|inputMode=|onKeyDown=|online_bonus_label|showLoyaltySection|showRewardEmailForm|customerEmail|rewardEmail' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'isCodeLocked|codeSecondsLeft|tableCodeInput|verifyTableCode|codeVerificationError|infoModal|tableCodeLength|hallGuestCodeEnabled|guestCode' -Encoding UTF8
++$start=180; $count=140; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=3098; $count=45; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=3358; $count=35; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'function HallVerifyBlock|const HallVerifyBlock' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'hall.verify|infoModal|codeSecondsLeft|codeAttempts|codeLockedUntil|verifyTableCode\(' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'renderHallCheckoutContent|hallContent|checkoutExtra|HallVerifyBlock' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'renderHallCheckoutContent|hallContent|HallVerifyBlock|showTableConfirmSheet' -Encoding UTF8
++$start=3238; $count=25; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'renderHallCheckoutContent' -Encoding UTF8
++$start=350; $count=180; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'discount_percent|discount_percentage|loyalty_points_per_order|loyalty_review_points|loyalty_enabled|discount_enabled|loyaltyEnabled|discountEnabled' -Encoding UTF8
++$start=1948; $count=40; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'earnedPoints|discountAmount|finalTotal|maxRedeemPoints|discountPercent|points_per_order|discount_percent|discount_percentage' -Encoding UTF8
++$start=316; $count=30; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'finalTotal|grandTotal|discountAmount|pointsDiscountAmount|cartTotalAmount' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'showLoyaltySection=' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'cartGrandTotal|formatPrice\(Number\(cartTotalAmount\)' -Encoding UTF8
++Test-Path 'pipeline/chain-state/publicmenu-260322-125326-codex-findings.md'
++Test-Path 'pages/PublicMenu/review_2026-03-22.md'
++Test-Path 'pages/PublicMenu/commands_2026-03-22.log'
+diff --git a/pages/PublicMenu/review_2026-03-22.md b/pages/PublicMenu/review_2026-03-22.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..bf11c0f4f79d2fac4fa4b8533fc0eff9cdc87a03
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-22.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-125326
++
++## Findings
++1. [P1] Pre-checkout loyalty accordion still renders old UI - `x.jsx:1966-1968,3237,3334` still enables `showLoyaltySection`, and `CartView.jsx:902-1034` still renders the full bonus/email/redeem/discount block plus the extra pre-submit loyalty row. This directly conflicts with the batch requirement to remove the pre-checkout loyalty section and replace it with a compact motivational text block above the CTA. FIX: stop rendering the pre-submit loyalty section in `CartView.jsx`; replace it with a small 1-2 line motivational block driven by partner loyalty/discount settings, and keep reward logic only in post-submit surfaces.
++2. [P1] Banned "онлайн" wording is still visible in the active checkout flow - `CartView.jsx:1032` shows `Бонусы за онлайн-заказ`, and `x.jsx:3415-3417` shows `По онлайн-заказу вы получите бонусы / скидку`. The task explicitly forbids the word `онлайн` in this dine-in UI because it confuses hall guests. FIX: replace the active pre-submit copy with the new dine-in-safe text variants and remove the old `онлайн` messaging from this flow.
++3. [P1] Table confirmation Bottom Sheet is still the old design and still shows a duplicate code field - `x.jsx:3409-3417` keeps the old title/subtitle/benefit copy, `x.jsx:3441-3453` renders a separate visible input with a `0000` placeholder under the visual cells, `x.jsx:3479` keeps `Подтвердить и отправить`, and `x.jsx:3482-3489` keeps `Не тот стол? Изменить`. That preserves the exact confusing UX this batch is supposed to remove. FIX: redesign the sheet to the new IA: title `Введите код стола`, always-visible helper text, four empty cells only, no duplicate field, no change-table link, compact motivation line near the CTA, and button text `Отправить`.
++4. [P1] Table verification still auto-submits as soon as the last digit is entered - `CartView.jsx:189-225` calls `verifyTableCode()` automatically on full-length input, while `x.jsx:3466-3475` also exposes a submit button in the Bottom Sheet. In practice the request can fire before the user taps the CTA, so the new button is not authoritative and the redesigned flow cannot behave as specified. FIX: disable the `CartView.jsx` auto-verify effect for the just-in-time Bottom Sheet flow and trigger verification only from the Bottom Sheet submit action after entry is complete.
++5. [P1] Motivation text logic is not driven by actual partner configuration - `x.jsx:3415-3417` branches only on `loyaltyEnabled`, so discount-only partners fall back to generic copy, and loyalty partners never see the required dynamic `%` or `+X` values. `CartView.jsx` also has no replacement motivation block at all after removing the old loyalty UI. FIX: derive one source of truth from partner bonus/discount settings and render the four required variants: bonus only, discount only, both, or none.
++6. [P2] Cart drawer total still shows the raw cart sum instead of the discounted total - `CartView.jsx:323-326` computes `cartGrandTotal`, but `CartView.jsx:1042` renders `cartTotalAmount`. When discount or redeemed points are active, the amount shown immediately above submit is higher than the amount actually sent. FIX: render `cartGrandTotal` or pass `finalTotal` into the total row so the checkout summary matches the submitted order total.
++
++## Summary
++Total: 6 findings (0 P0, 5 P1, 1 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 and Fix 2 rely on partner fields described as `or similar`, so the exact source fields for points/discount text were not fully specified from the prompt alone.
++- Missing context (what info would have helped): The prompt says `ONLY these 3 files` but names four paths (`CartView.jsx`, `x.jsx`, `README.md`, `BUGS.md`). It also uses `pages/PublicMenu/*.jsx`, which could imply more JSX files than the two named in the task context.
++- Scope questions (anything you weren't sure if it's in scope): Whether to treat this as only `CartView.jsx` + `x.jsx` review or every JSX file in `pages/PublicMenu`; whether existing items already listed in `BUGS.md` should be re-reported or only current batch blockers.
+diff --git a/pipeline/chain-state/publicmenu-260322-125326-codex-findings.md b/pipeline/chain-state/publicmenu-260322-125326-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..bf11c0f4f79d2fac4fa4b8533fc0eff9cdc87a03
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260322-125326-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-125326
++
++## Findings
++1. [P1] Pre-checkout loyalty accordion still renders old UI - `x.jsx:1966-1968,3237,3334` still enables `showLoyaltySection`, and `CartView.jsx:902-1034` still renders the full bonus/email/redeem/discount block plus the extra pre-submit loyalty row. This directly conflicts with the batch requirement to remove the pre-checkout loyalty section and replace it with a compact motivational text block above the CTA. FIX: stop rendering the pre-submit loyalty section in `CartView.jsx`; replace it with a small 1-2 line motivational block driven by partner loyalty/discount settings, and keep reward logic only in post-submit surfaces.
++2. [P1] Banned "онлайн" wording is still visible in the active checkout flow - `CartView.jsx:1032` shows `Бонусы за онлайн-заказ`, and `x.jsx:3415-3417` shows `По онлайн-заказу вы получите бонусы / скидку`. The task explicitly forbids the word `онлайн` in this dine-in UI because it confuses hall guests. FIX: replace the active pre-submit copy with the new dine-in-safe text variants and remove the old `онлайн` messaging from this flow.
++3. [P1] Table confirmation Bottom Sheet is still the old design and still shows a duplicate code field - `x.jsx:3409-3417` keeps the old title/subtitle/benefit copy, `x.jsx:3441-3453` renders a separate visible input with a `0000` placeholder under the visual cells, `x.jsx:3479` keeps `Подтвердить и отправить`, and `x.jsx:3482-3489` keeps `Не тот стол? Изменить`. That preserves the exact confusing UX this batch is supposed to remove. FIX: redesign the sheet to the new IA: title `Введите код стола`, always-visible helper text, four empty cells only, no duplicate field, no change-table link, compact motivation line near the CTA, and button text `Отправить`.
++4. [P1] Table verification still auto-submits as soon as the last digit is entered - `CartView.jsx:189-225` calls `verifyTableCode()` automatically on full-length input, while `x.jsx:3466-3475` also exposes a submit button in the Bottom Sheet. In practice the request can fire before the user taps the CTA, so the new button is not authoritative and the redesigned flow cannot behave as specified. FIX: disable the `CartView.jsx` auto-verify effect for the just-in-time Bottom Sheet flow and trigger verification only from the Bottom Sheet submit action after entry is complete.
++5. [P1] Motivation text logic is not driven by actual partner configuration - `x.jsx:3415-3417` branches only on `loyaltyEnabled`, so discount-only partners fall back to generic copy, and loyalty partners never see the required dynamic `%` or `+X` values. `CartView.jsx` also has no replacement motivation block at all after removing the old loyalty UI. FIX: derive one source of truth from partner bonus/discount settings and render the four required variants: bonus only, discount only, both, or none.
++6. [P2] Cart drawer total still shows the raw cart sum instead of the discounted total - `CartView.jsx:323-326` computes `cartGrandTotal`, but `CartView.jsx:1042` renders `cartTotalAmount`. When discount or redeemed points are active, the amount shown immediately above submit is higher than the amount actually sent. FIX: render `cartGrandTotal` or pass `finalTotal` into the total row so the checkout summary matches the submitted order total.
++
++## Summary
++Total: 6 findings (0 P0, 5 P1, 1 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 and Fix 2 rely on partner fields described as `or similar`, so the exact source fields for points/discount text were not fully specified from the prompt alone.
++- Missing context (what info would have helped): The prompt says `ONLY these 3 files` but names four paths (`CartView.jsx`, `x.jsx`, `README.md`, `BUGS.md`). It also uses `pages/PublicMenu/*.jsx`, which could imply more JSX files than the two named in the task context.
++- Scope questions (anything you weren't sure if it's in scope): Whether to treat this as only `CartView.jsx` + `x.jsx` review or every JSX file in `pages/PublicMenu`; whether existing items already listed in `BUGS.md` should be re-reported or only current batch blockers.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-22.log b/pages/PublicMenu/commands_2026-03-22.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..10bd509bada588fc60dd6a28eff9c006346910f0
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-22.log
+@@ -0,0 +1,41 @@
++Get-Content -Raw 'pages/PublicMenu/CartView.jsx'
++Get-Content -Raw 'pages/PublicMenu/x.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++(Get-Content 'pages/PublicMenu/CartView.jsx' | Measure-Object -Line).Lines
++(Get-Content 'pages/PublicMenu/x.jsx' | Measure-Object -Line).Lines
++(Get-Content 'pages/PublicMenu/README.md' | Measure-Object -Line).Lines
++(Get-Content 'pages/PublicMenu/BUGS.md' | Measure-Object -Line).Lines
++Get-Content 'pages/PublicMenu/README.md' | Select-Object -First 250
++Get-Content 'pages/PublicMenu/BUGS.md' | Select-Object -First 250
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'loyal|онлайн|online|email|bonus|discount|Отправить официанту|send to waiter|Лояльность' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'Подтвердите стол|Введите код стола|0000|Не тот стол|онлайн|online|codeVerification|table code|Отправить|confirm' -Encoding UTF8
++$start=880; $count=180; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=500; $count=70; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=3388; $count=120; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=1510; $count=120; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'function useHallTable|const useHallTable|onKeyDown|onPaste|setTableCodeInput|verifyTableCode|codeVerificationError|codeLockedUntil|codeAttempts' -Encoding UTF8
++$start=1196; $count=220; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=1; $count=180; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'placeholder=|aria-label=|inputMode=|onKeyDown=|online_bonus_label|showLoyaltySection|showRewardEmailForm|customerEmail|rewardEmail' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'isCodeLocked|codeSecondsLeft|tableCodeInput|verifyTableCode|codeVerificationError|infoModal|tableCodeLength|hallGuestCodeEnabled|guestCode' -Encoding UTF8
++$start=180; $count=140; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=3098; $count=45; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=3358; $count=35; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'function HallVerifyBlock|const HallVerifyBlock' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'hall.verify|infoModal|codeSecondsLeft|codeAttempts|codeLockedUntil|verifyTableCode\(' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'renderHallCheckoutContent|hallContent|checkoutExtra|HallVerifyBlock' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'renderHallCheckoutContent|hallContent|HallVerifyBlock|showTableConfirmSheet' -Encoding UTF8
++$start=3238; $count=25; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'renderHallCheckoutContent' -Encoding UTF8
++$start=350; $count=180; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'discount_percent|discount_percentage|loyalty_points_per_order|loyalty_review_points|loyalty_enabled|discount_enabled|loyaltyEnabled|discountEnabled' -Encoding UTF8
++$start=1948; $count=40; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'earnedPoints|discountAmount|finalTotal|maxRedeemPoints|discountPercent|points_per_order|discount_percent|discount_percentage' -Encoding UTF8
++$start=316; $count=30; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'finalTotal|grandTotal|discountAmount|pointsDiscountAmount|cartTotalAmount' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'showLoyaltySection=' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'cartGrandTotal|formatPrice\(Number\(cartTotalAmount\)' -Encoding UTF8
++Test-Path 'pipeline/chain-state/publicmenu-260322-125326-codex-findings.md'
++Test-Path 'pages/PublicMenu/review_2026-03-22.md'
++Test-Path 'pages/PublicMenu/commands_2026-03-22.log'
+diff --git a/pages/PublicMenu/review_2026-03-22.md b/pages/PublicMenu/review_2026-03-22.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..bf11c0f4f79d2fac4fa4b8533fc0eff9cdc87a03
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-22.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-125326
++
++## Findings
++1. [P1] Pre-checkout loyalty accordion still renders old UI - `x.jsx:1966-1968,3237,3334` still enables `showLoyaltySection`, and `CartView.jsx:902-1034` still renders the full bonus/email/redeem/discount block plus the extra pre-submit loyalty row. This directly conflicts with the batch requirement to remove the pre-checkout loyalty section and replace it with a compact motivational text block above the CTA. FIX: stop rendering the pre-submit loyalty section in `CartView.jsx`; replace it with a small 1-2 line motivational block driven by partner loyalty/discount settings, and keep reward logic only in post-submit surfaces.
++2. [P1] Banned "онлайн" wording is still visible in the active checkout flow - `CartView.jsx:1032` shows `Бонусы за онлайн-заказ`, and `x.jsx:3415-3417` shows `По онлайн-заказу вы получите бонусы / скидку`. The task explicitly forbids the word `онлайн` in this dine-in UI because it confuses hall guests. FIX: replace the active pre-submit copy with the new dine-in-safe text variants and remove the old `онлайн` messaging from this flow.
++3. [P1] Table confirmation Bottom Sheet is still the old design and still shows a duplicate code field - `x.jsx:3409-3417` keeps the old title/subtitle/benefit copy, `x.jsx:3441-3453` renders a separate visible input with a `0000` placeholder under the visual cells, `x.jsx:3479` keeps `Подтвердить и отправить`, and `x.jsx:3482-3489` keeps `Не тот стол? Изменить`. That preserves the exact confusing UX this batch is supposed to remove. FIX: redesign the sheet to the new IA: title `Введите код стола`, always-visible helper text, four empty cells only, no duplicate field, no change-table link, compact motivation line near the CTA, and button text `Отправить`.
++4. [P1] Table verification still auto-submits as soon as the last digit is entered - `CartView.jsx:189-225` calls `verifyTableCode()` automatically on full-length input, while `x.jsx:3466-3475` also exposes a submit button in the Bottom Sheet. In practice the request can fire before the user taps the CTA, so the new button is not authoritative and the redesigned flow cannot behave as specified. FIX: disable the `CartView.jsx` auto-verify effect for the just-in-time Bottom Sheet flow and trigger verification only from the Bottom Sheet submit action after entry is complete.
++5. [P1] Motivation text logic is not driven by actual partner configuration - `x.jsx:3415-3417` branches only on `loyaltyEnabled`, so discount-only partners fall back to generic copy, and loyalty partners never see the required dynamic `%` or `+X` values. `CartView.jsx` also has no replacement motivation block at all after removing the old loyalty UI. FIX: derive one source of truth from partner bonus/discount settings and render the four required variants: bonus only, discount only, both, or none.
++6. [P2] Cart drawer total still shows the raw cart sum instead of the discounted total - `CartView.jsx:323-326` computes `cartGrandTotal`, but `CartView.jsx:1042` renders `cartTotalAmount`. When discount or redeemed points are active, the amount shown immediately above submit is higher than the amount actually sent. FIX: render `cartGrandTotal` or pass `finalTotal` into the total row so the checkout summary matches the submitted order total.
++
++## Summary
++Total: 6 findings (0 P0, 5 P1, 1 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 and Fix 2 rely on partner fields described as `or similar`, so the exact source fields for points/discount text were not fully specified from the prompt alone.
++- Missing context (what info would have helped): The prompt says `ONLY these 3 files` but names four paths (`CartView.jsx`, `x.jsx`, `README.md`, `BUGS.md`). It also uses `pages/PublicMenu/*.jsx`, which could imply more JSX files than the two named in the task context.
++- Scope questions (anything you weren't sure if it's in scope): Whether to treat this as only `CartView.jsx` + `x.jsx` review or every JSX file in `pages/PublicMenu`; whether existing items already listed in `BUGS.md` should be re-reported or only current batch blockers.
+diff --git a/pipeline/chain-state/publicmenu-260322-125326-codex-findings.md b/pipeline/chain-state/publicmenu-260322-125326-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..bf11c0f4f79d2fac4fa4b8533fc0eff9cdc87a03
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260322-125326-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-125326
++
++## Findings
++1. [P1] Pre-checkout loyalty accordion still renders old UI - `x.jsx:1966-1968,3237,3334` still enables `showLoyaltySection`, and `CartView.jsx:902-1034` still renders the full bonus/email/redeem/discount block plus the extra pre-submit loyalty row. This directly conflicts with the batch requirement to remove the pre-checkout loyalty section and replace it with a compact motivational text block above the CTA. FIX: stop rendering the pre-submit loyalty section in `CartView.jsx`; replace it with a small 1-2 line motivational block driven by partner loyalty/discount settings, and keep reward logic only in post-submit surfaces.
++2. [P1] Banned "онлайн" wording is still visible in the active checkout flow - `CartView.jsx:1032` shows `Бонусы за онлайн-заказ`, and `x.jsx:3415-3417` shows `По онлайн-заказу вы получите бонусы / скидку`. The task explicitly forbids the word `онлайн` in this dine-in UI because it confuses hall guests. FIX: replace the active pre-submit copy with the new dine-in-safe text variants and remove the old `онлайн` messaging from this flow.
++3. [P1] Table confirmation Bottom Sheet is still the old design and still shows a duplicate code field - `x.jsx:3409-3417` keeps the old title/subtitle/benefit copy, `x.jsx:3441-3453` renders a separate visible input with a `0000` placeholder under the visual cells, `x.jsx:3479` keeps `Подтвердить и отправить`, and `x.jsx:3482-3489` keeps `Не тот стол? Изменить`. That preserves the exact confusing UX this batch is supposed to remove. FIX: redesign the sheet to the new IA: title `Введите код стола`, always-visible helper text, four empty cells only, no duplicate field, no change-table link, compact motivation line near the CTA, and button text `Отправить`.
++4. [P1] Table verification still auto-submits as soon as the last digit is entered - `CartView.jsx:189-225` calls `verifyTableCode()` automatically on full-length input, while `x.jsx:3466-3475` also exposes a submit button in the Bottom Sheet. In practice the request can fire before the user taps the CTA, so the new button is not authoritative and the redesigned flow cannot behave as specified. FIX: disable the `CartView.jsx` auto-verify effect for the just-in-time Bottom Sheet flow and trigger verification only from the Bottom Sheet submit action after entry is complete.
++5. [P1] Motivation text logic is not driven by actual partner configuration - `x.jsx:3415-3417` branches only on `loyaltyEnabled`, so discount-only partners fall back to generic copy, and loyalty partners never see the required dynamic `%` or `+X` values. `CartView.jsx` also has no replacement motivation block at all after removing the old loyalty UI. FIX: derive one source of truth from partner bonus/discount settings and render the four required variants: bonus only, discount only, both, or none.
++6. [P2] Cart drawer total still shows the raw cart sum instead of the discounted total - `CartView.jsx:323-326` computes `cartGrandTotal`, but `CartView.jsx:1042` renders `cartTotalAmount`. When discount or redeemed points are active, the amount shown immediately above submit is higher than the amount actually sent. FIX: render `cartGrandTotal` or pass `finalTotal` into the total row so the checkout summary matches the submitted order total.
++
++## Summary
++Total: 6 findings (0 P0, 5 P1, 1 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 and Fix 2 rely on partner fields described as `or similar`, so the exact source fields for points/discount text were not fully specified from the prompt alone.
++- Missing context (what info would have helped): The prompt says `ONLY these 3 files` but names four paths (`CartView.jsx`, `x.jsx`, `README.md`, `BUGS.md`). It also uses `pages/PublicMenu/*.jsx`, which could imply more JSX files than the two named in the task context.
++- Scope questions (anything you weren't sure if it's in scope): Whether to treat this as only `CartView.jsx` + `x.jsx` review or every JSX file in `pages/PublicMenu`; whether existing items already listed in `BUGS.md` should be re-reported or only current batch blockers.
+
+codex
+Saved the findings to [publicmenu-260322-125326-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260322-125326-codex-findings.md). I also saved the repo-required copies to [review_2026-03-22.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-22.md) and [commands_2026-03-22.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-22.log).
+
+The review found 6 issues: the old pre-checkout loyalty accordion is still rendered, banned `онлайн` copy is still visible, the table-code Bottom Sheet still uses the old layout with a duplicate `0000` input, code verification still auto-fires before the CTA, the new motivation text logic is not implemented from partner settings, and the cart total row still shows the raw sum instead of the discounted total.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-22.log b/pages/PublicMenu/commands_2026-03-22.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..10bd509bada588fc60dd6a28eff9c006346910f0
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-22.log
+@@ -0,0 +1,41 @@
++Get-Content -Raw 'pages/PublicMenu/CartView.jsx'
++Get-Content -Raw 'pages/PublicMenu/x.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++(Get-Content 'pages/PublicMenu/CartView.jsx' | Measure-Object -Line).Lines
++(Get-Content 'pages/PublicMenu/x.jsx' | Measure-Object -Line).Lines
++(Get-Content 'pages/PublicMenu/README.md' | Measure-Object -Line).Lines
++(Get-Content 'pages/PublicMenu/BUGS.md' | Measure-Object -Line).Lines
++Get-Content 'pages/PublicMenu/README.md' | Select-Object -First 250
++Get-Content 'pages/PublicMenu/BUGS.md' | Select-Object -First 250
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'loyal|онлайн|online|email|bonus|discount|Отправить официанту|send to waiter|Лояльность' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'Подтвердите стол|Введите код стола|0000|Не тот стол|онлайн|online|codeVerification|table code|Отправить|confirm' -Encoding UTF8
++$start=880; $count=180; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=500; $count=70; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=3388; $count=120; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=1510; $count=120; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'function useHallTable|const useHallTable|onKeyDown|onPaste|setTableCodeInput|verifyTableCode|codeVerificationError|codeLockedUntil|codeAttempts' -Encoding UTF8
++$start=1196; $count=220; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=1; $count=180; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'placeholder=|aria-label=|inputMode=|onKeyDown=|online_bonus_label|showLoyaltySection|showRewardEmailForm|customerEmail|rewardEmail' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'isCodeLocked|codeSecondsLeft|tableCodeInput|verifyTableCode|codeVerificationError|infoModal|tableCodeLength|hallGuestCodeEnabled|guestCode' -Encoding UTF8
++$start=180; $count=140; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=3098; $count=45; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++$start=3358; $count=35; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'function HallVerifyBlock|const HallVerifyBlock' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'hall.verify|infoModal|codeSecondsLeft|codeAttempts|codeLockedUntil|verifyTableCode\(' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'renderHallCheckoutContent|hallContent|checkoutExtra|HallVerifyBlock' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'renderHallCheckoutContent|hallContent|HallVerifyBlock|showTableConfirmSheet' -Encoding UTF8
++$start=3238; $count=25; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'renderHallCheckoutContent' -Encoding UTF8
++$start=350; $count=180; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'discount_percent|discount_percentage|loyalty_points_per_order|loyalty_review_points|loyalty_enabled|discount_enabled|loyaltyEnabled|discountEnabled' -Encoding UTF8
++$start=1948; $count=40; $i=$start; Get-Content 'pages/PublicMenu/x.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'earnedPoints|discountAmount|finalTotal|maxRedeemPoints|discountPercent|points_per_order|discount_percent|discount_percentage' -Encoding UTF8
++$start=316; $count=30; $i=$start; Get-Content 'pages/PublicMenu/CartView.jsx' | Select-Object -Skip ($start-1) -First $count | ForEach-Object { '{0,5}: {1}' -f $i, $_; $i++ }
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'finalTotal|grandTotal|discountAmount|pointsDiscountAmount|cartTotalAmount' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'showLoyaltySection=' -Encoding UTF8
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'cartGrandTotal|formatPrice\(Number\(cartTotalAmount\)' -Encoding UTF8
++Test-Path 'pipeline/chain-state/publicmenu-260322-125326-codex-findings.md'
++Test-Path 'pages/PublicMenu/review_2026-03-22.md'
++Test-Path 'pages/PublicMenu/commands_2026-03-22.log'
+diff --git a/pages/PublicMenu/review_2026-03-22.md b/pages/PublicMenu/review_2026-03-22.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..bf11c0f4f79d2fac4fa4b8533fc0eff9cdc87a03
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-22.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-125326
++
++## Findings
++1. [P1] Pre-checkout loyalty accordion still renders old UI - `x.jsx:1966-1968,3237,3334` still enables `showLoyaltySection`, and `CartView.jsx:902-1034` still renders the full bonus/email/redeem/discount block plus the extra pre-submit loyalty row. This directly conflicts with the batch requirement to remove the pre-checkout loyalty section and replace it with a compact motivational text block above the CTA. FIX: stop rendering the pre-submit loyalty section in `CartView.jsx`; replace it with a small 1-2 line motivational block driven by partner loyalty/discount settings, and keep reward logic only in post-submit surfaces.
++2. [P1] Banned "онлайн" wording is still visible in the active checkout flow - `CartView.jsx:1032` shows `Бонусы за онлайн-заказ`, and `x.jsx:3415-3417` shows `По онлайн-заказу вы получите бонусы / скидку`. The task explicitly forbids the word `онлайн` in this dine-in UI because it confuses hall guests. FIX: replace the active pre-submit copy with the new dine-in-safe text variants and remove the old `онлайн` messaging from this flow.
++3. [P1] Table confirmation Bottom Sheet is still the old design and still shows a duplicate code field - `x.jsx:3409-3417` keeps the old title/subtitle/benefit copy, `x.jsx:3441-3453` renders a separate visible input with a `0000` placeholder under the visual cells, `x.jsx:3479` keeps `Подтвердить и отправить`, and `x.jsx:3482-3489` keeps `Не тот стол? Изменить`. That preserves the exact confusing UX this batch is supposed to remove. FIX: redesign the sheet to the new IA: title `Введите код стола`, always-visible helper text, four empty cells only, no duplicate field, no change-table link, compact motivation line near the CTA, and button text `Отправить`.
++4. [P1] Table verification still auto-submits as soon as the last digit is entered - `CartView.jsx:189-225` calls `verifyTableCode()` automatically on full-length input, while `x.jsx:3466-3475` also exposes a submit button in the Bottom Sheet. In practice the request can fire before the user taps the CTA, so the new button is not authoritative and the redesigned flow cannot behave as specified. FIX: disable the `CartView.jsx` auto-verify effect for the just-in-time Bottom Sheet flow and trigger verification only from the Bottom Sheet submit action after entry is complete.
++5. [P1] Motivation text logic is not driven by actual partner configuration - `x.jsx:3415-3417` branches only on `loyaltyEnabled`, so discount-only partners fall back to generic copy, and loyalty partners never see the required dynamic `%` or `+X` values. `CartView.jsx` also has no replacement motivation block at all after removing the old loyalty UI. FIX: derive one source of truth from partner bonus/discount settings and render the four required variants: bonus only, discount only, both, or none.
++6. [P2] Cart drawer total still shows the raw cart sum instead of the discounted total - `CartView.jsx:323-326` computes `cartGrandTotal`, but `CartView.jsx:1042` renders `cartTotalAmount`. When discount or redeemed points are active, the amount shown immediately above submit is higher than the amount actually sent. FIX: render `cartGrandTotal` or pass `finalTotal` into the total row so the checkout summary matches the submitted order total.
++
++## Summary
++Total: 6 findings (0 P0, 5 P1, 1 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 and Fix 2 rely on partner fields described as `or similar`, so the exact source fields for points/discount text were not fully specified from the prompt alone.
++- Missing context (what info would have helped): The prompt says `ONLY these 3 files` but names four paths (`CartView.jsx`, `x.jsx`, `README.md`, `BUGS.md`). It also uses `pages/PublicMenu/*.jsx`, which could imply more JSX files than the two named in the task context.
++- Scope questions (anything you weren't sure if it's in scope): Whether to treat this as only `CartView.jsx` + `x.jsx` review or every JSX file in `pages/PublicMenu`; whether existing items already listed in `BUGS.md` should be re-reported or only current batch blockers.
+diff --git a/pipeline/chain-state/publicmenu-260322-125326-codex-findings.md b/pipeline/chain-state/publicmenu-260322-125326-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..bf11c0f4f79d2fac4fa4b8533fc0eff9cdc87a03
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260322-125326-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-125326
++
++## Findings
++1. [P1] Pre-checkout loyalty accordion still renders old UI - `x.jsx:1966-1968,3237,3334` still enables `showLoyaltySection`, and `CartView.jsx:902-1034` still renders the full bonus/email/redeem/discount block plus the extra pre-submit loyalty row. This directly conflicts with the batch requirement to remove the pre-checkout loyalty section and replace it with a compact motivational text block above the CTA. FIX: stop rendering the pre-submit loyalty section in `CartView.jsx`; replace it with a small 1-2 line motivational block driven by partner loyalty/discount settings, and keep reward logic only in post-submit surfaces.
++2. [P1] Banned "онлайн" wording is still visible in the active checkout flow - `CartView.jsx:1032` shows `Бонусы за онлайн-заказ`, and `x.jsx:3415-3417` shows `По онлайн-заказу вы получите бонусы / скидку`. The task explicitly forbids the word `онлайн` in this dine-in UI because it confuses hall guests. FIX: replace the active pre-submit copy with the new dine-in-safe text variants and remove the old `онлайн` messaging from this flow.
++3. [P1] Table confirmation Bottom Sheet is still the old design and still shows a duplicate code field - `x.jsx:3409-3417` keeps the old title/subtitle/benefit copy, `x.jsx:3441-3453` renders a separate visible input with a `0000` placeholder under the visual cells, `x.jsx:3479` keeps `Подтвердить и отправить`, and `x.jsx:3482-3489` keeps `Не тот стол? Изменить`. That preserves the exact confusing UX this batch is supposed to remove. FIX: redesign the sheet to the new IA: title `Введите код стола`, always-visible helper text, four empty cells only, no duplicate field, no change-table link, compact motivation line near the CTA, and button text `Отправить`.
++4. [P1] Table verification still auto-submits as soon as the last digit is entered - `CartView.jsx:189-225` calls `verifyTableCode()` automatically on full-length input, while `x.jsx:3466-3475` also exposes a submit button in the Bottom Sheet. In practice the request can fire before the user taps the CTA, so the new button is not authoritative and the redesigned flow cannot behave as specified. FIX: disable the `CartView.jsx` auto-verify effect for the just-in-time Bottom Sheet flow and trigger verification only from the Bottom Sheet submit action after entry is complete.
++5. [P1] Motivation text logic is not driven by actual partner configuration - `x.jsx:3415-3417` branches only on `loyaltyEnabled`, so discount-only partners fall back to generic copy, and loyalty partners never see the required dynamic `%` or `+X` values. `CartView.jsx` also has no replacement motivation block at all after removing the old loyalty UI. FIX: derive one source of truth from partner bonus/discount settings and render the four required variants: bonus only, discount only, both, or none.
++6. [P2] Cart drawer total still shows the raw cart sum instead of the discounted total - `CartView.jsx:323-326` computes `cartGrandTotal`, but `CartView.jsx:1042` renders `cartTotalAmount`. When discount or redeemed points are active, the amount shown immediately above submit is higher than the amount actually sent. FIX: render `cartGrandTotal` or pass `finalTotal` into the total row so the checkout summary matches the submitted order total.
++
++## Summary
++Total: 6 findings (0 P0, 5 P1, 1 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 and Fix 2 rely on partner fields described as `or similar`, so the exact source fields for points/discount text were not fully specified from the prompt alone.
++- Missing context (what info would have helped): The prompt says `ONLY these 3 files` but names four paths (`CartView.jsx`, `x.jsx`, `README.md`, `BUGS.md`). It also uses `pages/PublicMenu/*.jsx`, which could imply more JSX files than the two named in the task context.
++- Scope questions (anything you weren't sure if it's in scope): Whether to treat this as only `CartView.jsx` + `x.jsx` review or every JSX file in `pages/PublicMenu`; whether existing items already listed in `BUGS.md` should be re-reported or only current batch blockers.
+
+tokens used
+72 932
+Saved the findings to [publicmenu-260322-125326-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260322-125326-codex-findings.md). I also saved the repo-required copies to [review_2026-03-22.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-22.md) and [commands_2026-03-22.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-22.log).
+
+The review found 6 issues: the old pre-checkout loyalty accordion is still rendered, banned `онлайн` copy is still visible, the table-code Bottom Sheet still uses the old layout with a duplicate `0000` input, code verification still auto-fires before the CTA, the new motivation text logic is not implemented from partner settings, and the cart total row still shows the raw sum instead of the discounted total.

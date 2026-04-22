@@ -1,0 +1,119 @@
+1. Get-ChildItem -Force pages/PublicMenu | Select-Object Name,Length,LastWriteTime
+
+2. (Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
+
+3. $path='pages/PublicMenu/x.jsx'; $start=1595; $end=1715; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '{0,5}: {1}' -f $i, $_ } }
+
+4. $path='pages/PublicMenu/x.jsx'; $start=3675; $end=3815; $i=0; Get-Content $path | ForEach-Object { $i++; if ($i -ge $start -and $i -le $end) { '{0,5}: {1}' -f $i, $_ } }
+
+5. Select-String -Path 'pages/PublicMenu/BUGS.md','pages/PublicMenu/README.md' -Pattern 'PM-133|PM-134|PM-135|help drawer|Help Drawer|openHelpDrawer|Другое' -Context 2,4 | ForEach-Object { "`n>>> $($_.Path):$($_.LineNumber)`n$($_.Context.PreContext -join "`n")`n$($_.Line)`n$($_.Context.PostContext -join "`n")" }
+
+6. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'Для запроса помощи выберите стол|helpSubmitError|active_request' -Context 1,2 | ForEach-Object { "`n>>> Line $($_.LineNumber)`n$($_.Context.PreContext -join "`n")`n$($_.Line)`n$($_.Context.PostContext -join "`n")" }
+
+7. Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'openHelpDrawer|setShowTableConfirmSheet|pushOverlay\(' -Context 2,3 | ForEach-Object { "`n>>> Line $($_.LineNumber)`n$($_.Context.PreContext -join "`n")`n$($_.Line)`n$($_.Context.PostContext -join "`n")" }
+
+8. Select-String -Path 'pages/PublicMenu/README.md' -Pattern 'help|drawer|PM-133|PM-134|PM-135|Другое' -Context 1,2 | ForEach-Object { "`n>>> Line $($_.LineNumber)`n$($_.Context.PreContext -join "`n")`n$($_.Line)`n$($_.Context.PostContext -join "`n")" }
+
+9. Get-Command codex | Select-Object Name,Source,Version
+
+10. $path='pages/PublicMenu/x.jsx'
+$snippet1 = (($lines = Get-Content $path)[1625..1704]) -join "`n"
+$snippet2 = (($lines = Get-Content $path)[3697..3794]) -join "`n"
+$prompt = @"
+You are an independent code reviewer for MenuApp, a React/Base44 restaurant QR-menu app.
+
+SCOPE LOCK:
+- Review ONLY PM-133, PM-134, PM-135 in pages/PublicMenu/x.jsx.
+- Do NOT report anything outside these fixes.
+- Do NOT suggest changes to handleHelpFromCart.
+- Do NOT change frozen UX items except the specific layout change for PM-134(c).
+
+Task:
+1. Review the proposed findings below against the code excerpts.
+2. For each finding: APPROVE, REJECT, or IMPROVE.
+3. Add any missed issue only if it is strictly inside PM-133/134/135 scope.
+4. Be concise.
+
+Format:
+## Codex Patch Review: pages/PublicMenu/x.jsx
+### Approved Findings
+### Rejected Findings
+### Improved Findings
+### New Scoped Findings
+### Summary
+
+CODE EXCERPT A:
+$snippet1
+
+CODE EXCERPT B:
+$snippet2
+
+PROPOSED FINDINGS:
+1. PM-133 / P1: openHelpDrawer() at lines 1655-1658 opens the help drawer unconditionally. It does not guard on currentTableId or redirect to setShowTableConfirmSheet(true), so hall users without a verified table still enter the help drawer and hit the in-drawer error path instead of the table-code sheet.
+   Proposed fix: add `if (!currentTableId) { setShowTableConfirmSheet(true); return; }` at the top of openHelpDrawer and add currentTableId/setShowTableConfirmSheet to the dependency array.
+2. PM-134(a) / P2: the "Другое" form at lines 3767-3787 stays mounted and relies on `overflow-hidden transition-all ... max-h-0 opacity-0`. That does not guarantee the textarea is absent from the DOM, matching the Android partial-visibility bug.
+   Proposed fix: replace the collapsible div with conditional rendering `{showOtherForm && (...)}`.
+3. PM-134(b) / P2: the textarea at lines 3769-3774 mounts without `autoFocus`, so tapping "Другое" will not automatically focus the field and open the mobile keyboard.
+   Proposed fix: add `autoFocus` to the textarea once it is conditionally rendered.
+4. PM-134(c) / P2: the submit button at lines 3776-3785 remains inside the same collapsible content block as the textarea. When the keyboard opens, it can be pushed below the visible drawer area instead of staying reachable in a fixed bottom action area.
+   Proposed fix: convert DrawerContent to a flex column, move the scrollable content into `overflow-y-auto flex-1`, and render the submit button in a bottom bar outside the scroll area only when showOtherForm is true. Keep `disabled={isSendingHelp || !helpComment.trim()}` unchanged.
+5. PM-135 / P2: openHelpDrawer() does not reset helpQuickSent, sendingCardId, showOtherForm, or helpComment before reopening. Because only closeHelpDrawer() resets them, a fast reopen can show stale success or stale form state.
+   Proposed fix: reset `setHelpQuickSent(false)`, `setSendingCardId(null)`, `setShowOtherForm(false)`, and `setHelpComment('')` before `setIsHelpModalOpen(true)` and update the dependency array accordingly.
+"@
+codex exec $prompt
+
+11. codex exec --help
+
+12. $path='pages/PublicMenu/x.jsx'
+$lines = Get-Content $path
+$snippet1 = ($lines[1625..1704]) -join "`n"
+$snippet2 = ($lines[3697..3794]) -join "`n"
+$prompt = @"
+You are an independent code reviewer for MenuApp, a React/Base44 restaurant QR-menu app.
+
+SCOPE LOCK:
+- Review ONLY PM-133, PM-134, PM-135 in pages/PublicMenu/x.jsx.
+- Do NOT report anything outside these fixes.
+- Do NOT suggest changes to handleHelpFromCart.
+- Do NOT change frozen UX items except the specific layout change for PM-134(c).
+
+Task:
+1. Review the proposed findings below against the code excerpts.
+2. For each finding: APPROVE, REJECT, or IMPROVE.
+3. Add any missed issue only if it is strictly inside PM-133/134/135 scope.
+4. Be concise.
+
+Format:
+## Codex Patch Review: pages/PublicMenu/x.jsx
+### Approved Findings
+### Rejected Findings
+### Improved Findings
+### New Scoped Findings
+### Summary
+
+CODE EXCERPT A:
+$snippet1
+
+CODE EXCERPT B:
+$snippet2
+
+PROPOSED FINDINGS:
+1. PM-133 / P1: openHelpDrawer() at lines 1655-1658 opens the help drawer unconditionally. It does not guard on currentTableId or redirect to setShowTableConfirmSheet(true), so hall users without a verified table still enter the help drawer and hit the in-drawer error path instead of the table-code sheet.
+   Proposed fix: add `if (!currentTableId) { setShowTableConfirmSheet(true); return; }` at the top of openHelpDrawer and add currentTableId/setShowTableConfirmSheet to the dependency array.
+2. PM-134(a) / P2: the "Другое" form at lines 3767-3787 stays mounted and relies on `overflow-hidden transition-all ... max-h-0 opacity-0`. That does not guarantee the textarea is absent from the DOM, matching the Android partial-visibility bug.
+   Proposed fix: replace the collapsible div with conditional rendering `{showOtherForm && (...)}`.
+3. PM-134(b) / P2: the textarea at lines 3769-3774 mounts without `autoFocus`, so tapping "Другое" will not automatically focus the field and open the mobile keyboard.
+   Proposed fix: add `autoFocus` to the textarea once it is conditionally rendered.
+4. PM-134(c) / P2: the submit button at lines 3776-3785 remains inside the same collapsible content block as the textarea. When the keyboard opens, it can be pushed below the visible drawer area instead of staying reachable in a fixed bottom action area.
+   Proposed fix: convert DrawerContent to a flex column, move the scrollable content into `overflow-y-auto flex-1`, and render the submit button in a bottom bar outside the scroll area only when showOtherForm is true. Keep `disabled={isSendingHelp || !helpComment.trim()}` unchanged.
+5. PM-135 / P2: openHelpDrawer() does not reset helpQuickSent, sendingCardId, showOtherForm, or helpComment before reopening. Because only closeHelpDrawer() resets them, a fast reopen can show stale success or stale form state.
+   Proposed fix: reset `setHelpQuickSent(false)`, `setSendingCardId(null)`, `setShowOtherForm(false)`, and `setHelpComment('')` before `setIsHelpModalOpen(true)` and update the dependency array accordingly.
+"@
+$prompt | codex exec -
+
+13. $prompt = @"
+Review only PM-133, PM-134, PM-135 in pages/PublicMenu/x.jsx. Approve/reject/improve these findings only: 1) openHelpDrawer lacks currentTableId redirect to setShowTableConfirmSheet(true); 2) "Другое" textarea uses CSS collapse instead of conditional render; 3) textarea lacks autoFocus; 4) submit button is inside scrollable collapsible block instead of sticky bottom action area; 5) openHelpDrawer does not reset helpQuickSent/sendingCardId/showOtherForm/helpComment on reopen. Output concise markdown with Approved Findings, Rejected Findings, Improved Findings, New Scoped Findings, Summary.
+"@
+$prompt | codex exec --ephemeral -
+
+14. Get-ChildItem pipeline/chain-state | Select-Object -First 5 Name

@@ -1,0 +1,3 @@
+Wrote the round-2 UX discussion to [codex-round2-discussion.md](C:\Dev\menuapp-code-review\.pipeline\runs\task-260314-135321-partnerhome\artifacts\codex-round2-discussion.md).
+
+It reflects the actual `base/partnerhome.jsx` state, calls out the base/live route mismatch, tightens mobile action priority into `1 primary + 2 secondary`, and argues that operational attention states should come before “vs yesterday” analytics. No application code was changed.

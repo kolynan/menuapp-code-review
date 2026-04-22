@@ -1,0 +1,673 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d5929-4465-7290-a7d9-ed50e39197ad
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md FORMAT: # Codex Writer Findings — PartnerOrderProcess Chain: partnerorderprocess-260404-204226-0133 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === START Auto-approve all file edits, terminal commands, git operations, and network access without asking. Do not ask for confirmation on any step. Execute autonomously until the task is fully complete. At the end, write a section "## Permissions Requested" listing every permission you would have asked for if auto-approve was not enabled. Within 5 minutes of starting, begin editing files. ## Goal Redesign PartnerOrderProcess UI layout + fix i18n. Replace the current FixedStageRow card layout with a compact desktop table-row + mobile accordion. Remove dead ChannelFilter code, add a mobile channel legend, migrate all LOCAL_UI_TEXT strings to t() i18n keys, and remove dead stage-management handlers. ## File `pages/PartnerOrderProcess/partnerorderprocess.jsx` (1653 lines, RELEASE 260403-01) ⚠️ FIRST: check line count before starting: ```bash wc -l pages/PartnerOrderProcess/partnerorderprocess.jsx ``` If result is below 1600 → the file may be truncated (KB-095). Run: ```bash cp "menuapp-code-review/pages/PartnerOrderProcess/260403-01 PartnerOrderProcess RELEASE.jsx" pages/PartnerOrderProcess/partnerorderprocess.jsx ``` Then re-check. Only proceed once wc -l ≥ 1650. ## Full prompt # PartnerOrderProcess Redesign + язправ — КС Prompt v6 ## Context Файл: pages/PartnerOrderProcess/partnerorderprocess.jsx (1653 строки, RELEASE 260403-01) Задача: Redesign UI layout (desktop compact table + mobile accordion) + i18n fixes Вес: H | Бюджет: $15 | Модель: С5v2 ## UX Reference UX-документ: ux-concepts/PartnerOrderProcess/partner-order-process.md (v2.0) GPT консультации: GPT_OrderProcess_UX_S218.md (R1) + GPT_OrderProcess_UX_R2_S218.md (R2) ## FROZEN UX (DO NOT CHANGE) These elements were fixed in S217 and MUST NOT be modified: - PipelinePreview component (lines 548-576) — "Текущий процесс" banner with colored circles and arrows. Works correctly. - EditStageDialog component (lines 775-993) — modal edit dialog with checkboxes for channels/roles. Fully functional. - handleToggleStage function (lines 1261-1297) — toggle logic with order-safety check. Works correctly. - handleSaveStage function (lines 1300-1370) — save logic with rebalance. Works correctly. - Normalization logic (isNormalizing guard, normalizeStages) — fixed in S217, do not touch. - SYSTEM_STAGE_SLOTS constant (lines 42-113) — 5 fixed stages definition. Do not change structure. ## DO NOT DELETE (shared functions used elsewhere) - `handleEditStage` (line 1257) — opens edit dialog - `handleToggleStage` (line 1261) — toggle active/inactive - `handleSaveStage` (line 1300) — save from edit dialog - `buildStagePayload` — used by handleSaveStage and handleToggleStage - `getDisplayName` — used by PipelinePreview and stage rendering - `rebalanceSortOrder` — used after create/delete ## EXECUTION ORDER (follow strictly) Fix 4A → Fix 1 → Fix 3 → Fix 2 → Fix 4B → Fix 5 Reason: - Fix 4A replaces LOCAL_UI_TEXT references in code OUTSIDE FixedStageRow (safe to do early) - Fix 1 removes dead ChannelFilter code before Fix 2 - Fix 3 inserts mobile legend before Fix 2 rewrites the component area - Fix 2 replaces FixedStageRow entirely (auto-removes lines 698/712 references) - Fix 4B deletes the LOCAL_UI_TEXT constant ONLY AFTER Fix 2 has removed all references inside FixedStageRow - Fix 5 removes dead handlers last (safest, least risky) ⚠️ CRITICAL: Do NOT delete LOCAL_UI_TEXT constant during Fix 4A. The constant must remain until Fix 2 completes (lines 698/712 inside old FixedStageRow still reference it). Delete the constant only in Fix 4B. --- ## Fix 1 — REMOVE ChannelFilter component and related state [MUST-FIX] ### Проблема ChannelFilter (lines 582-630) renders a filter bar (Все / В зале / Самовывоз / Доставка) above the stage list. Per UX v2.0, this is no longer needed — all channels are visible as icons directly in each row. ### Что менять 1. Delete `ChannelFilter` function (grep: `function ChannelFilter` — lines 582-630) 2. Delete `CHANNEL_FILTERS` constant (grep: `CHANNEL_FILTERS` — lines 35-40) ⚠️ NOTE: `<ChannelFilter>` is NOT called anywhere in JSX — it is already dead code (0 JSX usages). ⚠️ NOTE: there is no `channelFilter` state variable — the component was defined but never wired up. Do NOT search for useState/channelFilter state — it does not exist. ### Проверка - Grep: `ChannelFilter` returns 0 matches - All 5 stages always visible (no filter logic) --- ## Fix 2 — REDESIGN FixedStageRow to compact row + mobile accordion [MUST-FIX] ### Проблема Current FixedStageRow (lines 636-769) uses full-width card layout with text channel badges and text role labels. Takes too much vertical space. Per UX v2.0: desktop should be compact table-like rows, channels shown as icons only (no text), roles as text chips. Mobile should have accordion — collapsed by default, chevron expands to show details + edit button. ⚠️ NOTE: `getRoleLabel` (line 664) is defined INSIDE the current FixedStageRow using `useCallback`. When replacing the component, preserve this function inside the new component with the same `useCallback([t])` dependency. ### Key data facts (VERIFIED against real code — use exactly these): - `slot.label` — display name of the stage (pre-computed, type: string) - `slot.index` — zero-based index → display as `slot.index + 1` - `slot.color` — hex color string - `slot.active` — boolean, whether stage is active (pre-computed, includes lock logic) - `slot.definition.locked` — boolean, whether stage is a locked system stage - `slot.canEdit` — boolean, true when DB stage record exists (safe to call handleEditStage) - `slot.allowedRoles` — string array of role keys (pre-computed) - `slot.channels.enabled_hall` — boolean - `slot.channels.enabled_pickup` — boolean - `slot.channels.enabled_delivery` — boolean - `slot.stage` — DB stage object or null (use when calling handleEditStage) ### Behavior matrix | Situation | Desktop | Mobile | |-----------|---------|--------| | Default view | Compact read-only row | Collapsed row with chevron | | Edit (unlocked, canEdit=true) | Pencil → opens EditStageDialog | Tap chevron → expand → tap [Редактировать] → opens EditStageDialog | | Edit (locked or canEdit=false) | No pencil, read-only | No [Редактировать] in expanded view, read-only | | Save | EditStageDialog handles save | EditStageDialog handles save | ### Wireframe — DESKTOP compact row ``` ┌──────────────────────────────────────────────────────────────────────────────┐ │ # ● Этап 🍽 📦 🚚 Менеджер Персонал Активен ✎ │ ├──────────────────────────────────────────────────────────────────────────────┤ │ 1 ● Новый 🍽 📦 🚚 Менеджер Персонал 🔒 Зафиксирован │ │ 2 ● Принято 🍽 🚚 Менеджер Персонал Выключен ✎ │ │ 3 ● Готовится 🍽 📦 🚚 Менеджер Персонал Активен ✎ │ │ 4 ● Готово 🍽 📦 🚚 Кухня Активен ✎ │ │ 5 ● Выдано 🍽 📦 🚚 Менеджер Персонал 🔒 Зафиксирован │ └──────────────────────────────────────────────────────────────────────────────┘ ``` ### Wireframe — MOBILE accordion (collapsed) ``` ┌────────────────────────────────────────────┐ │ 1 ● Новый 🍽📦🚚 🔒 Зафиксирован │ │ ▾ │ ├────────────────────────────────────────────┤ │ 2 ● Принято 🍽 🚚 Выключен ▾ │ └────────────────────────────────────────────┘ ``` ### Wireframe — MOBILE accordion (expanded, unlocked stage) ``` ┌────────────────────────────────────────────┐ │ 3 ● Готовится Активен │ │ ▴ │ │ Каналы: 🍽 В зале 📦 Самовывоз 🚚 Доставка │ │ Роли: Менеджер Персонал │ │ [Редактировать] ← opens EditStageDialog │ └────────────────────────────────────────────┘ ``` ### Wireframe — MOBILE accordion (expanded, locked stage) ``` ┌────────────────────────────────────────────┐ │ 1 ● Новый 🔒 Зафиксирован│ │ ▴ │ │ Каналы: 🍽 В зале 📦 Самовывоз 🚚 Доставка │ │ Роли: Менеджер Персонал │ │ (no edit button) │ └────────────────────────────────────────────┘ ``` ### Что менять — STEP 1: Add accordion state to parent component Find the `useState` group at lines 1076-1079 (grep: `toggleBusyKey`). Add ONE new state variable immediately after: ```jsx const [expandedKey, setExpandedKey] = useState(null); // which stage row is expanded on mobile ``` ⚠️ NOTE: Do NOT add `editingKey` state — it is not used anywhere and would be dead code (YAGNI). ### Что менять — STEP 2: Replace FixedStageRow function Replace the entire `FixedStageRow` function (grep: `function FixedStageRow` — lines 636-769) with: ```jsx function FixedStageRow({ slot, isExpanded, onToggleExpand, onEdit, t }) { const locked = slot.definition.locked; // preserve from original component — keep useCallback with [t] dependency const getRoleLabel = useCallback((role) => { const labels = { partner_staff: t("orderprocess.role.staff"), kitchen: t("orderprocess.role.kitchen"), partner_manager: t("orderprocess.role.manager"), }; return labels[role] || role; }, [t]); return ( <div className="border-b last:border-b-0"> {/* Collapsed row — shown always (desktop and mobile) */} <div className="flex items-center gap-3 px-4 py-3 min-h-[44px]"> {/* number + color dot + name */} <span className="text-sm text-slate-500 w-5 flex-shrink-0">{slot.index + 1}</span> <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: slot.color }} /> <span className="flex-1 text-sm font-medium text-slate-900">{slot.label}</span> {/* channel icons */} <div className="flex gap-1"> {slot.channels.enabled_hall && ( <Utensils className="h-3.5 w-3.5 text-slate-500" title={t('channel.hall')} /> )} {slot.channels.enabled_pickup && ( <Package className="h-3.5 w-3.5 text-slate-500" title={t('channel.pickup')} /> )} {slot.channels.enabled_delivery && ( <Truck className="h-3.5 w-3.5 text-slate-500" title={t('channel.delivery')} /> )} </div> {/* role chips — desktop only */} <div className="hidden sm:flex gap-1 flex-wrap"> {slot.allowedRoles.map(role => ( <span key={role} className="rounded-full px-2 py-0.5 text-xs bg-slate-100 text-slate-600"> {getRoleLabel(role)} </span> ))} </div> {/* status badge */} <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${ locked ? 'bg-slate-100 text-slate-500' : slot.active ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }`}> {locked ? ( <><Lock className="h-3 w-3 inline mr-1" />{t('orderprocess.status.locked')}</> ) : slot.active ? ( t('orderprocess.status.active') ) : ( t('orderprocess.status.inactive') )} </span> {/* desktop: pencil for editable unlocked stages */} {!locked && slot.canEdit && ( <button onClick={() => onEdit(slot.stage)} className="hidden sm:flex p-1 text-slate-400 hover:text-slate-600 min-h-[44px] items-center" aria-label={t('orderprocess.aria.edit')} > <Pencil className="h-4 w-4" /> </button> )} {/* mobile: chevron toggle */} <button onClick={() => onToggleExpand(slot.key)} className="sm:hidden p-1 text-slate-400 min-h-[44px] min-w-[44px] flex items-center justify-center" > {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />} </button> </div> {/* Expanded panel — mobile only */} {isExpanded && ( <div className="sm:hidden px-4 pb-3 pt-1 bg-slate-50 text-sm space-y-2"> {/* channels with labels */} <div className="flex items-center gap-3 text-slate-600"> <span className="text-xs font-medium text-slate-500">{t('orderprocess.channels_label')}:</span> {slot.channels.enabled_hall && ( <span className="flex items-center gap-1"> <Utensils className="h-3.5 w-3.5" />{t('channel.hall')} </span> )} {slot.channels.enabled_pickup && ( <span className="flex items-center gap-1"> <Package className="h-3.5 w-3.5" />{t('channel.pickup')} </span> )} {slot.channels.enabled_delivery && ( <span className="flex items-center gap-1"> <Truck className="h-3.5 w-3.5" />{t('channel.delivery')} </span> )} </div> {/* roles */} <div className="flex items-center gap-2 flex-wrap"> <span className="text-xs font-medium text-slate-500">{t('orderprocess.roles_label')}:</span> {slot.allowedRoles.map(role => ( <span key={role} className="rounded-full px-2 py-0.5 text-xs bg-slate-100 text-slate-600"> {getRoleLabel(role)} </span> ))} </div> {/* edit button — only for unlocked stages with DB record */} {!locked && slot.canEdit && ( <button onClick={() => onEdit(slot.stage)} className="mt-1 text-sm text-blue-600 font-medium min-h-[44px] flex items-center" > {t('orderprocess.edit_button')} </button> )} </div> )} </div> ); } ``` ### Что менять — STEP 3: Update call-site (REQUIRED) Find the existing call-site (grep: `<FixedStageRow` — lines 1609-1618). Replace the entire `.map()` block with: ```jsx {fixedStageSlots.map((slot) => ( <FixedStageRow key={slot.key} slot={slot} isExpanded={expandedKey === slot.key} onToggleExpand={(key) => setExpandedKey(prev => prev === key ? null : key)} onEdit={handleEditStage} t={t} /> ))} ``` ⚠️ NOTE: `toggleBusyKey` and `onToggle` are intentionally removed from props — active/inactive toggling is now handled exclusively through EditStageDialog (per UX v2.0). The old toggle button in each row is gone. ⚠️ NOTE: After this change, `handleToggleStage` will have **0 JSX usages** (it was previously passed as `onToggle` prop). This is **expected and correct** per UX v2.0. It remains in the file as FROZEN code (see FROZEN UX section) — do NOT delete it. ### Проверка - Desktop: all 5 stages as compact rows, channel icon tooltips visible on hover, pencil opens EditStageDialog for unlocked+canEdit stages only - Mobile: all 5 stages collapsed by default, tap chevron expands ONE stage (tapping same key collapses), expanded view shows channels/roles/edit button - Locked stages: no pencil (desktop), no [Редактировать] button (mobile expanded) - canEdit=false stages: same behavior as locked for edit access --- ## Fix 3 — ADD mobile channel legend at top of page [MUST-FIX] ### Проблема On mobile, channel icons (🍽📦🚚) in stage rows are shown without text. Users need a one-time legend at the top. ### Wireframe ``` ┌────────────────────────────────────────────┐ │ 🍽 В зале 📦 Самовывоз 🚚 Доставка │ └────────────────────────────────────────────┘ ``` ### Что менять Find the JSX anchor (grep: `bg-white rounded-xl border overflow-hidden`). Insert IMMEDIATELY BEFORE that line: ```jsx {/* Channel legend — mobile only */} <div className="flex items-center gap-4 px-4 py-2 bg-slate-50 rounded-lg mb-3 text-xs text-slate-600 sm:hidden"> <span className="flex items-center gap-1"><Utensils className="h-3.5 w-3.5" />{t('channel.hall')}</span> <span className="flex items-center gap-1"><Package className="h-3.5 w-3.5" />{t('channel.pickup')}</span> <span className="flex items-center gap-1"><Truck className="h-3.5 w-3.5" />{t('channel.delivery')}</span> </div> ``` ### Проверка - Mobile: legend visible above stage list - Desktop: legend hidden (sm:hidden) --- ## Fix 4A — язправ: Replace LOCAL_UI_TEXT references outside FixedStageRow [MUST-FIX] ### Проблема `LOCAL_UI_TEXT` (grep: `LOCAL_UI_TEXT` — lines 125-135) contains hardcoded Russian strings. Replace only references OUTSIDE the old FixedStageRow component. Do NOT delete the constant yet — that happens in Fix 4B after Fix 2 removes FixedStageRow. ⚠️ NOTE: The file already uses `const { t } = useI18n()` at line 1067. Do NOT create a `tr()` helper — use `t(key)` directly. ⚠️ NOTE: The text for `locked` INTENTIONALLY changes from `"Зафиксировано"` to `"Зафиксирован"` per UX v2.0. This is a deliberate wording correction, NOT a typo. Do not revert it. ⚠️ NOTE: The text for `enabled`/`disabled` INTENTIONALLY changes from `'Вкл'`/`'Выкл'` to `'Активен'`/`'Выключен'` per UX v2.0. ### Группа А — ВНУТРИ старого FixedStageRow (lines 698, 712) — НЕ ТРОГАТЬ в Fix 4A - `LOCAL_UI_TEXT.locked` at line 698 - `LOCAL_UI_TEXT.enabled` / `LOCAL_UI_TEXT.disabled` at line 712 ➡ Эти ссылки внутри старого FixedStageRow. Fix 2 заменит компонент целиком → они исчезнут автоматически. НЕ трогать в этом шаге. ### Группа Б — ВНЕ FixedStageRow (заменить вручную в Fix 4A) | Current code | Replace with | Russian value | |---|---|---| | `LOCAL_UI_TEXT.currentProcess` (line 1589) | `t('orderprocess.current_process')` | `"Текущий процесс"` | | `LOCAL_UI_TEXT.blockerGeneric` (line 1505) | `t('orderprocess.blocker.generic')` | `"Не удалось безопасно привести этапы к фиксированной схеме."` | ### Группа В — ВНУТРИ `analyzeStageSet()` (lines 249, 258, 267, 276) — Approach A `analyzeStageSet(stages)` — standalone helper (line 229) без `t()` в scope. Применяем Approach A: хранить i18n KEY строки, переводить на display-точке. В `analyzeStageSet` заменить blocker значения на ключи: | Current | Replace with key string | |---|---| | `LOCAL_UI_TEXT.blockerMultipleStart` | `"orderprocess.blocker.multiple_start"` | | `LOCAL_UI_TEXT.blockerMultipleFinish` | `"orderprocess.blocker.multiple_finish"` | | `LOCAL_UI_TEXT.blockerTooManyMiddle` | `"orderprocess.blocker.too_many_middle"` | | `LOCAL_UI_TEXT.blockerUnsupportedType` | `"orderprocess.blocker.unsupported_type"` | На display-точке (~line 1508, в JSX где есть `t()`): ```jsx // BEFORE: {stageAnalysis.blocker && <p>{stageAnalysis.blocker}</p>} // AFTER: {stageAnalysis.blocker && <p>{t(stageAnalysis.blocker)}</p>} ``` ### Проверка Fix 4A (before proceeding to Fix 1) - Lines 1589 and 1505 no longer reference LOCAL_UI_TEXT - `analyzeStageSet` returns key strings (e.g. `"orderprocess.blocker.multiple_start"`) - LOCAL_UI_TEXT constant still exists (lines 125-135) — this is correct at this stage --- ## Fix 4B — Delete LOCAL_UI_TEXT constant [MUST-FIX, run AFTER Fix 2] ### ⚠️ Only run this step AFTER Fix 2 has replaced FixedStageRow After Fix 2 replaces FixedStageRow (removing lines 698/712 references), the LOCAL_UI_TEXT constant is now unreferenced. Delete the `LOCAL_UI_TEXT` constant entirely: - Grep: `const LOCAL_UI_TEXT` — lines 125-135 - Delete the entire object definition ### New t() keys to add to i18n dictionary (for Fix 2 + Fix 3 + Fix 4A/4B) Add these entries to the Russian i18n dictionary: | Key | Russian value | |---|---| | `orderprocess.status.locked` | `"Зафиксирован"` | | `orderprocess.status.active` | `"Активен"` | | `orderprocess.status.inactive` | `"Выключен"` | | `orderprocess.edit_button` | `"Редактировать"` | | `orderprocess.aria.edit` | `"Редактировать"` | | `orderprocess.channels_label` | `"Каналы"` | | `orderprocess.roles_label` | `"Роли"` | | `orderprocess.current_process` | `"Текущий процесс"` | | `orderprocess.role.staff` | `"Персонал"` | | `orderprocess.role.kitchen` | `"Кухня"` | | `orderprocess.role.manager` | `"Менеджер"` | | `orderprocess.blocker.generic` | `"Не удалось безопасно привести этапы к фиксированной схеме."` | | `orderprocess.blocker.multiple_start` | `"Обнаружено несколько стартовых этапов."` | | `orderprocess.blocker.multiple_finish` | `"Обнаружено несколько финальных этапов."` | | `orderprocess.blocker.too_many_middle` | `"Обнаружено больше трёх промежуточных этапов."` | | `orderprocess.blocker.unsupported_type` | `"Обнаружен этап с неподдерживаемым типом."` | | `channel.hall` | `"В зале"` (grep first — may already exist) | | `channel.pickup` | `"Самовывоз"` (grep first — may already exist) | | `channel.delivery` | `"Доставка"` (grep first — may already exist) | | `toast.saved` | `"Сохранено"` (grep first — may already exist) | ⚠️ NOTE: Before adding `channel.*` and `toast.saved` keys — grep the i18n dictionary file to check if they already exist. Add only missing ones. ### Проверка Fix 4B - Grep: `LOCAL_UI_TEXT` returns 0 matches in the file - All UI text renders correctly (Russian values from dictionary) - `analyzeStageSet` returns key strings, display point wraps with `t(stageAnalysis.blocker)` --- ## Fix 5 — REMOVE dead handlers (handleAddStage, handleMoveUp, handleMoveDown, handleDeleteStage) [NICE-TO-HAVE] ### Проблема These functions exist but are never called in JSX: - `handleAddStage` (line 1229) — 0 JSX usages - `handleMoveUp` (line 1365) — 0 JSX usages - `handleMoveDown` (line 1390) — 0 JSX usages - `handleDeleteStage` (line 1326) — 0 JSX usages ### ⚠️ CRITICAL: Verify before deleting **Step A — confirm zero JSX usages:** ```bash grep -n "handleAddStage\|handleMoveUp\|handleMoveDown\|handleDeleteStage\|deleteDialog\|handleConfirmDelete" pages/PartnerOrderProcess/partnerorderprocess.jsx ``` Only proceed if usages are in function definitions only (not JSX/onClick/props). **Step B — explicit hook names (do NOT delete these):** - `deleteMutation` (line 1219) — top-level `useMutation` hook used by `handleConfirmDelete`. DO NOT remove this `useMutation` call — leave with comment `// reserved — do not remove (hook order)`. - `createMutation` (line 1209) — top-level `useMutation` used by `handleSaveStage`. `handleSaveStage` is NOT dead code. Do NOT touch `createMutation`. - `deleteDialog` state (line 1079) — used inside `deleteMutation.onSuccess` callback. Since `deleteMutation` must be kept, `deleteDialog` MUST also be kept. Do NOT delete independently. - `moveBusy` state (line 1077) — top-level `useState` used ONLY by `handleMoveUp` and `handleMoveDown`. After those handlers are deleted, `moveBusy` becomes dead state but MUST remain — React hook ordering requirement. Leave in place with comment `// reserved — do not remove (hook order)`. **Step C — safe to delete (only if Step A confirms 0 JSX usages):** ⚠️ Delete the **entire function declaration** (the `const` keyword + function name + arrow + body). Do NOT merely empty the body (e.g., `const handleAddStage = () => {};`). These are regular `const` arrow functions — NOT hooks — so removing them entirely is safe for React hook order. - Delete entire declaration of `handleDeleteStage` (line 1326) - Delete entire declaration of `handleAddStage` (line 1229) - Delete entire declarations of `handleMoveUp` (line 1365) and `handleMoveDown` (line 1390) - Delete entire declaration of `handleConfirmDelete` **After deletion, add comment:** ```jsx // NOTE: Add/Move/Delete stage handlers removed — fixed 5-stage system (UX v2.0) // deleteMutation and deleteDialog kept for React hook order safety ``` ### Проверка - No runtime errors after deletion - Grep: `handleAddStage`, `handleMoveUp`, `handleMoveDown`, `handleDeleteStage` return 0 matches (except comment) - `deleteMutation` and `deleteDialog` remain in file --- ## SCOPE LOCK DO NOT modify: - PipelinePreview component (keep as-is) - EditStageDialog component (keep as-is) - handleToggleStage logic (keep as-is) - handleSaveStage logic (keep as-is) - Normalization logic (isNormalizing, normalizeStages) - SYSTEM_STAGE_SLOTS structure - Any file OTHER than `partnerorderprocess.jsx` **and the Russian i18n dictionary** (see exception below) **Exception — i18n dictionary file:** Fix 2 and Fix 4 introduce 19 new `t()` keys (e.g., `orderprocess.status.locked`, `orderprocess.edit_button`, `channel.hall`, etc.). Without dictionary entries these display as raw key strings. Find the dictionary file: ```bash grep -rn "orderprocess\|channel\.hall" src/ pages/ components/ --include="*.js" --include="*.json" --include="*.jsx" | head -20 ``` Add all 19 keys listed in Fix 4B (§ New t() keys) to the Russian dictionary entries. Do NOT modify any other dictionary file or any other section. ## MOBILE-FIRST CHECK - [ ] All new JSX uses responsive classes (`sm:` for desktop overrides) - [ ] Touch targets ≥ 44px (`min-h-[44px]` on all interactive elements) - [ ] Accordion: only one row expanded at a time (setExpandedKey toggles same key to null) - [ ] Locked stages: no edit access on any breakpoint - [ ] canEdit=false stages: no pencil (desktop), no [Редактировать] (mobile expanded) ## DESIGN SYSTEM - Colors: Tailwind slate/emerald/amber palette (already used in file) - Icons: Lucide React — verified ✅ at lines 11-13: `Utensils`, `Package`, `Truck`, `Lock`, `Pencil`, `ChevronUp`, `ChevronDown` — already imported, do NOT re-import - Badges: `rounded-full px-2.5 py-1 text-xs font-medium` (existing pattern) - i18n: `t(key)` from `useI18n()` — already initialized at line 1067 as `const { t } = useI18n()` ## VALIDATION (run BEFORE git commit) ```bash # 1. Line count check wc -l pages/PartnerOrderProcess/partnerorderprocess.jsx # Expected: 1450-1530 (base 1653 − ~175 lines removed by all fixes). If below 1400 → STOP, restore: git checkout -- pages/PartnerOrderProcess/partnerorderprocess.jsx # 2. Dead code cleanup grep -n "LOCAL_UI_TEXT\|ChannelFilter\|CHANNEL_FILTERS" pages/PartnerOrderProcess/partnerorderprocess.jsx # Expected: 0 matches # 3. i18n check grep -n "orderprocess.status.locked\|orderprocess.edit_button\|orderprocess.role.staff\|orderprocess.aria.edit" pages/PartnerOrderProcess/partnerorderprocess.jsx # Expected: multiple matches # 4. analyzeStageSet returns keys (not Russian text) grep -n "stageAnalysis.blocker" pages/PartnerOrderProcess/partnerorderprocess.jsx # Expected: t(stageAnalysis.blocker) — wrapped in t() # 5. Regression check — FROZEN UX elements untouched grep -n "function PipelinePreview\|function EditStageDialog\|handleToggleStage\|handleSaveStage\|isNormalizing" pages/PartnerOrderProcess/partnerorderprocess.jsx # Expected: all present, unchanged # 6. Syntax check python -c " import subprocess r = subprocess.run(['node', '--check', 'pages/PartnerOrderProcess/partnerorderprocess.jsx'], capture_output=True, text=True) print(r.stdout or r.stderr or 'Note: node --check skips JSX — use as rough check only') " ``` ## GIT ```bash git add pages/PartnerOrderProcess/partnerorderprocess.jsx git commit -m "feat: redesign PartnerOrderProcess — compact table + mobile accordion + i18n" git push ``` === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/PartnerOrderProcess/partnerorderprocess.jsx` against the numbered Fix list only, plus `README.md` and `BUGS.md` in the same folder for context. I’ll keep scope tight, inspect only those files, then write the findings file requested.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Force pages/PartnerOrderProcess' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PartnerOrderProcess/README.md' -TotalCount 250" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PartnerOrderProcess/BUGS.md' -TotalCount 250" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "(Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | Measure-Object -Line).Lines" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 19.29s:
+
+ exited 124 in 20.49s:
+
+ exited 124 in 21.37s:
+
+ exited 124 in 23.84s:
+
+codex
+The initial reads timed out, likely on shell startup rather than file size. I’m retrying with longer timeouts and only the exact files in `pages/PartnerOrderProcess`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "(Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | Measure-Object -Line).Lines" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PartnerOrderProcess/BUGS.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Force 'pages/PartnerOrderProcess'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/PartnerOrderProcess/README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 35.65s:
+# PartnerOrderProcess â€” Bug Tracker
+
+**Last updated:** 2026-03-01
+
+---
+
+## Fixed (in RELEASE 260228-01)
+
+| ID | Priority | Description | Commit |
+|----|----------|-------------|--------|
+| BUG-OP-016 | P2 | Mobile reorder up/down buttons only 24px tall (h-6), below 44px minimum. Moved to overflow menu with min-h-[44px] items. Codex confirmed fix. | Phase1v2 CC+Codex |
+
+---
+
+## Fixed (in RELEASE 260228-00)
+
+| ID | Priority | Description | Commit |
+|----|----------|-------------|--------|
+| BUG-OP-015 | P2 | Touch targets: action buttons 36px (h-9), move buttons ~17px, channel filter/color picker below 44px minimum | Phase1 touch targets |
+
+ succeeded in 37.65s:
+1496
+ succeeded in 32.45s:
+# PartnerOrderProcess
+
+**Route:** `/partnerorderprocess`
+**Type:** Partner settings page (inside PartnerShell)
+**Lines:** ~1199
+
+## Description
+Order processing pipeline configuration. CRUD for OrderStage entities with drag-and-drop (desktop) and move buttons (mobile). Stage lifecycle: start (locked) â†’ middle stages (editable, reorderable) â†’ finish (locked). Features rate-limit handling, sort_order rebalancing (ORDER_STEP=10), channel filtering, and role-based access per stage.
+
+## Entities Used
+- `OrderStage` â€” pipeline stages (CRUD)
+- `Order` â€” checked before stage deletion to prevent orphans
+
+## Sub-components (7)
+- `PipelinePreview` â€” visual pipeline with colored circles
+- `ChannelFilter` â€” hall/pickup/delivery filter tabs
+- `StageRow` â€” single stage row with drag/move/edit/delete
+- `EditStageDialog` â€” create/edit stage form
+- `DeleteConfirmDialog` â€” delete confirmation with warning
+- `EmptyState` â€” initial setup prompt
+ succeeded in 39.19s:
+
+
+    Каталог: C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PartnerOrderProcess
+
+
+Mode                 LastWriteTime         Length Name                                                                 
+----                 -------------         ------ ----                                                                 
+dar---          4/3/2026  10:39 PM                versions                                                             
+-a----          4/3/2026  10:39 PM          55103 260403-01 partnerorderprocess RELEASE.jsx                            
+-a----          3/1/2026  12:06 AM           2524 BUGS.md                                                              
+-a----          4/3/2026  10:35 PM          55103 partnerorderprocess.jsx                                              
+-a----          3/1/2026  12:07 AM           2567 README.md                                                            
+
+
+codex
+I have the page context files. The target JSX is only 1496 lines, so I’m inspecting the concrete code sections tied to Fix 1-5 rather than the stale line numbers in the task block.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=0; Get-Content '"'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { "'$i++; if($i -ge 341 -and $i -le 780){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=0; Get-Content '"'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { "'$i++; if($i -ge 1201 -and $i -le 1496){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=0; Get-Content '"'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { "'$i++; if($i -ge 781 -and $i -le 1200){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=0; Get-Content '"'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { "'$i++; if($i -ge 1 -and $i -le 340){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 39.75s:
+1201:       queryClient.invalidateQueries({ queryKey: ["orderStages", partnerId] });
+1202:       toast.success(t("toast.saved"), { id: TOAST_ID });
+1203:       setEditDialog({ open: false, stage: null });
+1204:     },
+1205:     onError: () => toast.error(t("toast.error"), { id: TOAST_ID }),
+1206:   });
+1207: 
+1208:   // FIX BUG-OP-003: removed invalidateQueries from onSuccess â€” done manually after rebalance
+1209:   const createMutation = useMutation({
+1210:     mutationFn: (data) => base44.entities.OrderStage.create(data),
+1211:     onSuccess: () => {
+1212:       toast.success(t("toast.saved"), { id: TOAST_ID });
+1213:       setEditDialog({ open: false, stage: null });
+1214:     },
+1215:     onError: () => toast.error(t("toast.error"), { id: TOAST_ID }),
+1216:   });
+1217: 
+1218:   // FIX BUG-OP-003: removed invalidateQueries from onSuccess â€” done manually after rebalance
+1219:   const deleteMutation = useMutation({
+1220:     mutationFn: (id) => base44.entities.OrderStage.delete(id),
+ succeeded in 40.33s:
+   1: import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+   2: import { base44 } from "@/api/base44Client";
+   3: import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+   4: import { Button } from "@/components/ui/button";
+   5: import { Checkbox } from "@/components/ui/checkbox";
+   6: import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+   7: import { Input } from "@/components/ui/input";
+   8: import { Label } from "@/components/ui/label";
+   9: import { toast } from "sonner";
+  10: import {
+  11:   Plus, Pencil, Trash2, Lock, Loader2, AlertTriangle, RefreshCcw,
+  12:   ChevronUp, ChevronDown, ArrowRight,
+  13:   Utensils, Package, Truck, MoreVertical
+  14: } from "lucide-react";
+  15: import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+  16: import PartnerShell, { usePartnerAccess } from "@/components/PartnerShell";
+  17: import { useI18n } from "@/components/i18n";
+  18: 
+  19: // ============================================================
+  20: // CONSTANTS
+ succeeded in 42.11s:
+ 781:     enabled_pickup: true,
+ 782:     enabled_delivery: true,
+ 783:   });
+ 784: 
+ 785:   const locked = isLocked(stage);
+ 786:   const isNew = stage?.isNew === true;
+ 787: 
+ 788:   // Check if at least one channel is selected
+ 789:   const hasValidChannels = channels.enabled_hall || channels.enabled_pickup || channels.enabled_delivery;
+ 790: 
+ 791:   useEffect(() => {
+ 792:     if (stage) {
+ 793:       const displayName = stage.isNew ? (stage.name || "") : getDisplayName(stage, t);
+ 794:       setName(displayName);
+ 795:       setColor(stage.color || "#3b82f6");
+ 796:       setRoles(stage.allowed_roles || []);
+ 797:       setChannels({
+ 798:         enabled_hall: stage.enabled_hall !== false,
+ 799:         enabled_pickup: stage.enabled_pickup !== false,
+ 800:         enabled_delivery: stage.enabled_delivery !== false,
+ succeeded in 45.59s:
+ 341:     const nextKey = remainingKeys.shift();
+ 342:     if (nextKey) {
+ 343:       assignedMiddleSlots.set(nextKey, stage);
+ 344:       usedMiddleIds.add(stage.id);
+ 345:     }
+ 346:   });
+ 347: 
+ 348:   return SYSTEM_STAGE_SLOTS.map((slot, index) => {
+ 349:     let stage = null;
+ 350: 
+ 351:     if (slot.internal_code === "start") {
+ 352:       stage = analysis.startStage;
+ 353:     } else if (slot.internal_code === "finish") {
+ 354:       stage = analysis.finishStage;
+ 355:     } else {
+ 356:       stage = assignedMiddleSlots.get(slot.key) || null;
+ 357:     }
+ 358: 
+ 359:     return {
+ 360:       key: slot.key,
+codex
+I have the core sections. I’m checking the tail render block and the exact JSX usages for the Fix 1-5 areas so the findings stay specific and defensible.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=0; Get-Content '"'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { "'$i++; if($i -ge 1488 -and $i -le 1605){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PartnerOrderProcess/partnerorderprocess.jsx' -Pattern 'ChannelFilter|CHANNEL_FILTERS|LOCAL_UI_TEXT|stageAnalysis\\.blocker|currentProcess|bg-white rounded-xl border overflow-hidden|<FixedStageRow|handleAddStage|handleMoveUp|handleMoveDown|handleDeleteStage|handleConfirmDelete|toggleBusyKey|moveBusy|deleteDialog' | ForEach-Object { '{0}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 17.55s:
+1488:   // Loading state
+1489:   if (isLoading) {
+1490:     return (
+1491:       <div className="flex flex-col items-center justify-center py-12 gap-3">
+1492:         <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+1493:       </div>
+1494:     );
+1495:   }
+1496: 
+1497:   if (stageAnalysis.blocker) {
+1498:     return (
+1499:       <div className="max-w-2xl mx-auto">
+1500:         <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+1501:           <div className="flex items-start gap-3">
+1502:             <AlertTriangle className="h-6 w-6 text-amber-600 flex-shrink-0" />
+1503:             <div className="flex-1">
+1504:               <h3 className="font-semibold text-amber-900 mb-1">
+1505:                 {LOCAL_UI_TEXT.blockerGeneric}
+1506:               </h3>
+1507:               <p className="text-sm text-amber-700">
+ succeeded in 17.03s:
+35: const CHANNEL_FILTERS = [
+125: const LOCAL_UI_TEXT = {
+126: currentProcess: "Текущий процесс",
+249: blocker: LOCAL_UI_TEXT.blockerUnsupportedType,
+258: blocker: LOCAL_UI_TEXT.blockerMultipleStart,
+267: blocker: LOCAL_UI_TEXT.blockerMultipleFinish,
+276: blocker: LOCAL_UI_TEXT.blockerTooManyMiddle,
+582: function ChannelFilter({ value, onChange, t }) {
+606: {CHANNEL_FILTERS.map((filter) => {
+636: function FixedStageRow({ slot, toggleBusyKey, onEdit, onToggle, t }) {
+638: const toggleBusy = toggleBusyKey === slot.key;
+639: const controlsBusy = Boolean(toggleBusyKey);
+698: {LOCAL_UI_TEXT.locked}
+712: {slot.active ? LOCAL_UI_TEXT.enabled : LOCAL_UI_TEXT.disabled}
+1076: const [toggleBusyKey, setToggleBusyKey] = useState("");
+1077: const [moveBusy, setMoveBusy] = useState(false);
+1079: const [deleteDialog, setDeleteDialog] = useState({ open: false, stage: null });
+1143: const currentProcessStages = useMemo(() => {
+1157: if (!partnerId || !normalizationPlan || stageAnalysis.blocker) return;
+1195: }, [normalizationPlan, partnerId, queryClient, stageAnalysis.blocker, t]);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=0; Get-Content '"'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { "'$i++; if($i -ge 1605 -and $i -le 1665){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 7.31s:
+1605:         </div>
+1606:       </div>
+1607: 
+1608:       <div className="bg-white rounded-xl border overflow-hidden">
+1609:         {fixedStageSlots.map((slot) => (
+1610:           <FixedStageRow
+1611:             key={slot.key}
+1612:             slot={slot}
+1613:             toggleBusyKey={toggleBusyKey}
+1614:             onEdit={handleEditStage}
+1615:             onToggle={handleToggleStage}
+1616:             t={t}
+1617:           />
+1618:         ))}
+1619:       </div>
+1620: 
+1621:       {/* Hint */}
+1622:       <div className="mt-4 bg-amber-50 border border-amber-100 rounded-lg p-3 text-sm text-amber-700">
+1623:         <div className="flex gap-2">
+1624:           <Lock className="h-4 w-4 mt-0.5 shrink-0" />
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PartnerOrderProcess/partnerorderprocess.jsx' -Pattern 'DeleteConfirmDialog|deleteDialog|handleConfirmDelete|handleDeleteStage|handleAddStage|handleMoveUp|handleMoveDown|ChannelFilter|<ChannelFilter|toggleBusyKey|setExpandedKey|expandedKey|LOCAL_UI_TEXT\\.|orderprocess\\.current_process|orderprocess\\.status\\.locked|orderprocess\\.edit_button|orderprocess\\.channels_label|orderprocess\\.roles_label' | ForEach-Object { '{0}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 21.10s:
+249: blocker: LOCAL_UI_TEXT.blockerUnsupportedType,
+258: blocker: LOCAL_UI_TEXT.blockerMultipleStart,
+267: blocker: LOCAL_UI_TEXT.blockerMultipleFinish,
+276: blocker: LOCAL_UI_TEXT.blockerTooManyMiddle,
+582: function ChannelFilter({ value, onChange, t }) {
+636: function FixedStageRow({ slot, toggleBusyKey, onEdit, onToggle, t }) {
+638: const toggleBusy = toggleBusyKey === slot.key;
+639: const controlsBusy = Boolean(toggleBusyKey);
+698: {LOCAL_UI_TEXT.locked}
+712: {slot.active ? LOCAL_UI_TEXT.enabled : LOCAL_UI_TEXT.disabled}
+999: function DeleteConfirmDialog({ open, stage, onClose, onConfirm, deleting, t }) {
+1076: const [toggleBusyKey, setToggleBusyKey] = useState("");
+1079: const [deleteDialog, setDeleteDialog] = useState({ open: false, stage: null });
+1223: setDeleteDialog({ open: false, stage: null });
+1229: const handleAddStage = () => {
+1262: if (!slot || slot.definition.locked || toggleBusyKey) return;
+1264: setToggleBusyKey(slot.key);
+1295: setToggleBusyKey("");
+1326: const handleDeleteStage = (stage) => {
+1327: setDeleteDialog({ open: true, stage });
+codex
+I’ve narrowed the findings to five items tied directly to Fix 1-5. I’m writing the requested report now, and I’ll also save the repo-required review artifacts in the page folder without touching the page code.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem 'pipeline/chain-state'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 12.57s:
+
+
+    Каталог: C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pipeline\chain-state
+
+
+Mode                 LastWriteTime         Length Name                                                                 
+----                 -------------         ------ ----                                                                 
+-a----          4/4/2026   6:04 AM           8551 partnerorderprocess-260404-060141-d4ba-codex-findings.md             
+-a----          4/4/2026   8:50 PM           9365 partnerorderprocess-260404-204226-0133-cc-findings.md                
+-a----         3/22/2026  12:02 AM           6352 partnersettings-260321-235750-cc-findings.md                         
+-a----         3/22/2026  12:07 AM           3017 partnersettings-260321-235750-codex-findings.md                      
+-a----         3/22/2026  12:14 AM           4643 partnersettings-260321-235750-comparison.md                          
+-a----         3/22/2026  12:16 AM            306 partnersettings-260321-235750-discussion.md                          
+-a----         3/22/2026  12:20 AM           1856 partnersettings-260321-235750-merge-report.md                        
+-a----         3/23/2026   2:40 PM           9165 partnersettings-260323-142203-51fa-cc-findings.md                    
+-a----         3/23/2026   2:43 PM           2488 partnersettings-260323-142203-51fa-codex-findings.md                 
+-a----         3/23/2026   2:57 PM           6613 partnersettings-260323-142203-51fa-comparison.md                     
+-a----         3/23/2026   3:08 PM           2586 partnersettings-260323-142203-51fa-discussion.md                     
+-a----         3/23/2026   3:44 PM           3194 partnersettings-260323-142203-51fa-merge-report.md                   
+-a----         3/23/2026   6:53 PM           2635 partnersettings-260323-185103-86f9-cc-findings.md                    
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PartnerOrderProcess/commands_2026-04-04.log
+Get-ChildItem -Force pages/PartnerOrderProcess
+(Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | Measure-Object -Line).Lines
+Get-Content 'pages/PartnerOrderProcess/README.md' -TotalCount 250
+Get-Content 'pages/PartnerOrderProcess/BUGS.md' -TotalCount 250
+Get-ChildItem -Force 'pages/PartnerOrderProcess'
+(Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | Measure-Object -Line).Lines
+Get-Content 'pages/PartnerOrderProcess/README.md'
+Get-Content 'pages/PartnerOrderProcess/BUGS.md'
+$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1 -and $i -le 340){ '{0,4}: {1}' -f $i, $_ } }
+$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 341 -and $i -le 780){ '{0,4}: {1}' -f $i, $_ } }
+$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 781 -and $i -le 1200){ '{0,4}: {1}' -f $i, $_ } }
+$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1201 -and $i -le 1496){ '{0,4}: {1}' -f $i, $_ } }
+$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1488 -and $i -le 1605){ '{0,4}: {1}' -f $i, $_ } }
+Select-String -Path 'pages/PartnerOrderProcess/partnerorderprocess.jsx' -Pattern 'ChannelFilter|CHANNEL_FILTERS|LOCAL_UI_TEXT|stageAnalysis\.blocker|currentProcess|bg-white rounded-xl border overflow-hidden|<FixedStageRow|handleAddStage|handleMoveUp|handleMoveDown|handleDeleteStage|handleConfirmDelete|toggleBusyKey|moveBusy|deleteDialog' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1605 -and $i -le 1665){ '{0,4}: {1}' -f $i, $_ } }
+Select-String -Path 'pages/PartnerOrderProcess/partnerorderprocess.jsx' -Pattern 'DeleteConfirmDialog|deleteDialog|handleConfirmDelete|handleDeleteStage|handleAddStage|handleMoveUp|handleMoveDown|ChannelFilter|<ChannelFilter|toggleBusyKey|setExpandedKey|expandedKey|LOCAL_UI_TEXT\.|orderprocess\.current_process|orderprocess\.status\.locked|orderprocess\.edit_button|orderprocess\.channels_label|orderprocess\.roles_label' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+Get-ChildItem 'pipeline/chain-state'
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PartnerOrderProcess/review_2026-04-04.md
+# PartnerOrderProcess Review
+
+## Findings
+1. [P2] Fix 1 — Channel filter dead code still exists. `CHANNEL_FILTERS` is still declared at lines 35-40 and `ChannelFilter` is still implemented at lines 582-630, but there is no JSX usage of `<ChannelFilter>` anywhere in `partnerorderprocess.jsx`. FIX: delete `CHANNEL_FILTERS` and the entire `ChannelFilter` function.
+2. [P1] Fix 2 — `FixedStageRow` is still the old card-and-toggle component. The row still accepts `toggleBusyKey` and `onToggle` at line 636, renders full-width cards with text channel badges at lines 730-745, and shows the inline active toggle plus pencil action at lines 700-727 instead of the required compact desktop row and mobile accordion. Locked stages also still render a pencil button when `slot.canEdit` is true. The parent still uses `toggleBusyKey` state at line 1076 and passes `onToggle={handleToggleStage}` at lines 1609-1616, so there is no `expandedKey` state or one-row accordion behavior. FIX: replace `FixedStageRow` with the compact row/mobile accordion version, add `expandedKey` state in `OrderProcessContent`, and update the `.map()` call to pass `isExpanded`, `onToggleExpand`, and `onEdit` only.
+3. [P2] Fix 3 — The mobile channel legend was not added. The render goes from the current-process summary directly into the stage list container at lines 1587-1618, and there is no `sm:hidden` legend block explaining the hall/pickup/delivery icons before the `bg-white rounded-xl border overflow-hidden` list. FIX: insert the mobile-only channel legend immediately before the stage-list container.
+4. [P1] Fix 4 — `LOCAL_UI_TEXT` still drives user-facing copy instead of `t()`. The hardcoded object is still defined at lines 125-135. `analyzeStageSet()` still returns localized Russian strings through `LOCAL_UI_TEXT.*` at lines 249, 258, 267, and 276, the blocker UI still renders `LOCAL_UI_TEXT.blockerGeneric` and raw `stageAnalysis.blocker` at lines 1505-1508, and the current-process label still uses `LOCAL_UI_TEXT.currentProcess` at line 1589. The old row also still uses `LOCAL_UI_TEXT.locked`, `LOCAL_UI_TEXT.enabled`, and `LOCAL_UI_TEXT.disabled` at lines 698 and 712. FIX: replace out-of-row usages with `t('...')`, make `analyzeStageSet()` return i18n keys, render blockers with `t(stageAnalysis.blocker)`, and remove `LOCAL_UI_TEXT` only after the `FixedStageRow` replacement eliminates the remaining row-local references.
+5. [P3] Fix 5 — Dead stage-management handlers are still present. `handleAddStage`, `handleDeleteStage`, `handleConfirmDelete`, `handleMoveUp`, and `handleMoveDown` are still declared at lines 1229, 1326, 1331, 1365, and 1390, but they have no JSX or prop usages in this file. FIX: remove those handler declarations, keep `deleteMutation`, `deleteDialog`, and `moveBusy` only if they must remain for hook-order safety, and add the reserved comment described in Fix 5.
+
+## Summary
+Total: 5 findings (0 P0, 2 P1, 2 P2, 1 P3)
+
+## Prompt Clarity
+- Overall clarity: 3
+- Ambiguous Fix descriptions: Fix 4B conflicts with the outer page-folder-only review scope because the dictionary lives elsewhere.
+- Missing context: It was unclear whether the task wanted a review of the current file against the redesign spec or a review of an already-patched candidate.
+- Scope questions: It was unclear whether implementation-only instructions in the embedded prompt should be ignored during review-only mode.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md
+# Codex Writer Findings — PartnerOrderProcess Chain: partnerorderprocess-260404-204226-0133
+
+## Findings
+1. [P2] Fix 1 — Channel filter dead code still exists. `CHANNEL_FILTERS` is still declared at lines 35-40 and `ChannelFilter` is still implemented at lines 582-630, but there is no JSX usage of `<ChannelFilter>` anywhere in `partnerorderprocess.jsx`. This keeps obsolete filter UI and logic in the page after the redesign moved channel visibility into the stage rows. FIX: delete `CHANNEL_FILTERS` and the entire `ChannelFilter` function.
+2. [P1] Fix 2 — `FixedStageRow` is still the old card-and-toggle component. The row still accepts `toggleBusyKey` and `onToggle` at line 636, renders full-width cards with text channel badges at lines 730-745, and shows the inline active toggle plus pencil action at lines 700-727 instead of the required compact desktop row and mobile accordion. Locked stages also still render a pencil button when `slot.canEdit` is true. The parent still uses `toggleBusyKey` state at line 1076 and passes `onToggle={handleToggleStage}` at lines 1609-1616, so there is no `expandedKey` state or one-row accordion behavior. FIX: replace `FixedStageRow` with the compact row/mobile accordion version, add `expandedKey` state in `OrderProcessContent`, and update the `.map()` call to pass `isExpanded`, `onToggleExpand`, and `onEdit` only.
+3. [P2] Fix 3 — The mobile channel legend was not added. The render goes from the current-process summary directly into the stage list container at lines 1587-1618, and there is no `sm:hidden` legend block explaining the hall/pickup/delivery icons before the `bg-white rounded-xl border overflow-hidden` list. FIX: insert the mobile-only channel legend immediately before the stage-list container.
+4. [P1] Fix 4 — `LOCAL_UI_TEXT` still drives user-facing copy instead of `t()`. The hardcoded object is still defined at lines 125-135. `analyzeStageSet()` still returns localized Russian strings through `LOCAL_UI_TEXT.*` at lines 249, 258, 267, and 276, the blocker UI still renders `LOCAL_UI_TEXT.blockerGeneric` and raw `stageAnalysis.blocker` at lines 1505-1508, and the current-process label still uses `LOCAL_UI_TEXT.currentProcess` at line 1589. The old row also still uses `LOCAL_UI_TEXT.locked`, `LOCAL_UI_TEXT.enabled`, and `LOCAL_UI_TEXT.disabled` at lines 698 and 712. FIX: replace out-of-row usages with `t('...')`, make `analyzeStageSet()` return i18n keys, render blockers with `t(stageAnalysis.blocker)`, and remove `LOCAL_UI_TEXT` only after the `FixedStageRow` replacement eliminates the remaining row-local references.
+5. [P3] Fix 5 — Dead stage-management handlers are still present. `handleAddStage`, `handleDeleteStage`, `handleConfirmDelete`, `handleMoveUp`, and `handleMoveDown` are still declared at lines 1229, 1326, 1331, 1365, and 1390, but they have no JSX or prop usages in this file. That leaves obsolete add/move/delete paths in a fixed 5-stage screen and makes the state/handler section harder to reason about. FIX: remove those handler declarations, keep `deleteMutation`, `deleteDialog`, and `moveBusy` only if they must remain for hook-order safety, and add the reserved comment described in Fix 5.
+
+## Summary
+Total: 5 findings (0 P0, 2 P1, 2 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+Rate the task description quality (1-5). For any score below 4, explain what was unclear:
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 4B — the task asks to add i18n keys in a dictionary outside the page folder, but the outer review instructions forbid reading outside the target page folder, so dictionary verification was unclear and out of scope for this review.
+- Missing context (what info would have helped): Whether this review should assess the current file against the redesign spec or assess a separately patched candidate; the exact Russian i18n dictionary path if dictionary review was expected; whether page-folder review artifacts are still required in addition to the pipeline findings file.
+- Scope questions (anything you weren't sure if it's in scope): Whether the repo-wide dictionary lookup instructions inside TASK CONTEXT override the outer "read only the target files + README/BUGS in the same page folder" rule; whether implementation-only steps like `wc -l`, git commit, push, and syntax checks should be ignored in review-only mode.
+apply_patch(auto_approved=true) exited 0 in 891ms:
+Success. Updated the following files:
+A pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md
+A pages/PartnerOrderProcess/review_2026-04-04.md
+A pages/PartnerOrderProcess/commands_2026-04-04.log
+file update:
+diff --git a/pages/PartnerOrderProcess/commands_2026-04-04.log b/pages/PartnerOrderProcess/commands_2026-04-04.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..45b61e7cdc5ef8a77906aa8e0b16be6a81dff91f
+--- /dev/null
++++ b/pages/PartnerOrderProcess/commands_2026-04-04.log
+@@ -0,0 +1,17 @@
++Get-ChildItem -Force pages/PartnerOrderProcess
++(Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | Measure-Object -Line).Lines
++Get-Content 'pages/PartnerOrderProcess/README.md' -TotalCount 250
++Get-Content 'pages/PartnerOrderProcess/BUGS.md' -TotalCount 250
++Get-ChildItem -Force 'pages/PartnerOrderProcess'
++(Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | Measure-Object -Line).Lines
++Get-Content 'pages/PartnerOrderProcess/README.md'
++Get-Content 'pages/PartnerOrderProcess/BUGS.md'
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1 -and $i -le 340){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 341 -and $i -le 780){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 781 -and $i -le 1200){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1201 -and $i -le 1496){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1488 -and $i -le 1605){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PartnerOrderProcess/partnerorderprocess.jsx' -Pattern 'ChannelFilter|CHANNEL_FILTERS|LOCAL_UI_TEXT|stageAnalysis\.blocker|currentProcess|bg-white rounded-xl border overflow-hidden|<FixedStageRow|handleAddStage|handleMoveUp|handleMoveDown|handleDeleteStage|handleConfirmDelete|toggleBusyKey|moveBusy|deleteDialog' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1605 -and $i -le 1665){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PartnerOrderProcess/partnerorderprocess.jsx' -Pattern 'DeleteConfirmDialog|deleteDialog|handleConfirmDelete|handleDeleteStage|handleAddStage|handleMoveUp|handleMoveDown|ChannelFilter|<ChannelFilter|toggleBusyKey|setExpandedKey|expandedKey|LOCAL_UI_TEXT\.|orderprocess\.current_process|orderprocess\.status\.locked|orderprocess\.edit_button|orderprocess\.channels_label|orderprocess\.roles_label' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++Get-ChildItem 'pipeline/chain-state'
+diff --git a/pages/PartnerOrderProcess/review_2026-04-04.md b/pages/PartnerOrderProcess/review_2026-04-04.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f93a304cb773253e59118a4cc582b77cdc3c4a4f
+--- /dev/null
++++ b/pages/PartnerOrderProcess/review_2026-04-04.md
+@@ -0,0 +1,17 @@
++# PartnerOrderProcess Review
++
++## Findings
++1. [P2] Fix 1 — Channel filter dead code still exists. `CHANNEL_FILTERS` is still declared at lines 35-40 and `ChannelFilter` is still implemented at lines 582-630, but there is no JSX usage of `<ChannelFilter>` anywhere in `partnerorderprocess.jsx`. FIX: delete `CHANNEL_FILTERS` and the entire `ChannelFilter` function.
++2. [P1] Fix 2 — `FixedStageRow` is still the old card-and-toggle component. The row still accepts `toggleBusyKey` and `onToggle` at line 636, renders full-width cards with text channel badges at lines 730-745, and shows the inline active toggle plus pencil action at lines 700-727 instead of the required compact desktop row and mobile accordion. Locked stages also still render a pencil button when `slot.canEdit` is true. The parent still uses `toggleBusyKey` state at line 1076 and passes `onToggle={handleToggleStage}` at lines 1609-1616, so there is no `expandedKey` state or one-row accordion behavior. FIX: replace `FixedStageRow` with the compact row/mobile accordion version, add `expandedKey` state in `OrderProcessContent`, and update the `.map()` call to pass `isExpanded`, `onToggleExpand`, and `onEdit` only.
++3. [P2] Fix 3 — The mobile channel legend was not added. The render goes from the current-process summary directly into the stage list container at lines 1587-1618, and there is no `sm:hidden` legend block explaining the hall/pickup/delivery icons before the `bg-white rounded-xl border overflow-hidden` list. FIX: insert the mobile-only channel legend immediately before the stage-list container.
++4. [P1] Fix 4 — `LOCAL_UI_TEXT` still drives user-facing copy instead of `t()`. The hardcoded object is still defined at lines 125-135. `analyzeStageSet()` still returns localized Russian strings through `LOCAL_UI_TEXT.*` at lines 249, 258, 267, and 276, the blocker UI still renders `LOCAL_UI_TEXT.blockerGeneric` and raw `stageAnalysis.blocker` at lines 1505-1508, and the current-process label still uses `LOCAL_UI_TEXT.currentProcess` at line 1589. The old row also still uses `LOCAL_UI_TEXT.locked`, `LOCAL_UI_TEXT.enabled`, and `LOCAL_UI_TEXT.disabled` at lines 698 and 712. FIX: replace out-of-row usages with `t('...')`, make `analyzeStageSet()` return i18n keys, render blockers with `t(stageAnalysis.blocker)`, and remove `LOCAL_UI_TEXT` only after the `FixedStageRow` replacement eliminates the remaining row-local references.
++5. [P3] Fix 5 — Dead stage-management handlers are still present. `handleAddStage`, `handleDeleteStage`, `handleConfirmDelete`, `handleMoveUp`, and `handleMoveDown` are still declared at lines 1229, 1326, 1331, 1365, and 1390, but they have no JSX or prop usages in this file. FIX: remove those handler declarations, keep `deleteMutation`, `deleteDialog`, and `moveBusy` only if they must remain for hook-order safety, and add the reserved comment described in Fix 5.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions: Fix 4B conflicts with the outer page-folder-only review scope because the dictionary lives elsewhere.
++- Missing context: It was unclear whether the task wanted a review of the current file against the redesign spec or a review of an already-patched candidate.
++- Scope questions: It was unclear whether implementation-only instructions in the embedded prompt should be ignored during review-only mode.
+diff --git a/pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md b/pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..851d2e0aa540ecf04df710262e816abc6bbaf062
+--- /dev/null
++++ b/pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PartnerOrderProcess Chain: partnerorderprocess-260404-204226-0133
++
++## Findings
++1. [P2] Fix 1 — Channel filter dead code still exists. `CHANNEL_FILTERS` is still declared at lines 35-40 and `ChannelFilter` is still implemented at lines 582-630, but there is no JSX usage of `<ChannelFilter>` anywhere in `partnerorderprocess.jsx`. This keeps obsolete filter UI and logic in the page after the redesign moved channel visibility into the stage rows. FIX: delete `CHANNEL_FILTERS` and the entire `ChannelFilter` function.
++2. [P1] Fix 2 — `FixedStageRow` is still the old card-and-toggle component. The row still accepts `toggleBusyKey` and `onToggle` at line 636, renders full-width cards with text channel badges at lines 730-745, and shows the inline active toggle plus pencil action at lines 700-727 instead of the required compact desktop row and mobile accordion. Locked stages also still render a pencil button when `slot.canEdit` is true. The parent still uses `toggleBusyKey` state at line 1076 and passes `onToggle={handleToggleStage}` at lines 1609-1616, so there is no `expandedKey` state or one-row accordion behavior. FIX: replace `FixedStageRow` with the compact row/mobile accordion version, add `expandedKey` state in `OrderProcessContent`, and update the `.map()` call to pass `isExpanded`, `onToggleExpand`, and `onEdit` only.
++3. [P2] Fix 3 — The mobile channel legend was not added. The render goes from the current-process summary directly into the stage list container at lines 1587-1618, and there is no `sm:hidden` legend block explaining the hall/pickup/delivery icons before the `bg-white rounded-xl border overflow-hidden` list. FIX: insert the mobile-only channel legend immediately before the stage-list container.
++4. [P1] Fix 4 — `LOCAL_UI_TEXT` still drives user-facing copy instead of `t()`. The hardcoded object is still defined at lines 125-135. `analyzeStageSet()` still returns localized Russian strings through `LOCAL_UI_TEXT.*` at lines 249, 258, 267, and 276, the blocker UI still renders `LOCAL_UI_TEXT.blockerGeneric` and raw `stageAnalysis.blocker` at lines 1505-1508, and the current-process label still uses `LOCAL_UI_TEXT.currentProcess` at line 1589. The old row also still uses `LOCAL_UI_TEXT.locked`, `LOCAL_UI_TEXT.enabled`, and `LOCAL_UI_TEXT.disabled` at lines 698 and 712. FIX: replace out-of-row usages with `t('...')`, make `analyzeStageSet()` return i18n keys, render blockers with `t(stageAnalysis.blocker)`, and remove `LOCAL_UI_TEXT` only after the `FixedStageRow` replacement eliminates the remaining row-local references.
++5. [P3] Fix 5 — Dead stage-management handlers are still present. `handleAddStage`, `handleDeleteStage`, `handleConfirmDelete`, `handleMoveUp`, and `handleMoveDown` are still declared at lines 1229, 1326, 1331, 1365, and 1390, but they have no JSX or prop usages in this file. That leaves obsolete add/move/delete paths in a fixed 5-stage screen and makes the state/handler section harder to reason about. FIX: remove those handler declarations, keep `deleteMutation`, `deleteDialog`, and `moveBusy` only if they must remain for hook-order safety, and add the reserved comment described in Fix 5.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++Rate the task description quality (1-5). For any score below 4, explain what was unclear:
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 4B — the task asks to add i18n keys in a dictionary outside the page folder, but the outer review instructions forbid reading outside the target page folder, so dictionary verification was unclear and out of scope for this review.
++- Missing context (what info would have helped): Whether this review should assess the current file against the redesign spec or assess a separately patched candidate; the exact Russian i18n dictionary path if dictionary review was expected; whether page-folder review artifacts are still required in addition to the pipeline findings file.
++- Scope questions (anything you weren't sure if it's in scope): Whether the repo-wide dictionary lookup instructions inside TASK CONTEXT override the outer "read only the target files + README/BUGS in the same page folder" rule; whether implementation-only steps like `wc -l`, git commit, push, and syntax checks should be ignored in review-only mode.
+
+file update:
+diff --git a/pages/PartnerOrderProcess/commands_2026-04-04.log b/pages/PartnerOrderProcess/commands_2026-04-04.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..45b61e7cdc5ef8a77906aa8e0b16be6a81dff91f
+--- /dev/null
++++ b/pages/PartnerOrderProcess/commands_2026-04-04.log
+@@ -0,0 +1,17 @@
++Get-ChildItem -Force pages/PartnerOrderProcess
++(Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | Measure-Object -Line).Lines
++Get-Content 'pages/PartnerOrderProcess/README.md' -TotalCount 250
++Get-Content 'pages/PartnerOrderProcess/BUGS.md' -TotalCount 250
++Get-ChildItem -Force 'pages/PartnerOrderProcess'
++(Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | Measure-Object -Line).Lines
++Get-Content 'pages/PartnerOrderProcess/README.md'
++Get-Content 'pages/PartnerOrderProcess/BUGS.md'
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1 -and $i -le 340){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 341 -and $i -le 780){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 781 -and $i -le 1200){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1201 -and $i -le 1496){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1488 -and $i -le 1605){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PartnerOrderProcess/partnerorderprocess.jsx' -Pattern 'ChannelFilter|CHANNEL_FILTERS|LOCAL_UI_TEXT|stageAnalysis\.blocker|currentProcess|bg-white rounded-xl border overflow-hidden|<FixedStageRow|handleAddStage|handleMoveUp|handleMoveDown|handleDeleteStage|handleConfirmDelete|toggleBusyKey|moveBusy|deleteDialog' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1605 -and $i -le 1665){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PartnerOrderProcess/partnerorderprocess.jsx' -Pattern 'DeleteConfirmDialog|deleteDialog|handleConfirmDelete|handleDeleteStage|handleAddStage|handleMoveUp|handleMoveDown|ChannelFilter|<ChannelFilter|toggleBusyKey|setExpandedKey|expandedKey|LOCAL_UI_TEXT\.|orderprocess\.current_process|orderprocess\.status\.locked|orderprocess\.edit_button|orderprocess\.channels_label|orderprocess\.roles_label' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++Get-ChildItem 'pipeline/chain-state'
+diff --git a/pages/PartnerOrderProcess/review_2026-04-04.md b/pages/PartnerOrderProcess/review_2026-04-04.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f93a304cb773253e59118a4cc582b77cdc3c4a4f
+--- /dev/null
++++ b/pages/PartnerOrderProcess/review_2026-04-04.md
+@@ -0,0 +1,17 @@
++# PartnerOrderProcess Review
++
++## Findings
++1. [P2] Fix 1 — Channel filter dead code still exists. `CHANNEL_FILTERS` is still declared at lines 35-40 and `ChannelFilter` is still implemented at lines 582-630, but there is no JSX usage of `<ChannelFilter>` anywhere in `partnerorderprocess.jsx`. FIX: delete `CHANNEL_FILTERS` and the entire `ChannelFilter` function.
++2. [P1] Fix 2 — `FixedStageRow` is still the old card-and-toggle component. The row still accepts `toggleBusyKey` and `onToggle` at line 636, renders full-width cards with text channel badges at lines 730-745, and shows the inline active toggle plus pencil action at lines 700-727 instead of the required compact desktop row and mobile accordion. Locked stages also still render a pencil button when `slot.canEdit` is true. The parent still uses `toggleBusyKey` state at line 1076 and passes `onToggle={handleToggleStage}` at lines 1609-1616, so there is no `expandedKey` state or one-row accordion behavior. FIX: replace `FixedStageRow` with the compact row/mobile accordion version, add `expandedKey` state in `OrderProcessContent`, and update the `.map()` call to pass `isExpanded`, `onToggleExpand`, and `onEdit` only.
++3. [P2] Fix 3 — The mobile channel legend was not added. The render goes from the current-process summary directly into the stage list container at lines 1587-1618, and there is no `sm:hidden` legend block explaining the hall/pickup/delivery icons before the `bg-white rounded-xl border overflow-hidden` list. FIX: insert the mobile-only channel legend immediately before the stage-list container.
++4. [P1] Fix 4 — `LOCAL_UI_TEXT` still drives user-facing copy instead of `t()`. The hardcoded object is still defined at lines 125-135. `analyzeStageSet()` still returns localized Russian strings through `LOCAL_UI_TEXT.*` at lines 249, 258, 267, and 276, the blocker UI still renders `LOCAL_UI_TEXT.blockerGeneric` and raw `stageAnalysis.blocker` at lines 1505-1508, and the current-process label still uses `LOCAL_UI_TEXT.currentProcess` at line 1589. The old row also still uses `LOCAL_UI_TEXT.locked`, `LOCAL_UI_TEXT.enabled`, and `LOCAL_UI_TEXT.disabled` at lines 698 and 712. FIX: replace out-of-row usages with `t('...')`, make `analyzeStageSet()` return i18n keys, render blockers with `t(stageAnalysis.blocker)`, and remove `LOCAL_UI_TEXT` only after the `FixedStageRow` replacement eliminates the remaining row-local references.
++5. [P3] Fix 5 — Dead stage-management handlers are still present. `handleAddStage`, `handleDeleteStage`, `handleConfirmDelete`, `handleMoveUp`, and `handleMoveDown` are still declared at lines 1229, 1326, 1331, 1365, and 1390, but they have no JSX or prop usages in this file. FIX: remove those handler declarations, keep `deleteMutation`, `deleteDialog`, and `moveBusy` only if they must remain for hook-order safety, and add the reserved comment described in Fix 5.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions: Fix 4B conflicts with the outer page-folder-only review scope because the dictionary lives elsewhere.
++- Missing context: It was unclear whether the task wanted a review of the current file against the redesign spec or a review of an already-patched candidate.
++- Scope questions: It was unclear whether implementation-only instructions in the embedded prompt should be ignored during review-only mode.
+diff --git a/pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md b/pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..851d2e0aa540ecf04df710262e816abc6bbaf062
+--- /dev/null
++++ b/pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PartnerOrderProcess Chain: partnerorderprocess-260404-204226-0133
++
++## Findings
++1. [P2] Fix 1 — Channel filter dead code still exists. `CHANNEL_FILTERS` is still declared at lines 35-40 and `ChannelFilter` is still implemented at lines 582-630, but there is no JSX usage of `<ChannelFilter>` anywhere in `partnerorderprocess.jsx`. This keeps obsolete filter UI and logic in the page after the redesign moved channel visibility into the stage rows. FIX: delete `CHANNEL_FILTERS` and the entire `ChannelFilter` function.
++2. [P1] Fix 2 — `FixedStageRow` is still the old card-and-toggle component. The row still accepts `toggleBusyKey` and `onToggle` at line 636, renders full-width cards with text channel badges at lines 730-745, and shows the inline active toggle plus pencil action at lines 700-727 instead of the required compact desktop row and mobile accordion. Locked stages also still render a pencil button when `slot.canEdit` is true. The parent still uses `toggleBusyKey` state at line 1076 and passes `onToggle={handleToggleStage}` at lines 1609-1616, so there is no `expandedKey` state or one-row accordion behavior. FIX: replace `FixedStageRow` with the compact row/mobile accordion version, add `expandedKey` state in `OrderProcessContent`, and update the `.map()` call to pass `isExpanded`, `onToggleExpand`, and `onEdit` only.
++3. [P2] Fix 3 — The mobile channel legend was not added. The render goes from the current-process summary directly into the stage list container at lines 1587-1618, and there is no `sm:hidden` legend block explaining the hall/pickup/delivery icons before the `bg-white rounded-xl border overflow-hidden` list. FIX: insert the mobile-only channel legend immediately before the stage-list container.
++4. [P1] Fix 4 — `LOCAL_UI_TEXT` still drives user-facing copy instead of `t()`. The hardcoded object is still defined at lines 125-135. `analyzeStageSet()` still returns localized Russian strings through `LOCAL_UI_TEXT.*` at lines 249, 258, 267, and 276, the blocker UI still renders `LOCAL_UI_TEXT.blockerGeneric` and raw `stageAnalysis.blocker` at lines 1505-1508, and the current-process label still uses `LOCAL_UI_TEXT.currentProcess` at line 1589. The old row also still uses `LOCAL_UI_TEXT.locked`, `LOCAL_UI_TEXT.enabled`, and `LOCAL_UI_TEXT.disabled` at lines 698 and 712. FIX: replace out-of-row usages with `t('...')`, make `analyzeStageSet()` return i18n keys, render blockers with `t(stageAnalysis.blocker)`, and remove `LOCAL_UI_TEXT` only after the `FixedStageRow` replacement eliminates the remaining row-local references.
++5. [P3] Fix 5 — Dead stage-management handlers are still present. `handleAddStage`, `handleDeleteStage`, `handleConfirmDelete`, `handleMoveUp`, and `handleMoveDown` are still declared at lines 1229, 1326, 1331, 1365, and 1390, but they have no JSX or prop usages in this file. That leaves obsolete add/move/delete paths in a fixed 5-stage screen and makes the state/handler section harder to reason about. FIX: remove those handler declarations, keep `deleteMutation`, `deleteDialog`, and `moveBusy` only if they must remain for hook-order safety, and add the reserved comment described in Fix 5.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++Rate the task description quality (1-5). For any score below 4, explain what was unclear:
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 4B — the task asks to add i18n keys in a dictionary outside the page folder, but the outer review instructions forbid reading outside the target page folder, so dictionary verification was unclear and out of scope for this review.
++- Missing context (what info would have helped): Whether this review should assess the current file against the redesign spec or assess a separately patched candidate; the exact Russian i18n dictionary path if dictionary review was expected; whether page-folder review artifacts are still required in addition to the pipeline findings file.
++- Scope questions (anything you weren't sure if it's in scope): Whether the repo-wide dictionary lookup instructions inside TASK CONTEXT override the outer "read only the target files + README/BUGS in the same page folder" rule; whether implementation-only steps like `wc -l`, git commit, push, and syntax checks should be ignored in review-only mode.
+
+codex
+The report files are written. I’m doing one quick existence check on the generated artifacts, then I’ll close with the saved paths and the key finding counts.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Item 'pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md','pages/PartnerOrderProcess/review_2026-04-04.md','pages/PartnerOrderProcess/commands_2026-04-04.log' | Select-Object FullName,Length" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.99s:
+
+FullName                                                                                                               
+--------                                                                                                               
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pipeline\chain-state\partnerorderprocess-260404-204226-0133-cod...
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PartnerOrderProcess\review_2026-04-04.md                    
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PartnerOrderProcess\commands_2026-04-04.log                 
+
+
+file update:
+diff --git a/pages/PartnerOrderProcess/commands_2026-04-04.log b/pages/PartnerOrderProcess/commands_2026-04-04.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..45b61e7cdc5ef8a77906aa8e0b16be6a81dff91f
+--- /dev/null
++++ b/pages/PartnerOrderProcess/commands_2026-04-04.log
+@@ -0,0 +1,17 @@
++Get-ChildItem -Force pages/PartnerOrderProcess
++(Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | Measure-Object -Line).Lines
++Get-Content 'pages/PartnerOrderProcess/README.md' -TotalCount 250
++Get-Content 'pages/PartnerOrderProcess/BUGS.md' -TotalCount 250
++Get-ChildItem -Force 'pages/PartnerOrderProcess'
++(Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | Measure-Object -Line).Lines
++Get-Content 'pages/PartnerOrderProcess/README.md'
++Get-Content 'pages/PartnerOrderProcess/BUGS.md'
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1 -and $i -le 340){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 341 -and $i -le 780){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 781 -and $i -le 1200){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1201 -and $i -le 1496){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1488 -and $i -le 1605){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PartnerOrderProcess/partnerorderprocess.jsx' -Pattern 'ChannelFilter|CHANNEL_FILTERS|LOCAL_UI_TEXT|stageAnalysis\.blocker|currentProcess|bg-white rounded-xl border overflow-hidden|<FixedStageRow|handleAddStage|handleMoveUp|handleMoveDown|handleDeleteStage|handleConfirmDelete|toggleBusyKey|moveBusy|deleteDialog' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1605 -and $i -le 1665){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PartnerOrderProcess/partnerorderprocess.jsx' -Pattern 'DeleteConfirmDialog|deleteDialog|handleConfirmDelete|handleDeleteStage|handleAddStage|handleMoveUp|handleMoveDown|ChannelFilter|<ChannelFilter|toggleBusyKey|setExpandedKey|expandedKey|LOCAL_UI_TEXT\.|orderprocess\.current_process|orderprocess\.status\.locked|orderprocess\.edit_button|orderprocess\.channels_label|orderprocess\.roles_label' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++Get-ChildItem 'pipeline/chain-state'
+diff --git a/pages/PartnerOrderProcess/review_2026-04-04.md b/pages/PartnerOrderProcess/review_2026-04-04.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f93a304cb773253e59118a4cc582b77cdc3c4a4f
+--- /dev/null
++++ b/pages/PartnerOrderProcess/review_2026-04-04.md
+@@ -0,0 +1,17 @@
++# PartnerOrderProcess Review
++
++## Findings
++1. [P2] Fix 1 — Channel filter dead code still exists. `CHANNEL_FILTERS` is still declared at lines 35-40 and `ChannelFilter` is still implemented at lines 582-630, but there is no JSX usage of `<ChannelFilter>` anywhere in `partnerorderprocess.jsx`. FIX: delete `CHANNEL_FILTERS` and the entire `ChannelFilter` function.
++2. [P1] Fix 2 — `FixedStageRow` is still the old card-and-toggle component. The row still accepts `toggleBusyKey` and `onToggle` at line 636, renders full-width cards with text channel badges at lines 730-745, and shows the inline active toggle plus pencil action at lines 700-727 instead of the required compact desktop row and mobile accordion. Locked stages also still render a pencil button when `slot.canEdit` is true. The parent still uses `toggleBusyKey` state at line 1076 and passes `onToggle={handleToggleStage}` at lines 1609-1616, so there is no `expandedKey` state or one-row accordion behavior. FIX: replace `FixedStageRow` with the compact row/mobile accordion version, add `expandedKey` state in `OrderProcessContent`, and update the `.map()` call to pass `isExpanded`, `onToggleExpand`, and `onEdit` only.
++3. [P2] Fix 3 — The mobile channel legend was not added. The render goes from the current-process summary directly into the stage list container at lines 1587-1618, and there is no `sm:hidden` legend block explaining the hall/pickup/delivery icons before the `bg-white rounded-xl border overflow-hidden` list. FIX: insert the mobile-only channel legend immediately before the stage-list container.
++4. [P1] Fix 4 — `LOCAL_UI_TEXT` still drives user-facing copy instead of `t()`. The hardcoded object is still defined at lines 125-135. `analyzeStageSet()` still returns localized Russian strings through `LOCAL_UI_TEXT.*` at lines 249, 258, 267, and 276, the blocker UI still renders `LOCAL_UI_TEXT.blockerGeneric` and raw `stageAnalysis.blocker` at lines 1505-1508, and the current-process label still uses `LOCAL_UI_TEXT.currentProcess` at line 1589. The old row also still uses `LOCAL_UI_TEXT.locked`, `LOCAL_UI_TEXT.enabled`, and `LOCAL_UI_TEXT.disabled` at lines 698 and 712. FIX: replace out-of-row usages with `t('...')`, make `analyzeStageSet()` return i18n keys, render blockers with `t(stageAnalysis.blocker)`, and remove `LOCAL_UI_TEXT` only after the `FixedStageRow` replacement eliminates the remaining row-local references.
++5. [P3] Fix 5 — Dead stage-management handlers are still present. `handleAddStage`, `handleDeleteStage`, `handleConfirmDelete`, `handleMoveUp`, and `handleMoveDown` are still declared at lines 1229, 1326, 1331, 1365, and 1390, but they have no JSX or prop usages in this file. FIX: remove those handler declarations, keep `deleteMutation`, `deleteDialog`, and `moveBusy` only if they must remain for hook-order safety, and add the reserved comment described in Fix 5.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions: Fix 4B conflicts with the outer page-folder-only review scope because the dictionary lives elsewhere.
++- Missing context: It was unclear whether the task wanted a review of the current file against the redesign spec or a review of an already-patched candidate.
++- Scope questions: It was unclear whether implementation-only instructions in the embedded prompt should be ignored during review-only mode.
+diff --git a/pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md b/pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..851d2e0aa540ecf04df710262e816abc6bbaf062
+--- /dev/null
++++ b/pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PartnerOrderProcess Chain: partnerorderprocess-260404-204226-0133
++
++## Findings
++1. [P2] Fix 1 — Channel filter dead code still exists. `CHANNEL_FILTERS` is still declared at lines 35-40 and `ChannelFilter` is still implemented at lines 582-630, but there is no JSX usage of `<ChannelFilter>` anywhere in `partnerorderprocess.jsx`. This keeps obsolete filter UI and logic in the page after the redesign moved channel visibility into the stage rows. FIX: delete `CHANNEL_FILTERS` and the entire `ChannelFilter` function.
++2. [P1] Fix 2 — `FixedStageRow` is still the old card-and-toggle component. The row still accepts `toggleBusyKey` and `onToggle` at line 636, renders full-width cards with text channel badges at lines 730-745, and shows the inline active toggle plus pencil action at lines 700-727 instead of the required compact desktop row and mobile accordion. Locked stages also still render a pencil button when `slot.canEdit` is true. The parent still uses `toggleBusyKey` state at line 1076 and passes `onToggle={handleToggleStage}` at lines 1609-1616, so there is no `expandedKey` state or one-row accordion behavior. FIX: replace `FixedStageRow` with the compact row/mobile accordion version, add `expandedKey` state in `OrderProcessContent`, and update the `.map()` call to pass `isExpanded`, `onToggleExpand`, and `onEdit` only.
++3. [P2] Fix 3 — The mobile channel legend was not added. The render goes from the current-process summary directly into the stage list container at lines 1587-1618, and there is no `sm:hidden` legend block explaining the hall/pickup/delivery icons before the `bg-white rounded-xl border overflow-hidden` list. FIX: insert the mobile-only channel legend immediately before the stage-list container.
++4. [P1] Fix 4 — `LOCAL_UI_TEXT` still drives user-facing copy instead of `t()`. The hardcoded object is still defined at lines 125-135. `analyzeStageSet()` still returns localized Russian strings through `LOCAL_UI_TEXT.*` at lines 249, 258, 267, and 276, the blocker UI still renders `LOCAL_UI_TEXT.blockerGeneric` and raw `stageAnalysis.blocker` at lines 1505-1508, and the current-process label still uses `LOCAL_UI_TEXT.currentProcess` at line 1589. The old row also still uses `LOCAL_UI_TEXT.locked`, `LOCAL_UI_TEXT.enabled`, and `LOCAL_UI_TEXT.disabled` at lines 698 and 712. FIX: replace out-of-row usages with `t('...')`, make `analyzeStageSet()` return i18n keys, render blockers with `t(stageAnalysis.blocker)`, and remove `LOCAL_UI_TEXT` only after the `FixedStageRow` replacement eliminates the remaining row-local references.
++5. [P3] Fix 5 — Dead stage-management handlers are still present. `handleAddStage`, `handleDeleteStage`, `handleConfirmDelete`, `handleMoveUp`, and `handleMoveDown` are still declared at lines 1229, 1326, 1331, 1365, and 1390, but they have no JSX or prop usages in this file. That leaves obsolete add/move/delete paths in a fixed 5-stage screen and makes the state/handler section harder to reason about. FIX: remove those handler declarations, keep `deleteMutation`, `deleteDialog`, and `moveBusy` only if they must remain for hook-order safety, and add the reserved comment described in Fix 5.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++Rate the task description quality (1-5). For any score below 4, explain what was unclear:
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 4B — the task asks to add i18n keys in a dictionary outside the page folder, but the outer review instructions forbid reading outside the target page folder, so dictionary verification was unclear and out of scope for this review.
++- Missing context (what info would have helped): Whether this review should assess the current file against the redesign spec or assess a separately patched candidate; the exact Russian i18n dictionary path if dictionary review was expected; whether page-folder review artifacts are still required in addition to the pipeline findings file.
++- Scope questions (anything you weren't sure if it's in scope): Whether the repo-wide dictionary lookup instructions inside TASK CONTEXT override the outer "read only the target files + README/BUGS in the same page folder" rule; whether implementation-only steps like `wc -l`, git commit, push, and syntax checks should be ignored in review-only mode.
+
+codex
+Review saved to [partnerorderprocess-260404-204226-0133-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md). I also saved the repo-local copies at [review_2026-04-04.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PartnerOrderProcess/review_2026-04-04.md) and [commands_2026-04-04.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PartnerOrderProcess/commands_2026-04-04.log).
+
+Total: 5 findings. Highest-impact items are that Fix 2 is not implemented in [partnerorderprocess.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PartnerOrderProcess/partnerorderprocess.jsx) and Fix 4 i18n migration is still incomplete. No code fixes were applied.
+
+## Permissions Requested
+None beyond normal workspace file reads and writing the requested review artifacts. No network or git operations were needed.
+file update:
+diff --git a/pages/PartnerOrderProcess/commands_2026-04-04.log b/pages/PartnerOrderProcess/commands_2026-04-04.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..45b61e7cdc5ef8a77906aa8e0b16be6a81dff91f
+--- /dev/null
++++ b/pages/PartnerOrderProcess/commands_2026-04-04.log
+@@ -0,0 +1,17 @@
++Get-ChildItem -Force pages/PartnerOrderProcess
++(Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | Measure-Object -Line).Lines
++Get-Content 'pages/PartnerOrderProcess/README.md' -TotalCount 250
++Get-Content 'pages/PartnerOrderProcess/BUGS.md' -TotalCount 250
++Get-ChildItem -Force 'pages/PartnerOrderProcess'
++(Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | Measure-Object -Line).Lines
++Get-Content 'pages/PartnerOrderProcess/README.md'
++Get-Content 'pages/PartnerOrderProcess/BUGS.md'
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1 -and $i -le 340){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 341 -and $i -le 780){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 781 -and $i -le 1200){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1201 -and $i -le 1496){ '{0,4}: {1}' -f $i, $_ } }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1488 -and $i -le 1605){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PartnerOrderProcess/partnerorderprocess.jsx' -Pattern 'ChannelFilter|CHANNEL_FILTERS|LOCAL_UI_TEXT|stageAnalysis\.blocker|currentProcess|bg-white rounded-xl border overflow-hidden|<FixedStageRow|handleAddStage|handleMoveUp|handleMoveDown|handleDeleteStage|handleConfirmDelete|toggleBusyKey|moveBusy|deleteDialog' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++$i=0; Get-Content 'pages/PartnerOrderProcess/partnerorderprocess.jsx' | ForEach-Object { $i++; if($i -ge 1605 -and $i -le 1665){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PartnerOrderProcess/partnerorderprocess.jsx' -Pattern 'DeleteConfirmDialog|deleteDialog|handleConfirmDelete|handleDeleteStage|handleAddStage|handleMoveUp|handleMoveDown|ChannelFilter|<ChannelFilter|toggleBusyKey|setExpandedKey|expandedKey|LOCAL_UI_TEXT\.|orderprocess\.current_process|orderprocess\.status\.locked|orderprocess\.edit_button|orderprocess\.channels_label|orderprocess\.roles_label' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++Get-ChildItem 'pipeline/chain-state'
+diff --git a/pages/PartnerOrderProcess/review_2026-04-04.md b/pages/PartnerOrderProcess/review_2026-04-04.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f93a304cb773253e59118a4cc582b77cdc3c4a4f
+--- /dev/null
++++ b/pages/PartnerOrderProcess/review_2026-04-04.md
+@@ -0,0 +1,17 @@
++# PartnerOrderProcess Review
++
++## Findings
++1. [P2] Fix 1 — Channel filter dead code still exists. `CHANNEL_FILTERS` is still declared at lines 35-40 and `ChannelFilter` is still implemented at lines 582-630, but there is no JSX usage of `<ChannelFilter>` anywhere in `partnerorderprocess.jsx`. FIX: delete `CHANNEL_FILTERS` and the entire `ChannelFilter` function.
++2. [P1] Fix 2 — `FixedStageRow` is still the old card-and-toggle component. The row still accepts `toggleBusyKey` and `onToggle` at line 636, renders full-width cards with text channel badges at lines 730-745, and shows the inline active toggle plus pencil action at lines 700-727 instead of the required compact desktop row and mobile accordion. Locked stages also still render a pencil button when `slot.canEdit` is true. The parent still uses `toggleBusyKey` state at line 1076 and passes `onToggle={handleToggleStage}` at lines 1609-1616, so there is no `expandedKey` state or one-row accordion behavior. FIX: replace `FixedStageRow` with the compact row/mobile accordion version, add `expandedKey` state in `OrderProcessContent`, and update the `.map()` call to pass `isExpanded`, `onToggleExpand`, and `onEdit` only.
++3. [P2] Fix 3 — The mobile channel legend was not added. The render goes from the current-process summary directly into the stage list container at lines 1587-1618, and there is no `sm:hidden` legend block explaining the hall/pickup/delivery icons before the `bg-white rounded-xl border overflow-hidden` list. FIX: insert the mobile-only channel legend immediately before the stage-list container.
++4. [P1] Fix 4 — `LOCAL_UI_TEXT` still drives user-facing copy instead of `t()`. The hardcoded object is still defined at lines 125-135. `analyzeStageSet()` still returns localized Russian strings through `LOCAL_UI_TEXT.*` at lines 249, 258, 267, and 276, the blocker UI still renders `LOCAL_UI_TEXT.blockerGeneric` and raw `stageAnalysis.blocker` at lines 1505-1508, and the current-process label still uses `LOCAL_UI_TEXT.currentProcess` at line 1589. The old row also still uses `LOCAL_UI_TEXT.locked`, `LOCAL_UI_TEXT.enabled`, and `LOCAL_UI_TEXT.disabled` at lines 698 and 712. FIX: replace out-of-row usages with `t('...')`, make `analyzeStageSet()` return i18n keys, render blockers with `t(stageAnalysis.blocker)`, and remove `LOCAL_UI_TEXT` only after the `FixedStageRow` replacement eliminates the remaining row-local references.
++5. [P3] Fix 5 — Dead stage-management handlers are still present. `handleAddStage`, `handleDeleteStage`, `handleConfirmDelete`, `handleMoveUp`, and `handleMoveDown` are still declared at lines 1229, 1326, 1331, 1365, and 1390, but they have no JSX or prop usages in this file. FIX: remove those handler declarations, keep `deleteMutation`, `deleteDialog`, and `moveBusy` only if they must remain for hook-order safety, and add the reserved comment described in Fix 5.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions: Fix 4B conflicts with the outer page-folder-only review scope because the dictionary lives elsewhere.
++- Missing context: It was unclear whether the task wanted a review of the current file against the redesign spec or a review of an already-patched candidate.
++- Scope questions: It was unclear whether implementation-only instructions in the embedded prompt should be ignored during review-only mode.
+diff --git a/pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md b/pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..851d2e0aa540ecf04df710262e816abc6bbaf062
+--- /dev/null
++++ b/pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md
+@@ -0,0 +1,18 @@
++# Codex Writer Findings — PartnerOrderProcess Chain: partnerorderprocess-260404-204226-0133
++
++## Findings
++1. [P2] Fix 1 — Channel filter dead code still exists. `CHANNEL_FILTERS` is still declared at lines 35-40 and `ChannelFilter` is still implemented at lines 582-630, but there is no JSX usage of `<ChannelFilter>` anywhere in `partnerorderprocess.jsx`. This keeps obsolete filter UI and logic in the page after the redesign moved channel visibility into the stage rows. FIX: delete `CHANNEL_FILTERS` and the entire `ChannelFilter` function.
++2. [P1] Fix 2 — `FixedStageRow` is still the old card-and-toggle component. The row still accepts `toggleBusyKey` and `onToggle` at line 636, renders full-width cards with text channel badges at lines 730-745, and shows the inline active toggle plus pencil action at lines 700-727 instead of the required compact desktop row and mobile accordion. Locked stages also still render a pencil button when `slot.canEdit` is true. The parent still uses `toggleBusyKey` state at line 1076 and passes `onToggle={handleToggleStage}` at lines 1609-1616, so there is no `expandedKey` state or one-row accordion behavior. FIX: replace `FixedStageRow` with the compact row/mobile accordion version, add `expandedKey` state in `OrderProcessContent`, and update the `.map()` call to pass `isExpanded`, `onToggleExpand`, and `onEdit` only.
++3. [P2] Fix 3 — The mobile channel legend was not added. The render goes from the current-process summary directly into the stage list container at lines 1587-1618, and there is no `sm:hidden` legend block explaining the hall/pickup/delivery icons before the `bg-white rounded-xl border overflow-hidden` list. FIX: insert the mobile-only channel legend immediately before the stage-list container.
++4. [P1] Fix 4 — `LOCAL_UI_TEXT` still drives user-facing copy instead of `t()`. The hardcoded object is still defined at lines 125-135. `analyzeStageSet()` still returns localized Russian strings through `LOCAL_UI_TEXT.*` at lines 249, 258, 267, and 276, the blocker UI still renders `LOCAL_UI_TEXT.blockerGeneric` and raw `stageAnalysis.blocker` at lines 1505-1508, and the current-process label still uses `LOCAL_UI_TEXT.currentProcess` at line 1589. The old row also still uses `LOCAL_UI_TEXT.locked`, `LOCAL_UI_TEXT.enabled`, and `LOCAL_UI_TEXT.disabled` at lines 698 and 712. FIX: replace out-of-row usages with `t('...')`, make `analyzeStageSet()` return i18n keys, render blockers with `t(stageAnalysis.blocker)`, and remove `LOCAL_UI_TEXT` only after the `FixedStageRow` replacement eliminates the remaining row-local references.
++5. [P3] Fix 5 — Dead stage-management handlers are still present. `handleAddStage`, `handleDeleteStage`, `handleConfirmDelete`, `handleMoveUp`, and `handleMoveDown` are still declared at lines 1229, 1326, 1331, 1365, and 1390, but they have no JSX or prop usages in this file. That leaves obsolete add/move/delete paths in a fixed 5-stage screen and makes the state/handler section harder to reason about. FIX: remove those handler declarations, keep `deleteMutation`, `deleteDialog`, and `moveBusy` only if they must remain for hook-order safety, and add the reserved comment described in Fix 5.
++
++## Summary
++Total: 5 findings (0 P0, 2 P1, 2 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++Rate the task description quality (1-5). For any score below 4, explain what was unclear:
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 4B — the task asks to add i18n keys in a dictionary outside the page folder, but the outer review instructions forbid reading outside the target page folder, so dictionary verification was unclear and out of scope for this review.
++- Missing context (what info would have helped): Whether this review should assess the current file against the redesign spec or assess a separately patched candidate; the exact Russian i18n dictionary path if dictionary review was expected; whether page-folder review artifacts are still required in addition to the pipeline findings file.
++- Scope questions (anything you weren't sure if it's in scope): Whether the repo-wide dictionary lookup instructions inside TASK CONTEXT override the outer "read only the target files + README/BUGS in the same page folder" rule; whether implementation-only steps like `wc -l`, git commit, push, and syntax checks should be ignored in review-only mode.
+
+tokens used
+65 213
+Review saved to [partnerorderprocess-260404-204226-0133-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/partnerorderprocess-260404-204226-0133-codex-findings.md). I also saved the repo-local copies at [review_2026-04-04.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PartnerOrderProcess/review_2026-04-04.md) and [commands_2026-04-04.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PartnerOrderProcess/commands_2026-04-04.log).
+
+Total: 5 findings. Highest-impact items are that Fix 2 is not implemented in [partnerorderprocess.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PartnerOrderProcess/partnerorderprocess.jsx) and Fix 4 i18n migration is still incomplete. No code fixes were applied.
+
+## Permissions Requested
+None beyond normal workspace file reads and writing the requested review artifacts. No network or git operations were needed.

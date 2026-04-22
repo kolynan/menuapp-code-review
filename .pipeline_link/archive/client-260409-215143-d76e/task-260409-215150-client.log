@@ -1,0 +1,192 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d7328-92b7-7741-91d6-78ff956e9e38
+--------
+user
+You are a Codex code reviewer evaluating the QUALITY of a КС implementation prompt (NOT executing it). A КС prompt is an instruction document for Claude Code + Codex pipeline to fix code in a React/Base44 app. Your role: find issues with the PROMPT DESIGN that could cause the execution to fail, produce wrong results, or require clarification. ⛔ DO NOT: run any commands (no shell, no PowerShell, no exec), make any code changes, modify files, read files from disk. ⛔ DO NOT: use Get-Content, Select-String, rg, cat, head, or any file-reading command. ALL source code you need is provided INLINE below. ✅ DO: analyze the prompt text AND the inline source code provided in the SOURCE CODE section below. To verify the prompt's code references — use ONLY the inline source code below: 1. Check line numbers against the provided source (line numbers are included) 2. Verify function names, variable names, and code snippets match the inline source 3. Check that code snippets in the prompt match actual code (correct field names, function signatures, etc.) ⚡ PERFORMANCE: The full source file is included inline in this prompt. Do NOT attempt to read it from disk — this wastes 15-30 minutes on PowerShell I/O. Everything you need is already here. For each issue: [CRITICAL/MEDIUM/LOW] Title — Description. PROMPT FIX: what to change in the prompt. Focus on: - Incorrect code snippets in the prompt (wrong syntax, wrong function calls, wrong variable names) — verify against actual code - Missing edge cases the prompt doesn't cover - Ambiguous instructions Codex might misinterpret - Safety risks: will this cause unintended file changes? - Missing context: what info would help Codex execute without hesitation? - Fix order: are there dependencies between fixes that need explicit sequencing? - Validation: are the post-fix verification steps sufficient? - Line numbers: verify all ~line N references against the actual file Write your findings to: pipeline/chain-state/client-260409-215143-d76e-codex-findings.md FORMAT: # Codex Reviewer Findings — ПССК Prompt Quality Review Chain: client-260409-215143-d76e ## Issues Found 1. [CRITICAL/MEDIUM/LOW] Title — Description. PROMPT FIX: ... 2. ... ## Summary Total: N issues (X CRITICAL, Y MEDIUM, Z LOW) ## Additional Risks Any risks the prompt author may not have considered. ## Prompt Clarity (MANDATORY — do NOT skip) - Overall clarity: [1-5] - What was most clear: - What was ambiguous or could cause hesitation: - Missing context: Do NOT apply any fixes to code files. Analysis only. === SOURCE CODE (with line numbers) === {{INLINE_SOURCE}} === END SOURCE CODE === === TASK CONTEXT === # Smoke Test #283 — Inline Source Injection (KB-129) ## Purpose This is a smoke test to verify that `resolve_inline_source()` correctly injects the Client page source code inline into the Codex reviewer prompt (KB-129 optimization). ## КС Prompt Under Review ``` --- page: Client --- # Client Page — Quick Fix ## Fix 1: Add loading state Find the main return statement and add a loading spinner before the content renders. At approximately line 10, add: if (loading) return <div>Loading...</div>; ## Verification - grep -n "loading" pages/Client/client.jsx → should show 1 result ``` ## SOURCE CODE {{INLINE_SOURCE}} === END ===
+mcp startup: no servers
+codex
+I’m reviewing the prompt design against the inline materials only. First pass is checking whether the prompt gives enough correct context to execute safely without relying on disk access.
+codex
+The prompt is blocked on a major precondition: the supposed inline source is still a `{{INLINE_SOURCE}}` placeholder, so any line-number or symbol-specific instruction is unverifiable. I’m writing the review report as an analysis artifact only, with the findings focused on prompt design failures and execution risk.
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/client-260409-215143-d76e-codex-findings.md
+# Codex Reviewer Findings — ПССК Prompt Quality Review
+Chain: client-260409-215143-d76e
+
+## Issues Found
+1. [CRITICAL] Inline source was not injected — The prompt says the full source is provided inline, but the `SOURCE CODE` block still contains the unresolved placeholder `{{INLINE_SOURCE}}`. That makes the requested checks impossible: line numbers cannot be verified, code snippets cannot be matched, and variable/function names cannot be confirmed against real code. PROMPT FIX: Fail closed if `{{INLINE_SOURCE}}` is still present, or ensure `resolve_inline_source()` injects the fully numbered Client page source before the prompt is sent.
+
+2. [CRITICAL] File targeting conflicts with repository workflow — The prompt verifies against `pages/Client/client.jsx`, but the repository instructions require working from the latest `*_BASE` file and producing `*_RELEASE` output without editing `_BASE`. As written, the executor could patch or verify the wrong file, or a file that does not exist in the expected versioned layout. PROMPT FIX: Name the exact source filename injected inline and explicitly state which `*_RELEASE` file should be updated, while keeping `_BASE` read-only.
+
+3. [CRITICAL] The fix assumes a `loading` symbol already exists — `if (loading) return <div>Loading...</div>;` is only safe if `loading` is already defined in the component. The prompt does not identify the actual loading source from the code, and with no inline source present there is no way to confirm that this symbol exists. That can produce an immediate compile/runtime failure. PROMPT FIX: Reference the real loading variable from the source, or instruct the executor how to derive/create it, including any required state/query changes.
+
+4. [MEDIUM] Placement instructions are too ambiguous for React/Base44 constraints — "Find the main return statement" and "At approximately line 10" do not identify the component or the exact insertion point. In a React file with multiple components or early returns, this can lead to the guard being inserted before hook declarations, after the wrong return, or in a nested helper component. PROMPT FIX: Anchor the change to the exact component name and a nearby code snippet, and state that the loading guard must be placed after all hooks/loading-variable declarations and immediately before the component's JSX return.
+
+5. [MEDIUM] The requested UI and the provided patch do not match — The instruction says "add a loading spinner", but the patch is only `<div>Loading...</div>`. That mismatch leaves room for inconsistent implementations and review churn. PROMPT FIX: Decide whether the expected result is a real spinner component, a skeleton, or a plain loading placeholder, and specify the exact pattern to use.
+
+6. [MEDIUM] The patch violates project i18n expectations — The snippet hardcodes `Loading...`, while the project rules require user-facing strings to go through `t('key')`. A pipeline following this prompt literally would implement a fix that conflicts with the app's stated standards. PROMPT FIX: Require the localized form, for example using the page-specific i18n key or an existing common loading label/component.
+
+7. [MEDIUM] Verification is brittle and does not validate correctness — `grep -n "loading" ... -> should show 1 result` does not prove the change is correct. It does not check whether `loading` is defined, whether the guard was inserted into the right component, whether the JSX compiles, or whether the file already had multiple `loading` references. PROMPT FIX: Replace the count-based check with structural validation against the inline source and patch, plus a compile/lint/test step if command execution is allowed in that workflow.
+
+8. [LOW] The verification command is environment-misaligned — The prompt uses `grep`, but the repo context is Windows PowerShell, and this smoke test explicitly emphasizes using the inline source instead of file-reading commands. Even if `grep` exists in some shells, it is the wrong validation strategy for this prompt design. PROMPT FIX: Remove shell-based file reads from this inline-source path and tell the reviewer to validate directly against the injected numbered source.
+
+## Summary
+Total: 8 issues (3 CRITICAL, 4 MEDIUM, 1 LOW)
+
+## Additional Risks
+- If the pipeline proceeds with `{{INLINE_SOURCE}}` unresolved, the executor may hallucinate code structure or fall back to disk reads that the surrounding instructions explicitly forbid.
+- If the model follows the prompt literally, it may insert the loading guard without checking existing loading, error, or empty-state flow, creating behavior regressions rather than a safe quick fix.
+- The current prompt does not provide an exact code anchor, so two agents could make different edits and both believe they satisfied the instruction.
+
+## Prompt Clarity (MANDATORY — do NOT skip)
+- Overall clarity: 2/5
+- What was most clear: The intended outcome is simple: add a loading-related guard before the page content renders.
+- What was ambiguous or could cause hesitation: The actual source is missing; the target file is not aligned with repo conventions; the component and insertion point are not identified; the prompt does not say where `loading` comes from; and the verification step does not meaningfully prove correctness.
+- Missing context: The real inline source with line numbers, the exact component/function name to edit, the actual loading state source, the correct versioned file name, and the expected validation method for a no-disk-read workflow.
+apply_patch(auto_approved=true) exited 0 in 8.53s:
+Success. Updated the following files:
+A pipeline/chain-state/client-260409-215143-d76e-codex-findings.md
+file update:
+diff --git a/pipeline/chain-state/client-260409-215143-d76e-codex-findings.md b/pipeline/chain-state/client-260409-215143-d76e-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..9af2002f2c86033a390b4dd49498129ef77adc08
+--- /dev/null
++++ b/pipeline/chain-state/client-260409-215143-d76e-codex-findings.md
+@@ -0,0 +1,33 @@
++# Codex Reviewer Findings — ПССК Prompt Quality Review
++Chain: client-260409-215143-d76e
++
++## Issues Found
++1. [CRITICAL] Inline source was not injected — The prompt says the full source is provided inline, but the `SOURCE CODE` block still contains the unresolved placeholder `{{INLINE_SOURCE}}`. That makes the requested checks impossible: line numbers cannot be verified, code snippets cannot be matched, and variable/function names cannot be confirmed against real code. PROMPT FIX: Fail closed if `{{INLINE_SOURCE}}` is still present, or ensure `resolve_inline_source()` injects the fully numbered Client page source before the prompt is sent.
++
++2. [CRITICAL] File targeting conflicts with repository workflow — The prompt verifies against `pages/Client/client.jsx`, but the repository instructions require working from the latest `*_BASE` file and producing `*_RELEASE` output without editing `_BASE`. As written, the executor could patch or verify the wrong file, or a file that does not exist in the expected versioned layout. PROMPT FIX: Name the exact source filename injected inline and explicitly state which `*_RELEASE` file should be updated, while keeping `_BASE` read-only.
++
++3. [CRITICAL] The fix assumes a `loading` symbol already exists — `if (loading) return <div>Loading...</div>;` is only safe if `loading` is already defined in the component. The prompt does not identify the actual loading source from the code, and with no inline source present there is no way to confirm that this symbol exists. That can produce an immediate compile/runtime failure. PROMPT FIX: Reference the real loading variable from the source, or instruct the executor how to derive/create it, including any required state/query changes.
++
++4. [MEDIUM] Placement instructions are too ambiguous for React/Base44 constraints — "Find the main return statement" and "At approximately line 10" do not identify the component or the exact insertion point. In a React file with multiple components or early returns, this can lead to the guard being inserted before hook declarations, after the wrong return, or in a nested helper component. PROMPT FIX: Anchor the change to the exact component name and a nearby code snippet, and state that the loading guard must be placed after all hooks/loading-variable declarations and immediately before the component's JSX return.
++
++5. [MEDIUM] The requested UI and the provided patch do not match — The instruction says "add a loading spinner", but the patch is only `<div>Loading...</div>`. That mismatch leaves room for inconsistent implementations and review churn. PROMPT FIX: Decide whether the expected result is a real spinner component, a skeleton, or a plain loading placeholder, and specify the exact pattern to use.
++
++6. [MEDIUM] The patch violates project i18n expectations — The snippet hardcodes `Loading...`, while the project rules require user-facing strings to go through `t('key')`. A pipeline following this prompt literally would implement a fix that conflicts with the app's stated standards. PROMPT FIX: Require the localized form, for example using the page-specific i18n key or an existing common loading label/component.
++
++7. [MEDIUM] Verification is brittle and does not validate correctness — `grep -n "loading" ... -> should show 1 result` does not prove the change is correct. It does not check whether `loading` is defined, whether the guard was inserted into the right component, whether the JSX compiles, or whether the file already had multiple `loading` references. PROMPT FIX: Replace the count-based check with structural validation against the inline source and patch, plus a compile/lint/test step if command execution is allowed in that workflow.
++
++8. [LOW] The verification command is environment-misaligned — The prompt uses `grep`, but the repo context is Windows PowerShell, and this smoke test explicitly emphasizes using the inline source instead of file-reading commands. Even if `grep` exists in some shells, it is the wrong validation strategy for this prompt design. PROMPT FIX: Remove shell-based file reads from this inline-source path and tell the reviewer to validate directly against the injected numbered source.
++
++## Summary
++Total: 8 issues (3 CRITICAL, 4 MEDIUM, 1 LOW)
++
++## Additional Risks
++- If the pipeline proceeds with `{{INLINE_SOURCE}}` unresolved, the executor may hallucinate code structure or fall back to disk reads that the surrounding instructions explicitly forbid.
++- If the model follows the prompt literally, it may insert the loading guard without checking existing loading, error, or empty-state flow, creating behavior regressions rather than a safe quick fix.
++- The current prompt does not provide an exact code anchor, so two agents could make different edits and both believe they satisfied the instruction.
++
++## Prompt Clarity (MANDATORY — do NOT skip)
++- Overall clarity: 2/5
++- What was most clear: The intended outcome is simple: add a loading-related guard before the page content renders.
++- What was ambiguous or could cause hesitation: The actual source is missing; the target file is not aligned with repo conventions; the component and insertion point are not identified; the prompt does not say where `loading` comes from; and the verification step does not meaningfully prove correctness.
++- Missing context: The real inline source with line numbers, the exact component/function name to edit, the actual loading state source, the correct versioned file name, and the expected validation method for a no-disk-read workflow.
+
+file update:
+diff --git a/pipeline/chain-state/client-260409-215143-d76e-codex-findings.md b/pipeline/chain-state/client-260409-215143-d76e-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..9af2002f2c86033a390b4dd49498129ef77adc08
+--- /dev/null
++++ b/pipeline/chain-state/client-260409-215143-d76e-codex-findings.md
+@@ -0,0 +1,33 @@
++# Codex Reviewer Findings — ПССК Prompt Quality Review
++Chain: client-260409-215143-d76e
++
++## Issues Found
++1. [CRITICAL] Inline source was not injected — The prompt says the full source is provided inline, but the `SOURCE CODE` block still contains the unresolved placeholder `{{INLINE_SOURCE}}`. That makes the requested checks impossible: line numbers cannot be verified, code snippets cannot be matched, and variable/function names cannot be confirmed against real code. PROMPT FIX: Fail closed if `{{INLINE_SOURCE}}` is still present, or ensure `resolve_inline_source()` injects the fully numbered Client page source before the prompt is sent.
++
++2. [CRITICAL] File targeting conflicts with repository workflow — The prompt verifies against `pages/Client/client.jsx`, but the repository instructions require working from the latest `*_BASE` file and producing `*_RELEASE` output without editing `_BASE`. As written, the executor could patch or verify the wrong file, or a file that does not exist in the expected versioned layout. PROMPT FIX: Name the exact source filename injected inline and explicitly state which `*_RELEASE` file should be updated, while keeping `_BASE` read-only.
++
++3. [CRITICAL] The fix assumes a `loading` symbol already exists — `if (loading) return <div>Loading...</div>;` is only safe if `loading` is already defined in the component. The prompt does not identify the actual loading source from the code, and with no inline source present there is no way to confirm that this symbol exists. That can produce an immediate compile/runtime failure. PROMPT FIX: Reference the real loading variable from the source, or instruct the executor how to derive/create it, including any required state/query changes.
++
++4. [MEDIUM] Placement instructions are too ambiguous for React/Base44 constraints — "Find the main return statement" and "At approximately line 10" do not identify the component or the exact insertion point. In a React file with multiple components or early returns, this can lead to the guard being inserted before hook declarations, after the wrong return, or in a nested helper component. PROMPT FIX: Anchor the change to the exact component name and a nearby code snippet, and state that the loading guard must be placed after all hooks/loading-variable declarations and immediately before the component's JSX return.
++
++5. [MEDIUM] The requested UI and the provided patch do not match — The instruction says "add a loading spinner", but the patch is only `<div>Loading...</div>`. That mismatch leaves room for inconsistent implementations and review churn. PROMPT FIX: Decide whether the expected result is a real spinner component, a skeleton, or a plain loading placeholder, and specify the exact pattern to use.
++
++6. [MEDIUM] The patch violates project i18n expectations — The snippet hardcodes `Loading...`, while the project rules require user-facing strings to go through `t('key')`. A pipeline following this prompt literally would implement a fix that conflicts with the app's stated standards. PROMPT FIX: Require the localized form, for example using the page-specific i18n key or an existing common loading label/component.
++
++7. [MEDIUM] Verification is brittle and does not validate correctness — `grep -n "loading" ... -> should show 1 result` does not prove the change is correct. It does not check whether `loading` is defined, whether the guard was inserted into the right component, whether the JSX compiles, or whether the file already had multiple `loading` references. PROMPT FIX: Replace the count-based check with structural validation against the inline source and patch, plus a compile/lint/test step if command execution is allowed in that workflow.
++
++8. [LOW] The verification command is environment-misaligned — The prompt uses `grep`, but the repo context is Windows PowerShell, and this smoke test explicitly emphasizes using the inline source instead of file-reading commands. Even if `grep` exists in some shells, it is the wrong validation strategy for this prompt design. PROMPT FIX: Remove shell-based file reads from this inline-source path and tell the reviewer to validate directly against the injected numbered source.
++
++## Summary
++Total: 8 issues (3 CRITICAL, 4 MEDIUM, 1 LOW)
++
++## Additional Risks
++- If the pipeline proceeds with `{{INLINE_SOURCE}}` unresolved, the executor may hallucinate code structure or fall back to disk reads that the surrounding instructions explicitly forbid.
++- If the model follows the prompt literally, it may insert the loading guard without checking existing loading, error, or empty-state flow, creating behavior regressions rather than a safe quick fix.
++- The current prompt does not provide an exact code anchor, so two agents could make different edits and both believe they satisfied the instruction.
++
++## Prompt Clarity (MANDATORY — do NOT skip)
++- Overall clarity: 2/5
++- What was most clear: The intended outcome is simple: add a loading-related guard before the page content renders.
++- What was ambiguous or could cause hesitation: The actual source is missing; the target file is not aligned with repo conventions; the component and insertion point are not identified; the prompt does not say where `loading` comes from; and the verification step does not meaningfully prove correctness.
++- Missing context: The real inline source with line numbers, the exact component/function name to edit, the actual loading state source, the correct versioned file name, and the expected validation method for a no-disk-read workflow.
+
+codex
+Findings are saved in [client-260409-215143-d76e-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/client-260409-215143-d76e-codex-findings.md).
+
+The main blocker is that the prompt claims the full source is inline, but the `SOURCE CODE` section still contains `{{INLINE_SOURCE}}`. Because of that, the prompt’s line-number and symbol-level instructions are not verifiable at all. I also flagged two other critical prompt-design problems: it targets `pages/Client/client.jsx` instead of the repo’s versioned `_BASE`/`_RELEASE` workflow, and it tells the executor to insert `if (loading)` without identifying where `loading` comes from.
+
+I recorded 8 total issues: 3 critical, 4 medium, 1 low. I did not run any commands or read files from disk.
+file update:
+diff --git a/pipeline/chain-state/client-260409-215143-d76e-codex-findings.md b/pipeline/chain-state/client-260409-215143-d76e-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..9af2002f2c86033a390b4dd49498129ef77adc08
+--- /dev/null
++++ b/pipeline/chain-state/client-260409-215143-d76e-codex-findings.md
+@@ -0,0 +1,33 @@
++# Codex Reviewer Findings — ПССК Prompt Quality Review
++Chain: client-260409-215143-d76e
++
++## Issues Found
++1. [CRITICAL] Inline source was not injected — The prompt says the full source is provided inline, but the `SOURCE CODE` block still contains the unresolved placeholder `{{INLINE_SOURCE}}`. That makes the requested checks impossible: line numbers cannot be verified, code snippets cannot be matched, and variable/function names cannot be confirmed against real code. PROMPT FIX: Fail closed if `{{INLINE_SOURCE}}` is still present, or ensure `resolve_inline_source()` injects the fully numbered Client page source before the prompt is sent.
++
++2. [CRITICAL] File targeting conflicts with repository workflow — The prompt verifies against `pages/Client/client.jsx`, but the repository instructions require working from the latest `*_BASE` file and producing `*_RELEASE` output without editing `_BASE`. As written, the executor could patch or verify the wrong file, or a file that does not exist in the expected versioned layout. PROMPT FIX: Name the exact source filename injected inline and explicitly state which `*_RELEASE` file should be updated, while keeping `_BASE` read-only.
++
++3. [CRITICAL] The fix assumes a `loading` symbol already exists — `if (loading) return <div>Loading...</div>;` is only safe if `loading` is already defined in the component. The prompt does not identify the actual loading source from the code, and with no inline source present there is no way to confirm that this symbol exists. That can produce an immediate compile/runtime failure. PROMPT FIX: Reference the real loading variable from the source, or instruct the executor how to derive/create it, including any required state/query changes.
++
++4. [MEDIUM] Placement instructions are too ambiguous for React/Base44 constraints — "Find the main return statement" and "At approximately line 10" do not identify the component or the exact insertion point. In a React file with multiple components or early returns, this can lead to the guard being inserted before hook declarations, after the wrong return, or in a nested helper component. PROMPT FIX: Anchor the change to the exact component name and a nearby code snippet, and state that the loading guard must be placed after all hooks/loading-variable declarations and immediately before the component's JSX return.
++
++5. [MEDIUM] The requested UI and the provided patch do not match — The instruction says "add a loading spinner", but the patch is only `<div>Loading...</div>`. That mismatch leaves room for inconsistent implementations and review churn. PROMPT FIX: Decide whether the expected result is a real spinner component, a skeleton, or a plain loading placeholder, and specify the exact pattern to use.
++
++6. [MEDIUM] The patch violates project i18n expectations — The snippet hardcodes `Loading...`, while the project rules require user-facing strings to go through `t('key')`. A pipeline following this prompt literally would implement a fix that conflicts with the app's stated standards. PROMPT FIX: Require the localized form, for example using the page-specific i18n key or an existing common loading label/component.
++
++7. [MEDIUM] Verification is brittle and does not validate correctness — `grep -n "loading" ... -> should show 1 result` does not prove the change is correct. It does not check whether `loading` is defined, whether the guard was inserted into the right component, whether the JSX compiles, or whether the file already had multiple `loading` references. PROMPT FIX: Replace the count-based check with structural validation against the inline source and patch, plus a compile/lint/test step if command execution is allowed in that workflow.
++
++8. [LOW] The verification command is environment-misaligned — The prompt uses `grep`, but the repo context is Windows PowerShell, and this smoke test explicitly emphasizes using the inline source instead of file-reading commands. Even if `grep` exists in some shells, it is the wrong validation strategy for this prompt design. PROMPT FIX: Remove shell-based file reads from this inline-source path and tell the reviewer to validate directly against the injected numbered source.
++
++## Summary
++Total: 8 issues (3 CRITICAL, 4 MEDIUM, 1 LOW)
++
++## Additional Risks
++- If the pipeline proceeds with `{{INLINE_SOURCE}}` unresolved, the executor may hallucinate code structure or fall back to disk reads that the surrounding instructions explicitly forbid.
++- If the model follows the prompt literally, it may insert the loading guard without checking existing loading, error, or empty-state flow, creating behavior regressions rather than a safe quick fix.
++- The current prompt does not provide an exact code anchor, so two agents could make different edits and both believe they satisfied the instruction.
++
++## Prompt Clarity (MANDATORY — do NOT skip)
++- Overall clarity: 2/5
++- What was most clear: The intended outcome is simple: add a loading-related guard before the page content renders.
++- What was ambiguous or could cause hesitation: The actual source is missing; the target file is not aligned with repo conventions; the component and insertion point are not identified; the prompt does not say where `loading` comes from; and the verification step does not meaningfully prove correctness.
++- Missing context: The real inline source with line numbers, the exact component/function name to edit, the actual loading state source, the correct versioned file name, and the expected validation method for a no-disk-read workflow.
+
+tokens used
+16 667
+Findings are saved in [client-260409-215143-d76e-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/client-260409-215143-d76e-codex-findings.md).
+
+The main blocker is that the prompt claims the full source is inline, but the `SOURCE CODE` section still contains `{{INLINE_SOURCE}}`. Because of that, the prompt’s line-number and symbol-level instructions are not verifiable at all. I also flagged two other critical prompt-design problems: it targets `pages/Client/client.jsx` instead of the repo’s versioned `_BASE`/`_RELEASE` workflow, and it tells the executor to insert `if (loading)` without identifying where `loading` comes from.
+
+I recorded 8 total issues: 3 critical, 4 medium, 1 low. I did not run any commands or read files from disk.

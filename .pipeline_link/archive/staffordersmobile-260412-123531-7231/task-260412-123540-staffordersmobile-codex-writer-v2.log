@@ -1,0 +1,585 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d809e-6a15-7dc1-a6a9-81773f78d815
+--------
+user
+**MANDATORY FIRST STEP — run this before anything else:** ``` git fetch origin 2>/dev/null; git reset --hard origin/main ``` This ensures your working copy is in sync with the remote repository (prevents KB-095 stale-copy issue). --- Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md FORMAT: # Codex Writer Findings — StaffOrdersMobile Chain: staffordersmobile-260412-123531-7231 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Feature: Implement collapsed table card (скс) — identity block + status chips (#288) Reference: `ux-concepts/StaffOrdersMobile/GPT_SOM_CollapsedCard_S250.md`, `ux-concepts/StaffOrdersMobile/GPT_SOM_UXSpec_S250.md`, `BUGS_MASTER.md`. Production page: https://menu-app-mvp-49a4f5b2.base44.app/staffordersmobile **Context:** `staffordersmobile.jsx` is 4429 lines. The active `OrderGroupCard` component starts at line 1675. ⚠️ IMPORTANT: Lines 523-620 and lines 1121-~1390 are COMMENTED-OUT legacy code (inside `/* */` blocks) — do NOT modify these. Target ONLY the ACTIVE code inside `OrderGroupCard` (line 1675+). The collapsed card header is inside `OrderGroupCard`, approximately lines 2178-2210, inside the `onClick={onToggleExpand}` div. Currently for `group.type === "table"` it shows: ownership icon (★/🔒) + compact table badge + jump chips (Запросы N, Новые N, Готово N). This layout must be replaced with a new identity block + status chips design. Jump chips move to expanded view only. --- ## HTML Mockup Reference (inline, authoritative — v13, GPT R6, S250) **When this spec and the Fix description conflict — values below WIN.** ```css /* ── Collapsed Card layout ── */ .card { min-height: 72px; padding: 10px 12px 10px 16px; border-radius: 14px; display: flex; gap: 10px; align-items: center; background: #fff; } /* ── Identity Wrapper (v11: ownership badge outside — GPT R5) ── */ /* 84px wide to accommodate badge overlap at top-left corner */ .identity-wrapper { position: relative; flex: 0 0 84px; width: 84px; display: flex; align-items: center; justify-content: flex-end; } /* Identity block: 78×54px (GPT R3) */ .identity { width: 78px; height: 54px; border-radius: 12px; display: flex; align-items: center; justify-content: center; } /* v12 (GPT R6): 3 urgency levels — "normal/мятный" REMOVED */ .identity.danger { background: #FFE8E5; } .identity.warning { background: #FFF1DD; } .identity.calm { background: #F2F2F7; border: 1.5px solid #D9D9E0; } /* Tappable free table: green ring = "tap to claim" affordance */ .identity.tappable { outline: 2.5px solid #34c75980; outline-offset: 3px; cursor: pointer; } /* GPT R3: table number 26px, centered, ALWAYS dark */ .identity__table { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: #1c1c1e; /* ALWAYS #1c1c1e — GPT R3: do NOT color by urgency */ } /* ── Ownership badge: OUTSIDE identity block (GPT R5) ── */ /* Overlap-badge at top-left corner of wrapper — doesn't compete with number or urgency color */ .ownership-badge { position: absolute; top: -7px; left: -7px; width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 1.5px solid rgba(0,0,0,0.08); box-shadow: 0 1px 4px rgba(0,0,0,0.13); display: flex; align-items: center; justify-content: center; font-size: 13px; z-index: 2; } .ownership-badge.mine { background: #FFF8E7; border-color: #FFD60A50; } .ownership-badge.free { background: #EAF7EE; border-color: #34c75940; } .ownership-badge.locked { background: #f2f2f7; border-color: #d1d1d6; } /* ── Right zone ── */ .rightZone { min-height: 54px; flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; justify-content: center; } /* Chips: GPT R3: height 26px, font 13px */ .chip { height: 26px; padding: 0 9px; border-radius: 13px; font-size: 13px; font-weight: 600; white-space: nowrap; } .chip.serve { background: #34c75920; color: #30a14e; } .chip.request { background: #ff3b3020; color: #ff3b30; } .chip.new { background: #007aff20; color: #007aff; } .chip.work { background: #f2f2f7; color: #8e8e93; } /* Longest-chip highlight */ .chip.longest.serve { background: #34c759; color: #fff; } .chip.longest.request { background: #ff3b30; color: #fff; } .chip.longest.new { background: #007aff; color: #fff; } ``` **Card HTML example** (Стол 5, danger, ownershipState='mine'): ```html <div class="card"> <div class="identity-wrapper"> <div class="ownership-badge mine">★</div> <div class="identity danger"> <span class="identity__table">5</span> </div> </div> <div class="rightZone"> <div class="chips"> <span class="chip serve">Готово 1 · 4м</span> <span class="chip request">Запросы 1 · 2м</span> <span class="chip longest new">Новые 2 · 23м</span> </div> </div> </div> ``` **Card HTML example** (Стол 8, danger, фильтр «Все», чужой — badge 🔒 виден): ```html <div class="card"> <div class="identity-wrapper"> <div class="ownership-badge locked">🔒</div> <div class="identity danger"> <span class="identity__table">8</span> </div> </div> <div class="rightZone"><div class="chips"> <span class="chip longest serve">Готово 2 · 9м</span> <span class="chip work">Принято 1</span> </div></div> </div> ``` --- ## Fix 1 — #288 (P1) [MUST-FIX]: Replace collapsed table card with identity block + status chips ### Сейчас (current behavior) In `OrderGroupCard` (~lines 2181-2206), the `group.type === "table"` branch shows: - Row 1: ownership icon (★/🔒) + compact badge with table number + optional zone name chip - Row 2: `jumpChips` (computed at line 2018) rendered as colored border chips. These appear in BOTH collapsed and expanded states because the header is always visible. ### Должно быть (expected behavior) **A. New collapsed card layout** — replace the `group.type === "table"` header branch: ``` ┌──────────────────────────────────────────────────────┐ │ ★┐ ┌────────┐ [Готово 1 · 4м] [Запросы 2 · 2м] │ │ └─►│ 22 │ [Новые 3 · 23м●] [Принято 2] │ │ └────────┘ │ │ badge identity chips zone (flex-wrap, right side) │ └──────────────────────────────────────────────────────┘ ● = longest-chip highlight (solid fill + white text) ★ badge = outside identity block, top-left overlap ``` **Card outer layout:** `flex items-center gap-[10px] min-h-[72px]` (replaces `space-y-2`) **Left — identity wrapper** (`flex-shrink-0`, 84px wide, `position: relative`): 1. **Ownership badge** — rendered OUTSIDE the identity block, absolute positioned in wrapper. **ALWAYS show** based on `ownershipState` alone — do NOT add a filter check (NOTE: `assignFilters` is NOT a prop of `OrderGroupCard`, verified call-site lines 4271-4296; do NOT add new props). Filter-based badge hiding is a separate BACKLOG item: - `ownershipState === 'mine'`: round 26×26px badge `top-[-7px] left-[-7px]`, bg `#FFF8E7`, border `#FFD60A50`, shows ★ - `ownershipState === 'other'`: same position, bg `#f2f2f7`, border `#d1d1d6`, shows 🔒. Render as `<button>` with `onClick={(e) => { e.stopPropagation(); showOtherTableHint(e); }}` + `aria-label={HALL_UI_TEXT.otherTableTitle}` - `ownershipState === 'free'`: bg `#EAF7EE`, border `#34c75940`, shows ☆ 2. **Identity block** — 78×54px, `border-radius: 12px`, centered number: - Urgency background via inline style (see C below) — NOT Tailwind color classes (pastels not in Tailwind) - **Table number**: centered (`display: flex; align-items: center; justify-content: center`), `font-size: 26px`, `font-weight: 700`, `tabular-nums`, **ALWAYS `color: #1c1c1e`** — NEVER white, never colored by urgency - Value: `compactTableLabel` (confirmed at line 2194 in active OrderGroupCard) - Free table tappable: add `style={{outline: '2.5px solid #34c75980', outlineOffset: '3px'}}` when `ownershipState === 'free'` **Right — chips zone** (`flex-1`, `display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; align-content: center`): - Show `scsChips` (see computation below) — non-zero only, fixed order - **Chip base**: `height: 26px; padding: 0 9px; border-radius: 13px; font-size: 13px; font-weight: 600; white-space: nowrap` - **Default style** (outline): use HALL_CHIP_STYLES-equivalent colors per tone (see HTML mockup CSS — serve/request/new/work) - Alternatively: reuse `HALL_CHIP_STYLES[chip.tone]` from line 351 if existing classes are close enough — CC judgment call - **Highlighted chip** (longest actionable): `SCS_SOLID_CHIP[chip.tone]` — solid fill + white text - **Format**: - Actionable (Готово/Запросы/Новые): `` `${chip.label} ${chip.count} · ${formatCompactMinutes(chip.ageMin)}` `` - Non-actionable (Принято/Готовится/В работе): `` `${chip.label} ${chip.count}` `` - Chips are `<span>` (not interactive — card tap expands) - Empty (no chips): show `{HALL_UI_TEXT.noActions}` (line 328) **Keep unchanged:** - `ownerHintVisible` tooltip block (lines 2199-2204) — keep it below the new layout, same as before **B. Jump chips → expanded view only:** - REMOVE jump chips rendering from the always-visible header area (line 2205 currently) - ADD jump chips rendering INSIDE the expanded content block (when `isExpanded`, ABOVE the sections): ```jsx {jumpChips.length > 0 && ( <div className="flex flex-wrap items-center gap-1.5 pb-3"> {jumpChips.map(chip => ( <button key={chip.kind} type="button" onClick={(e) => { e.stopPropagation(); scrollToSection(chip.kind); }} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold border min-h-[32px] ${HALL_CHIP_STYLES[chip.tone]}`}> {`${chip.label} ${chip.count}`} </button> ))} </div> )} ``` Note: `setIsExpanded(true)` is dropped from onClick (already expanded). Rest unchanged (SOM-S235-01 ✅ FROZEN). **C. Urgency color model** (identity block background — inline styles, pastels): | Level | Condition | Inline style | |-------|-----------|-------------| | calm | no actionable chips | `{{background:'#F2F2F7', border:'1.5px solid #D9D9E0'}}` | | warning | oldest actionable 3–5м | `{{background:'#FFF1DD'}}` | | danger | oldest actionable ≥6м | `{{background:'#FFE8E5'}}` | ⚠️ "normal" level does NOT exist — removed in v12 (GPT R6). 3 levels only: calm/warning/danger. "Oldest actionable" = max `ageMin` among Готово/Запросы/Новые chips (if any). 0–2м → calm (no urgency yet). ### НЕ должно быть - ❌ Do NOT show jump chips in collapsed header (move to expanded only) - ❌ Do NOT show max-wait badge (replaced by longest-chip highlight in S250) - ❌ Do NOT show zone name chip in new collapsed header - ❌ Do NOT use solid-color urgency backgrounds (green-500/amber-400/red-500) — pastels only - ❌ Do NOT color table number white or by urgency — always `color: #1c1c1e` - ❌ Do NOT put ownership icon inside identity block — badge goes OUTSIDE (in wrapper) - ❌ Do NOT modify commented-out code blocks (lines 523-620, lines 1121-~1390) - ❌ Do NOT change expanded card content (sections, bulk bars, inline toast) - ❌ Do NOT change the OrderGroupCard component props or call-site ### Файл и локация File: `pages/StaffOrdersMobile/staffordersmobile.jsx` (4429 lines) Component: `OrderGroupCard` (line 1675) — ONLY target ACTIVE code here **Step 1 — Add helpers near line 376** (after `formatClockTime` function, line 376): ```js function getUrgencyLevel(ageMin) { // v12: 3 levels only — calm/warning/danger (no "normal") if (!Number.isFinite(ageMin) || ageMin <= 0) return 'calm'; if (ageMin >= 6) return 'danger'; if (ageMin >= 3) return 'warning'; return 'calm'; // 0–2м = calm (no urgency action needed yet) } const URGENCY_IDENTITY_STYLE = { calm: { background: '#F2F2F7', border: '1.5px solid #D9D9E0' }, warning: { background: '#FFF1DD' }, danger: { background: '#FFE8E5' }, }; const SCS_SOLID_CHIP = { green: 'bg-green-500 text-white border-green-500', red: 'bg-red-500 text-white border-red-500', blue: 'bg-blue-500 text-white border-blue-500', }; ``` **Step 2 — Add scsChips computation inside OrderGroupCard** (after `jumpChips` const, ~line 2025): ```js const scsChips = useMemo(() => { const chips = []; if (readyOrders.length > 0) { const ageMin = getOldestAgeMinutes(readyOrders, o => o.stage_entered_at || o.created_date) || 0; chips.push({ key: 'ready', label: 'Готово', count: readyOrders.length, ageMin, isActionable: true, tone: 'green' }); } if (tableRequests.length > 0) { const ageMin = getOldestAgeMinutes(tableRequests, r => r.created_date) || 0; chips.push({ key: 'requests', label: 'Запросы', count: tableRequests.length, ageMin, isActionable: true, tone: 'red' }); } if (newOrders.length > 0) { const ageMin = getOldestAgeMinutes(newOrders, o => o.created_date) || 0; chips.push({ key: 'new', label: 'Новые', count: newOrders.length, ageMin, isActionable: true, tone: 'blue' }); } inProgressSections.forEach(section => { if (section.rowCount > 0) { const label = section.sid === '__null__' ? 'В работе' : section.label; chips.push({ key: section.sid, label, count: section.rowCount, ageMin: 0, isActionable: false, tone: 'gray' }); } }); return chips; }, [readyOrders, tableRequests, newOrders, inProgressSections, getOldestAgeMinutes]); const scsOldestActionable = useMemo(() => { const ages = scsChips.filter(c => c.isActionable && c.ageMin > 0).map(c => c.ageMin); return ages.length > 0 ? Math.max(...ages) : 0; }, [scsChips]); const scsUrgency = getUrgencyLevel(scsOldestActionable); const scsHighlightKey = useMemo(() => { const actionable = scsChips.filter(c => c.isActionable && c.ageMin > 0); if (actionable.length === 0) return null; const maxAge = Math.max(...actionable.map(c => c.ageMin)); // Tie rule: Готово > Запросы > Новые for (const key of ['ready', 'requests', 'new']) { const chip = actionable.find(c => c.key === key && c.ageMin === maxAge); if (chip) return chip.key; } return actionable.find(c => c.ageMin === maxAge)?.key || null; }, [scsChips]); ``` **Step 3 — Replace collapsed card JSX** inside OrderGroupCard (lines ~2181-2206): - Search for: `{group.type === "table" ? (` (inside the onClick div, ~line 2181) - Replace the `<div className="space-y-2">` block with the new layout: - Outer: `<div style={{display:'flex', alignItems:'center', gap:'10px', minHeight:'72px'}}>` (or Tailwind equivalent) - Identity wrapper: `<div style={{position:'relative', flexShrink:0, width:'84px', display:'flex', alignItems:'center', justifyContent:'flex-end'}}>` - Ownership badge (absolute, top-left of wrapper, shown only when filter==='all' or equivalent) - Identity block: `<div style={{width:'78px', height:'54px', borderRadius:'12px', display:'flex', alignItems:'center', justifyContent:'center', ...URGENCY_IDENTITY_STYLE[scsUrgency], ...(ownershipState==='free' ? {outline:'2.5px solid #34c75980', outlineOffset:'3px'} : {})}}>` - Table number: `<span style={{fontSize:'26px', fontWeight:700, color:'#1c1c1e', fontVariantNumeric:'tabular-nums'}}>{compactTableLabel}</span>` - Right zone: chips list from `scsChips` **Step 4 — Move jump chips** to expanded content block inside OrderGroupCard: - Search: `{isExpanded &&` or the expanded content conditional (after line 2225) - Add jump chips div at the TOP of the expanded content, before section renders ### Уже пробовали First implementation — no prior attempts. ### Проверка (мини тест-кейс) 1. Open /staffordersmobile, find a table with active orders 2. **Collapsed**: Left = 84px wrapper containing 78×54px identity block. Right = status chips «Готово 1 · 4м» / «Запросы 2 · 2м» / «Новые 3 · 23м». No jump chips visible when collapsed. 3. **Urgency colors**: Table with Готово 1 · 7м → identity background #FFE8E5 (pastel pink). Table with Новые 2 · 1м → #F2F2F7 (calm, 0–2м = no urgency). Table with Новые 2 · 4м → #FFF1DD (warning). 4. **Table number**: always dark `#1c1c1e` regardless of urgency — NEVER white. 5. **Longest-chip highlight**: «Новые 3 · 23м» = solid blue fill + white text (longest actionable). 6. **Expand**: jump chips appear at top of expanded content. Sections unchanged. 7. **Lock icon**: tap on 🔒 badge (outside identity block, top-left) → shows owner hint tooltip. Card does NOT expand on this tap. --- ## FROZEN UX (DO NOT CHANGE) The following are implemented and tested in RELEASE 260408-00. Do NOT modify: - **Jump chips style** (SOM-S235-01 ✅): `HALL_CHIP_STYLES` line 351. Classes `bg-red-50 border-red-300 text-red-600` etc. — keep exactly. Only move render location from header → expanded view. - **Bulk bar position** (SOM-S235-02 ✅): bulk action bar renders BELOW section cards, NOT in section header - **Dual metric** (SOM-S235-04 ✅): collapsed sections show `«N гостей · N блюд»` format - **Verb-first labels** (SOM-S235-05 ✅): «Принять», «В работу», «Готово», «Выдать» in OrderCard - **Close table text** (SOM-S235-06 ✅): action-oriented format in closeDisabledReason - **Inline toast** (SOM-S211-01 ✅): lifted to StaffOrdersMobile parent (line 2814: `// lifted from OrderGroupCard`). Do NOT move or refactor this. - **Auto-expand В РАБОТЕ** (SOM-S208-01 ✅): `expandedSubGroups` state logic — do NOT change - **No nested card duplicate** (SOM-S231-01 ✅): do NOT add any nested wrapper around expanded content --- ## ⛔ SCOPE LOCK — change ONLY what is described in Fix 1 - Edit ONLY `pages/StaffOrdersMobile/staffordersmobile.jsx` - Change ONLY: (1) collapsed card header JSX in active OrderGroupCard (~2181-2206), (2) jump chips location (header → expanded), (3) add scsChips computed values (~line 2025), (4) add urgency helpers (~line 376) - Do NOT modify: expanded card sections, bulk bars, OrderCard component, StaffOrdersMobile main component (line 2738+), any other file - Do NOT introduce new imports (Star, Lock, useMemo already used; `formatCompactMinutes` already defined) - Do NOT touch commented-out code blocks (lines 523-620, lines 1121-~1390) - If you see another issue outside this scope — SKIP IT ## Implementation Notes Files: `pages/StaffOrdersMobile/staffordersmobile.jsx` (4429 lines) Do not read the full file. Targeted excerpts only: - Lines 370–390: formatClockTime area (add urgency helpers here) - Lines 2018–2045: jumpChips + ownershipState (add scsChips after jumpChips) - Lines 2175–2230: collapsed card header + start of expanded content (main replacement) - Find expanded content: `grep -n "isExpanded" staffordersmobile.jsx` → look for the expanded content block after line 2225 Grep verification (run before commit to confirm FROZEN UX unchanged): - `grep -n "HALL_CHIP_STYLES" staffordersmobile.jsx` → confirm line 351 definition unchanged - `grep -n "bulk.*bar\|section-bulk" staffordersmobile.jsx` → confirm bulk bar still below sections - `grep -n "lifted from OrderGroupCard" staffordersmobile.jsx` → confirm comment still at line ~2814 - `grep -n "space-y-2" staffordersmobile.jsx` → should be 0 results inside active OrderGroupCard (we replaced it) - `grep -n "bg-green-500\|bg-amber-400\|bg-red-500" staffordersmobile.jsx` → should NOT appear in identity block (pastels use inline style, not Tailwind) ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a staff mobile app, used one-handed on the go. At 375px viewport width: - [ ] Identity block is exactly 78×54px, wrapper 84px `flex-shrink-0` — does not compress - [ ] Table number (26px, dark #1c1c1e) readable on ALL urgency background colors (calm/warning/danger — all pastel, all readable) - [ ] Ownership badge (26×26px circle) does not overlap card content — badge is above/outside - [ ] Chips wrap correctly, max 2 rows on small screens - [ ] Overall card min-height ≥72px - [ ] Card tap area covers full card width (unchanged) - [ ] Lock badge tap shows hint without expanding card (`e.stopPropagation()` on badge onClick) - [ ] No jump chips visible in collapsed state ## Regression Check (MANDATORY after implementation) Verify these existing features still work after changes: - [ ] **Table expansion**: tap card → expands, jump chips appear at top, sections visible - [ ] **Jump chip navigation**: tap «Готово N» chip (in expanded) → scrolls to Готово section - [ ] **Bulk action**: «Принять все (N)» button appears below section cards (not in header) - [ ] **Inline toast**: after bulk serve, undo toast appears (lifted state — survives unmount) - [ ] **Close table**: «Закрыть стол» disabled with action-oriented hint when orders pending - [ ] **Owner hint**: tap 🔒 badge → shows tooltip, does NOT expand card ## Git ```bash git add pages/StaffOrdersMobile/staffordersmobile.jsx git commit -m "feat(SOM): implement collapsed table card (скс) — identity block + status chips (#288)" git push ``` ## Self-check Before executing, briefly list: 1. Any ambiguities in this prompt 2. Any risks that might cause you to stall (e.g. can't find the right lines, wrong comment block) 3. Your execution plan (grep first, then which steps in order) If you see a problem, say so and propose a fix before proceeding. ## Post-task review After completing the task, answer: 1. Rate this prompt 1-10 for clarity and executability 2. What was unclear or caused hesitation? 3. What would you change to make it faster to execute? 4. Token efficiency: Where did you spend the most tokens? Suggest specific prompt changes. 5. Speed: What information would help complete this faster? === END ===
+mcp startup: no servers
+codex
+I’m syncing the repo first as requested, then I’ll read only the target page file plus `README.md`/`BUGS.md` in `pages/StaffOrdersMobile` and write the findings file.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git fetch origin 2>$null; git reset --hard origin/main' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 52.15s:
+HEAD is now at 9864d14 fix(PublicMenu): 17 fixes via consensus chain publicmenu-260409-145921-5382
+codex
+Before I inspect the file, here’s the execution frame.
+
+Ambiguities: the prompt mixes implementation instructions with a review-only request, so I’m treating the numbered Fix list as the only allowed review scope and checking whether the current code matches Fix 1. Risks: the target file is large and line numbers may have shifted after recent changes, so I’ll use targeted line reads and in-file searches only. Plan: read `README.md` and `BUGS.md` in `pages/StaffOrdersMobile`, then inspect the specified excerpts in `staffordersmobile.jsx`, then write the findings to the required pipeline file and save the report/command log in the page folder.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/StaffOrdersMobile' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$start=2165; $end=2265; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '"'{0,5}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$start=320; $end=390; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '"'{0,5}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$start=1985; $end=2065; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '"'{0,5}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/StaffOrdersMobile/README.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/StaffOrdersMobile/BUGS.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 40.93s:
+screenshots
+versions
+260306-05 StaffOrdersMobile RELEASE.jsx
+260405-00 StaffOrdersMobile RELEASE.jsx
+260407-00 StaffOrdersMobile RELEASE.jsx
+260408-00 StaffOrdersMobile RELEASE.jsx
+Audit_FunctionalMap_S70.md
+BUGS.md
+DeepAnalysis_S70.md
+smoke-test-result.md
+StaffOrdersMobile README.md
+staffordersmobile.jsx
+staffordersmobile.jsx.bak
+staffordersmobile_v1.0_BASE.jsx
+TEST_PLAN.md
+ succeeded in 43.30s:
+  320:   acceptAll: "\u041F\u0440\u0438\u043D\u044F\u0442\u044C \u0432\u0441\u0435",
+  321:   serve: "\u0412\u044B\u0434\u0430\u0442\u044C",
+  322:   serveAll: "\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0435",
+  323:   show: "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C",
+  324:   hide: "\u0421\u043A\u0440\u044B\u0442\u044C",
+  325:   collapse: "\u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C",
+  326:   closeTable: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C \u0441\u0442\u043E\u043B",
+  327:   loading: "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430...",
+  328:   noActions: "\u041D\u0435\u0442 \u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0445 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439",
+  329:   otherTableTitle: "\u0427\u0443\u0436\u043E\u0439 \u0441\u0442\u043E\u043B",
+  330:   otherTableHint: "\u0417\u0430\u043A\u0440\u0435\u043F\u043B\u0451\u043D \u0437\u0430 \u0434\u0440\u0443\u0433\u0438\u043C \u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A\u043E\u043C",
+  331:   requestsBlocker: "\u0415\u0441\u0442\u044C \u043D\u0435\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043D\u044B\u0435 \u0437\u0430\u043F\u0440\u043E\u0441\u044B",
+  332:   newBlocker: "\u0415\u0441\u0442\u044C \u043D\u043E\u0432\u044B\u0435 \u0431\u043B\u044E\u0434\u0430",
+  333:   inProgressBlocker: "\u0415\u0441\u0442\u044C \u0431\u043B\u044E\u0434\u0430 \u0432 \u0440\u0430\u0431\u043E\u0442\u0435",
+  334:   readyBlocker: "\u0415\u0441\u0442\u044C \u0431\u043B\u044E\u0434\u0430 \u0432 \u0441\u0435\u043A\u0446\u0438\u0438 \u00AB\u0413\u043E\u0442\u043E\u0432\u043E\u00BB",
+  335:   acceptRequest: "\u041F\u0440\u0438\u043D\u044F\u0442\u044C",
+  336:   serveRequest: "\u0412\u044B\u0434\u0430\u0442\u044C",
+  337:   acceptAllRequests: "\u041F\u0440\u0438\u043D\u044F\u0442\u044C \u0432\u0441\u0435",
+  338:   serveAllRequests: "\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0435",
+  339:   undoLabel: "\u0412\u044B\u0434\u0430\u043D \u0433\u043E\u0441\u0442\u044E",
+ exited 1 in 41.88s:
+Get-Content : Cannot find path 'C:\Users\ASUS\Dev\Menu AI 
+Cowork\menuapp-code-review\pages\StaffOrdersMobile\README.md' because it does not exist.
+At line:2 char:1
++ Get-Content pages/StaffOrdersMobile/README.md
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (C:\Users\ASUS\D...obile\README.md:String) [Get-Content], ItemNotFoundEx 
+   ception
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+ succeeded in 45.71s:
+ 1985:   const getOldestAgeMinutes = useCallback((entries, getDate) => {
+ 1986:     if (!entries.length) return null;
+ 1987:     const oldest = Math.min(...entries.map((entry) => safeParseDate(getDate(entry)).getTime()));
+ 1988:     return Math.max(0, Math.floor((Date.now() - oldest) / 60000));
+ 1989:   }, []);
+ 1990: 
+ 1991:   const buildHallRows = useCallback((orders, { served = false } = {}) => {
+ 1992:     return orders.flatMap((order) => {
+ 1993:       const orderItems = served ? servedItemsByOrder[order.id] : itemsByOrder[order.id];
+ 1994:       const meta = getOrderActionMeta(order);
+ 1995:       const secondary = guestMarker(order);
+ 1996:       const timeLabel = served ? formatClockTime(order.updated_date || order.created_date) : null;
+ 1997:       if (!orderItems || orderItems.length === 0) {
+ 1998:         return [{ id: `${order.id}:${served ? "served" : "active"}:loading`, order, primary: HALL_UI_TEXT.loading, secondary, actionLabel: served ? null : meta.rowLabel, willServe: meta.willServe, loading: true, timeLabel }];
+ 1999:       }
+ 2000:       return orderItems.map((item, index) => ({ id: `${order.id}:${item.id || index}`, order, primary: `${item.dish_name || HALL_UI_TEXT.loading} \u00D7${item.quantity || 1}`, secondary, actionLabel: served ? null : meta.rowLabel, willServe: meta.willServe, loading: false, timeLabel }));
+ 2001:     });
+ 2002:   }, [getOrderActionMeta, guestMarker, itemsByOrder, servedItemsByOrder]);
+ 2003: 
+ 2004:   const newRows = useMemo(() => buildHallRows(newOrders), [buildHallRows, newOrders]);
+ succeeded in 46.31s:
+ 2165:         <div className="space-y-1">
+ 2166:           {orderItems.length > 0 ? orderItems.map((item, index) => <div key={item.id || index} className="text-xs text-slate-600">{`${item.dish_name} \u00D7${item.quantity || 1}`}</div>) : <div className="text-xs text-slate-400">{HALL_UI_TEXT.loading}</div>}
+ 2167:         </div>
+ 2168:         <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+ 2169:           {order.order_number ? <span className="text-[10px] text-slate-400">{order.order_number}</span> : <span />}
+ 2170:           {buildAdvancePayload(order) && <button type="button" onClick={() => handleSingleAction(order)} disabled={advanceMutation.isPending} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{advanceMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : actionLabel}</button>}
+ 2171:         </div>
+ 2172:       </div>
+ 2173:     );
+ 2174:   }, [advanceMutation.isPending, buildAdvancePayload, getOrderActionMeta, getStatusConfig, guestName, handleSingleAction, itemsByOrder]);
+ 2175: 
+ 2176:   const highlightRing = isHighlighted ? "ring-2 ring-indigo-400 ring-offset-1" : "";
+ 2177: 
+ 2178:   return (
+ 2179:     <div data-group-id={group.id} className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-all duration-300 ${style.bgClass} ${style.borderClass} ${highlightRing}`}>
+ 2180:       <div className="px-4 pt-3 pb-3 cursor-pointer active:opacity-80" onClick={onToggleExpand} role="button" aria-expanded={isExpanded} aria-label={group.type === "table" ? identifier : `${identifier}: ${statusLabel}`}>
+ 2181:         {group.type === "table" ? (
+ 2182:           <div className="space-y-2">
+ 2183:             <div className="flex items-start justify-between gap-3">
+ 2184:               <div className="flex items-center gap-2 min-w-0">
+ succeeded in 1m 25s:
+# StaffOrdersMobile Bug Tracker
+
+**Page:** `pages/StaffOrdersMobile/staffordersmobile.jsx`
+**Last updated:** 2026-04-06 (Chain c05c â€” SOM Section Rework: lifecycle order, active/passive, dual metric, 2-step requests, staff pill, inline toast, close-blocker, bulk requests)
+
+---
+
+## Fixed Bugs
+
+### SOM-KS1-P0-01 (P0) -- activeRequests filter excludes 'accepted' status
+- **Function:** activeRequests useMemo filter (line ~3310)
+- **Root cause:** Filter only included `["new", "in_progress"]` â€” accepted requests vanished from UI, making two-step flow impossible.
+- **Fix:** Changed to `!["done", "cancelled"].includes(r.status)` â€” now includes accepted requests.
+- **Chain:** staffordersmobile-260406-195641-c05c
+- **Status:** ðŸŸ¡ Fixed (pending test)
+
+### SOM-KS1-P0-02 (P0) -- updateRequestMutation only passes status, loses assignee
+- **Function:** updateRequestMutation mutationFn (line ~3315)
+- **Root cause:** Destructured only `{id, status}` â€” Accept step needed `assignee` + `assigned_at` fields.
+- **Fix:** Changed to spread all payload fields to update call.
+codex
+The target header block is still the pre-#288 version, so I’m checking a couple more local excerpts to confirm whether any of the new SCS helpers/chips logic exists before I write the review.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$start=1675; $end=1765; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '"'{0,5}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$start=2055; $end=2095; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '"'{0,5}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'getUrgencyLevel|URGENCY_IDENTITY_STYLE|SCS_SOLID_CHIP|scsChips|scsOldestActionable|scsUrgency|scsHighlightKey'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 33.36s:
+ 2055:     [HALL_UI_TEXT.readyBlocker]: "ready",
+ 2056:   }), []);
+ 2057:   const handleCloseTableClick = useCallback(() => {
+ 2058:     const sessionId = group.orders.map((order) => getLinkId(order.table_session)).find(Boolean);
+ 2059:     if (onCloseTable && sessionId) {
+ 2060:       onCloseTable(sessionId, identifier);
+ 2061:       return;
+ 2062:     }
+ 2063:     if (onCloseAllOrders) onCloseAllOrders(group.orders);
+ 2064:   }, [group.orders, identifier, onCloseAllOrders, onCloseTable]);
+ 2065:   const showOtherTableHint = useCallback((event) => {
+ 2066:     event?.stopPropagation();
+ 2067:     if (ownershipState !== "other") return;
+ 2068:     setOwnerHintVisible(true);
+ 2069:     if (ownerHintTimerRef.current) clearTimeout(ownerHintTimerRef.current);
+ 2070:     ownerHintTimerRef.current = setTimeout(() => setOwnerHintVisible(false), 1600);
+ 2071:   }, [ownershipState]);
+ 2072: 
+ 2073:   const getSummaryTone = useCallback((kind, ageMin) => {
+ 2074:     if (kind === "requests") return ageMin >= 3 ? "text-red-600" : "text-violet-600";
+ succeeded in 35.41s:
+ 1675: function OrderGroupCard({
+ 1676:   group,
+ 1677:   isExpanded,
+ 1678:   onToggleExpand,
+ 1679:   isHighlighted,
+ 1680:   isFavorite,
+ 1681:   onToggleFavorite,
+ 1682:   getStatusConfig,
+ 1683:   guestsMap,
+ 1684:   effectiveUserId,
+ 1685:   onMutate,
+ 1686:   onCloseTable,
+ 1687:   overdueMinutes,
+ 1688:   notifiedOrderIds,
+ 1689:   onClearNotified,
+ 1690:   tableMap,
+ 1691:   activeRequests,
+ 1692:   onCloseAllOrders,
+ 1693:   onCloseRequest,
+ 1694:   orderStages = [],
+ succeeded in 30.52s:
+---
+version: "4.0.1"
+updated: "2026-03-06"
+session: 90
+deployed: "2026-03-02 S69"
+---
+
+# StaffOrdersMobile â€” ÐœÐ¾Ð±Ð¸Ð»ÑŒÐ½Ñ‹Ð¹ Ð¸Ð½Ñ‚ÐµÑ€Ñ„ÐµÐ¹Ñ Ð¿ÐµÑ€ÑÐ¾Ð½Ð°Ð»Ð°
+
+## ÐžÐ¿Ð¸ÑÐ°Ð½Ð¸Ðµ
+ÐœÐ¾Ð±Ð¸Ð»ÑŒÐ½Ñ‹Ð¹ Ð¸Ð½Ñ‚ÐµÑ€Ñ„ÐµÐ¹Ñ Ð´Ð»Ñ Ð¿ÐµÑ€ÑÐ¾Ð½Ð°Ð»Ð° Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð°. ÐŸÑ€Ð¸Ñ‘Ð¼ Ð·Ð°ÐºÐ°Ð·Ð¾Ð², ÑÐ¼ÐµÐ½Ð° ÑÑ‚Ð°Ñ‚ÑƒÑÐ¾Ð², Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹ Ð¿Ð¾Ð¼Ð¾Ñ‰Ð¸, Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€Ð¾Ð²ÐºÐ° Ð¿Ð¾ ÑÑ‚Ð¾Ð»Ð°Ð¼. Ð¡Ð°Ð¼Ñ‹Ð¹ ÑÐ»Ð¾Ð¶Ð½Ñ‹Ð¹ Ñ„Ð°Ð¹Ð» Ð¿Ñ€Ð¾ÐµÐºÑ‚Ð° (v3.6.0 â€” stale data + close table confirm S74).
+
+**Route:** `/staffordersmobile`
+**Roles:** partner_manager, partner_staff, kitchen
+**Ð Ð°Ð·Ð¼ÐµÑ€:** ~3940 ÑÑ‚Ñ€Ð¾Ðº (v3.2.0)
+
+## ÐÑ€Ñ…Ð¸Ñ‚ÐµÐºÑ‚ÑƒÑ€Ð°
+
+### ÐšÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚Ñ‹ (14)
+- `StaffOrdersMobile` â€” Ð³Ð»Ð°Ð²Ð½Ñ‹Ð¹
+ succeeded in 31.02s:
+
+codex
+I’ve confirmed the file still contains the legacy collapsed-header branch and none of the new SCS helper symbols exist. I’m creating the findings report and command log now, without touching the page code.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/StaffOrdersMobile | Where-Object { $_ -like '"'review_*' -or "'$_ -like '"'commands_*' }" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pipeline/chain-state' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 29.68s:
+
+ succeeded in 34.63s:
+client-260409-215143-d76e-codex-findings.md
+partnerorderprocess-260404-060141-d4ba-codex-findings.md
+partnerorderprocess-260404-204226-0133-cc-findings.md
+partnerorderprocess-260404-204226-0133-codex-findings.md
+partnerorderprocess-260404-204226-0133-merge-report.md
+partnersettings-260321-235750-cc-findings.md
+partnersettings-260321-235750-codex-findings.md
+partnersettings-260321-235750-comparison.md
+partnersettings-260321-235750-discussion.md
+partnersettings-260321-235750-merge-report.md
+partnersettings-260323-142203-51fa-cc-findings.md
+partnersettings-260323-142203-51fa-codex-findings.md
+partnersettings-260323-142203-51fa-comparison.md
+partnersettings-260323-142203-51fa-discussion.md
+partnersettings-260323-142203-51fa-merge-report.md
+partnersettings-260323-185103-86f9-cc-findings.md
+partnersettings-260323-185103-86f9-codex-findings.md
+partnersettings-260323-185103-86f9-comparison.md
+partnersettings-260323-185103-86f9-discussion.md
+partnersettings-260323-185103-86f9-merge-report.md
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/StaffOrdersMobile/commands_2026-04-12.log
+git fetch origin 2>$null; git reset --hard origin/main
+Get-ChildItem -Name pages/StaffOrdersMobile
+Get-Content pages/StaffOrdersMobile/README.md
+Get-Content pages/StaffOrdersMobile/BUGS.md
+$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=320; $end=390; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
+$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1985; $end=2065; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
+$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2165; $end=2265; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
+Get-Content 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'
+$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1675; $end=1765; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
+$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2055; $end=2095; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
+Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'getUrgencyLevel|URGENCY_IDENTITY_STYLE|SCS_SOLID_CHIP|scsChips|scsOldestActionable|scsUrgency|scsHighlightKey'
+Get-ChildItem -Name pipeline/chain-state
+Get-ChildItem -Name pages/StaffOrdersMobile | Where-Object { $_ -like 'review_*' -or $_ -like 'commands_*' }
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md
+# Codex Writer Findings — StaffOrdersMobile
+Chain: staffordersmobile-260412-123531-7231
+
+## Findings
+1. [P1] Missing SCS urgency and chip derivation for Fix 1 — In `pages/StaffOrdersMobile/staffordersmobile.jsx` the helper area at lines 376-378 still jumps directly from `formatClockTime` to `getAgeMinutes`, and the `OrderGroupCard` data section at lines 2018-2025 still defines only `jumpChips` before continuing into `legacySummaryLines`. The required Fix 1 values `getUrgencyLevel`, `URGENCY_IDENTITY_STYLE`, `SCS_SOLID_CHIP`, `scsChips`, `scsOldestActionable`, `scsUrgency`, and `scsHighlightKey` are absent, so the collapsed table card cannot compute the required pastel identity background, longest-chip highlight, or the new actionable/non-actionable chip set. FIX: add the Fix 1 helper/constants near `formatClockTime`, then compute `scsChips` and the derived urgency/highlight values immediately after `jumpChips`.
+2. [P1] Collapsed table header still renders the legacy compact layout — The active `group.type === "table"` branch at lines 2181-2205 still uses the old `space-y-2` header with an inline ownership icon/button (2185-2193), a dark table pill with white text (2194), an optional zone chip (2195), and no 84px identity wrapper or 78x54 pastel identity block. This misses the required outside overlap ownership badge, always-dark 26px table number, free-table green outline, and wrapped right-side `scsChips` layout from Fix 1. FIX: replace the entire collapsed table header block with the specified identity-wrapper + identity block + right-zone `scsChips` layout, remove the zone chip from the collapsed header, and show `HALL_UI_TEXT.noActions` only when `scsChips` is empty.
+3. [P1] Jump chips were not moved to expanded view — The always-visible header still renders `jumpChips` at line 2205 and still uses the old `setIsExpanded(true); scrollToSection(...)` handler, while the expanded table content starts at lines 2230-2247 with no jump-chip row at its top. That leaves jump chips visible in collapsed state and missing from expanded state, which is the opposite of Fix 1. FIX: remove the header-level `jumpChips` render, then add the specified `jumpChips.length > 0` button row as the first element inside the expanded table fragment, keeping `HALL_CHIP_STYLES` unchanged and dropping `setIsExpanded(true)` from the chip click handler.
+
+## Summary
+Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 contains a direct conflict: it says the ownership badge must "ALWAYS show based on `ownershipState` alone" and later Step 3 says it should be "shown only when `filter==='all'` or equivalent." The context-file name is also inconsistent: the folder contains `StaffOrdersMobile README.md`, not `README.md`.
+- Missing context (what info would have helped): For a review-only task, the implementation-only sections (`git add/commit/push`, mobile-first checklist, regression checklist, post-task review) added noise that did not affect the deliverable. A short note saying "review current code against Fix 1 only; do not implement" would make execution faster.
+- Scope questions (anything you weren't sure if it's in scope): Whether the page-folder `review_*.md` and `commands_*.log` artifacts were still required in addition to the pipeline findings file, and whether the missing `README.md` should be treated as an error or replaced by `StaffOrdersMobile README.md`.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/StaffOrdersMobile/review_2026-04-12.md
+# Codex Writer Findings — StaffOrdersMobile
+Chain: staffordersmobile-260412-123531-7231
+
+## Findings
+1. [P1] Missing SCS urgency and chip derivation for Fix 1 — In `pages/StaffOrdersMobile/staffordersmobile.jsx` the helper area at lines 376-378 still jumps directly from `formatClockTime` to `getAgeMinutes`, and the `OrderGroupCard` data section at lines 2018-2025 still defines only `jumpChips` before continuing into `legacySummaryLines`. The required Fix 1 values `getUrgencyLevel`, `URGENCY_IDENTITY_STYLE`, `SCS_SOLID_CHIP`, `scsChips`, `scsOldestActionable`, `scsUrgency`, and `scsHighlightKey` are absent, so the collapsed table card cannot compute the required pastel identity background, longest-chip highlight, or the new actionable/non-actionable chip set. FIX: add the Fix 1 helper/constants near `formatClockTime`, then compute `scsChips` and the derived urgency/highlight values immediately after `jumpChips`.
+2. [P1] Collapsed table header still renders the legacy compact layout — The active `group.type === "table"` branch at lines 2181-2205 still uses the old `space-y-2` header with an inline ownership icon/button (2185-2193), a dark table pill with white text (2194), an optional zone chip (2195), and no 84px identity wrapper or 78x54 pastel identity block. This misses the required outside overlap ownership badge, always-dark 26px table number, free-table green outline, and wrapped right-side `scsChips` layout from Fix 1. FIX: replace the entire collapsed table header block with the specified identity-wrapper + identity block + right-zone `scsChips` layout, remove the zone chip from the collapsed header, and show `HALL_UI_TEXT.noActions` only when `scsChips` is empty.
+3. [P1] Jump chips were not moved to expanded view — The always-visible header still renders `jumpChips` at line 2205 and still uses the old `setIsExpanded(true); scrollToSection(...)` handler, while the expanded table content starts at lines 2230-2247 with no jump-chip row at its top. That leaves jump chips visible in collapsed state and missing from expanded state, which is the opposite of Fix 1. FIX: remove the header-level `jumpChips` render, then add the specified `jumpChips.length > 0` button row as the first element inside the expanded table fragment, keeping `HALL_CHIP_STYLES` unchanged and dropping `setIsExpanded(true)` from the chip click handler.
+
+## Summary
+Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 contains a direct conflict: it says the ownership badge must "ALWAYS show based on `ownershipState` alone" and later Step 3 says it should be "shown only when `filter==='all'` or equivalent." The context-file name is also inconsistent: the folder contains `StaffOrdersMobile README.md`, not `README.md`.
+- Missing context (what info would have helped): For a review-only task, the implementation-only sections (`git add/commit/push`, mobile-first checklist, regression checklist, post-task review) added noise that did not affect the deliverable. A short note saying "review current code against Fix 1 only; do not implement" would make execution faster.
+- Scope questions (anything you weren't sure if it's in scope): Whether the page-folder `review_*.md` and `commands_*.log` artifacts were still required in addition to the pipeline findings file, and whether the missing `README.md` should be treated as an error or replaced by `StaffOrdersMobile README.md`.
+apply_patch(auto_approved=true) exited 0 in 13.77s:
+Success. Updated the following files:
+A pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md
+A pages/StaffOrdersMobile/review_2026-04-12.md
+A pages/StaffOrdersMobile/commands_2026-04-12.log
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-04-12.log b/pages/StaffOrdersMobile/commands_2026-04-12.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..eebe5ed6095f8f61535a575f5cc1003deef2ad00
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-04-12.log
+@@ -0,0 +1,13 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Name pages/StaffOrdersMobile
++Get-Content pages/StaffOrdersMobile/README.md
++Get-Content pages/StaffOrdersMobile/BUGS.md
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=320; $end=390; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1985; $end=2065; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2165; $end=2265; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++Get-Content 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1675; $end=1765; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2055; $end=2095; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'getUrgencyLevel|URGENCY_IDENTITY_STYLE|SCS_SOLID_CHIP|scsChips|scsOldestActionable|scsUrgency|scsHighlightKey'
++Get-ChildItem -Name pipeline/chain-state
++Get-ChildItem -Name pages/StaffOrdersMobile | Where-Object { $_ -like 'review_*' -or $_ -like 'commands_*' }
+diff --git a/pages/StaffOrdersMobile/review_2026-04-12.md b/pages/StaffOrdersMobile/review_2026-04-12.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8f5a32d5c56a965951f13ceee77f5fc7283fc504
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-04-12.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260412-123531-7231
++
++## Findings
++1. [P1] Missing SCS urgency and chip derivation for Fix 1 — In `pages/StaffOrdersMobile/staffordersmobile.jsx` the helper area at lines 376-378 still jumps directly from `formatClockTime` to `getAgeMinutes`, and the `OrderGroupCard` data section at lines 2018-2025 still defines only `jumpChips` before continuing into `legacySummaryLines`. The required Fix 1 values `getUrgencyLevel`, `URGENCY_IDENTITY_STYLE`, `SCS_SOLID_CHIP`, `scsChips`, `scsOldestActionable`, `scsUrgency`, and `scsHighlightKey` are absent, so the collapsed table card cannot compute the required pastel identity background, longest-chip highlight, or the new actionable/non-actionable chip set. FIX: add the Fix 1 helper/constants near `formatClockTime`, then compute `scsChips` and the derived urgency/highlight values immediately after `jumpChips`.
++2. [P1] Collapsed table header still renders the legacy compact layout — The active `group.type === "table"` branch at lines 2181-2205 still uses the old `space-y-2` header with an inline ownership icon/button (2185-2193), a dark table pill with white text (2194), an optional zone chip (2195), and no 84px identity wrapper or 78x54 pastel identity block. This misses the required outside overlap ownership badge, always-dark 26px table number, free-table green outline, and wrapped right-side `scsChips` layout from Fix 1. FIX: replace the entire collapsed table header block with the specified identity-wrapper + identity block + right-zone `scsChips` layout, remove the zone chip from the collapsed header, and show `HALL_UI_TEXT.noActions` only when `scsChips` is empty.
++3. [P1] Jump chips were not moved to expanded view — The always-visible header still renders `jumpChips` at line 2205 and still uses the old `setIsExpanded(true); scrollToSection(...)` handler, while the expanded table content starts at lines 2230-2247 with no jump-chip row at its top. That leaves jump chips visible in collapsed state and missing from expanded state, which is the opposite of Fix 1. FIX: remove the header-level `jumpChips` render, then add the specified `jumpChips.length > 0` button row as the first element inside the expanded table fragment, keeping `HALL_CHIP_STYLES` unchanged and dropping `setIsExpanded(true)` from the chip click handler.
++
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 contains a direct conflict: it says the ownership badge must "ALWAYS show based on `ownershipState` alone" and later Step 3 says it should be "shown only when `filter==='all'` or equivalent." The context-file name is also inconsistent: the folder contains `StaffOrdersMobile README.md`, not `README.md`.
++- Missing context (what info would have helped): For a review-only task, the implementation-only sections (`git add/commit/push`, mobile-first checklist, regression checklist, post-task review) added noise that did not affect the deliverable. A short note saying "review current code against Fix 1 only; do not implement" would make execution faster.
++- Scope questions (anything you weren't sure if it's in scope): Whether the page-folder `review_*.md` and `commands_*.log` artifacts were still required in addition to the pipeline findings file, and whether the missing `README.md` should be treated as an error or replaced by `StaffOrdersMobile README.md`.
+diff --git a/pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md b/pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8f5a32d5c56a965951f13ceee77f5fc7283fc504
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260412-123531-7231
++
++## Findings
++1. [P1] Missing SCS urgency and chip derivation for Fix 1 — In `pages/StaffOrdersMobile/staffordersmobile.jsx` the helper area at lines 376-378 still jumps directly from `formatClockTime` to `getAgeMinutes`, and the `OrderGroupCard` data section at lines 2018-2025 still defines only `jumpChips` before continuing into `legacySummaryLines`. The required Fix 1 values `getUrgencyLevel`, `URGENCY_IDENTITY_STYLE`, `SCS_SOLID_CHIP`, `scsChips`, `scsOldestActionable`, `scsUrgency`, and `scsHighlightKey` are absent, so the collapsed table card cannot compute the required pastel identity background, longest-chip highlight, or the new actionable/non-actionable chip set. FIX: add the Fix 1 helper/constants near `formatClockTime`, then compute `scsChips` and the derived urgency/highlight values immediately after `jumpChips`.
++2. [P1] Collapsed table header still renders the legacy compact layout — The active `group.type === "table"` branch at lines 2181-2205 still uses the old `space-y-2` header with an inline ownership icon/button (2185-2193), a dark table pill with white text (2194), an optional zone chip (2195), and no 84px identity wrapper or 78x54 pastel identity block. This misses the required outside overlap ownership badge, always-dark 26px table number, free-table green outline, and wrapped right-side `scsChips` layout from Fix 1. FIX: replace the entire collapsed table header block with the specified identity-wrapper + identity block + right-zone `scsChips` layout, remove the zone chip from the collapsed header, and show `HALL_UI_TEXT.noActions` only when `scsChips` is empty.
++3. [P1] Jump chips were not moved to expanded view — The always-visible header still renders `jumpChips` at line 2205 and still uses the old `setIsExpanded(true); scrollToSection(...)` handler, while the expanded table content starts at lines 2230-2247 with no jump-chip row at its top. That leaves jump chips visible in collapsed state and missing from expanded state, which is the opposite of Fix 1. FIX: remove the header-level `jumpChips` render, then add the specified `jumpChips.length > 0` button row as the first element inside the expanded table fragment, keeping `HALL_CHIP_STYLES` unchanged and dropping `setIsExpanded(true)` from the chip click handler.
++
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 contains a direct conflict: it says the ownership badge must "ALWAYS show based on `ownershipState` alone" and later Step 3 says it should be "shown only when `filter==='all'` or equivalent." The context-file name is also inconsistent: the folder contains `StaffOrdersMobile README.md`, not `README.md`.
++- Missing context (what info would have helped): For a review-only task, the implementation-only sections (`git add/commit/push`, mobile-first checklist, regression checklist, post-task review) added noise that did not affect the deliverable. A short note saying "review current code against Fix 1 only; do not implement" would make execution faster.
++- Scope questions (anything you weren't sure if it's in scope): Whether the page-folder `review_*.md` and `commands_*.log` artifacts were still required in addition to the pipeline findings file, and whether the missing `README.md` should be treated as an error or replaced by `StaffOrdersMobile README.md`.
+
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-04-12.log b/pages/StaffOrdersMobile/commands_2026-04-12.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..eebe5ed6095f8f61535a575f5cc1003deef2ad00
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-04-12.log
+@@ -0,0 +1,13 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Name pages/StaffOrdersMobile
++Get-Content pages/StaffOrdersMobile/README.md
++Get-Content pages/StaffOrdersMobile/BUGS.md
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=320; $end=390; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1985; $end=2065; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2165; $end=2265; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++Get-Content 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1675; $end=1765; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2055; $end=2095; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'getUrgencyLevel|URGENCY_IDENTITY_STYLE|SCS_SOLID_CHIP|scsChips|scsOldestActionable|scsUrgency|scsHighlightKey'
++Get-ChildItem -Name pipeline/chain-state
++Get-ChildItem -Name pages/StaffOrdersMobile | Where-Object { $_ -like 'review_*' -or $_ -like 'commands_*' }
+diff --git a/pages/StaffOrdersMobile/review_2026-04-12.md b/pages/StaffOrdersMobile/review_2026-04-12.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8f5a32d5c56a965951f13ceee77f5fc7283fc504
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-04-12.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260412-123531-7231
++
++## Findings
++1. [P1] Missing SCS urgency and chip derivation for Fix 1 — In `pages/StaffOrdersMobile/staffordersmobile.jsx` the helper area at lines 376-378 still jumps directly from `formatClockTime` to `getAgeMinutes`, and the `OrderGroupCard` data section at lines 2018-2025 still defines only `jumpChips` before continuing into `legacySummaryLines`. The required Fix 1 values `getUrgencyLevel`, `URGENCY_IDENTITY_STYLE`, `SCS_SOLID_CHIP`, `scsChips`, `scsOldestActionable`, `scsUrgency`, and `scsHighlightKey` are absent, so the collapsed table card cannot compute the required pastel identity background, longest-chip highlight, or the new actionable/non-actionable chip set. FIX: add the Fix 1 helper/constants near `formatClockTime`, then compute `scsChips` and the derived urgency/highlight values immediately after `jumpChips`.
++2. [P1] Collapsed table header still renders the legacy compact layout — The active `group.type === "table"` branch at lines 2181-2205 still uses the old `space-y-2` header with an inline ownership icon/button (2185-2193), a dark table pill with white text (2194), an optional zone chip (2195), and no 84px identity wrapper or 78x54 pastel identity block. This misses the required outside overlap ownership badge, always-dark 26px table number, free-table green outline, and wrapped right-side `scsChips` layout from Fix 1. FIX: replace the entire collapsed table header block with the specified identity-wrapper + identity block + right-zone `scsChips` layout, remove the zone chip from the collapsed header, and show `HALL_UI_TEXT.noActions` only when `scsChips` is empty.
++3. [P1] Jump chips were not moved to expanded view — The always-visible header still renders `jumpChips` at line 2205 and still uses the old `setIsExpanded(true); scrollToSection(...)` handler, while the expanded table content starts at lines 2230-2247 with no jump-chip row at its top. That leaves jump chips visible in collapsed state and missing from expanded state, which is the opposite of Fix 1. FIX: remove the header-level `jumpChips` render, then add the specified `jumpChips.length > 0` button row as the first element inside the expanded table fragment, keeping `HALL_CHIP_STYLES` unchanged and dropping `setIsExpanded(true)` from the chip click handler.
++
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 contains a direct conflict: it says the ownership badge must "ALWAYS show based on `ownershipState` alone" and later Step 3 says it should be "shown only when `filter==='all'` or equivalent." The context-file name is also inconsistent: the folder contains `StaffOrdersMobile README.md`, not `README.md`.
++- Missing context (what info would have helped): For a review-only task, the implementation-only sections (`git add/commit/push`, mobile-first checklist, regression checklist, post-task review) added noise that did not affect the deliverable. A short note saying "review current code against Fix 1 only; do not implement" would make execution faster.
++- Scope questions (anything you weren't sure if it's in scope): Whether the page-folder `review_*.md` and `commands_*.log` artifacts were still required in addition to the pipeline findings file, and whether the missing `README.md` should be treated as an error or replaced by `StaffOrdersMobile README.md`.
+diff --git a/pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md b/pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8f5a32d5c56a965951f13ceee77f5fc7283fc504
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260412-123531-7231
++
++## Findings
++1. [P1] Missing SCS urgency and chip derivation for Fix 1 — In `pages/StaffOrdersMobile/staffordersmobile.jsx` the helper area at lines 376-378 still jumps directly from `formatClockTime` to `getAgeMinutes`, and the `OrderGroupCard` data section at lines 2018-2025 still defines only `jumpChips` before continuing into `legacySummaryLines`. The required Fix 1 values `getUrgencyLevel`, `URGENCY_IDENTITY_STYLE`, `SCS_SOLID_CHIP`, `scsChips`, `scsOldestActionable`, `scsUrgency`, and `scsHighlightKey` are absent, so the collapsed table card cannot compute the required pastel identity background, longest-chip highlight, or the new actionable/non-actionable chip set. FIX: add the Fix 1 helper/constants near `formatClockTime`, then compute `scsChips` and the derived urgency/highlight values immediately after `jumpChips`.
++2. [P1] Collapsed table header still renders the legacy compact layout — The active `group.type === "table"` branch at lines 2181-2205 still uses the old `space-y-2` header with an inline ownership icon/button (2185-2193), a dark table pill with white text (2194), an optional zone chip (2195), and no 84px identity wrapper or 78x54 pastel identity block. This misses the required outside overlap ownership badge, always-dark 26px table number, free-table green outline, and wrapped right-side `scsChips` layout from Fix 1. FIX: replace the entire collapsed table header block with the specified identity-wrapper + identity block + right-zone `scsChips` layout, remove the zone chip from the collapsed header, and show `HALL_UI_TEXT.noActions` only when `scsChips` is empty.
++3. [P1] Jump chips were not moved to expanded view — The always-visible header still renders `jumpChips` at line 2205 and still uses the old `setIsExpanded(true); scrollToSection(...)` handler, while the expanded table content starts at lines 2230-2247 with no jump-chip row at its top. That leaves jump chips visible in collapsed state and missing from expanded state, which is the opposite of Fix 1. FIX: remove the header-level `jumpChips` render, then add the specified `jumpChips.length > 0` button row as the first element inside the expanded table fragment, keeping `HALL_CHIP_STYLES` unchanged and dropping `setIsExpanded(true)` from the chip click handler.
++
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 contains a direct conflict: it says the ownership badge must "ALWAYS show based on `ownershipState` alone" and later Step 3 says it should be "shown only when `filter==='all'` or equivalent." The context-file name is also inconsistent: the folder contains `StaffOrdersMobile README.md`, not `README.md`.
++- Missing context (what info would have helped): For a review-only task, the implementation-only sections (`git add/commit/push`, mobile-first checklist, regression checklist, post-task review) added noise that did not affect the deliverable. A short note saying "review current code against Fix 1 only; do not implement" would make execution faster.
++- Scope questions (anything you weren't sure if it's in scope): Whether the page-folder `review_*.md` and `commands_*.log` artifacts were still required in addition to the pipeline findings file, and whether the missing `README.md` should be treated as an error or replaced by `StaffOrdersMobile README.md`.
+
+codex
+The findings file and the required page-folder artifacts are written. I’m doing a quick existence check and then I’ll close with the three scoped findings only.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Item pages/StaffOrdersMobile/review_2026-04-12.md, pages/StaffOrdersMobile/commands_2026-04-12.log | Select-Object FullName,Length' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Item pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md | Select-Object FullName,Length' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 22.24s:
+
+FullName                                                                                             Length
+--------                                                                                             ------
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\StaffOrdersMobile\review_2026-04-12.md      3543
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\StaffOrdersMobile\commands_2026-04-12.log   1515
+
+
+ succeeded in 22.60s:
+
+FullName                                                                                                               
+--------                                                                                                               
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pipeline\chain-state\staffordersmobile-260412-123531-7231-codex...
+
+
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-04-12.log b/pages/StaffOrdersMobile/commands_2026-04-12.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..eebe5ed6095f8f61535a575f5cc1003deef2ad00
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-04-12.log
+@@ -0,0 +1,13 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Name pages/StaffOrdersMobile
++Get-Content pages/StaffOrdersMobile/README.md
++Get-Content pages/StaffOrdersMobile/BUGS.md
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=320; $end=390; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1985; $end=2065; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2165; $end=2265; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++Get-Content 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1675; $end=1765; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2055; $end=2095; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'getUrgencyLevel|URGENCY_IDENTITY_STYLE|SCS_SOLID_CHIP|scsChips|scsOldestActionable|scsUrgency|scsHighlightKey'
++Get-ChildItem -Name pipeline/chain-state
++Get-ChildItem -Name pages/StaffOrdersMobile | Where-Object { $_ -like 'review_*' -or $_ -like 'commands_*' }
+diff --git a/pages/StaffOrdersMobile/review_2026-04-12.md b/pages/StaffOrdersMobile/review_2026-04-12.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8f5a32d5c56a965951f13ceee77f5fc7283fc504
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-04-12.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260412-123531-7231
++
++## Findings
++1. [P1] Missing SCS urgency and chip derivation for Fix 1 — In `pages/StaffOrdersMobile/staffordersmobile.jsx` the helper area at lines 376-378 still jumps directly from `formatClockTime` to `getAgeMinutes`, and the `OrderGroupCard` data section at lines 2018-2025 still defines only `jumpChips` before continuing into `legacySummaryLines`. The required Fix 1 values `getUrgencyLevel`, `URGENCY_IDENTITY_STYLE`, `SCS_SOLID_CHIP`, `scsChips`, `scsOldestActionable`, `scsUrgency`, and `scsHighlightKey` are absent, so the collapsed table card cannot compute the required pastel identity background, longest-chip highlight, or the new actionable/non-actionable chip set. FIX: add the Fix 1 helper/constants near `formatClockTime`, then compute `scsChips` and the derived urgency/highlight values immediately after `jumpChips`.
++2. [P1] Collapsed table header still renders the legacy compact layout — The active `group.type === "table"` branch at lines 2181-2205 still uses the old `space-y-2` header with an inline ownership icon/button (2185-2193), a dark table pill with white text (2194), an optional zone chip (2195), and no 84px identity wrapper or 78x54 pastel identity block. This misses the required outside overlap ownership badge, always-dark 26px table number, free-table green outline, and wrapped right-side `scsChips` layout from Fix 1. FIX: replace the entire collapsed table header block with the specified identity-wrapper + identity block + right-zone `scsChips` layout, remove the zone chip from the collapsed header, and show `HALL_UI_TEXT.noActions` only when `scsChips` is empty.
++3. [P1] Jump chips were not moved to expanded view — The always-visible header still renders `jumpChips` at line 2205 and still uses the old `setIsExpanded(true); scrollToSection(...)` handler, while the expanded table content starts at lines 2230-2247 with no jump-chip row at its top. That leaves jump chips visible in collapsed state and missing from expanded state, which is the opposite of Fix 1. FIX: remove the header-level `jumpChips` render, then add the specified `jumpChips.length > 0` button row as the first element inside the expanded table fragment, keeping `HALL_CHIP_STYLES` unchanged and dropping `setIsExpanded(true)` from the chip click handler.
++
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 contains a direct conflict: it says the ownership badge must "ALWAYS show based on `ownershipState` alone" and later Step 3 says it should be "shown only when `filter==='all'` or equivalent." The context-file name is also inconsistent: the folder contains `StaffOrdersMobile README.md`, not `README.md`.
++- Missing context (what info would have helped): For a review-only task, the implementation-only sections (`git add/commit/push`, mobile-first checklist, regression checklist, post-task review) added noise that did not affect the deliverable. A short note saying "review current code against Fix 1 only; do not implement" would make execution faster.
++- Scope questions (anything you weren't sure if it's in scope): Whether the page-folder `review_*.md` and `commands_*.log` artifacts were still required in addition to the pipeline findings file, and whether the missing `README.md` should be treated as an error or replaced by `StaffOrdersMobile README.md`.
+diff --git a/pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md b/pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8f5a32d5c56a965951f13ceee77f5fc7283fc504
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260412-123531-7231
++
++## Findings
++1. [P1] Missing SCS urgency and chip derivation for Fix 1 — In `pages/StaffOrdersMobile/staffordersmobile.jsx` the helper area at lines 376-378 still jumps directly from `formatClockTime` to `getAgeMinutes`, and the `OrderGroupCard` data section at lines 2018-2025 still defines only `jumpChips` before continuing into `legacySummaryLines`. The required Fix 1 values `getUrgencyLevel`, `URGENCY_IDENTITY_STYLE`, `SCS_SOLID_CHIP`, `scsChips`, `scsOldestActionable`, `scsUrgency`, and `scsHighlightKey` are absent, so the collapsed table card cannot compute the required pastel identity background, longest-chip highlight, or the new actionable/non-actionable chip set. FIX: add the Fix 1 helper/constants near `formatClockTime`, then compute `scsChips` and the derived urgency/highlight values immediately after `jumpChips`.
++2. [P1] Collapsed table header still renders the legacy compact layout — The active `group.type === "table"` branch at lines 2181-2205 still uses the old `space-y-2` header with an inline ownership icon/button (2185-2193), a dark table pill with white text (2194), an optional zone chip (2195), and no 84px identity wrapper or 78x54 pastel identity block. This misses the required outside overlap ownership badge, always-dark 26px table number, free-table green outline, and wrapped right-side `scsChips` layout from Fix 1. FIX: replace the entire collapsed table header block with the specified identity-wrapper + identity block + right-zone `scsChips` layout, remove the zone chip from the collapsed header, and show `HALL_UI_TEXT.noActions` only when `scsChips` is empty.
++3. [P1] Jump chips were not moved to expanded view — The always-visible header still renders `jumpChips` at line 2205 and still uses the old `setIsExpanded(true); scrollToSection(...)` handler, while the expanded table content starts at lines 2230-2247 with no jump-chip row at its top. That leaves jump chips visible in collapsed state and missing from expanded state, which is the opposite of Fix 1. FIX: remove the header-level `jumpChips` render, then add the specified `jumpChips.length > 0` button row as the first element inside the expanded table fragment, keeping `HALL_CHIP_STYLES` unchanged and dropping `setIsExpanded(true)` from the chip click handler.
++
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 contains a direct conflict: it says the ownership badge must "ALWAYS show based on `ownershipState` alone" and later Step 3 says it should be "shown only when `filter==='all'` or equivalent." The context-file name is also inconsistent: the folder contains `StaffOrdersMobile README.md`, not `README.md`.
++- Missing context (what info would have helped): For a review-only task, the implementation-only sections (`git add/commit/push`, mobile-first checklist, regression checklist, post-task review) added noise that did not affect the deliverable. A short note saying "review current code against Fix 1 only; do not implement" would make execution faster.
++- Scope questions (anything you weren't sure if it's in scope): Whether the page-folder `review_*.md` and `commands_*.log` artifacts were still required in addition to the pipeline findings file, and whether the missing `README.md` should be treated as an error or replaced by `StaffOrdersMobile README.md`.
+
+codex
+Saved the scoped review to [staffordersmobile-260412-123531-7231-codex-findings.md](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md>), mirrored it to [review_2026-04-12.md](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/review_2026-04-12.md>), and logged commands in [commands_2026-04-12.log](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/commands_2026-04-12.log>). No code changes were made.
+
+The 3 in-scope findings are all P1:
+1. The Fix 1 SCS helper/data layer is missing near [staffordersmobile.jsx](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx:376>) and [staffordersmobile.jsx](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx:2018>), so the card cannot compute pastel urgency, longest-chip highlighting, or the new `scsChips` set.
+2. The collapsed table header at [staffordersmobile.jsx](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx:2181>) is still the legacy inline icon + dark pill + zone chip layout, not the required identity block + status chips design.
+3. Jump chips still render in the always-visible collapsed header at [staffordersmobile.jsx](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx:2205>) and are absent from the expanded block starting at [staffordersmobile.jsx](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx:2230>).
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-04-12.log b/pages/StaffOrdersMobile/commands_2026-04-12.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..eebe5ed6095f8f61535a575f5cc1003deef2ad00
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-04-12.log
+@@ -0,0 +1,13 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Name pages/StaffOrdersMobile
++Get-Content pages/StaffOrdersMobile/README.md
++Get-Content pages/StaffOrdersMobile/BUGS.md
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=320; $end=390; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1985; $end=2065; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2165; $end=2265; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++Get-Content 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1675; $end=1765; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$p='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2055; $end=2095; $i=0; Get-Content $p | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'getUrgencyLevel|URGENCY_IDENTITY_STYLE|SCS_SOLID_CHIP|scsChips|scsOldestActionable|scsUrgency|scsHighlightKey'
++Get-ChildItem -Name pipeline/chain-state
++Get-ChildItem -Name pages/StaffOrdersMobile | Where-Object { $_ -like 'review_*' -or $_ -like 'commands_*' }
+diff --git a/pages/StaffOrdersMobile/review_2026-04-12.md b/pages/StaffOrdersMobile/review_2026-04-12.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8f5a32d5c56a965951f13ceee77f5fc7283fc504
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-04-12.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260412-123531-7231
++
++## Findings
++1. [P1] Missing SCS urgency and chip derivation for Fix 1 — In `pages/StaffOrdersMobile/staffordersmobile.jsx` the helper area at lines 376-378 still jumps directly from `formatClockTime` to `getAgeMinutes`, and the `OrderGroupCard` data section at lines 2018-2025 still defines only `jumpChips` before continuing into `legacySummaryLines`. The required Fix 1 values `getUrgencyLevel`, `URGENCY_IDENTITY_STYLE`, `SCS_SOLID_CHIP`, `scsChips`, `scsOldestActionable`, `scsUrgency`, and `scsHighlightKey` are absent, so the collapsed table card cannot compute the required pastel identity background, longest-chip highlight, or the new actionable/non-actionable chip set. FIX: add the Fix 1 helper/constants near `formatClockTime`, then compute `scsChips` and the derived urgency/highlight values immediately after `jumpChips`.
++2. [P1] Collapsed table header still renders the legacy compact layout — The active `group.type === "table"` branch at lines 2181-2205 still uses the old `space-y-2` header with an inline ownership icon/button (2185-2193), a dark table pill with white text (2194), an optional zone chip (2195), and no 84px identity wrapper or 78x54 pastel identity block. This misses the required outside overlap ownership badge, always-dark 26px table number, free-table green outline, and wrapped right-side `scsChips` layout from Fix 1. FIX: replace the entire collapsed table header block with the specified identity-wrapper + identity block + right-zone `scsChips` layout, remove the zone chip from the collapsed header, and show `HALL_UI_TEXT.noActions` only when `scsChips` is empty.
++3. [P1] Jump chips were not moved to expanded view — The always-visible header still renders `jumpChips` at line 2205 and still uses the old `setIsExpanded(true); scrollToSection(...)` handler, while the expanded table content starts at lines 2230-2247 with no jump-chip row at its top. That leaves jump chips visible in collapsed state and missing from expanded state, which is the opposite of Fix 1. FIX: remove the header-level `jumpChips` render, then add the specified `jumpChips.length > 0` button row as the first element inside the expanded table fragment, keeping `HALL_CHIP_STYLES` unchanged and dropping `setIsExpanded(true)` from the chip click handler.
++
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 contains a direct conflict: it says the ownership badge must "ALWAYS show based on `ownershipState` alone" and later Step 3 says it should be "shown only when `filter==='all'` or equivalent." The context-file name is also inconsistent: the folder contains `StaffOrdersMobile README.md`, not `README.md`.
++- Missing context (what info would have helped): For a review-only task, the implementation-only sections (`git add/commit/push`, mobile-first checklist, regression checklist, post-task review) added noise that did not affect the deliverable. A short note saying "review current code against Fix 1 only; do not implement" would make execution faster.
++- Scope questions (anything you weren't sure if it's in scope): Whether the page-folder `review_*.md` and `commands_*.log` artifacts were still required in addition to the pipeline findings file, and whether the missing `README.md` should be treated as an error or replaced by `StaffOrdersMobile README.md`.
+diff --git a/pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md b/pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8f5a32d5c56a965951f13ceee77f5fc7283fc504
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260412-123531-7231
++
++## Findings
++1. [P1] Missing SCS urgency and chip derivation for Fix 1 — In `pages/StaffOrdersMobile/staffordersmobile.jsx` the helper area at lines 376-378 still jumps directly from `formatClockTime` to `getAgeMinutes`, and the `OrderGroupCard` data section at lines 2018-2025 still defines only `jumpChips` before continuing into `legacySummaryLines`. The required Fix 1 values `getUrgencyLevel`, `URGENCY_IDENTITY_STYLE`, `SCS_SOLID_CHIP`, `scsChips`, `scsOldestActionable`, `scsUrgency`, and `scsHighlightKey` are absent, so the collapsed table card cannot compute the required pastel identity background, longest-chip highlight, or the new actionable/non-actionable chip set. FIX: add the Fix 1 helper/constants near `formatClockTime`, then compute `scsChips` and the derived urgency/highlight values immediately after `jumpChips`.
++2. [P1] Collapsed table header still renders the legacy compact layout — The active `group.type === "table"` branch at lines 2181-2205 still uses the old `space-y-2` header with an inline ownership icon/button (2185-2193), a dark table pill with white text (2194), an optional zone chip (2195), and no 84px identity wrapper or 78x54 pastel identity block. This misses the required outside overlap ownership badge, always-dark 26px table number, free-table green outline, and wrapped right-side `scsChips` layout from Fix 1. FIX: replace the entire collapsed table header block with the specified identity-wrapper + identity block + right-zone `scsChips` layout, remove the zone chip from the collapsed header, and show `HALL_UI_TEXT.noActions` only when `scsChips` is empty.
++3. [P1] Jump chips were not moved to expanded view — The always-visible header still renders `jumpChips` at line 2205 and still uses the old `setIsExpanded(true); scrollToSection(...)` handler, while the expanded table content starts at lines 2230-2247 with no jump-chip row at its top. That leaves jump chips visible in collapsed state and missing from expanded state, which is the opposite of Fix 1. FIX: remove the header-level `jumpChips` render, then add the specified `jumpChips.length > 0` button row as the first element inside the expanded table fragment, keeping `HALL_CHIP_STYLES` unchanged and dropping `setIsExpanded(true)` from the chip click handler.
++
++## Summary
++Total: 3 findings (0 P0, 3 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 contains a direct conflict: it says the ownership badge must "ALWAYS show based on `ownershipState` alone" and later Step 3 says it should be "shown only when `filter==='all'` or equivalent." The context-file name is also inconsistent: the folder contains `StaffOrdersMobile README.md`, not `README.md`.
++- Missing context (what info would have helped): For a review-only task, the implementation-only sections (`git add/commit/push`, mobile-first checklist, regression checklist, post-task review) added noise that did not affect the deliverable. A short note saying "review current code against Fix 1 only; do not implement" would make execution faster.
++- Scope questions (anything you weren't sure if it's in scope): Whether the page-folder `review_*.md` and `commands_*.log` artifacts were still required in addition to the pipeline findings file, and whether the missing `README.md` should be treated as an error or replaced by `StaffOrdersMobile README.md`.
+
+tokens used
+61 447
+Saved the scoped review to [staffordersmobile-260412-123531-7231-codex-findings.md](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/staffordersmobile-260412-123531-7231-codex-findings.md>), mirrored it to [review_2026-04-12.md](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/review_2026-04-12.md>), and logged commands in [commands_2026-04-12.log](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/commands_2026-04-12.log>). No code changes were made.
+
+The 3 in-scope findings are all P1:
+1. The Fix 1 SCS helper/data layer is missing near [staffordersmobile.jsx](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx:376>) and [staffordersmobile.jsx](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx:2018>), so the card cannot compute pastel urgency, longest-chip highlighting, or the new `scsChips` set.
+2. The collapsed table header at [staffordersmobile.jsx](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx:2181>) is still the legacy inline icon + dark pill + zone chip layout, not the required identity block + status chips design.
+3. Jump chips still render in the always-visible collapsed header at [staffordersmobile.jsx](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx:2205>) and are absent from the expanded block starting at [staffordersmobile.jsx](</C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx:2230>).

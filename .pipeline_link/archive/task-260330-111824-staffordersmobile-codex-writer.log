@@ -1,0 +1,1220 @@
+2026-03-30T06:18:36.873915Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:18:36.876878Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:18:38.150162Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:18:38.150247Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d3d64-edda-7c33-8762-d0abd6af6f1f
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md FORMAT: # Codex Writer Findings — StaffOrdersMobile Chain: staffordersmobile-260330-111817-2199 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # SOM Batch P0: Implement UX Redesign — Card Summary + Shift Filter + Status Sections + Service Requests Reference: `ux-concepts/StaffOrdersMobile/staff-orders-mobile.md` v1.0, `BUGS_MASTER.md`, `DECISIONS_INDEX.md §8`. TARGET file (modify): `pages/StaffOrdersMobile/staffordersmobile.jsx` (4022 lines) CONTEXT files (read only): `ux-concepts/StaffOrdersMobile/staff-orders-mobile.md` --- ## FROZEN UX (DO NOT CHANGE) The following items have been tested and confirmed working. Do NOT modify under any circumstances: - **Status translation**: `getStatusConfig().label` uses `getStageName()` + `t()` for i18n — SO-S76-01, SO-S89-01 ✅ Tested - **Action button text**: translated via `getStatusConfig().actionLabel` — do NOT hardcode button labels — SO-S76-02 ✅ - **Client name in Pickup/Delivery orders**: `o.client_name` in `contactInfo` — SO-S76-03 ✅ - **No double "Стол" prefix**: `identifier = \`Стол ${tableData.name}\`` already includes prefix — do NOT add "Стол" anywhere else — SO-S61-07 ✅ - **handleAction — derivedNextStatus**: position-based logic (first→accepted, last→served, mid→in_progress). Do NOT rewrite. — PM-158 ✅ Tested S197 - **BannerNotification**: auto-hide + scroll-to-table on tap (lines ~3369+) — do NOT touch - **Expand/collapse animation**: `duration-200 ease-out` class on expanded content div (~line 1654) — do NOT change - **Polling**: `refetchInterval: effectivePollingInterval` — do NOT change - **Session cleanup**: `runSessionCleanup()` useEffect — do NOT remove - **Request section header**: header text for service requests section has no duplicates — Batch 6 S198 ✅ --- ## Fix 1 — #164 (P0) [MUST-FIX]: Replace dish-text in collapsed card with actionable status summary ### Current behavior Collapsed card Row 3 (~line 1630) shows a dish text list: "Стейк×2, New York Steak×1, +5" (built from `itemsPreview` useMemo at ~line 1355). This tells the waiter WHAT is in the table, but NOT where action is needed. Row 4 (~line 1639) shows request badges separately as violet chips. ### Expected behavior Replace Row 3 + Row 4 with a **two-line status summary**: **Line 1 — urgent (СЕЙЧАС):** counts requiring immediate action + request badges merged inline - Format: `СЕЙЧАС: 2 новых · 1 выдать · 🧾 Счёт` - "новых" count = `activeOrders.filter(o => getStatusConfig(o).isFirstStage).length` - "выдать" count = `completedOrders.length` (these are isFinishStage = "ready to serve" orders) - Request badges inline: bill → "🧾 Счёт", call_waiter → "📞 Официант", other → "❗ Запрос" - Show this line ONLY if any of the counts > 0 **Line 2 — non-urgent (ЕЩЁ):** background work + total - Format: `ЕЩЁ: 3 готовится · 150 ₸` - "готовится" count = `activeOrders.filter(o => !getStatusConfig(o).isFirstStage).length` - Total ₸: use `billData.total` if > 0, else omit - Show this line ONLY if count > 0 **Important variable context** (all already computed in OrderGroupCard): - `activeOrders` = !isFinishStage orders (~line 1317) - `completedOrders` = isFinishStage orders (~line 1322) — NOTE: "completed" here means "ready to serve", NOT served - `requestBadges` = array of {type, count} (~line 1409) - `billData` = {total, guests} (~line 1501) Ref: `ux-concepts/StaffOrdersMobile/staff-orders-mobile.md` §ASCII макеты, decisions #1, #15. ### Must NOT - Do NOT show dish text list in collapsed card (remove `itemsPreview` from row 3 render) - Do NOT keep Row 4 request badges as separate chips — they are now merged into Line 1 inline - Do NOT remove `itemsPreview` useMemo itself (may be used in test/debug) — only remove its render - Do NOT change `requestBadges` useMemo logic — only change how they render ### File and location File: `pages/StaffOrdersMobile/staffordersmobile.jsx` - `search for "Row 3: items preview"` → ~line 1630 (collapsed card render, REPLACE this section) - `search for "Row 4: request badges"` → ~line 1639 (collapsed card badges, REPLACE/MERGE) - `search for "const itemsPreview = useMemo"` → ~line 1355 (keep useMemo, remove render) - `search for "const completedOrders = useMemo"` → ~line 1322 (used for "выдать" count) ### Verification Open staff page → each table card shows "СЕЙЧАС: N новых · N выдать" and "ЕЩЁ: N готовится · NNN ₸" instead of dish text. --- ## Fix 2 — PM-142 (P0) [MUST-FIX]: Fix shift filter fallback — use start of today, not 12 hours ago ### Current behavior `FALLBACK_HOURS = 12` at ~line 469. When `partner.working_hours` is not configured (or invalid), `getShiftStartTime()` returns `now - 12 hours`. At 8:00am this means "from 8:00pm yesterday" → orders from previous day appear in the active list. ### Expected behavior Change BOTH fallback returns in `getShiftStartTime()` to use **start of current calendar day** (midnight local): ```javascript // OLD (both occurrences): return new Date(now.getTime() - FALLBACK_HOURS * 60 * 60 * 1000); // NEW: const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0); return startOfToday; ``` Two occurrences: 1. Early return when `workingHours` is null/invalid (~line 474) 2. Final fallback return at end of function (~line 537) ### Must NOT - Do NOT remove `FALLBACK_HOURS` constant — just don't use it in the returns - Do NOT change the overnight shift logic (when working_hours IS configured) — only change the fallback returns - Do NOT modify the shift filter application in `activeOrders` or `activeRequests` useMemo ### File and location File: `pages/StaffOrdersMobile/staffordersmobile.jsx` - `search for "const FALLBACK_HOURS"` → ~line 469 - `search for "FALLBACK_HOURS \* 60"` → ~lines 474 and 537 (both must be changed) ### Previously tried None. PM-142 was previously fixed in CartView.jsx but NOT in StaffOrdersMobile.jsx. ### Verification Open staff page at 8:00am → active table list shows NO tables/orders from previous days. --- ## Fix 3 — #166 (P0) [MUST-FIX]: Expanded card — restructure orders into status sections (not flat list) ### Current behavior Inside expanded card, Block A (~line 1657) shows ALL `activeOrders` as a flat list under one "ЗАКАЗЫ" header. Block F (~line 1808) shows `completedOrders` (= isFinishStage = "ready to serve" orders) under "Завершённые заказы" header, collapsed by default. This causes the waiter to manually scan all orders to find what needs action. ### Expected behavior Replace flat Block A + Block F with **3 status-based sections** in this order (after Block C which Fix 4 moves to top): **Section 1 — Новые** (OPEN by default): - Orders: `activeOrders.filter(o => getStatusConfig(o).isFirstStage)` - Header: `Новые (N) [Принять все]` - "Принять все" button: iterate each order in this section, call the same action mechanism used by the single-order action button (CTA button / Block B equivalent) for each - If empty: hide entire section **Section 2 — Готово к выдаче** (OPEN by default): - Orders: `completedOrders` (these ARE the isFinishStage orders — currently misnamed as "completedOrders") - Header: `Готово к выдаче (N) [Выдать все]` - "Выдать все" button: iterate each order, call action mechanism for each - Move from Block F's current position to HERE (between Новые and Готовится) - Default state: OPEN (no collapse required) - If empty: hide entire section **Section 3 — В работе** (COLLAPSED by default): - Orders: `activeOrders.filter(o => !getStatusConfig(o).isFirstStage)` - Header: `В работе (N) ▼` (tap to expand/collapse) - Default state: COLLAPSED - If empty: hide entire section Each order card WITHIN sections keeps the existing layout (guest name, time, status badge, items, action button) — same as current Block A order rows. Add state: `const [inProgressExpanded, setInProgressExpanded] = useState(false)` near existing `const [completedExpanded, setCompletedExpanded]` (~line 1438 area). Ref: `ux-concepts/StaffOrdersMobile/staff-orders-mobile.md` §decisions #10, #11, §ASCII "Экран стола с группировкой". ### Must NOT - Do NOT change order card layout inside sections (same guest name, time badge, action button) - Do NOT change `activeOrders` or `completedOrders` useMemo definitions - Do NOT change `getStatusConfig()` or `computeTableStatus()` functions - Do NOT change Block B (single-order CTA button), Block E (bill summary), Block D (close table) - "Принять все" / "Выдать все" buttons: NO confirmation dialog (per UX spec decision #9) - Do NOT remove Block E and Block D — keep them after sections ### File and location File: `pages/StaffOrdersMobile/staffordersmobile.jsx` - `search for "Block A — Active Orders"` → ~line 1657 (REPLACE with 3 sections) - `search for "Block F — Completed Orders"` → ~line 1808 (MOVE to Section 2 position, repurpose as "Готово к выдаче") - `search for "const completedOrders = useMemo"` → ~line 1322 (use for Section 2) - `search for "completedExpanded"` → ~line 1438 area (add new `inProgressExpanded` state nearby) ### Verification Open expanded table card with mixed orders → see separate sections "Новые (N)", "Готово к выдаче (N)", "В работе (N)" with correct order counts in each. --- ## Fix 4 — #167 (P0) [MUST-FIX]: Service requests — move section to top + fix button + fix bill icon ### Current behavior (a) Block C ("Guest Requests") is positioned BELOW Block A in expanded card (~line 1739), making it easy to miss urgent requests. (b) Request action button (~line 1758) shows `"В работе"` when `req.status === 'new'` and `"Готово"` otherwise. This creates an unnecessary intermediate state. (c) Request badge on collapsed card (~line 1644): shows `Bell` icon for `badge.type === 'bill'` — wrong icon. Bill request should use a receipt-style icon. ### Expected behavior **(a) Move Block C to TOP of expanded content** — first thing visible after expanding, before all order sections (before Fix 3 sections). New order in expanded content: 1. Block C (Requests) ← **MOVED HERE** 2. Section "Новые" (Fix 3) 3. Section "Готово к выдаче" (Fix 3) 4. Section "В работе" (Fix 3) 5. Block E (Bill summary) ← unchanged 6. Block B (single CTA) ← unchanged 7. Block D (Close table) ← unchanged **(b) Fix button text**: Replace the conditional `req.status === 'new' ? 'В работе' : 'Готово'` with a single **"Выполнено"** button that marks the request as done (calls existing `onCloseRequest(req.id, req.status)`). No intermediate "in_progress" state needed per UX spec decision #6. **(c) Fix bill icon on collapsed card**: Replace `Bell` with `Receipt` icon for `badge.type === 'bill'` in `requestBadges` render (~line 1644). - Import `Receipt` from `lucide-react`. If `Receipt` is not available in installed version, use `FileText` as fallback. - Also update Block C expanded view (~line 1749): use same `Receipt`/`FileText` icon for `req.request_type === 'bill'` instead of `Bell`. Ref: `ux-concepts/StaffOrdersMobile/staff-orders-mobile.md` §decisions #6, #7, §ASCII "Сервисные запросы". ### Must NOT - Do NOT change the `activeRequests` shift filter (keep existing `new`/`in_progress` filter) - Do NOT change `onCloseRequest` function signature - Do NOT remove Block C — MOVE it (cut from current ~line 1739 position, paste to top of expanded content) - Keep the violet color scheme for request cards (bg-violet-50, border-violet-200) ### File and location File: `pages/StaffOrdersMobile/staffordersmobile.jsx` - `search for "Block C — Guest Requests"` → ~line 1739 (CUT and MOVE to top of expanded content) - `search for "Block A — Active Orders"` → ~line 1657 (Block C goes BEFORE this, after expanding div opens) - `search for "badge.type === 'bill' \? <Bell"` → ~line 1644 (collapsed card icon fix) - `search for "import.*from.*lucide-react"` → ~line 159 (add Receipt import here) - Button fix: `search for "В работе"` in context of service requests → ~line 1758 ### Previously tried None. Block C and request icons not previously modified. ### Verification 1. Table with service request: expand card → requests section appears FIRST (above "Новые" orders). 2. Tap "Выполнено" → request dismissed (no "В работе" intermediate step). 3. Collapsed card with Bill request → shows Receipt/FileText icon, not Bell. --- ## ⛔ SCOPE LOCK — Change ONLY what is described in Fix 1–4 above - Modify ONLY `pages/StaffOrdersMobile/staffordersmobile.jsx` - Do NOT modify any other files (CartView.jsx, MenuView.jsx, x.jsx, etc.) - Do NOT change: `computeTableStatus()`, `getStatusConfig()`, `handleAction()`, polling logic, authentication flow, BannerNotification, `runSessionCleanup()` - Do NOT add new API entities or new backend calls - If you find a bug outside Fix 1-4 scope: document it in findings, do NOT fix it --- ## Implementation Notes - File: `pages/StaffOrdersMobile/staffordersmobile.jsx` (4022 lines) - Git: `git add pages/StaffOrdersMobile/staffordersmobile.jsx && git commit -m "SOM P0: card summary, shift filter, status sections, service requests"` - Key architecture: `activeOrders` = !isFinishStage (new/accepted/in_progress); `completedOrders` = isFinishStage (ready to serve, NOT truly served — served orders are excluded at outer query level) - All 4 fixes are in same single-component file — no cross-file dependencies ## FROZEN UX grep verification (run before commit) ```bash grep -n "derivedNextStatus" pages/StaffOrdersMobile/staffordersmobile.jsx | head -5 grep -n "FALLBACK_HOURS" pages/StaffOrdersMobile/staffordersmobile.jsx grep -n "duration-200 ease-out" pages/StaffOrdersMobile/staffordersmobile.jsx ``` Expected: derivedNextStatus logic unchanged, FALLBACK_HOURS constant present (but fallback returns changed), animation class present. ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Verify at 375px width: - [ ] Status summary (СЕЙЧАС / ЕЩЁ) fits in 2 lines without overflow on 375px - [ ] Section headers (Новые, Готово к выдаче, В работе) are tappable: min 44×44px touch target - [ ] "Принять все" / "Выдать все" buttons: min 44px height - [ ] "Выполнено" button on service request: min 44px height, easily tappable - [ ] Collapsed card summary does not overflow card width - [ ] No duplicate indicators between collapsed summary and expanded sections ## Regression Check (MANDATORY after implementation) Existing features that must continue to work after changes: - [ ] New order banner notification (BannerNotification) appears and auto-dismisses - [ ] Tap card to expand/collapse — animation works - [ ] Single-order action button (Block B CTA: "Принять" / "Выдать") still works - [ ] Bill summary (Block E) shows and expands per-guest breakdown - [ ] Close table button (Block D) appears and opens confirmation dialog - [ ] Tab switch "Активные" / "Завершённые" at page level still filters correctly - [ ] Shift filter (shiftStartTime) still applied — orders from yesterday do NOT appear === END ===
+mcp startup: no servers
+2026-03-30T06:18:38.487935Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:18:38.488024Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:18:38.722935Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:18:38.723064Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:18:44.373012Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:18:44.375589Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:18:44.605627Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:18:44.605953Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+codex
+Reviewing `pages/StaffOrdersMobile/staffordersmobile.jsx` against Fix 1-4 only. I’m reading that file plus `README.md`/`BUGS.md` in the same page folder, then I’ll write a concise findings report to the requested pipeline file.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/StaffOrdersMobile' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Path pages/StaffOrdersMobile/staffordersmobile.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 13.60s:
+
+ exited 124 in 13.87s:
+
+2026-03-30T06:20:30.077526Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:20:30.077871Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:20:30.346994Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:20:30.347368Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+codex
+The full file read is too expensive, so I’m narrowing to the exact sections for Fix 1-4 and checking whether `README.md`/`BUGS.md` exist in `pages/StaffOrdersMobile`. After that I’ll extract only the relevant line ranges for review.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/StaffOrdersMobile' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+"'$patterns = @(
+  '"'const FALLBACK_HOURS',
+  'FALLBACK_HOURS \\* 60',
+  'const completedOrders = useMemo',
+  'const itemsPreview = useMemo',
+  'const requestBadges = useMemo',
+  'completedExpanded',
+  'Row 3: items preview',
+  'Row 4: request badges',
+  'Block A',
+  'Block C',
+  'Block F',
+  'badge.type === ''bill''',
+  'Receipt',
+  'В работе',
+  'Выполнено'
+)
+foreach ("'$p in $patterns) {
+  Select-String -Path '"'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern "'$p | ForEach-Object {
+    '"'{0}:{1}' -f "'$_.LineNumber, $_.Line.Trim()
+  }
+}
+'"'@ | powershell -NoProfile -Command -" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 21.59s:
+
+ exited 124 in 21.51s:
+
+2026-03-30T06:21:56.134226Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:21:56.134431Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:21:56.348848Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:21:56.349198Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/StaffOrdersMobile' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 7.45s:
+versions
+260329-01 StaffOrdersMobile RELEASE.jsx
+260329-02 StaffOrdersMobile RELEASE.jsx
+Audit_FunctionalMap_S70.md
+BUGS.md
+commands_2026-03-29.log
+DeepAnalysis_S70.md
+review_2026-03-29.md
+StaffOrdersMobile README.md
+staffordersmobile.jsx
+staffordersmobile_v1.0_BASE.jsx
+TEST_PLAN.md
+TEST_PLAN_PM158_S197.md
+2026-03-30T06:22:32.319853Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:22:32.320108Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:22:32.550129Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:22:32.550266Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Path pages/StaffOrdersMobile/BUGS.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Path 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.61s:
+---
+version: "4.0.1"
+updated: "2026-03-06"
+session: 90
+deployed: "2026-03-02 S69"
+---
+
+# StaffOrdersMobile â€” ÐœÐ¾Ð±Ð¸Ð»ÑŒÐ½Ñ‹Ð¹ Ð¸Ð½Ñ‚ÐµÑ€Ñ„ÐµÐ¹Ñ Ð¿ÐµÑ€ÑÐ¾Ð½Ð°Ð»Ð°
+
+## ÐžÐ¿Ð¸ÑÐ°Ð½Ð¸Ðµ
+ÐœÐ¾Ð±Ð¸Ð»ÑŒÐ½Ñ‹Ð¹ Ð¸Ð½Ñ‚ÐµÑ€Ñ„ÐµÐ¹Ñ Ð´Ð»Ñ Ð¿ÐµÑ€ÑÐ¾Ð½Ð°Ð»Ð° Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð°. ÐŸÑ€Ð¸Ñ‘Ð¼ Ð·Ð°ÐºÐ°Ð·Ð¾Ð², ÑÐ¼ÐµÐ½Ð° ÑÑ‚Ð°Ñ‚ÑƒÑÐ¾Ð², Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹ Ð¿Ð¾Ð¼Ð¾Ñ‰Ð¸, Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€Ð¾Ð²ÐºÐ° Ð¿Ð¾ ÑÑ‚Ð¾Ð»Ð°Ð¼. Ð¡Ð°Ð¼Ñ‹Ð¹ ÑÐ»Ð¾Ð¶Ð½Ñ‹Ð¹ Ñ„Ð°Ð¹Ð» Ð¿Ñ€Ð¾ÐµÐºÑ‚Ð° (v3.6.0 â€” stale data + close table confirm S74).
+
+**Route:** `/staffordersmobile`
+**Roles:** partner_manager, partner_staff, kitchen
+**Ð Ð°Ð·Ð¼ÐµÑ€:** ~3940 ÑÑ‚Ñ€Ð¾Ðº (v3.2.0)
+
+## ÐÑ€Ñ…Ð¸Ñ‚ÐµÐºÑ‚ÑƒÑ€Ð°
+
+### ÐšÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚Ñ‹ (14)
+- `StaffOrdersMobile` â€” Ð³Ð»Ð°Ð²Ð½Ñ‹Ð¹
+ succeeded in 8.71s:
+# StaffOrdersMobile Bug Tracker
+
+**Page:** `pages/StaffOrdersMobile/260306-04 StaffOrdersMobile RELEASE.jsx`
+**Last updated:** 2026-03-06 (Session 90 â€” restored from 260305-00 + re-applied SO-S89-01)
+
+---
+
+## Fixed Bugs
+
+### BUG-S66-01 (P1) -- Detail view doesn't open on card tap (Sprint B broken)
+- **Function:** TableDetailScreen render / CSS animation
+- **Root cause:** CSS `translate-x-full` â†’ `translate-x-0` transition with `requestAnimationFrame` timing was unreliable in Base44 platform container. Detail screen mounted but stayed off-screen.
+- **Fix:** Removed slide-in animation entirely. Detail view now shows instantly with `z-50` (above all other content). Swipe-right to close gesture retained.
+- **Commit:** `9b27dfd`
+- **RELEASE:** `260302-05 StaffOrdersMobile RELEASE.jsx`
+- **Status:** FIXED
+
+### BUG-S66-02 (P1) -- No CTA button on PREPARING card
+- **Function:** computeGroupCTA
+- **Root cause:** `computeGroupCTA` returned `null` for all PREPARING status cards (by Sprint A design V2-06). Orders in middle stages (kitchen working) had no action button, preventing waiter from advancing them.
+2026-03-30T06:23:18.994956Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:23:18.995283Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:23:19.208050Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:23:19.208180Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:23:36.058474Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:23:36.058595Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+codex
+I’ve confirmed the page folder context files. Now I’m pulling the exact code windows around the four requested fixes so the review stays inside scope and doesn’t scan the rest of the repo.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+"'$path = '"'pages/StaffOrdersMobile/staffordersmobile.jsx'
+"'$lines = Get-Content -Path $path
+function Show-Range($start, $end) {
+  for ($i = $start; $i -le $end; $i++) {
+    if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] }
+  }
+}
+Show-Range 450 560
+'"'@ | powershell -NoProfile -Command -" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+"'$path = '"'pages/StaffOrdersMobile/staffordersmobile.jsx'
+"'$lines = Get-Content -Path $path
+function Show-Range($start, $end) {
+  for ($i = $start; $i -le $end; $i++) {
+    if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] }
+  }
+}
+Show-Range 1 240
+'"'@ | powershell -NoProfile -Command -" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+"'$path = '"'pages/StaffOrdersMobile/staffordersmobile.jsx'
+"'$lines = Get-Content -Path $path
+function Show-Range($start, $end) {
+  for ($i = $start; $i -le $end; $i++) {
+    if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] }
+  }
+}
+Show-Range 1280 1535
+'"'@ | powershell -NoProfile -Command -" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@'
+"'$path = '"'pages/StaffOrdersMobile/staffordersmobile.jsx'
+"'$lines = Get-Content -Path $path
+function Show-Range($start, $end) {
+  for ($i = $start; $i -le $end; $i++) {
+    if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] }
+  }
+}
+Show-Range 1600 1865
+'"'@ | powershell -NoProfile -Command -" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 34.41s:
+
+ succeeded in 34.84s:
+
+ succeeded in 34.70s:
+
+ succeeded in 34.71s:
+
+2026-03-30T06:24:55.683425Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:24:55.683597Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:24:55.906107Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:24:55.906401Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path = '"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$lines = Get-Content -Path $path; for ($i = 1; $i -le 240; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 9.55s:
+    1: /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    2:    STAFFORDERSMOBILE â€” v4.0.0 (2026-03-05) UX Redesign â€” Expand/Collapse Cards
+    3: 
+    4:    CHANGES in v4.0.0 (UX Redesign â€” Expand/Collapse Cards â€” S77):
+    5:    - Replaced detail view navigation with inline expand/collapse cards
+    6:    - Collapsed card: identifier + elapsed time + channel + status + items preview + request badges
+    7:    - Expanded card (Hall): Block A (active orders) + Block B (action) + Block C (requests)
+    8:      + Block E (bill summary) + Block F (completed orders) + Block D (close table)
+    9:    - Expanded card (Pickup/Delivery): Block A (full items) + Block B (action) + contacts
+   10:    - Max 1 expanded card at a time; tap to toggle
+   11:    - Animation: height 200ms ease-out, content opacity transition
+   12:    - Items loaded per-order via useQueries, cached 60s
+   13:    - Human-readable status labels, no system IDs or raw i18n keys
+   14:    - Order number displayed as secondary gray text
+   15:    - Request badges (bill/waiter) on collapsed hall cards
+   16:    - Bill summary with per-guest breakdown
+   17:    - Close table with disable reasons
+   18: 
+   19:    CHANGES in v3.7.0 (Bug Fixes â€” S76):
+   20:    - BUG-S76-01: Fixed i18n â€” status badge now translates OrderStage names via t()
+2026-03-30T06:25:33.928043Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:25:33.928159Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:25:34.156120Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:25:34.156269Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path = '"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$lines = Get-Content -Path $path; for ($i = 1280; $i -le 1535; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path = '"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$lines = Get-Content -Path $path; for ($i = 450; $i -le 560; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path = '"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$lines = Get-Content -Path $path; for ($i = 1600; $i -le 1865; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 12.97s:
+ 1280:       </CardContent>
+ 1281:     </Card>
+ 1282:   );
+ 1283: }
+ 1284: 
+ 1285: 
+ 1286: 
+ 1287: // v4.0.0: OrderGroupCard â€” Expand/Collapse design (replaces detail view)
+ 1288: function OrderGroupCard({
+ 1289:   group,
+ 1290:   isExpanded,
+ 1291:   onToggleExpand,
+ 1292:   isHighlighted,
+ 1293:   isFavorite,
+ 1294:   onToggleFavorite,
+ 1295:   getStatusConfig,
+ 1296:   guestsMap,
+ 1297:   effectiveUserId,
+ 1298:   onMutate,
+ 1299:   onCloseTable,
+ succeeded in 13.23s:
+  450: 
+  451: function safeParseDate(dateStr) {
+  452:   if (!dateStr) return new Date();
+  453:   try {
+  454:     const safe = !String(dateStr).endsWith("Z") ? `${dateStr}Z` : dateStr;
+  455:     const d = new Date(safe);
+  456:     if (isNaN(d.getTime())) return new Date();
+  457:     return d;
+  458:   } catch {
+  459:     return new Date();
+  460:   }
+  461: }
+  462: 
+  463: /**
+  464:  * Calculate when current shift started based on working_hours
+  465:  * @param {Object} workingHours - partner.working_hours object
+  466:  * @returns {Date} - shift start datetime
+  467:  */
+  468: function getShiftStartTime(workingHours) {
+  469:   const FALLBACK_HOURS = 12;
+ succeeded in 13.54s:
+ 1600:           )}
+ 1601:           {/* Contacts for pickup/delivery */}
+ 1602:           {contactInfo && (contactInfo.name || contactInfo.phone) && (
+ 1603:             <React.Fragment>
+ 1604:               <span className="text-xs text-slate-500 ml-auto truncate max-w-[120px]">
+ 1605:                 {contactInfo.name || ''}
+ 1606:               </span>
+ 1607:               {contactInfo.phone && (
+ 1608:                 <a
+ 1609:                   href={`tel:${contactInfo.phone}`}
+ 1610:                   onClick={e => e.stopPropagation()}
+ 1611:                   className="text-xs text-blue-600 shrink-0"
+ 1612:                 >
+ 1613:                   +7{'\u2026'}{contactInfo.phone.slice(-4)}
+ 1614:                 </a>
+ 1615:               )}
+ 1616:             </React.Fragment>
+ 1617:           )}
+ 1618:           {/* Favorite star */}
+ 1619:           {group.type === 'table' && tableId && (
+2026-03-30T06:26:40.619201Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:26:40.619523Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:26:40.964382Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:26:40.964743Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'СЕЙЧАС|ЕЩЁ|Принять все|Выдать все|Готово к выдаче|Выполнено|Receipt|FileText|inProgressExpanded' | ForEach-Object { '{0}:{1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'onCloseAllOrders|handleAdvance|onCloseRequest\\(' | ForEach-Object { '{0}:{1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.42s:
+1219:{items.length > 5 && <div className="text-xs text-slate-400 italic">… ещё {items.length - 5}</div>}
+ succeeded in 11.74s:
+1305:onCloseAllOrders,
+1483:const handleAdvance = () => {
+1536:if (onCloseAllOrders) onCloseAllOrders(group.orders);
+1719:onClick={handleAdvance}
+1756:onClick={() => onCloseRequest(req.id, req.status)}
+3891:onCloseAllOrders={handleCloseAllOrders}
+2026-03-30T06:27:32.250645Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:27:32.250743Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:27:32.464266Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:27:32.464445Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path = '"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$lines = Get-Content -Path $path; for ($i = 1530; $i -le 1550; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 6.88s:
+ 1530: 
+ 1531:   const handleCloseTableClick = () => {
+ 1532:     if (onCloseTable && group.type === 'table') {
+ 1533:       const sessionId = group.orders.length > 0 ? getLinkId(group.orders[0].table_session) : null;
+ 1534:       if (sessionId) { onCloseTable(sessionId, identifier); return; }
+ 1535:     }
+ 1536:     if (onCloseAllOrders) onCloseAllOrders(group.orders);
+ 1537:   };
+ 1538: 
+ 1539:   // Guest display name helper
+ 1540:   const guestName = (order) => {
+ 1541:     const gid = getLinkId(order.guest);
+ 1542:     const guest = gid && guestsMap ? guestsMap[gid] : null;
+ 1543:     if (guest) return getGuestDisplayName(guest);
+ 1544:     if (order.client_name) return order.client_name;
+ 1545:     return '\u0413\u043E\u0441\u0442\u044C';
+ 1546:   };
+ 1547: 
+ 1548:   const highlightRing = isHighlighted ? 'ring-2 ring-indigo-400 ring-offset-1' : '';
+ 1549: 
+2026-03-30T06:27:59.023959Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:27:59.024228Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:27:59.253724Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:27:59.253975Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+codex
+I’ve narrowed the UI sections, but Fix 4 also changes behavior, not just labels. I’m checking the in-file `onCloseRequest` implementation now to confirm whether the current button still drives the old two-step request workflow.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'handleCloseRequest|onCloseRequest|ServiceRequest.update|request.status' | ForEach-Object { '{0}:{1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path = '"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$lines = Get-Content -Path $path; for ($i = 3300; $i -le 3445; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.04s:
+ 3300: 
+ 3301:   // v2.7.1: Tab filtering (active vs completed)
+ 3302:   const filteredGroups = useMemo(() => {
+ 3303:     if (!orderGroups) return [];
+ 3304:     
+ 3305:     return orderGroups.filter(group => {
+ 3306:       const hasActiveOrder = group.orders.some(o => {
+ 3307:         const config = getStatusConfig(o);
+ 3308:         return !config.isFinishStage && o.status !== 'cancelled';
+ 3309:       });
+ 3310:       
+ 3311:       return activeTab === 'active' ? hasActiveOrder : !hasActiveOrder;
+ 3312:     });
+ 3313:   }, [orderGroups, activeTab, getStatusConfig]);
+ 3314: 
+ 3315:   // v2.7.1: Tab counts
+ 3316:   const tabCounts = useMemo(() => {
+ 3317:     if (!orderGroups) return { active: 0, completed: 0 };
+ 3318:     
+ 3319:     let active = 0, completed = 0;
+ succeeded in 2.04s:
+920:const statusLabel = request.status === "new" ? "Новый" : "В работе";
+922:request.status === "new"
+925:const actionLabel = request.status === "new" ? "В работу" : "Готово";
+1306:onCloseRequest,
+1753:{onCloseRequest && (
+1756:onClick={() => onCloseRequest(req.id, req.status)}
+3038:mutationFn: ({ id, status }) => base44.entities.ServiceRequest.update(id, { status }),
+3893:onCloseRequest={(reqId, status) => updateRequestMutation.mutate({ id: reqId, status: status === 'new' ? 'in_progress' : 'done' })}
+2026-03-30T06:28:50.557877Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:28:50.558011Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:28:50.825808Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:28:50.825919Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path = '"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$lines = Get-Content -Path $path; for ($i = 3028; $i -le 3042; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.78s:
+ 3028:       // SHIFT FILTER
+ 3029:       const createdAt = safeParseDate(r.created_date).getTime();
+ 3030:       if (createdAt < shiftCutoff) return false;
+ 3031:       
+ 3032:       // Existing status filter
+ 3033:       return ["new", "in_progress"].includes(r.status);
+ 3034:     });
+ 3035:   }, [allRequests, isKitchen, shiftStartTime]);
+ 3036: 
+ 3037:   const updateRequestMutation = useMutation({
+ 3038:     mutationFn: ({ id, status }) => base44.entities.ServiceRequest.update(id, { status }),
+ 3039:     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["serviceRequests"] }),
+ 3040:     onError: (err) => {
+ 3041:       if (isRateLimitError(err)) {
+ 3042:         queryClient.cancelQueries();
+2026-03-30T06:29:07.858631Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:29:07.858778Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:29:08.077254Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:29:08.077376Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path = '"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$lines = Get-Content -Path $path; for ($i = 3886; $i -le 3896; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.33s:
+ 3886:                   onCloseTable={canCloseTable ? handleCloseTable : null}
+ 3887:                   overdueMinutes={partnerData?.order_overdue_minutes}
+ 3888:                   notifiedOrderIds={notifiedOrderIds}
+ 3889:                   onClearNotified={clearNotified}
+ 3890:                   tableMap={tableMap}
+ 3891:                   onCloseAllOrders={handleCloseAllOrders}
+ 3892:                   activeRequests={activeRequests}
+ 3893:                   onCloseRequest={(reqId, status) => updateRequestMutation.mutate({ id: reqId, status: status === 'new' ? 'in_progress' : 'done' })}
+ 3894:                 />
+ 3895:               ))
+ 3896:             )}
+2026-03-30T06:29:21.965833Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:29:21.965959Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:29:22.180964Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:29:22.181236Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+codex
+I have the findings. I’m writing the requested pipeline report now, and I’ll also drop the repo-mandated review artifacts in `pages/StaffOrdersMobile` so the review remains discoverable from the page folder.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pipeline/chain-state' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.72s:
+True
+2026-03-30T06:30:18.811921Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:30:18.812030Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:30:19.051339Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:30:19.051449Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md
+# Codex Writer Findings - StaffOrdersMobile
+Chain: staffordersmobile-260330-111817-2199
+
+## Findings
+1. [P0] Fix 1 not implemented in collapsed card summary - `pages/StaffOrdersMobile/staffordersmobile.jsx:1630-1650` still renders `itemsPreview` plus separate request chips, so the card shows dish text or `Нет позиций` instead of the required two-line `СЕЙЧАС` / `ЕЩЁ` action summary built from `activeOrders`, `completedOrders`, `requestBadges`, and `billData`. FIX: replace Row 3 + Row 4 render with the merged two-line status summary; keep the `itemsPreview` useMemo itself, but stop rendering it in the collapsed card.
+2. [P0] Fix 2 fallback still uses 12 hours ago - `getShiftStartTime()` still returns `new Date(now.getTime() - FALLBACK_HOURS * 60 * 60 * 1000)` at `pages/StaffOrdersMobile/staffordersmobile.jsx:474` and `pages/StaffOrdersMobile/staffordersmobile.jsx:537`, so early-morning active lists will still include yesterday's orders when `partner.working_hours` is missing or invalid. FIX: keep `FALLBACK_HOURS` defined, but change both fallback returns to `startOfToday` with `setHours(0, 0, 0, 0)`.
+3. [P0] Fix 3 status sections were not applied - `pages/StaffOrdersMobile/staffordersmobile.jsx:1657-1712` still shows one flat `activeOrders` list under `Заказы`, while `pages/StaffOrdersMobile/staffordersmobile.jsx:1808-1846` keeps `completedOrders` in a separate collapsed `Выполнено` block. The required `Новые`, `Готово к выдаче`, and `В работе` sections, the default-open/default-collapsed behavior, `inProgressExpanded` state, and per-section bulk actions are all missing. FIX: replace Block A + Block F with the three specified sections and wire bulk actions through the same order-advance path used by the single-order CTA.
+4. [P0] Fix 4 request section is still below the order/action blocks - `Block C` is still rendered at `pages/StaffOrdersMobile/staffordersmobile.jsx:1739-1767`, after the flat orders block and after Block B, so urgent guest requests remain buried instead of being the first expanded section. FIX: move Block C to the top of expanded content, before the order-status sections.
+5. [P0] Fix 4 request completion still uses the old two-step flow - Block C still renders conditional button text at `pages/StaffOrdersMobile/staffordersmobile.jsx:1754-1760`, and the prop wiring at `pages/StaffOrdersMobile/staffordersmobile.jsx:3893` still mutates `new -> in_progress -> done`. That does not match the required single `Выполнено` action with no intermediate state. FIX: change the Block C button to a single `Выполнено` label and route that action to immediate completion while keeping the `onCloseRequest(req.id, req.status)` call shape intact.
+6. [P0] Fix 4 bill request icon was not updated - bill badges still use `Bell` in the collapsed card at `pages/StaffOrdersMobile/staffordersmobile.jsx:1644` and in Block C at `pages/StaffOrdersMobile/staffordersmobile.jsx:1749`, and the `lucide-react` import list at `pages/StaffOrdersMobile/staffordersmobile.jsx:162-193` does not add `Receipt` or `FileText`. FIX: import `Receipt` (or `FileText` fallback) and use it for `bill` requests in both render paths.
+
+## Summary
+Total: 6 findings (6 P0, 0 P1, 0 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY - do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/StaffOrdersMobile/commands_2026-03-30.log
+# Commands executed on 2026-03-30
+
+[timed out] Get-ChildItem -Name pages/StaffOrdersMobile
+[timed out] Get-Content -Path pages/StaffOrdersMobile/staffordersmobile.jsx
+[timed out] Get-ChildItem -Name pages/StaffOrdersMobile
+[timed out] @'
+$patterns = @(
+  'const FALLBACK_HOURS',
+  'FALLBACK_HOURS \\* 60',
+  'const completedOrders = useMemo',
+  'const itemsPreview = useMemo',
+  'const requestBadges = useMemo',
+  'completedExpanded',
+  'Row 3: items preview',
+  'Row 4: request badges',
+  'Block A',
+  'Block C',
+  'Block F',
+  'badge.type === ''bill''',
+  'Receipt',
+  'В работе',
+  'Выполнено'
+)
+foreach ($p in $patterns) {
+  Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern $p | ForEach-Object {
+    '{0}:{1}' -f $_.LineNumber, $_.Line.Trim()
+  }
+}
+'@ | powershell -NoProfile -Command -
+
+Get-ChildItem -Name pages/StaffOrdersMobile
+Get-Content -Path pages/StaffOrdersMobile/BUGS.md
+Get-Content -Path 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'
+$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1; $i -le 240; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 450; $i -le 560; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1280; $i -le 1535; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1600; $i -le 1865; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'СЕЙЧАС|ЕЩЁ|Принять все|Выдать все|Готово к выдаче|Выполнено|Receipt|FileText|inProgressExpanded' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
+Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'onCloseAllOrders|handleAdvance|onCloseRequest\\(' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
+$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1530; $i -le 1550; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'handleCloseRequest|onCloseRequest|ServiceRequest.update|request.status' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
+$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 3300; $i -le 3445; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 3028; $i -le 3042; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 3886; $i -le 3896; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+Test-Path pipeline/chain-state
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/StaffOrdersMobile/review_2026-03-30.md
+# Code Review Report - StaffOrdersMobile (Fix 1-4)
+
+## Findings
+1. [P0] Fix 1 not implemented in collapsed card summary - `pages/StaffOrdersMobile/staffordersmobile.jsx:1630-1650` still renders `itemsPreview` plus separate request chips, so the card shows dish text or `Нет позиций` instead of the required two-line `СЕЙЧАС` / `ЕЩЁ` action summary built from `activeOrders`, `completedOrders`, `requestBadges`, and `billData`. FIX: replace Row 3 + Row 4 render with the merged two-line status summary; keep the `itemsPreview` useMemo itself, but stop rendering it in the collapsed card.
+2. [P0] Fix 2 fallback still uses 12 hours ago - `getShiftStartTime()` still returns `new Date(now.getTime() - FALLBACK_HOURS * 60 * 60 * 1000)` at `pages/StaffOrdersMobile/staffordersmobile.jsx:474` and `pages/StaffOrdersMobile/staffordersmobile.jsx:537`, so early-morning active lists will still include yesterday's orders when `partner.working_hours` is missing or invalid. FIX: keep `FALLBACK_HOURS` defined, but change both fallback returns to `startOfToday` with `setHours(0, 0, 0, 0)`.
+3. [P0] Fix 3 status sections were not applied - `pages/StaffOrdersMobile/staffordersmobile.jsx:1657-1712` still shows one flat `activeOrders` list under `Заказы`, while `pages/StaffOrdersMobile/staffordersmobile.jsx:1808-1846` keeps `completedOrders` in a separate collapsed `Выполнено` block. The required `Новые`, `Готово к выдаче`, and `В работе` sections, the default-open/default-collapsed behavior, `inProgressExpanded` state, and per-section bulk actions are all missing. FIX: replace Block A + Block F with the three specified sections and wire bulk actions through the same order-advance path used by the single-order CTA.
+4. [P0] Fix 4 request section is still below the order/action blocks - `Block C` is still rendered at `pages/StaffOrdersMobile/staffordersmobile.jsx:1739-1767`, after the flat orders block and after Block B, so urgent guest requests remain buried instead of being the first expanded section. FIX: move Block C to the top of expanded content, before the order-status sections.
+5. [P0] Fix 4 request completion still uses the old two-step flow - Block C still renders conditional button text at `pages/StaffOrdersMobile/staffordersmobile.jsx:1754-1760`, and the prop wiring at `pages/StaffOrdersMobile/staffordersmobile.jsx:3893` still mutates `new -> in_progress -> done`. That does not match the required single `Выполнено` action with no intermediate state. FIX: change the Block C button to a single `Выполнено` label and route that action to immediate completion while keeping the `onCloseRequest(req.id, req.status)` call shape intact.
+6. [P0] Fix 4 bill request icon was not updated - bill badges still use `Bell` in the collapsed card at `pages/StaffOrdersMobile/staffordersmobile.jsx:1644` and in Block C at `pages/StaffOrdersMobile/staffordersmobile.jsx:1749`, and the `lucide-react` import list at `pages/StaffOrdersMobile/staffordersmobile.jsx:162-193` does not add `Receipt` or `FileText`. FIX: import `Receipt` (or `FileText` fallback) and use it for `bill` requests in both render paths.
+
+## Summary
+Total: 6 findings (6 P0, 0 P1, 0 P2, 0 P3)
+
+## Prompt Clarity
+- Overall clarity: 5
+- Ambiguous Fix descriptions: None.
+- Missing context: None.
+- Scope questions: None.
+apply_patch(auto_approved=true) exited 0 in 872ms:
+Success. Updated the following files:
+A pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md
+A pages/StaffOrdersMobile/review_2026-03-30.md
+A pages/StaffOrdersMobile/commands_2026-03-30.log
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-03-30.log b/pages/StaffOrdersMobile/commands_2026-03-30.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e590eefbb6dec6543ff51d06198f40e7adf340b
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-03-30.log
+@@ -0,0 +1,45 @@
++# Commands executed on 2026-03-30
++
++[timed out] Get-ChildItem -Name pages/StaffOrdersMobile
++[timed out] Get-Content -Path pages/StaffOrdersMobile/staffordersmobile.jsx
++[timed out] Get-ChildItem -Name pages/StaffOrdersMobile
++[timed out] @'
++$patterns = @(
++  'const FALLBACK_HOURS',
++  'FALLBACK_HOURS \\* 60',
++  'const completedOrders = useMemo',
++  'const itemsPreview = useMemo',
++  'const requestBadges = useMemo',
++  'completedExpanded',
++  'Row 3: items preview',
++  'Row 4: request badges',
++  'Block A',
++  'Block C',
++  'Block F',
++  'badge.type === ''bill''',
++  'Receipt',
++  'В работе',
++  'Выполнено'
++)
++foreach ($p in $patterns) {
++  Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern $p | ForEach-Object {
++    '{0}:{1}' -f $_.LineNumber, $_.Line.Trim()
++  }
++}
++'@ | powershell -NoProfile -Command -
++
++Get-ChildItem -Name pages/StaffOrdersMobile
++Get-Content -Path pages/StaffOrdersMobile/BUGS.md
++Get-Content -Path 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1; $i -le 240; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 450; $i -le 560; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1280; $i -le 1535; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1600; $i -le 1865; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'СЕЙЧАС|ЕЩЁ|Принять все|Выдать все|Готово к выдаче|Выполнено|Receipt|FileText|inProgressExpanded' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'onCloseAllOrders|handleAdvance|onCloseRequest\\(' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1530; $i -le 1550; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'handleCloseRequest|onCloseRequest|ServiceRequest.update|request.status' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 3300; $i -le 3445; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 3028; $i -le 3042; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 3886; $i -le 3896; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Test-Path pipeline/chain-state
+diff --git a/pages/StaffOrdersMobile/review_2026-03-30.md b/pages/StaffOrdersMobile/review_2026-03-30.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..796a9a5bf4ef572b2a5bda70e3929c2ffae3ab6b
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-03-30.md
+@@ -0,0 +1,18 @@
++# Code Review Report - StaffOrdersMobile (Fix 1-4)
++
++## Findings
++1. [P0] Fix 1 not implemented in collapsed card summary - `pages/StaffOrdersMobile/staffordersmobile.jsx:1630-1650` still renders `itemsPreview` plus separate request chips, so the card shows dish text or `Нет позиций` instead of the required two-line `СЕЙЧАС` / `ЕЩЁ` action summary built from `activeOrders`, `completedOrders`, `requestBadges`, and `billData`. FIX: replace Row 3 + Row 4 render with the merged two-line status summary; keep the `itemsPreview` useMemo itself, but stop rendering it in the collapsed card.
++2. [P0] Fix 2 fallback still uses 12 hours ago - `getShiftStartTime()` still returns `new Date(now.getTime() - FALLBACK_HOURS * 60 * 60 * 1000)` at `pages/StaffOrdersMobile/staffordersmobile.jsx:474` and `pages/StaffOrdersMobile/staffordersmobile.jsx:537`, so early-morning active lists will still include yesterday's orders when `partner.working_hours` is missing or invalid. FIX: keep `FALLBACK_HOURS` defined, but change both fallback returns to `startOfToday` with `setHours(0, 0, 0, 0)`.
++3. [P0] Fix 3 status sections were not applied - `pages/StaffOrdersMobile/staffordersmobile.jsx:1657-1712` still shows one flat `activeOrders` list under `Заказы`, while `pages/StaffOrdersMobile/staffordersmobile.jsx:1808-1846` keeps `completedOrders` in a separate collapsed `Выполнено` block. The required `Новые`, `Готово к выдаче`, and `В работе` sections, the default-open/default-collapsed behavior, `inProgressExpanded` state, and per-section bulk actions are all missing. FIX: replace Block A + Block F with the three specified sections and wire bulk actions through the same order-advance path used by the single-order CTA.
++4. [P0] Fix 4 request section is still below the order/action blocks - `Block C` is still rendered at `pages/StaffOrdersMobile/staffordersmobile.jsx:1739-1767`, after the flat orders block and after Block B, so urgent guest requests remain buried instead of being the first expanded section. FIX: move Block C to the top of expanded content, before the order-status sections.
++5. [P0] Fix 4 request completion still uses the old two-step flow - Block C still renders conditional button text at `pages/StaffOrdersMobile/staffordersmobile.jsx:1754-1760`, and the prop wiring at `pages/StaffOrdersMobile/staffordersmobile.jsx:3893` still mutates `new -> in_progress -> done`. That does not match the required single `Выполнено` action with no intermediate state. FIX: change the Block C button to a single `Выполнено` label and route that action to immediate completion while keeping the `onCloseRequest(req.id, req.status)` call shape intact.
++6. [P0] Fix 4 bill request icon was not updated - bill badges still use `Bell` in the collapsed card at `pages/StaffOrdersMobile/staffordersmobile.jsx:1644` and in Block C at `pages/StaffOrdersMobile/staffordersmobile.jsx:1749`, and the `lucide-react` import list at `pages/StaffOrdersMobile/staffordersmobile.jsx:162-193` does not add `Receipt` or `FileText`. FIX: import `Receipt` (or `FileText` fallback) and use it for `bill` requests in both render paths.
++
++## Summary
++Total: 6 findings (6 P0, 0 P1, 0 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 5
++- Ambiguous Fix descriptions: None.
++- Missing context: None.
++- Scope questions: None.
+diff --git a/pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md b/pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c878680f355cc1fd70f60b88a996f1ed6b120d9
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings - StaffOrdersMobile
++Chain: staffordersmobile-260330-111817-2199
++
++## Findings
++1. [P0] Fix 1 not implemented in collapsed card summary - `pages/StaffOrdersMobile/staffordersmobile.jsx:1630-1650` still renders `itemsPreview` plus separate request chips, so the card shows dish text or `Нет позиций` instead of the required two-line `СЕЙЧАС` / `ЕЩЁ` action summary built from `activeOrders`, `completedOrders`, `requestBadges`, and `billData`. FIX: replace Row 3 + Row 4 render with the merged two-line status summary; keep the `itemsPreview` useMemo itself, but stop rendering it in the collapsed card.
++2. [P0] Fix 2 fallback still uses 12 hours ago - `getShiftStartTime()` still returns `new Date(now.getTime() - FALLBACK_HOURS * 60 * 60 * 1000)` at `pages/StaffOrdersMobile/staffordersmobile.jsx:474` and `pages/StaffOrdersMobile/staffordersmobile.jsx:537`, so early-morning active lists will still include yesterday's orders when `partner.working_hours` is missing or invalid. FIX: keep `FALLBACK_HOURS` defined, but change both fallback returns to `startOfToday` with `setHours(0, 0, 0, 0)`.
++3. [P0] Fix 3 status sections were not applied - `pages/StaffOrdersMobile/staffordersmobile.jsx:1657-1712` still shows one flat `activeOrders` list under `Заказы`, while `pages/StaffOrdersMobile/staffordersmobile.jsx:1808-1846` keeps `completedOrders` in a separate collapsed `Выполнено` block. The required `Новые`, `Готово к выдаче`, and `В работе` sections, the default-open/default-collapsed behavior, `inProgressExpanded` state, and per-section bulk actions are all missing. FIX: replace Block A + Block F with the three specified sections and wire bulk actions through the same order-advance path used by the single-order CTA.
++4. [P0] Fix 4 request section is still below the order/action blocks - `Block C` is still rendered at `pages/StaffOrdersMobile/staffordersmobile.jsx:1739-1767`, after the flat orders block and after Block B, so urgent guest requests remain buried instead of being the first expanded section. FIX: move Block C to the top of expanded content, before the order-status sections.
++5. [P0] Fix 4 request completion still uses the old two-step flow - Block C still renders conditional button text at `pages/StaffOrdersMobile/staffordersmobile.jsx:1754-1760`, and the prop wiring at `pages/StaffOrdersMobile/staffordersmobile.jsx:3893` still mutates `new -> in_progress -> done`. That does not match the required single `Выполнено` action with no intermediate state. FIX: change the Block C button to a single `Выполнено` label and route that action to immediate completion while keeping the `onCloseRequest(req.id, req.status)` call shape intact.
++6. [P0] Fix 4 bill request icon was not updated - bill badges still use `Bell` in the collapsed card at `pages/StaffOrdersMobile/staffordersmobile.jsx:1644` and in Block C at `pages/StaffOrdersMobile/staffordersmobile.jsx:1749`, and the `lucide-react` import list at `pages/StaffOrdersMobile/staffordersmobile.jsx:162-193` does not add `Receipt` or `FileText`. FIX: import `Receipt` (or `FileText` fallback) and use it for `bill` requests in both render paths.
++
++## Summary
++Total: 6 findings (6 P0, 0 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-03-30.log b/pages/StaffOrdersMobile/commands_2026-03-30.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e590eefbb6dec6543ff51d06198f40e7adf340b
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-03-30.log
+@@ -0,0 +1,45 @@
++# Commands executed on 2026-03-30
++
++[timed out] Get-ChildItem -Name pages/StaffOrdersMobile
++[timed out] Get-Content -Path pages/StaffOrdersMobile/staffordersmobile.jsx
++[timed out] Get-ChildItem -Name pages/StaffOrdersMobile
++[timed out] @'
++$patterns = @(
++  'const FALLBACK_HOURS',
++  'FALLBACK_HOURS \\* 60',
++  'const completedOrders = useMemo',
++  'const itemsPreview = useMemo',
++  'const requestBadges = useMemo',
++  'completedExpanded',
++  'Row 3: items preview',
++  'Row 4: request badges',
++  'Block A',
++  'Block C',
++  'Block F',
++  'badge.type === ''bill''',
++  'Receipt',
++  'В работе',
++  'Выполнено'
++)
++foreach ($p in $patterns) {
++  Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern $p | ForEach-Object {
++    '{0}:{1}' -f $_.LineNumber, $_.Line.Trim()
++  }
++}
++'@ | powershell -NoProfile -Command -
++
++Get-ChildItem -Name pages/StaffOrdersMobile
++Get-Content -Path pages/StaffOrdersMobile/BUGS.md
++Get-Content -Path 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1; $i -le 240; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 450; $i -le 560; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1280; $i -le 1535; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1600; $i -le 1865; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'СЕЙЧАС|ЕЩЁ|Принять все|Выдать все|Готово к выдаче|Выполнено|Receipt|FileText|inProgressExpanded' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'onCloseAllOrders|handleAdvance|onCloseRequest\\(' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1530; $i -le 1550; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'handleCloseRequest|onCloseRequest|ServiceRequest.update|request.status' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 3300; $i -le 3445; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 3028; $i -le 3042; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 3886; $i -le 3896; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Test-Path pipeline/chain-state
+diff --git a/pages/StaffOrdersMobile/review_2026-03-30.md b/pages/StaffOrdersMobile/review_2026-03-30.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..796a9a5bf4ef572b2a5bda70e3929c2ffae3ab6b
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-03-30.md
+@@ -0,0 +1,18 @@
++# Code Review Report - StaffOrdersMobile (Fix 1-4)
++
++## Findings
++1. [P0] Fix 1 not implemented in collapsed card summary - `pages/StaffOrdersMobile/staffordersmobile.jsx:1630-1650` still renders `itemsPreview` plus separate request chips, so the card shows dish text or `Нет позиций` instead of the required two-line `СЕЙЧАС` / `ЕЩЁ` action summary built from `activeOrders`, `completedOrders`, `requestBadges`, and `billData`. FIX: replace Row 3 + Row 4 render with the merged two-line status summary; keep the `itemsPreview` useMemo itself, but stop rendering it in the collapsed card.
++2. [P0] Fix 2 fallback still uses 12 hours ago - `getShiftStartTime()` still returns `new Date(now.getTime() - FALLBACK_HOURS * 60 * 60 * 1000)` at `pages/StaffOrdersMobile/staffordersmobile.jsx:474` and `pages/StaffOrdersMobile/staffordersmobile.jsx:537`, so early-morning active lists will still include yesterday's orders when `partner.working_hours` is missing or invalid. FIX: keep `FALLBACK_HOURS` defined, but change both fallback returns to `startOfToday` with `setHours(0, 0, 0, 0)`.
++3. [P0] Fix 3 status sections were not applied - `pages/StaffOrdersMobile/staffordersmobile.jsx:1657-1712` still shows one flat `activeOrders` list under `Заказы`, while `pages/StaffOrdersMobile/staffordersmobile.jsx:1808-1846` keeps `completedOrders` in a separate collapsed `Выполнено` block. The required `Новые`, `Готово к выдаче`, and `В работе` sections, the default-open/default-collapsed behavior, `inProgressExpanded` state, and per-section bulk actions are all missing. FIX: replace Block A + Block F with the three specified sections and wire bulk actions through the same order-advance path used by the single-order CTA.
++4. [P0] Fix 4 request section is still below the order/action blocks - `Block C` is still rendered at `pages/StaffOrdersMobile/staffordersmobile.jsx:1739-1767`, after the flat orders block and after Block B, so urgent guest requests remain buried instead of being the first expanded section. FIX: move Block C to the top of expanded content, before the order-status sections.
++5. [P0] Fix 4 request completion still uses the old two-step flow - Block C still renders conditional button text at `pages/StaffOrdersMobile/staffordersmobile.jsx:1754-1760`, and the prop wiring at `pages/StaffOrdersMobile/staffordersmobile.jsx:3893` still mutates `new -> in_progress -> done`. That does not match the required single `Выполнено` action with no intermediate state. FIX: change the Block C button to a single `Выполнено` label and route that action to immediate completion while keeping the `onCloseRequest(req.id, req.status)` call shape intact.
++6. [P0] Fix 4 bill request icon was not updated - bill badges still use `Bell` in the collapsed card at `pages/StaffOrdersMobile/staffordersmobile.jsx:1644` and in Block C at `pages/StaffOrdersMobile/staffordersmobile.jsx:1749`, and the `lucide-react` import list at `pages/StaffOrdersMobile/staffordersmobile.jsx:162-193` does not add `Receipt` or `FileText`. FIX: import `Receipt` (or `FileText` fallback) and use it for `bill` requests in both render paths.
++
++## Summary
++Total: 6 findings (6 P0, 0 P1, 0 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 5
++- Ambiguous Fix descriptions: None.
++- Missing context: None.
++- Scope questions: None.
+diff --git a/pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md b/pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c878680f355cc1fd70f60b88a996f1ed6b120d9
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings - StaffOrdersMobile
++Chain: staffordersmobile-260330-111817-2199
++
++## Findings
++1. [P0] Fix 1 not implemented in collapsed card summary - `pages/StaffOrdersMobile/staffordersmobile.jsx:1630-1650` still renders `itemsPreview` plus separate request chips, so the card shows dish text or `Нет позиций` instead of the required two-line `СЕЙЧАС` / `ЕЩЁ` action summary built from `activeOrders`, `completedOrders`, `requestBadges`, and `billData`. FIX: replace Row 3 + Row 4 render with the merged two-line status summary; keep the `itemsPreview` useMemo itself, but stop rendering it in the collapsed card.
++2. [P0] Fix 2 fallback still uses 12 hours ago - `getShiftStartTime()` still returns `new Date(now.getTime() - FALLBACK_HOURS * 60 * 60 * 1000)` at `pages/StaffOrdersMobile/staffordersmobile.jsx:474` and `pages/StaffOrdersMobile/staffordersmobile.jsx:537`, so early-morning active lists will still include yesterday's orders when `partner.working_hours` is missing or invalid. FIX: keep `FALLBACK_HOURS` defined, but change both fallback returns to `startOfToday` with `setHours(0, 0, 0, 0)`.
++3. [P0] Fix 3 status sections were not applied - `pages/StaffOrdersMobile/staffordersmobile.jsx:1657-1712` still shows one flat `activeOrders` list under `Заказы`, while `pages/StaffOrdersMobile/staffordersmobile.jsx:1808-1846` keeps `completedOrders` in a separate collapsed `Выполнено` block. The required `Новые`, `Готово к выдаче`, and `В работе` sections, the default-open/default-collapsed behavior, `inProgressExpanded` state, and per-section bulk actions are all missing. FIX: replace Block A + Block F with the three specified sections and wire bulk actions through the same order-advance path used by the single-order CTA.
++4. [P0] Fix 4 request section is still below the order/action blocks - `Block C` is still rendered at `pages/StaffOrdersMobile/staffordersmobile.jsx:1739-1767`, after the flat orders block and after Block B, so urgent guest requests remain buried instead of being the first expanded section. FIX: move Block C to the top of expanded content, before the order-status sections.
++5. [P0] Fix 4 request completion still uses the old two-step flow - Block C still renders conditional button text at `pages/StaffOrdersMobile/staffordersmobile.jsx:1754-1760`, and the prop wiring at `pages/StaffOrdersMobile/staffordersmobile.jsx:3893` still mutates `new -> in_progress -> done`. That does not match the required single `Выполнено` action with no intermediate state. FIX: change the Block C button to a single `Выполнено` label and route that action to immediate completion while keeping the `onCloseRequest(req.id, req.status)` call shape intact.
++6. [P0] Fix 4 bill request icon was not updated - bill badges still use `Bell` in the collapsed card at `pages/StaffOrdersMobile/staffordersmobile.jsx:1644` and in Block C at `pages/StaffOrdersMobile/staffordersmobile.jsx:1749`, and the `lucide-react` import list at `pages/StaffOrdersMobile/staffordersmobile.jsx:162-193` does not add `Receipt` or `FileText`. FIX: import `Receipt` (or `FileText` fallback) and use it for `bill` requests in both render paths.
++
++## Summary
++Total: 6 findings (6 P0, 0 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+2026-03-30T06:31:53.395013Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:31:53.395210Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:31:53.606538Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:31:53.606664Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+codex
+The report files are written. I’m doing one quick readback of the pipeline artifact to make sure the output format and counts match the requested contract.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Path pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.61s:
+# Codex Writer Findings - StaffOrdersMobile
+Chain: staffordersmobile-260330-111817-2199
+
+## Findings
+1. [P0] Fix 1 not implemented in collapsed card summary - `pages/StaffOrdersMobile/staffordersmobile.jsx:1630-1650` still renders `itemsPreview` plus separate request chips, so the card shows dish text or `ÐÐµÑ‚ Ð¿Ð¾Ð·Ð¸Ñ†Ð¸Ð¹` instead of the required two-line `Ð¡Ð•Ð™Ð§ÐÐ¡` / `Ð•Ð©Ð` action summary built from `activeOrders`, `completedOrders`, `requestBadges`, and `billData`. FIX: replace Row 3 + Row 4 render with the merged two-line status summary; keep the `itemsPreview` useMemo itself, but stop rendering it in the collapsed card.
+2. [P0] Fix 2 fallback still uses 12 hours ago - `getShiftStartTime()` still returns `new Date(now.getTime() - FALLBACK_HOURS * 60 * 60 * 1000)` at `pages/StaffOrdersMobile/staffordersmobile.jsx:474` and `pages/StaffOrdersMobile/staffordersmobile.jsx:537`, so early-morning active lists will still include yesterday's orders when `partner.working_hours` is missing or invalid. FIX: keep `FALLBACK_HOURS` defined, but change both fallback returns to `startOfToday` with `setHours(0, 0, 0, 0)`.
+3. [P0] Fix 3 status sections were not applied - `pages/StaffOrdersMobile/staffordersmobile.jsx:1657-1712` still shows one flat `activeOrders` list under `Ð—Ð°ÐºÐ°Ð·Ñ‹`, while `pages/StaffOrdersMobile/staffordersmobile.jsx:1808-1846` keeps `completedOrders` in a separate collapsed `Ð’Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¾` block. The required `ÐÐ¾Ð²Ñ‹Ðµ`, `Ð“Ð¾Ñ‚Ð¾Ð²Ð¾ Ðº Ð²Ñ‹Ð´Ð°Ñ‡Ðµ`, and `Ð’ Ñ€Ð°Ð±Ð¾Ñ‚Ðµ` sections, the default-open/default-collapsed behavior, `inProgressExpanded` state, and per-section bulk actions are all missing. FIX: replace Block A + Block F with the three specified sections and wire bulk actions through the same order-advance path used by the single-order CTA.
+4. [P0] Fix 4 request section is still below the order/action blocks - `Block C` is still rendered at `pages/StaffOrdersMobile/staffordersmobile.jsx:1739-1767`, after the flat orders block and after Block B, so urgent guest requests remain buried instead of being the first expanded section. FIX: move Block C to the top of expanded content, before the order-status sections.
+5. [P0] Fix 4 request completion still uses the old two-step flow - Block C still renders conditional button text at `pages/StaffOrdersMobile/staffordersmobile.jsx:1754-1760`, and the prop wiring at `pages/StaffOrdersMobile/staffordersmobile.jsx:3893` still mutates `new -> in_progress -> done`. That does not match the required single `Ð’Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¾` action with no intermediate state. FIX: change the Block C button to a single `Ð’Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¾` label and route that action to immediate completion while keeping the `onCloseRequest(req.id, req.status)` call shape intact.
+6. [P0] Fix 4 bill request icon was not updated - bill badges still use `Bell` in the collapsed card at `pages/StaffOrdersMobile/staffordersmobile.jsx:1644` and in Block C at `pages/StaffOrdersMobile/staffordersmobile.jsx:1749`, and the `lucide-react` import list at `pages/StaffOrdersMobile/staffordersmobile.jsx:162-193` does not add `Receipt` or `FileText`. FIX: import `Receipt` (or `FileText` fallback) and use it for `bill` requests in both render paths.
+
+## Summary
+Total: 6 findings (6 P0, 0 P1, 0 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY - do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-03-30.log b/pages/StaffOrdersMobile/commands_2026-03-30.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e590eefbb6dec6543ff51d06198f40e7adf340b
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-03-30.log
+@@ -0,0 +1,45 @@
++# Commands executed on 2026-03-30
++
++[timed out] Get-ChildItem -Name pages/StaffOrdersMobile
++[timed out] Get-Content -Path pages/StaffOrdersMobile/staffordersmobile.jsx
++[timed out] Get-ChildItem -Name pages/StaffOrdersMobile
++[timed out] @'
++$patterns = @(
++  'const FALLBACK_HOURS',
++  'FALLBACK_HOURS \\* 60',
++  'const completedOrders = useMemo',
++  'const itemsPreview = useMemo',
++  'const requestBadges = useMemo',
++  'completedExpanded',
++  'Row 3: items preview',
++  'Row 4: request badges',
++  'Block A',
++  'Block C',
++  'Block F',
++  'badge.type === ''bill''',
++  'Receipt',
++  'В работе',
++  'Выполнено'
++)
++foreach ($p in $patterns) {
++  Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern $p | ForEach-Object {
++    '{0}:{1}' -f $_.LineNumber, $_.Line.Trim()
++  }
++}
++'@ | powershell -NoProfile -Command -
++
++Get-ChildItem -Name pages/StaffOrdersMobile
++Get-Content -Path pages/StaffOrdersMobile/BUGS.md
++Get-Content -Path 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1; $i -le 240; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 450; $i -le 560; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1280; $i -le 1535; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1600; $i -le 1865; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'СЕЙЧАС|ЕЩЁ|Принять все|Выдать все|Готово к выдаче|Выполнено|Receipt|FileText|inProgressExpanded' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'onCloseAllOrders|handleAdvance|onCloseRequest\\(' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1530; $i -le 1550; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'handleCloseRequest|onCloseRequest|ServiceRequest.update|request.status' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 3300; $i -le 3445; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 3028; $i -le 3042; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 3886; $i -le 3896; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Test-Path pipeline/chain-state
+diff --git a/pages/StaffOrdersMobile/review_2026-03-30.md b/pages/StaffOrdersMobile/review_2026-03-30.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..796a9a5bf4ef572b2a5bda70e3929c2ffae3ab6b
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-03-30.md
+@@ -0,0 +1,18 @@
++# Code Review Report - StaffOrdersMobile (Fix 1-4)
++
++## Findings
++1. [P0] Fix 1 not implemented in collapsed card summary - `pages/StaffOrdersMobile/staffordersmobile.jsx:1630-1650` still renders `itemsPreview` plus separate request chips, so the card shows dish text or `Нет позиций` instead of the required two-line `СЕЙЧАС` / `ЕЩЁ` action summary built from `activeOrders`, `completedOrders`, `requestBadges`, and `billData`. FIX: replace Row 3 + Row 4 render with the merged two-line status summary; keep the `itemsPreview` useMemo itself, but stop rendering it in the collapsed card.
++2. [P0] Fix 2 fallback still uses 12 hours ago - `getShiftStartTime()` still returns `new Date(now.getTime() - FALLBACK_HOURS * 60 * 60 * 1000)` at `pages/StaffOrdersMobile/staffordersmobile.jsx:474` and `pages/StaffOrdersMobile/staffordersmobile.jsx:537`, so early-morning active lists will still include yesterday's orders when `partner.working_hours` is missing or invalid. FIX: keep `FALLBACK_HOURS` defined, but change both fallback returns to `startOfToday` with `setHours(0, 0, 0, 0)`.
++3. [P0] Fix 3 status sections were not applied - `pages/StaffOrdersMobile/staffordersmobile.jsx:1657-1712` still shows one flat `activeOrders` list under `Заказы`, while `pages/StaffOrdersMobile/staffordersmobile.jsx:1808-1846` keeps `completedOrders` in a separate collapsed `Выполнено` block. The required `Новые`, `Готово к выдаче`, and `В работе` sections, the default-open/default-collapsed behavior, `inProgressExpanded` state, and per-section bulk actions are all missing. FIX: replace Block A + Block F with the three specified sections and wire bulk actions through the same order-advance path used by the single-order CTA.
++4. [P0] Fix 4 request section is still below the order/action blocks - `Block C` is still rendered at `pages/StaffOrdersMobile/staffordersmobile.jsx:1739-1767`, after the flat orders block and after Block B, so urgent guest requests remain buried instead of being the first expanded section. FIX: move Block C to the top of expanded content, before the order-status sections.
++5. [P0] Fix 4 request completion still uses the old two-step flow - Block C still renders conditional button text at `pages/StaffOrdersMobile/staffordersmobile.jsx:1754-1760`, and the prop wiring at `pages/StaffOrdersMobile/staffordersmobile.jsx:3893` still mutates `new -> in_progress -> done`. That does not match the required single `Выполнено` action with no intermediate state. FIX: change the Block C button to a single `Выполнено` label and route that action to immediate completion while keeping the `onCloseRequest(req.id, req.status)` call shape intact.
++6. [P0] Fix 4 bill request icon was not updated - bill badges still use `Bell` in the collapsed card at `pages/StaffOrdersMobile/staffordersmobile.jsx:1644` and in Block C at `pages/StaffOrdersMobile/staffordersmobile.jsx:1749`, and the `lucide-react` import list at `pages/StaffOrdersMobile/staffordersmobile.jsx:162-193` does not add `Receipt` or `FileText`. FIX: import `Receipt` (or `FileText` fallback) and use it for `bill` requests in both render paths.
++
++## Summary
++Total: 6 findings (6 P0, 0 P1, 0 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 5
++- Ambiguous Fix descriptions: None.
++- Missing context: None.
++- Scope questions: None.
+diff --git a/pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md b/pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c878680f355cc1fd70f60b88a996f1ed6b120d9
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings - StaffOrdersMobile
++Chain: staffordersmobile-260330-111817-2199
++
++## Findings
++1. [P0] Fix 1 not implemented in collapsed card summary - `pages/StaffOrdersMobile/staffordersmobile.jsx:1630-1650` still renders `itemsPreview` plus separate request chips, so the card shows dish text or `Нет позиций` instead of the required two-line `СЕЙЧАС` / `ЕЩЁ` action summary built from `activeOrders`, `completedOrders`, `requestBadges`, and `billData`. FIX: replace Row 3 + Row 4 render with the merged two-line status summary; keep the `itemsPreview` useMemo itself, but stop rendering it in the collapsed card.
++2. [P0] Fix 2 fallback still uses 12 hours ago - `getShiftStartTime()` still returns `new Date(now.getTime() - FALLBACK_HOURS * 60 * 60 * 1000)` at `pages/StaffOrdersMobile/staffordersmobile.jsx:474` and `pages/StaffOrdersMobile/staffordersmobile.jsx:537`, so early-morning active lists will still include yesterday's orders when `partner.working_hours` is missing or invalid. FIX: keep `FALLBACK_HOURS` defined, but change both fallback returns to `startOfToday` with `setHours(0, 0, 0, 0)`.
++3. [P0] Fix 3 status sections were not applied - `pages/StaffOrdersMobile/staffordersmobile.jsx:1657-1712` still shows one flat `activeOrders` list under `Заказы`, while `pages/StaffOrdersMobile/staffordersmobile.jsx:1808-1846` keeps `completedOrders` in a separate collapsed `Выполнено` block. The required `Новые`, `Готово к выдаче`, and `В работе` sections, the default-open/default-collapsed behavior, `inProgressExpanded` state, and per-section bulk actions are all missing. FIX: replace Block A + Block F with the three specified sections and wire bulk actions through the same order-advance path used by the single-order CTA.
++4. [P0] Fix 4 request section is still below the order/action blocks - `Block C` is still rendered at `pages/StaffOrdersMobile/staffordersmobile.jsx:1739-1767`, after the flat orders block and after Block B, so urgent guest requests remain buried instead of being the first expanded section. FIX: move Block C to the top of expanded content, before the order-status sections.
++5. [P0] Fix 4 request completion still uses the old two-step flow - Block C still renders conditional button text at `pages/StaffOrdersMobile/staffordersmobile.jsx:1754-1760`, and the prop wiring at `pages/StaffOrdersMobile/staffordersmobile.jsx:3893` still mutates `new -> in_progress -> done`. That does not match the required single `Выполнено` action with no intermediate state. FIX: change the Block C button to a single `Выполнено` label and route that action to immediate completion while keeping the `onCloseRequest(req.id, req.status)` call shape intact.
++6. [P0] Fix 4 bill request icon was not updated - bill badges still use `Bell` in the collapsed card at `pages/StaffOrdersMobile/staffordersmobile.jsx:1644` and in Block C at `pages/StaffOrdersMobile/staffordersmobile.jsx:1749`, and the `lucide-react` import list at `pages/StaffOrdersMobile/staffordersmobile.jsx:162-193` does not add `Receipt` or `FileText`. FIX: import `Receipt` (or `FileText` fallback) and use it for `bill` requests in both render paths.
++
++## Summary
++Total: 6 findings (6 P0, 0 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+2026-03-30T06:32:10.252027Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:32:10.252148Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-30T06:32:10.476855Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-30T06:32:10.476975Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+codex
+Reviewed only [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx), [StaffOrdersMobile README.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/StaffOrdersMobile%20README.md), and [BUGS.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/BUGS.md). The requested findings file is written at [staffordersmobile-260330-111817-2199-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md).
+
+Summary: 6 findings, all P0 and all inside Fix 1-4 scope. The file still has the old collapsed items/request layout, both shift-filter fallbacks still use `12 hours ago`, the expanded card is still flat instead of split into the three required status sections, and Fix 4 is still incomplete in three places: request block order, two-step request completion flow, and bill request icons/imports.
+
+Per repo review rules, I also saved [review_2026-03-30.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/review_2026-03-30.md) and [commands_2026-03-30.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/commands_2026-03-30.log).
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-03-30.log b/pages/StaffOrdersMobile/commands_2026-03-30.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e590eefbb6dec6543ff51d06198f40e7adf340b
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-03-30.log
+@@ -0,0 +1,45 @@
++# Commands executed on 2026-03-30
++
++[timed out] Get-ChildItem -Name pages/StaffOrdersMobile
++[timed out] Get-Content -Path pages/StaffOrdersMobile/staffordersmobile.jsx
++[timed out] Get-ChildItem -Name pages/StaffOrdersMobile
++[timed out] @'
++$patterns = @(
++  'const FALLBACK_HOURS',
++  'FALLBACK_HOURS \\* 60',
++  'const completedOrders = useMemo',
++  'const itemsPreview = useMemo',
++  'const requestBadges = useMemo',
++  'completedExpanded',
++  'Row 3: items preview',
++  'Row 4: request badges',
++  'Block A',
++  'Block C',
++  'Block F',
++  'badge.type === ''bill''',
++  'Receipt',
++  'В работе',
++  'Выполнено'
++)
++foreach ($p in $patterns) {
++  Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern $p | ForEach-Object {
++    '{0}:{1}' -f $_.LineNumber, $_.Line.Trim()
++  }
++}
++'@ | powershell -NoProfile -Command -
++
++Get-ChildItem -Name pages/StaffOrdersMobile
++Get-Content -Path pages/StaffOrdersMobile/BUGS.md
++Get-Content -Path 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1; $i -le 240; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 450; $i -le 560; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1280; $i -le 1535; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1600; $i -le 1865; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'СЕЙЧАС|ЕЩЁ|Принять все|Выдать все|Готово к выдаче|Выполнено|Receipt|FileText|inProgressExpanded' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'onCloseAllOrders|handleAdvance|onCloseRequest\\(' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 1530; $i -le 1550; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Select-String -Path pages/StaffOrdersMobile/staffordersmobile.jsx -Pattern 'handleCloseRequest|onCloseRequest|ServiceRequest.update|request.status' | ForEach-Object { '{0}:{1}' -f $_.LineNumber, $_.Line.Trim() }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 3300; $i -le 3445; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 3028; $i -le 3042; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$path = 'pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines = Get-Content -Path $path; for ($i = 3886; $i -le 3896; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Test-Path pipeline/chain-state
+diff --git a/pages/StaffOrdersMobile/review_2026-03-30.md b/pages/StaffOrdersMobile/review_2026-03-30.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..796a9a5bf4ef572b2a5bda70e3929c2ffae3ab6b
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-03-30.md
+@@ -0,0 +1,18 @@
++# Code Review Report - StaffOrdersMobile (Fix 1-4)
++
++## Findings
++1. [P0] Fix 1 not implemented in collapsed card summary - `pages/StaffOrdersMobile/staffordersmobile.jsx:1630-1650` still renders `itemsPreview` plus separate request chips, so the card shows dish text or `Нет позиций` instead of the required two-line `СЕЙЧАС` / `ЕЩЁ` action summary built from `activeOrders`, `completedOrders`, `requestBadges`, and `billData`. FIX: replace Row 3 + Row 4 render with the merged two-line status summary; keep the `itemsPreview` useMemo itself, but stop rendering it in the collapsed card.
++2. [P0] Fix 2 fallback still uses 12 hours ago - `getShiftStartTime()` still returns `new Date(now.getTime() - FALLBACK_HOURS * 60 * 60 * 1000)` at `pages/StaffOrdersMobile/staffordersmobile.jsx:474` and `pages/StaffOrdersMobile/staffordersmobile.jsx:537`, so early-morning active lists will still include yesterday's orders when `partner.working_hours` is missing or invalid. FIX: keep `FALLBACK_HOURS` defined, but change both fallback returns to `startOfToday` with `setHours(0, 0, 0, 0)`.
++3. [P0] Fix 3 status sections were not applied - `pages/StaffOrdersMobile/staffordersmobile.jsx:1657-1712` still shows one flat `activeOrders` list under `Заказы`, while `pages/StaffOrdersMobile/staffordersmobile.jsx:1808-1846` keeps `completedOrders` in a separate collapsed `Выполнено` block. The required `Новые`, `Готово к выдаче`, and `В работе` sections, the default-open/default-collapsed behavior, `inProgressExpanded` state, and per-section bulk actions are all missing. FIX: replace Block A + Block F with the three specified sections and wire bulk actions through the same order-advance path used by the single-order CTA.
++4. [P0] Fix 4 request section is still below the order/action blocks - `Block C` is still rendered at `pages/StaffOrdersMobile/staffordersmobile.jsx:1739-1767`, after the flat orders block and after Block B, so urgent guest requests remain buried instead of being the first expanded section. FIX: move Block C to the top of expanded content, before the order-status sections.
++5. [P0] Fix 4 request completion still uses the old two-step flow - Block C still renders conditional button text at `pages/StaffOrdersMobile/staffordersmobile.jsx:1754-1760`, and the prop wiring at `pages/StaffOrdersMobile/staffordersmobile.jsx:3893` still mutates `new -> in_progress -> done`. That does not match the required single `Выполнено` action with no intermediate state. FIX: change the Block C button to a single `Выполнено` label and route that action to immediate completion while keeping the `onCloseRequest(req.id, req.status)` call shape intact.
++6. [P0] Fix 4 bill request icon was not updated - bill badges still use `Bell` in the collapsed card at `pages/StaffOrdersMobile/staffordersmobile.jsx:1644` and in Block C at `pages/StaffOrdersMobile/staffordersmobile.jsx:1749`, and the `lucide-react` import list at `pages/StaffOrdersMobile/staffordersmobile.jsx:162-193` does not add `Receipt` or `FileText`. FIX: import `Receipt` (or `FileText` fallback) and use it for `bill` requests in both render paths.
++
++## Summary
++Total: 6 findings (6 P0, 0 P1, 0 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 5
++- Ambiguous Fix descriptions: None.
++- Missing context: None.
++- Scope questions: None.
+diff --git a/pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md b/pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c878680f355cc1fd70f60b88a996f1ed6b120d9
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings - StaffOrdersMobile
++Chain: staffordersmobile-260330-111817-2199
++
++## Findings
++1. [P0] Fix 1 not implemented in collapsed card summary - `pages/StaffOrdersMobile/staffordersmobile.jsx:1630-1650` still renders `itemsPreview` plus separate request chips, so the card shows dish text or `Нет позиций` instead of the required two-line `СЕЙЧАС` / `ЕЩЁ` action summary built from `activeOrders`, `completedOrders`, `requestBadges`, and `billData`. FIX: replace Row 3 + Row 4 render with the merged two-line status summary; keep the `itemsPreview` useMemo itself, but stop rendering it in the collapsed card.
++2. [P0] Fix 2 fallback still uses 12 hours ago - `getShiftStartTime()` still returns `new Date(now.getTime() - FALLBACK_HOURS * 60 * 60 * 1000)` at `pages/StaffOrdersMobile/staffordersmobile.jsx:474` and `pages/StaffOrdersMobile/staffordersmobile.jsx:537`, so early-morning active lists will still include yesterday's orders when `partner.working_hours` is missing or invalid. FIX: keep `FALLBACK_HOURS` defined, but change both fallback returns to `startOfToday` with `setHours(0, 0, 0, 0)`.
++3. [P0] Fix 3 status sections were not applied - `pages/StaffOrdersMobile/staffordersmobile.jsx:1657-1712` still shows one flat `activeOrders` list under `Заказы`, while `pages/StaffOrdersMobile/staffordersmobile.jsx:1808-1846` keeps `completedOrders` in a separate collapsed `Выполнено` block. The required `Новые`, `Готово к выдаче`, and `В работе` sections, the default-open/default-collapsed behavior, `inProgressExpanded` state, and per-section bulk actions are all missing. FIX: replace Block A + Block F with the three specified sections and wire bulk actions through the same order-advance path used by the single-order CTA.
++4. [P0] Fix 4 request section is still below the order/action blocks - `Block C` is still rendered at `pages/StaffOrdersMobile/staffordersmobile.jsx:1739-1767`, after the flat orders block and after Block B, so urgent guest requests remain buried instead of being the first expanded section. FIX: move Block C to the top of expanded content, before the order-status sections.
++5. [P0] Fix 4 request completion still uses the old two-step flow - Block C still renders conditional button text at `pages/StaffOrdersMobile/staffordersmobile.jsx:1754-1760`, and the prop wiring at `pages/StaffOrdersMobile/staffordersmobile.jsx:3893` still mutates `new -> in_progress -> done`. That does not match the required single `Выполнено` action with no intermediate state. FIX: change the Block C button to a single `Выполнено` label and route that action to immediate completion while keeping the `onCloseRequest(req.id, req.status)` call shape intact.
++6. [P0] Fix 4 bill request icon was not updated - bill badges still use `Bell` in the collapsed card at `pages/StaffOrdersMobile/staffordersmobile.jsx:1644` and in Block C at `pages/StaffOrdersMobile/staffordersmobile.jsx:1749`, and the `lucide-react` import list at `pages/StaffOrdersMobile/staffordersmobile.jsx:162-193` does not add `Receipt` or `FileText`. FIX: import `Receipt` (or `FileText` fallback) and use it for `bill` requests in both render paths.
++
++## Summary
++Total: 6 findings (6 P0, 0 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+tokens used
+110 863
+Reviewed only [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx), [StaffOrdersMobile README.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/StaffOrdersMobile%20README.md), and [BUGS.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/BUGS.md). The requested findings file is written at [staffordersmobile-260330-111817-2199-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/staffordersmobile-260330-111817-2199-codex-findings.md).
+
+Summary: 6 findings, all P0 and all inside Fix 1-4 scope. The file still has the old collapsed items/request layout, both shift-filter fallbacks still use `12 hours ago`, the expanded card is still flat instead of split into the three required status sections, and Fix 4 is still incomplete in three places: request block order, two-step request completion flow, and bill request icons/imports.
+
+Per repo review rules, I also saved [review_2026-03-30.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/review_2026-03-30.md) and [commands_2026-03-30.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/commands_2026-03-30.log).

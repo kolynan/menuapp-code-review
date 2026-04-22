@@ -1,0 +1,656 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d4806-2a42-7a92-809b-baa93fe6c53d
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260401-125045-ef92 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # HD-17: Help Drawer closes after 5s + second request lost on multi-tap Reference: `BUGS_MASTER.md` (HD-17), `ux-concepts/HelpDrawer/help-drawer.md` v5.2. Production page: https://menu-app-mvp-49a4f5b2.base44.app (guest login, table scan). **Context:** The Help Drawer ("Нужна помощь?") lets guests tap request cards (call waiter, bill, etc.). Each tap starts a 5-second undo window before the actual server send. Bug: when the guest taps 2 cards in sequence, the drawer auto-closes after 5 seconds and only 1 request is saved. **File:** `pages/PublicMenu/x.jsx` (4424 lines) **Component to modify:** `handleCardTap` function, ~line 1805 --- ## Fix 1 — HD-17a (P1) [MUST-FIX]: Drawer auto-closes 5 seconds after a card tap ### Сейчас Guest taps a help request card (e.g. "Счёт") → a 5-second undo window starts → after 5 seconds the timeout fires → `handlePresetSelect(type)` is called → the B44 `useHelpRequests` hook internally calls `setIsHelpModalOpen(false)` as part of its original "select → submit → close modal" flow → the drawer closes automatically without any user action. ### Должно быть After 5 seconds the request is sent to the server AND the drawer stays open. The drawer should ONLY close when the user explicitly taps outside it or dismisses it. ### НЕ должно быть - Do NOT remove `handlePresetSelect(type)` from the timeout — it triggers the actual server send - Do NOT change when `pendingQuickSendRef.current` is set - Do NOT touch `closeHelpDrawer()` function ### Файл и локация File: `pages/PublicMenu/x.jsx` Function: `handleCardTap` ~line 1805 Timeout callback: ~lines 1813–1818: ```js const timeoutId = setTimeout(() => { pendingQuickSendRef.current = type; handlePresetSelect(type); setUndoToast(null); // ← ADD setIsHelpModalOpen(true) BEFORE this line }, 5000); ``` Search for: `pendingQuickSendRef.current = type;` inside the setTimeout in `handleCardTap`. Fix: add `setIsHelpModalOpen(true);` immediately after `handlePresetSelect(type);` and before `setUndoToast(null);`. This overrides the `setIsHelpModalOpen(false)` side-effect from `handlePresetSelect`. `setIsHelpModalOpen` is already available in scope — it is destructured from `useHelpRequests` at ~line 1639. ### Уже пробовали - This is the first fix attempt. Root cause identified via code analysis S214: `handlePresetSelect` from `useHelpRequests` was designed for the old "open modal → select → submit → close" flow. The new HD-01 "direct card tap → undo → delayed send" flow calls it only for the side-effect of setting `selectedHelpType`, but the modal-close side-effect is unwanted. ### Проверка 1. Open Help Drawer → tap any request card (e.g. "Позвать официанта") 2. Wait 5 seconds → undo toast disappears → drawer must still be OPEN 3. The card should now show disabled/pending state inside the still-open drawer --- ## Fix 2 — HD-17b (P1) [MUST-FIX]: Only 1 of 2 tapped requests is sent and stored ### Сейчас Guest taps card 1 ("Позвать") → undo toast appears. Guest then taps card 2 ("Счёт") → `handleCardTap` runs `clearTimeout(undoToast.timeoutId)` which CANCELS card 1's 5-second timer → card 1 stays in `status: 'sending'` forever, never reaches `status: 'pending'`. The localStorage persistence effect (line ~1970) only saves `pending`/`repeat` states — `sending` is never saved. After the drawer closes (Fix 1) and reopens, card 1's state is lost from localStorage. Only card 2 is visible. ### Должно быть When guest taps card 2, card 1's timer is NOT cancelled. Both timers run independently. Card 1 sends 5 seconds after card 1 was tapped. Card 2 sends 5 seconds after card 2 was tapped. ### НЕ должно быть - Do NOT change the `setUndoToast` call that updates the visual toast display to show card 2's type - Do NOT change the localStorage persistence effect (lines ~1970–1988) - Do NOT add complex queue management — just remove the clearTimeout ### Файл и локация File: `pages/PublicMenu/x.jsx` Function: `handleCardTap` ~line 1805 Target line: ~1807: ```js if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId); ``` Search for: `clearTimeout(undoToast.timeoutId)` inside `handleCardTap`. Fix: **remove** this line entirely. The existing `undoToast.timeoutId` timer for the previous card must continue running. NOTE: The visual undo toast will show only the MOST RECENT card (card 2 overwrites card 1's display). That is acceptable — the important thing is that both underlying timers still fire and both requests are sent. ### Уже пробовали First attempt. Root cause: when multi-tapping, `clearTimeout` kills the first card's actual send timer, leaving it stuck in `sending` state which is not persisted to localStorage. ### Проверка 1. Open Help Drawer → quickly tap card 1 ("Позвать") then card 2 ("Счёт") 2. Wait 5+ seconds 3. Both cards must show pending/disabled state simultaneously inside the (still-open) drawer 4. Reopen drawer → both requests visible --- ## ⛔ FROZEN UX — DO NOT CHANGE (tested and locked) - `closeHelpDrawer()` function — must remain unchanged (PM-126, PM-135, commit fda866c) - `openHelpDrawer()` function — must remain unchanged - `handleResolve` function — do NOT touch - `handleRemind` function — do NOT touch - `handleUndo` function — do NOT touch - The undo toast render position `fixed bottom-4 left-4 right-4 z-50` (HD-06, S213) - Button text: «Не нужно» and «Через» (HD-16, commit fda866c S214) — do NOT revert - Button colors: `text-orange-800 bg-orange-50` (HD-16, commit fda866c S214) — do NOT revert ## ⛔ SCOPE LOCK — modify ONLY what is specified above - Modify ONLY: `handleCardTap` function in `pages/PublicMenu/x.jsx` - Do NOT modify: any other function, hook call, state, effect, or component - Do NOT modify: `useHelpRequests` destructuring - If you see other issues — skip them, do not fix - Two changes total: (1) remove 1 line `clearTimeout(undoToast.timeoutId)`, (2) add 1 line `setIsHelpModalOpen(true)` after `handlePresetSelect(type)` ## Implementation Notes - File: `pages/PublicMenu/x.jsx` (4424 lines) — ONLY this file - `setIsHelpModalOpen` is destructured from `useHelpRequests` at ~line 1639 — already in scope, no import needed - `handleCardTap` is defined at ~line 1805 via `useCallback` - Do NOT use `node --check` for validation — fails on JSX/ESM files (KB-111). Use grep instead. - After changes: verify with `grep -n "clearTimeout(undoToast" pages/PublicMenu/x.jsx` — should return 0 matches (line removed) - After changes: verify with `grep -n "setIsHelpModalOpen(true)" pages/PublicMenu/x.jsx` — should return 1+ match (new line added in timeout) - String encoding: no new Cyrillic strings needed in this fix ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Primary usage: guest phone at table. Before committing, verify ALL changes at 375px viewport width: - [ ] Help Drawer remains open after 5 seconds (does not auto-close) - [ ] Both card states (pending/disabled) visible simultaneously when 2 cards tapped - [ ] Undo toast still visible at `fixed bottom-4` (not obscured) - [ ] Touch targets on cards: ≥ 44×44px - [ ] No duplicate visual indicators introduced ## Regression Check (MANDATORY after implementation) After implementing, verify these existing behaviors still work: - [ ] Single card tap: undo toast appears → wait 5s → request sent → drawer stays open - [ ] Undo button: tap card → immediately tap "Отменить" → card returns to idle state - [ ] "Не нужно" button: marks request resolved, removes it from list - [ ] Drawer opens/closes normally via the FAB button and swipe-down - [ ] Card cooldown timer countdown still works (disabled state shows «Через MM:SS») === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/PublicMenu/x.jsx` plus `README.md` and `BUGS.md` in the same folder only. I’m checking the two scoped fixes against the current code, then I’ll write the findings file and command log without touching the page code.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 11.69s:
+
+ exited 124 in 11.89s:
+
+codex
+The first reads timed out on this workspace, so I’m narrowing to direct file checks in the page folder and then reading only the relevant slices around `handleCardTap`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/x.jsx -TotalCount 5' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 31.41s:
+
+ exited 124 in 31.51s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command Get-Location in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 11.65s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command Get-Location in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.18s:
+
+Path                                                
+----                                                
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command 'Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 12.36s:
+components
+versions
+260320-01 useTableSession RELEASE.jsx
+260323-03 CheckoutView RELEASE.jsx
+260327-01 ModeTabs RELEASE.jsx
+260329-01 MenuView RELEASE.jsx
+260329-01 StickyCartBar RELEASE.jsx
+260330-02 CartView RELEASE.jsx
+260330-09 PublicMenu x RELEASE.jsx
+260331-01 PublicMenu x RELEASE.jsx
+260401-00 PublicMenu x RELEASE.jsx
+ACCEPTANCE_CRITERIA_PHASE1.md
+BUGS.md
+CartView.jsx
+CartView.jsx.bak
+CartView.jsx.bak2
+CheckoutView.jsx
+COPY_SPEC.md
+i18n_DrawerUX_S79.csv
+i18n_WorkingHours_S79.csv
+ succeeded in 12.43s:
+4064
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'handleCardTap|handlePresetSelect|setIsHelpModalOpen|clearTimeout\\(undoToast\\.timeoutId\\)|pendingQuickSendRef\\.current = type|localStorage' -Context 4,6" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command 'Get-Content pages/PublicMenu/README.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command 'Get-Content pages/PublicMenu/BUGS.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 16.55s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 16.56s:
+---
+version: "41.0"
+updated: "2026-03-30"
+session: 205
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*9 active bugs remaining (0x P0, 4x P1, 4x P2, 0x P3, 1x suggestion).*
+
+### BUG-PM-132: List mode stepper buttons use w-9 h-9 (36px) instead of w-11 h-11 (44px) (P2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P2
+- **ÐšÐ¾Ð³Ð´Ð°:** S177 (found by Codex in chain 74b9, confirmed by CC)
+ succeeded in 20.48s:
+
+  pages\PublicMenu\x.jsx:172:  if (!partnerId) return;
+  pages\PublicMenu\x.jsx:173:  try {
+  pages\PublicMenu\x.jsx:174:    const key = `menuapp_cart_${partnerId}`;
+  pages\PublicMenu\x.jsx:175:    if (!cartData || cartData.length === 0) {
+> pages\PublicMenu\x.jsx:176:      localStorage.removeItem(key);
+  pages\PublicMenu\x.jsx:177:      return;
+  pages\PublicMenu\x.jsx:178:    }
+> pages\PublicMenu\x.jsx:179:    localStorage.setItem(key, JSON.stringify({ items: cartData, ts: Date.now() }));
+  pages\PublicMenu\x.jsx:180:  } catch {}
+  pages\PublicMenu\x.jsx:181:};
+  pages\PublicMenu\x.jsx:182:
+  pages\PublicMenu\x.jsx:183:const getCartFromStorage = (partnerId) => {
+  pages\PublicMenu\x.jsx:184:  if (!partnerId) return null;
+  pages\PublicMenu\x.jsx:185:  try {
+  pages\PublicMenu\x.jsx:186:    const key = `menuapp_cart_${partnerId}`;
+> pages\PublicMenu\x.jsx:187:    const raw = localStorage.getItem(key);
+  pages\PublicMenu\x.jsx:188:    if (!raw) return null;
+  pages\PublicMenu\x.jsx:189:    const data = JSON.parse(raw);
+  pages\PublicMenu\x.jsx:190:    // Migrate legacy format (plain array) — accept but rewrite with timestamp
+codex
+I’ve reached the targeted section in `handleCardTap`. The file already contains the two requested edits, so I’m verifying whether anything in those exact fix paths is still broken before I write the scoped report.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=1968; $end=1988; for($i=$start; $i -le $end; $i++){ '"'{0,5}: {1}' -f "'$i, $lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=1798; $end=1822; for($i=$start; $i -le $end; $i++){ '"'{0,5}: {1}' -f "'$i, $lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 7.65s:
+ 1968:   // HD-05: Persist requestStates to localStorage on change
+ 1969:   useEffect(() => {
+ 1970:     if (!currentTableId || !hasLoadedHelpStatesRef.current) return; // HD-10: skip until load completes
+ 1971:     const key = `helpdrawer_${currentTableId}`;
+ 1972:     const persistable = {};
+ 1973:     for (const [type, state] of Object.entries(requestStates)) {
+ 1974:       if (type === 'other' && Array.isArray(state)) {
+ 1975:         const activeOthers = state.filter(e => e.status === 'pending' || e.status === 'repeat');
+ 1976:         if (activeOthers.length > 0) persistable.other = activeOthers;
+ 1977:         continue;
+ 1978:       }
+ 1979:       if (state && (state.status === 'pending' || state.status === 'repeat')) {
+ 1980:         persistable[type] = state;
+ 1981:       }
+ 1982:     }
+ 1983:     if (Object.keys(persistable).length === 0) {
+ 1984:       localStorage.removeItem(key);
+ 1985:     } else {
+ 1986:       localStorage.setItem(key, JSON.stringify(persistable));
+ 1987:     }
+ succeeded in 7.74s:
+ 1798:     setHelpComment('');
+ 1799:     // Clean up any pending undo timeout
+ 1800:     if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId);
+ 1801:     setUndoToast(null);
+ 1802:   }, [popOverlay, setHelpComment, undoToast]);
+ 1803: 
+ 1804:   // HD-01 + HD-06: Card tap with 5s undo delay before actual server send
+ 1805:   const handleCardTap = useCallback((type) => {
+ 1806:     // HD-17b: Do NOT cancel previous card's timer â€” both must fire independently
+ 1807: 
+ 1808:     // Set card to sending visually immediately
+ 1809:     setRequestStates(prev => ({ ...prev, [type]: { status: 'sending', sentAt: Date.now(), lastReminderAt: null, reminderCount: 0, remindCooldownUntil: null } }));
+ 1810: 
+ 1811:     // Schedule actual send after 5s (undo window)
+ 1812:     const timeoutId = setTimeout(() => {
+ 1813:       // Actually send to server via existing hook chain
+ 1814:       pendingQuickSendRef.current = type;
+ 1815:       handlePresetSelect(type);
+ 1816:       setIsHelpModalOpen(true); // HD-17a: re-open drawer after handlePresetSelect closes it
+ 1817:       setUndoToast(null);
+codex
+The current `handleCardTap` path is mostly aligned with the requested patch, but I’m checking one interaction the task text doesn’t spell out: multi-tap still uses a single global `undoToast`, so older timers can interfere with the latest toast and close flow.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=1688; $end=1710; for($i=$start; $i -le $end; $i++){ '"'{0,5}: {1}' -f "'$i, $lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'const \\[undoToast|setUndoToast\\(|undoToast\\?.timeoutId|undoToast\\.' -Context 2,3" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.97s:
+ 1688:           continue;
+ 1689:         }
+ 1690:         const cooldownMs = (HELP_COOLDOWN_SECONDS[type] || 120) * 1000;
+ 1691:         if ((state.status === 'pending' || state.status === 'repeat') && state.sentAt) {
+ 1692:           const elapsed = now - state.sentAt;
+ 1693:           if (elapsed < cooldownMs + 60000) {
+ 1694:             updated[type] = elapsed >= cooldownMs
+ 1695:               ? { ...state, status: 'repeat' }
+ 1696:               : { ...state };
+ 1697:           }
+ 1698:         }
+ 1699:       }
+ 1700:       if (Object.keys(updated).length > 0) {
+ 1701:         setRequestStates(updated);
+ 1702:       }
+ 1703:     } catch (e) { /* ignore corrupted storage */ }
+ 1704:     hasLoadedHelpStatesRef.current = true;
+ 1705:   }, [currentTableId, HELP_COOLDOWN_SECONDS]);
+ 1706:   // Structure: { call_waiter: { status: 'idle'|'sending'|'pending'|'repeat', sentAt, lastReminderAt, reminderCount, remindCooldownUntil, message? }, other: [...array of entries...] }
+ 1707:   const [undoToast, setUndoToast] = useState(null); // { type, expiresAt, timeoutId }
+ succeeded in 2.98s:
+
+  pages\PublicMenu\x.jsx:1705:  }, [currentTableId, HELP_COOLDOWN_SECONDS]);
+  pages\PublicMenu\x.jsx:1706:  // Structure: { call_waiter: { status: 'idle'|'sending'|'pending'|'repeat', sentAt, 
+lastReminderAt, reminderCount, remindCooldownUntil, message? }, other: [...array of entries...] }
+> pages\PublicMenu\x.jsx:1707:  const [undoToast, setUndoToast] = useState(null); // { type, expiresAt, timeoutId }
+  pages\PublicMenu\x.jsx:1708:  const [showOtherForm, setShowOtherForm] = useState(false);
+  pages\PublicMenu\x.jsx:1709:  const [timerTick, setTimerTick] = useState(0);
+  pages\PublicMenu\x.jsx:1710:  const pendingQuickSendRef = useRef(null);
+  pages\PublicMenu\x.jsx:1786:    setShowOtherForm(false);
+  pages\PublicMenu\x.jsx:1787:    setHelpComment('');
+> pages\PublicMenu\x.jsx:1788:    setUndoToast(null);
+  pages\PublicMenu\x.jsx:1789:    setIsHelpModalOpen(true);
+  pages\PublicMenu\x.jsx:1790:    pushOverlay('help');
+  pages\PublicMenu\x.jsx:1791:  }, [pushOverlay, currentTableId, setShowTableConfirmSheet, setHelpComment, 
+HELP_COOLDOWN_SECONDS]);
+  pages\PublicMenu\x.jsx:1798:    setHelpComment('');
+  pages\PublicMenu\x.jsx:1799:    // Clean up any pending undo timeout
+> pages\PublicMenu\x.jsx:1800:    if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId);
+> pages\PublicMenu\x.jsx:1801:    setUndoToast(null);
+  pages\PublicMenu\x.jsx:1802:  }, [popOverlay, setHelpComment, undoToast]);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'pendingQuickSendRef' -Context 2,4" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.60s:
+
+  pages\PublicMenu\x.jsx:1708:  const [showOtherForm, setShowOtherForm] = useState(false);
+  pages\PublicMenu\x.jsx:1709:  const [timerTick, setTimerTick] = useState(0);
+> pages\PublicMenu\x.jsx:1710:  const pendingQuickSendRef = useRef(null);
+  pages\PublicMenu\x.jsx:1711:  const ticketBoardRef = useRef(null); // Fix 3: ref for scroll-to-ticket-board
+  pages\PublicMenu\x.jsx:1712:  const [highlightedTicket, setHighlightedTicket] = useState(null); // Fix 3: amber 
+highlight on re-tap
+  pages\PublicMenu\x.jsx:1713:  const [isTicketExpanded, setIsTicketExpanded] = useState(false); // Fix 6: collapse 
+toggle
+  pages\PublicMenu\x.jsx:1714:
+  pages\PublicMenu\x.jsx:1812:    const timeoutId = setTimeout(() => {
+  pages\PublicMenu\x.jsx:1813:      // Actually send to server via existing hook chain
+> pages\PublicMenu\x.jsx:1814:      pendingQuickSendRef.current = type;
+  pages\PublicMenu\x.jsx:1815:      handlePresetSelect(type);
+  pages\PublicMenu\x.jsx:1816:      setIsHelpModalOpen(true); // HD-17a: re-open drawer after handlePresetSelect 
+closes it
+  pages\PublicMenu\x.jsx:1817:      setUndoToast(null);
+  pages\PublicMenu\x.jsx:1818:    }, 5000);
+  pages\PublicMenu\x.jsx:1853:    });
+  pages\PublicMenu\x.jsx:1854:    // Send reminder immediately (no undo)
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=1873; $end=1912; for($i=$start; $i -le $end; $i++){ '"'{0,5}: {1}' -f "'$i, $lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 6.28s:
+ 1873:   // HD-01: Auto-submit when selectedHelpType matches pending quick send
+ 1874:   useEffect(() => {
+ 1875:     if (pendingQuickSendRef.current && selectedHelpType === pendingQuickSendRef.current) {
+ 1876:       const type = pendingQuickSendRef.current;
+ 1877:       pendingQuickSendRef.current = null;
+ 1878:       const result = submitHelpRequest();
+ 1879:       const onSuccess = () => {
+ 1880:         setRequestStates(prev => {
+ 1881:           if (type === 'other' && Array.isArray(prev.other)) {
+ 1882:             // Mark the latest sending entry as pending
+ 1883:             const otherArr = prev.other.map(e => e.status === 'sending' ? { ...e, status: 'pending' } : e);
+ 1884:             return { ...prev, other: otherArr };
+ 1885:           }
+ 1886:           return { ...prev, [type]: { ...prev[type], status: 'pending', sentAt: prev[type]?.sentAt || Date.now(), lastReminderAt: prev[type]?.lastReminderAt || null, reminderCount: prev[type]?.reminderCount || 0, remindCooldownUntil: prev[type]?.remindCooldownUntil || null } };
+ 1887:         });
+ 1888:       };
+ 1889:       const onError = () => {
+ 1890:         setRequestStates(prev => {
+ 1891:           if (type === 'other' && Array.isArray(prev.other)) {
+ 1892:             // Remove sending entries on error
+codex
+I found two scoped regressions in the current multi-tap flow: the older timer can clear the latest undo toast early, and in multi-tap + dismiss the older timer can reopen the drawer after an explicit close. I’m writing the report now to the pipeline path and mirroring it into the page folder with a command log.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command 'Test-Path pipeline/chain-state' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command 'Test-Path pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 28.92s:
+True
+ succeeded in 28.99s:
+True
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260401-125045-ef92
+
+## Findings
+1. [P1] Older timer clears the newest undo window — `undoToast` is still a single global state at `pages/PublicMenu/x.jsx:1707`, and each `handleCardTap` timeout unconditionally runs `setUndoToast(null)` at `pages/PublicMenu/x.jsx:1817`. After tapping card A and then card B, card A's timer clears card B's toast before card B's own 5-second delay finishes, so the second request no longer has its full undo window. FIX: clear the toast only if the currently displayed toast still belongs to that same timer/type, for example with a functional `setUndoToast` guard keyed by `timeoutId`.
+2. [P1] Multi-tap + explicit dismiss can reopen the drawer without user action — `handleCardTap` now allows multiple timers to stay active, but `closeHelpDrawer` still cancels only the current `undoToast.timeoutId` at `pages/PublicMenu/x.jsx:1800`. If the guest taps two cards and then dismisses the drawer, the older hidden timer still fires and forces `setIsHelpModalOpen(true)` at `pages/PublicMenu/x.jsx:1816`, reopening the drawer after the user explicitly closed it. FIX: when multiple quick-send timers are allowed, either cancel all outstanding timers on dismiss or guard the forced reopen so it only happens if the drawer remained open through the countdown.
+
+## Summary
+Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-04-01.log
+Get-ChildItem -Name pages/PublicMenu  # timed out
+(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines  # timed out
+Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name  # timed out
+Get-Content pages/PublicMenu/x.jsx -TotalCount 5  # timed out
+Get-Location  # timed out
+Get-Location
+Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
+(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
+Get-Content pages/PublicMenu/README.md
+Get-Content pages/PublicMenu/BUGS.md
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'handleCardTap|handlePresetSelect|setIsHelpModalOpen|clearTimeout\(undoToast\.timeoutId\)|pendingQuickSendRef\.current = type|localStorage' -Context 4,6
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=1798; $end=1822; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=1968; $end=1988; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'const \[undoToast|setUndoToast\(|undoToast\?.timeoutId|undoToast\.' -Context 2,3
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=1688; $end=1710; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'pendingQuickSendRef' -Context 2,4
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=1873; $end=1912; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+Test-Path pipeline/chain-state
+Test-Path pages/PublicMenu
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-04-01.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260401-125045-ef92
+
+## Findings
+1. [P1] Older timer clears the newest undo window — `undoToast` is still a single global state at `pages/PublicMenu/x.jsx:1707`, and each `handleCardTap` timeout unconditionally runs `setUndoToast(null)` at `pages/PublicMenu/x.jsx:1817`. After tapping card A and then card B, card A's timer clears card B's toast before card B's own 5-second delay finishes, so the second request no longer has its full undo window. FIX: clear the toast only if the currently displayed toast still belongs to that same timer/type, for example with a functional `setUndoToast` guard keyed by `timeoutId`.
+2. [P1] Multi-tap + explicit dismiss can reopen the drawer without user action — `handleCardTap` now allows multiple timers to stay active, but `closeHelpDrawer` still cancels only the current `undoToast.timeoutId` at `pages/PublicMenu/x.jsx:1800`. If the guest taps two cards and then dismisses the drawer, the older hidden timer still fires and forces `setIsHelpModalOpen(true)` at `pages/PublicMenu/x.jsx:1816`, reopening the drawer after the user explicitly closed it. FIX: when multiple quick-send timers are allowed, either cancel all outstanding timers on dismiss or guard the forced reopen so it only happens if the drawer remained open through the countdown.
+
+## Summary
+Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+apply_patch(auto_approved=true) exited 0 in 4.08s:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md
+A pages/PublicMenu/review_2026-04-01.md
+A pages/PublicMenu/commands_2026-04-01.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-04-01.log b/pages/PublicMenu/commands_2026-04-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..6ee9f292a3e8b6537fa202d22be3b04ab0eeb0d1
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-04-01.log
+@@ -0,0 +1,19 @@
++Get-ChildItem -Name pages/PublicMenu  # timed out
++(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines  # timed out
++Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name  # timed out
++Get-Content pages/PublicMenu/x.jsx -TotalCount 5  # timed out
++Get-Location  # timed out
++Get-Location
++Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
++(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'handleCardTap|handlePresetSelect|setIsHelpModalOpen|clearTimeout\(undoToast\.timeoutId\)|pendingQuickSendRef\.current = type|localStorage' -Context 4,6
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1798; $end=1822; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1968; $end=1988; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'const \[undoToast|setUndoToast\(|undoToast\?.timeoutId|undoToast\.' -Context 2,3
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1688; $end=1710; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'pendingQuickSendRef' -Context 2,4
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1873; $end=1912; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++Test-Path pipeline/chain-state
++Test-Path pages/PublicMenu
+diff --git a/pages/PublicMenu/review_2026-04-01.md b/pages/PublicMenu/review_2026-04-01.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3b27c34e54de9d9431ca965ea6b5edeb6c447224
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-04-01.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260401-125045-ef92
++
++## Findings
++1. [P1] Older timer clears the newest undo window — `undoToast` is still a single global state at `pages/PublicMenu/x.jsx:1707`, and each `handleCardTap` timeout unconditionally runs `setUndoToast(null)` at `pages/PublicMenu/x.jsx:1817`. After tapping card A and then card B, card A's timer clears card B's toast before card B's own 5-second delay finishes, so the second request no longer has its full undo window. FIX: clear the toast only if the currently displayed toast still belongs to that same timer/type, for example with a functional `setUndoToast` guard keyed by `timeoutId`.
++2. [P1] Multi-tap + explicit dismiss can reopen the drawer without user action — `handleCardTap` now allows multiple timers to stay active, but `closeHelpDrawer` still cancels only the current `undoToast.timeoutId` at `pages/PublicMenu/x.jsx:1800`. If the guest taps two cards and then dismisses the drawer, the older hidden timer still fires and forces `setIsHelpModalOpen(true)` at `pages/PublicMenu/x.jsx:1816`, reopening the drawer after the user explicitly closed it. FIX: when multiple quick-send timers are allowed, either cancel all outstanding timers on dismiss or guard the forced reopen so it only happens if the drawer remained open through the countdown.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md b/pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3b27c34e54de9d9431ca965ea6b5edeb6c447224
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260401-125045-ef92
++
++## Findings
++1. [P1] Older timer clears the newest undo window — `undoToast` is still a single global state at `pages/PublicMenu/x.jsx:1707`, and each `handleCardTap` timeout unconditionally runs `setUndoToast(null)` at `pages/PublicMenu/x.jsx:1817`. After tapping card A and then card B, card A's timer clears card B's toast before card B's own 5-second delay finishes, so the second request no longer has its full undo window. FIX: clear the toast only if the currently displayed toast still belongs to that same timer/type, for example with a functional `setUndoToast` guard keyed by `timeoutId`.
++2. [P1] Multi-tap + explicit dismiss can reopen the drawer without user action — `handleCardTap` now allows multiple timers to stay active, but `closeHelpDrawer` still cancels only the current `undoToast.timeoutId` at `pages/PublicMenu/x.jsx:1800`. If the guest taps two cards and then dismisses the drawer, the older hidden timer still fires and forces `setIsHelpModalOpen(true)` at `pages/PublicMenu/x.jsx:1816`, reopening the drawer after the user explicitly closed it. FIX: when multiple quick-send timers are allowed, either cancel all outstanding timers on dismiss or guard the forced reopen so it only happens if the drawer remained open through the countdown.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-04-01.log b/pages/PublicMenu/commands_2026-04-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..6ee9f292a3e8b6537fa202d22be3b04ab0eeb0d1
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-04-01.log
+@@ -0,0 +1,19 @@
++Get-ChildItem -Name pages/PublicMenu  # timed out
++(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines  # timed out
++Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name  # timed out
++Get-Content pages/PublicMenu/x.jsx -TotalCount 5  # timed out
++Get-Location  # timed out
++Get-Location
++Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
++(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'handleCardTap|handlePresetSelect|setIsHelpModalOpen|clearTimeout\(undoToast\.timeoutId\)|pendingQuickSendRef\.current = type|localStorage' -Context 4,6
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1798; $end=1822; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1968; $end=1988; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'const \[undoToast|setUndoToast\(|undoToast\?.timeoutId|undoToast\.' -Context 2,3
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1688; $end=1710; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'pendingQuickSendRef' -Context 2,4
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1873; $end=1912; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++Test-Path pipeline/chain-state
++Test-Path pages/PublicMenu
+diff --git a/pages/PublicMenu/review_2026-04-01.md b/pages/PublicMenu/review_2026-04-01.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3b27c34e54de9d9431ca965ea6b5edeb6c447224
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-04-01.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260401-125045-ef92
++
++## Findings
++1. [P1] Older timer clears the newest undo window — `undoToast` is still a single global state at `pages/PublicMenu/x.jsx:1707`, and each `handleCardTap` timeout unconditionally runs `setUndoToast(null)` at `pages/PublicMenu/x.jsx:1817`. After tapping card A and then card B, card A's timer clears card B's toast before card B's own 5-second delay finishes, so the second request no longer has its full undo window. FIX: clear the toast only if the currently displayed toast still belongs to that same timer/type, for example with a functional `setUndoToast` guard keyed by `timeoutId`.
++2. [P1] Multi-tap + explicit dismiss can reopen the drawer without user action — `handleCardTap` now allows multiple timers to stay active, but `closeHelpDrawer` still cancels only the current `undoToast.timeoutId` at `pages/PublicMenu/x.jsx:1800`. If the guest taps two cards and then dismisses the drawer, the older hidden timer still fires and forces `setIsHelpModalOpen(true)` at `pages/PublicMenu/x.jsx:1816`, reopening the drawer after the user explicitly closed it. FIX: when multiple quick-send timers are allowed, either cancel all outstanding timers on dismiss or guard the forced reopen so it only happens if the drawer remained open through the countdown.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md b/pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3b27c34e54de9d9431ca965ea6b5edeb6c447224
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260401-125045-ef92
++
++## Findings
++1. [P1] Older timer clears the newest undo window — `undoToast` is still a single global state at `pages/PublicMenu/x.jsx:1707`, and each `handleCardTap` timeout unconditionally runs `setUndoToast(null)` at `pages/PublicMenu/x.jsx:1817`. After tapping card A and then card B, card A's timer clears card B's toast before card B's own 5-second delay finishes, so the second request no longer has its full undo window. FIX: clear the toast only if the currently displayed toast still belongs to that same timer/type, for example with a functional `setUndoToast` guard keyed by `timeoutId`.
++2. [P1] Multi-tap + explicit dismiss can reopen the drawer without user action — `handleCardTap` now allows multiple timers to stay active, but `closeHelpDrawer` still cancels only the current `undoToast.timeoutId` at `pages/PublicMenu/x.jsx:1800`. If the guest taps two cards and then dismisses the drawer, the older hidden timer still fires and forces `setIsHelpModalOpen(true)` at `pages/PublicMenu/x.jsx:1816`, reopening the drawer after the user explicitly closed it. FIX: when multiple quick-send timers are allowed, either cancel all outstanding timers on dismiss or guard the forced reopen so it only happens if the drawer remained open through the countdown.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+The scoped report and required repo-side artifacts are in place. I’m doing one quick read-back of the findings file paths, then I’ll give you the concise result.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command 'Get-Content pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command 'Get-Content pages/PublicMenu/commands_2026-04-01.log' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 16.65s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260401-125045-ef92
+
+## Findings
+1. [P1] Older timer clears the newest undo window â€” `undoToast` is still a single global state at `pages/PublicMenu/x.jsx:1707`, and each `handleCardTap` timeout unconditionally runs `setUndoToast(null)` at `pages/PublicMenu/x.jsx:1817`. After tapping card A and then card B, card A's timer clears card B's toast before card B's own 5-second delay finishes, so the second request no longer has its full undo window. FIX: clear the toast only if the currently displayed toast still belongs to that same timer/type, for example with a functional `setUndoToast` guard keyed by `timeoutId`.
+2. [P1] Multi-tap + explicit dismiss can reopen the drawer without user action â€” `handleCardTap` now allows multiple timers to stay active, but `closeHelpDrawer` still cancels only the current `undoToast.timeoutId` at `pages/PublicMenu/x.jsx:1800`. If the guest taps two cards and then dismisses the drawer, the older hidden timer still fires and forces `setIsHelpModalOpen(true)` at `pages/PublicMenu/x.jsx:1816`, reopening the drawer after the user explicitly closed it. FIX: when multiple quick-send timers are allowed, either cancel all outstanding timers on dismiss or guard the forced reopen so it only happens if the drawer remained open through the countdown.
+
+## Summary
+Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY â€” do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+ succeeded in 16.75s:
+Get-ChildItem -Name pages/PublicMenu  # timed out
+(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines  # timed out
+Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name  # timed out
+Get-Content pages/PublicMenu/x.jsx -TotalCount 5  # timed out
+Get-Location  # timed out
+Get-Location
+Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
+(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
+Get-Content pages/PublicMenu/README.md
+Get-Content pages/PublicMenu/BUGS.md
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'handleCardTap|handlePresetSelect|setIsHelpModalOpen|clearTimeout\(undoToast\.timeoutId\)|pendingQuickSendRef\.current = type|localStorage' -Context 4,6
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=1798; $end=1822; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=1968; $end=1988; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'const \[undoToast|setUndoToast\(|undoToast\?.timeoutId|undoToast\.' -Context 2,3
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=1688; $end=1710; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'pendingQuickSendRef' -Context 2,4
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=1873; $end=1912; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+Test-Path pipeline/chain-state
+Test-Path pages/PublicMenu
+file update:
+diff --git a/pages/PublicMenu/commands_2026-04-01.log b/pages/PublicMenu/commands_2026-04-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..6ee9f292a3e8b6537fa202d22be3b04ab0eeb0d1
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-04-01.log
+@@ -0,0 +1,19 @@
++Get-ChildItem -Name pages/PublicMenu  # timed out
++(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines  # timed out
++Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name  # timed out
++Get-Content pages/PublicMenu/x.jsx -TotalCount 5  # timed out
++Get-Location  # timed out
++Get-Location
++Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
++(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'handleCardTap|handlePresetSelect|setIsHelpModalOpen|clearTimeout\(undoToast\.timeoutId\)|pendingQuickSendRef\.current = type|localStorage' -Context 4,6
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1798; $end=1822; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1968; $end=1988; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'const \[undoToast|setUndoToast\(|undoToast\?.timeoutId|undoToast\.' -Context 2,3
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1688; $end=1710; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'pendingQuickSendRef' -Context 2,4
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1873; $end=1912; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++Test-Path pipeline/chain-state
++Test-Path pages/PublicMenu
+diff --git a/pages/PublicMenu/review_2026-04-01.md b/pages/PublicMenu/review_2026-04-01.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3b27c34e54de9d9431ca965ea6b5edeb6c447224
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-04-01.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260401-125045-ef92
++
++## Findings
++1. [P1] Older timer clears the newest undo window — `undoToast` is still a single global state at `pages/PublicMenu/x.jsx:1707`, and each `handleCardTap` timeout unconditionally runs `setUndoToast(null)` at `pages/PublicMenu/x.jsx:1817`. After tapping card A and then card B, card A's timer clears card B's toast before card B's own 5-second delay finishes, so the second request no longer has its full undo window. FIX: clear the toast only if the currently displayed toast still belongs to that same timer/type, for example with a functional `setUndoToast` guard keyed by `timeoutId`.
++2. [P1] Multi-tap + explicit dismiss can reopen the drawer without user action — `handleCardTap` now allows multiple timers to stay active, but `closeHelpDrawer` still cancels only the current `undoToast.timeoutId` at `pages/PublicMenu/x.jsx:1800`. If the guest taps two cards and then dismisses the drawer, the older hidden timer still fires and forces `setIsHelpModalOpen(true)` at `pages/PublicMenu/x.jsx:1816`, reopening the drawer after the user explicitly closed it. FIX: when multiple quick-send timers are allowed, either cancel all outstanding timers on dismiss or guard the forced reopen so it only happens if the drawer remained open through the countdown.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md b/pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3b27c34e54de9d9431ca965ea6b5edeb6c447224
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260401-125045-ef92
++
++## Findings
++1. [P1] Older timer clears the newest undo window — `undoToast` is still a single global state at `pages/PublicMenu/x.jsx:1707`, and each `handleCardTap` timeout unconditionally runs `setUndoToast(null)` at `pages/PublicMenu/x.jsx:1817`. After tapping card A and then card B, card A's timer clears card B's toast before card B's own 5-second delay finishes, so the second request no longer has its full undo window. FIX: clear the toast only if the currently displayed toast still belongs to that same timer/type, for example with a functional `setUndoToast` guard keyed by `timeoutId`.
++2. [P1] Multi-tap + explicit dismiss can reopen the drawer without user action — `handleCardTap` now allows multiple timers to stay active, but `closeHelpDrawer` still cancels only the current `undoToast.timeoutId` at `pages/PublicMenu/x.jsx:1800`. If the guest taps two cards and then dismisses the drawer, the older hidden timer still fires and forces `setIsHelpModalOpen(true)` at `pages/PublicMenu/x.jsx:1816`, reopening the drawer after the user explicitly closed it. FIX: when multiple quick-send timers are allowed, either cancel all outstanding timers on dismiss or guard the forced reopen so it only happens if the drawer remained open through the countdown.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+Scoped review is complete. I saved the findings to [publicmenu-260401-125045-ef92-codex-findings.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md), mirrored the report to [review_2026-04-01.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-04-01.md), and saved the command log to [commands_2026-04-01.log](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-04-01.log).
+
+I reported 2 scoped P1 findings only:
+1. Older multi-tap timers still clear the newest undo toast early, so the second tap loses part of its 5-second undo window.
+2. In multi-tap + explicit dismiss, an older hidden timer can still reopen the drawer later because only the latest timeout is canceled on close.
+
+No code changes were applied.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-04-01.log b/pages/PublicMenu/commands_2026-04-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..6ee9f292a3e8b6537fa202d22be3b04ab0eeb0d1
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-04-01.log
+@@ -0,0 +1,19 @@
++Get-ChildItem -Name pages/PublicMenu  # timed out
++(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines  # timed out
++Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name  # timed out
++Get-Content pages/PublicMenu/x.jsx -TotalCount 5  # timed out
++Get-Location  # timed out
++Get-Location
++Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
++(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'handleCardTap|handlePresetSelect|setIsHelpModalOpen|clearTimeout\(undoToast\.timeoutId\)|pendingQuickSendRef\.current = type|localStorage' -Context 4,6
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1798; $end=1822; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1968; $end=1988; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'const \[undoToast|setUndoToast\(|undoToast\?.timeoutId|undoToast\.' -Context 2,3
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1688; $end=1710; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'pendingQuickSendRef' -Context 2,4
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1873; $end=1912; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
++Test-Path pipeline/chain-state
++Test-Path pages/PublicMenu
+diff --git a/pages/PublicMenu/review_2026-04-01.md b/pages/PublicMenu/review_2026-04-01.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3b27c34e54de9d9431ca965ea6b5edeb6c447224
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-04-01.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260401-125045-ef92
++
++## Findings
++1. [P1] Older timer clears the newest undo window — `undoToast` is still a single global state at `pages/PublicMenu/x.jsx:1707`, and each `handleCardTap` timeout unconditionally runs `setUndoToast(null)` at `pages/PublicMenu/x.jsx:1817`. After tapping card A and then card B, card A's timer clears card B's toast before card B's own 5-second delay finishes, so the second request no longer has its full undo window. FIX: clear the toast only if the currently displayed toast still belongs to that same timer/type, for example with a functional `setUndoToast` guard keyed by `timeoutId`.
++2. [P1] Multi-tap + explicit dismiss can reopen the drawer without user action — `handleCardTap` now allows multiple timers to stay active, but `closeHelpDrawer` still cancels only the current `undoToast.timeoutId` at `pages/PublicMenu/x.jsx:1800`. If the guest taps two cards and then dismisses the drawer, the older hidden timer still fires and forces `setIsHelpModalOpen(true)` at `pages/PublicMenu/x.jsx:1816`, reopening the drawer after the user explicitly closed it. FIX: when multiple quick-send timers are allowed, either cancel all outstanding timers on dismiss or guard the forced reopen so it only happens if the drawer remained open through the countdown.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md b/pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3b27c34e54de9d9431ca965ea6b5edeb6c447224
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260401-125045-ef92
++
++## Findings
++1. [P1] Older timer clears the newest undo window — `undoToast` is still a single global state at `pages/PublicMenu/x.jsx:1707`, and each `handleCardTap` timeout unconditionally runs `setUndoToast(null)` at `pages/PublicMenu/x.jsx:1817`. After tapping card A and then card B, card A's timer clears card B's toast before card B's own 5-second delay finishes, so the second request no longer has its full undo window. FIX: clear the toast only if the currently displayed toast still belongs to that same timer/type, for example with a functional `setUndoToast` guard keyed by `timeoutId`.
++2. [P1] Multi-tap + explicit dismiss can reopen the drawer without user action — `handleCardTap` now allows multiple timers to stay active, but `closeHelpDrawer` still cancels only the current `undoToast.timeoutId` at `pages/PublicMenu/x.jsx:1800`. If the guest taps two cards and then dismisses the drawer, the older hidden timer still fires and forces `setIsHelpModalOpen(true)` at `pages/PublicMenu/x.jsx:1816`, reopening the drawer after the user explicitly closed it. FIX: when multiple quick-send timers are allowed, either cancel all outstanding timers on dismiss or guard the forced reopen so it only happens if the drawer remained open through the countdown.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+tokens used
+126 446
+Scoped review is complete. I saved the findings to [publicmenu-260401-125045-ef92-codex-findings.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260401-125045-ef92-codex-findings.md), mirrored the report to [review_2026-04-01.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-04-01.md), and saved the command log to [commands_2026-04-01.log](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-04-01.log).
+
+I reported 2 scoped P1 findings only:
+1. Older multi-tap timers still clear the newest undo toast early, so the second tap loses part of its 5-second undo window.
+2. In multi-tap + explicit dismiss, an older hidden timer can still reopen the drawer later because only the latest timeout is canceled on close.
+
+No code changes were applied.

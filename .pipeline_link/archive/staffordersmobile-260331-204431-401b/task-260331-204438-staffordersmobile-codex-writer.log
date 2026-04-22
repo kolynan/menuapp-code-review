@@ -1,0 +1,577 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d4491-8fb4-71e0-96be-ee844c91e48f
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/staffordersmobile-260331-204431-401b-codex-findings.md FORMAT: # Codex Writer Findings — StaffOrdersMobile Chain: staffordersmobile-260331-204431-401b ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # SOM-S210-01: Verb-first per-card buttons + Undo toast Target file: `pages/StaffOrdersMobile/staffordersmobile.jsx` (~4133 lines) ## Fix 1 — Verb-first per-card footer button labels Pattern to find (4 occurrences, ~lines 1808, 1885, 1963, 2053): ```bash grep -n "dishWord\|\u0412\u0441\u0435.*\u0431\u043b\u044e\u0434" pages/StaffOrdersMobile/staffordersmobile.jsx ``` Replace `\u0412\u0441\u0435 ${n} ${dishWord}` with: ```jsx n > 0 ? config.isFinishStage ? `\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})` : `${(config.actionLabel || '').replace(/^\u2192\s*/, '')} \u0432\u0441\u0451 (${n})` : (config.isFinishStage ? '\u0412\u044B\u0434\u0430\u0442\u044C' : (config.actionLabel || '\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435').replace(/^\u2192\s*/, '')) ``` Where `config = getStatusConfig(orders[0])` (check actual variable name at each call site). НЕ должно быть: group header buttons FROZEN, inline per-row buttons FROZEN. ## Fix 2 — Undo toast after finish-stage batch action State (add to TableCard): ```jsx const [undoToast, setUndoToast] = React.useState(null); ``` Trigger (finish-stage button click only, config.isFinishStage === true): ```jsx const snapshots = orders.map(o => ({ orderId: o.id, prevStatus: o.status, prevStageId: o.stage_id ? getLinkId(o.stage_id) : null })); handleBatchAction(orders); if (undoToast?.timerId) clearTimeout(undoToast.timerId); const timerId = setTimeout(() => setUndoToast(null), 5000); setUndoToast({ snapshots, timerId }); ``` Undo handler: ```jsx const handleUndo = () => { if (!undoToast) return; clearTimeout(undoToast.timerId); undoToast.snapshots.forEach(({ orderId, prevStatus, prevStageId }) => { const payload = { status: prevStatus }; if (prevStageId) payload.stage_id = prevStageId; updateOrder(orderId, payload); }); setUndoToast(null); }; ``` Toast JSX (inside TableCard, before closing div): ```jsx {undoToast && ( <div className="flex items-center justify-between bg-slate-800 text-white text-xs rounded-lg px-3 py-2 mt-2 mx-1"> <span>{'\u0412\u044B\u0434\u0430\u043D \u0433\u043E\u0441\u0442\u044E'}</span> <button onClick={handleUndo} className="ml-3 font-semibold text-amber-300 underline">{'\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C'}</button> </div> )} ``` ## FROZEN UX (DO NOT CHANGE) - Row 1/2/3 (collapsed card) — FROZEN - Expanded sections ЗАПРОСЫ/НОВЫЕ/ГОТОВО К ВЫДАЧЕ/В РАБОТЕ — FROZEN - Sub-grouping В РАБОТЕ + auto-expand — FROZEN (SOM-S208-01 S210) - Inline action buttons per row — FROZEN (#168 S207) - Group header buttons «Принять все»/«Выдать все» — FROZEN (#5 S207) ## SCOPE LOCK Modify ONLY: 4 button label expressions + undoToast state + handleUndo + toast JSX. Do NOT change handleBatchAction logic, computeTableStatus, getStatusConfig, Row 1/2/3. ## Implementation Notes - Russian strings → unicode escapes - getStatusConfig available via closure; getLinkId helper exists - handleBatchAction at ~line 1541 — find actual update fn name there ## MOBILE-FIRST CHECK (MANDATORY before commit) - [ ] «Принять всё (2)» fits one line at 375px - [ ] Undo toast visible, «Отменить» touch target ≥ 44px ## Regression Check (MANDATORY after implementation) - [ ] Collapsed card expands; Row 1 Clock+name+elapsed unchanged - [ ] Group headers «Принять все»/«Выдать все» unchanged - [ ] Inline row buttons unchanged; sub-grouping В РАБОТЕ unchanged ## Git ```bash git add pages/StaffOrdersMobile/staffordersmobile.jsx git commit -m "feat(SOM): verb-first per-card buttons + undo toast (SOM-S210-01)" ``` === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/StaffOrdersMobile/staffordersmobile.jsx` plus `README.md` and `BUGS.md` in the same folder, with scope locked to Fix 1 and Fix 2 only. I’m gathering just the local page context and the referenced code paths, then I’ll write the findings file in the required pipeline location.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Force "pages/StaffOrdersMobile" | Select-Object Name,Length,LastWriteTime' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 12.95s:
+
+Plan update
+  → Inspect target page folder and read README/BUGS plus the scoped sections of staffordersmobile.jsx
+  • Assess Fix 1 and Fix 2 only against the requested behavior and frozen areas
+  • Write findings to the pipeline file and required review artifacts
+codex
+The folder listing command timed out; I’m retrying with a longer timeout and then opening only the page-local files needed for the two fixes. After that I’ll verify whether the requested changes were actually applied and document only those findings.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/StaffOrdersMobile/BUGS.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Force 'pages/StaffOrdersMobile' | Format-Table -Auto Name,Length,LastWriteTime" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/StaffOrdersMobile/README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 20.91s:
+# StaffOrdersMobile Bug Tracker
+
+**Page:** `pages/StaffOrdersMobile/260306-04 StaffOrdersMobile RELEASE.jsx`
+**Last updated:** 2026-03-06 (Session 90 â€” restored from 260305-00 + re-applied SO-S89-01)
+
+---
+
+## Fixed Bugs
+
+### BUG-S66-01 (P1) -- Detail view doesn't open on card tap (Sprint B broken)
+- **Function:** TableDetailScreen render / CSS animation
+- **Root cause:** CSS `translate-x-full` â†’ `translate-x-0` transition with `requestAnimationFrame` timing was unreliable in Base44 platform container. Detail screen mounted but stayed off-screen.
+- **Fix:** Removed slide-in animation entirely. Detail view now shows instantly with `z-50` (above all other content). Swipe-right to close gesture retained.
+- **Commit:** `9b27dfd`
+- **RELEASE:** `260302-05 StaffOrdersMobile RELEASE.jsx`
+- **Status:** FIXED
+
+### BUG-S66-02 (P1) -- No CTA button on PREPARING card
+- **Function:** computeGroupCTA
+- **Root cause:** `computeGroupCTA` returned `null` for all PREPARING status cards (by Sprint A design V2-06). Orders in middle stages (kitchen working) had no action button, preventing waiter from advancing them.
+ succeeded in 23.52s:
+
+Name                                    Length LastWriteTime        
+----                                    ------ -------------        
+versions                                       3/31/2026 5:21:44 AM 
+260329-01 StaffOrdersMobile RELEASE.jsx 160868 3/29/2026 6:05:07 PM 
+260329-02 StaffOrdersMobile RELEASE.jsx 160868 3/29/2026 10:23:26 PM
+260331-00 StaffOrdersMobile RELEASE.jsx 177925 3/31/2026 5:21:44 AM 
+260331-01 StaffOrdersMobile RELEASE.jsx 177925 3/31/2026 11:50:58 AM
+Audit_FunctionalMap_S70.md              27851  3/2/2026 11:28:29 PM 
+BUGS.md                                 21038  3/31/2026 5:09:55 AM 
+DeepAnalysis_S70.md                     27883  3/3/2026 12:26:26 AM 
+StaffOrdersMobile README.md             7804   3/6/2026 4:02:02 PM  
+staffordersmobile.jsx                   178034 3/31/2026 11:49:32 AM
+staffordersmobile_v1.0_BASE.jsx         115552 2/24/2026 3:41:26 PM 
+TEST_PLAN.md                            5536   3/2/2026 4:00:46 PM  
+TEST_PLAN_PM158_S197.md                 3376   3/29/2026 4:14:30 PM 
+TEST_PLAN_SOM_S211.md                   5893   3/31/2026 5:21:43 PM 
+
+
+ exited 1 in 23.23s:
+Get-Content : Cannot find path 'C:\Users\ASUS\Dev\Menu AI 
+Cowork\menuapp-code-review\pages\StaffOrdersMobile\README.md' because it does not exist.
+At line:2 char:1
++ Get-Content -Raw 'pages/StaffOrdersMobile/README.md'
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (C:\Users\ASUS\D...obile\README.md:String) [Get-Content], ItemNotFoundEx 
+   ception
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+codex
+I’ve got the page-local bug tracker. Next I’m reading the page README and the exact `staffordersmobile.jsx` sections tied to the four label expressions and the undo-toast flow so I can assess only Fix 1 and Fix 2.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$start=1490; $end=1595; $lines=Get-Content $path; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ '"'{0,5}: {1}' -f "'$i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$ranges=@(@{s=1770;e=1835},@{s=1860;e=1908},@{s=1940;e=1988},@{s=2030;e=2085}); $lines=Get-Content $path; foreach($r in $ranges){ "--- RANGE $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '"'{0,5}: {1}' -f "'$i,$lines[$i-1] } } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'undoToast|handleUndo|dishWord|Выдан гостю|Отменить|actionLabel \\|\\||Выдать всё|Принять всё' | ForEach-Object { '{0}:{1}' -f "'$_.LineNumber,$_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 28.79s:
+--- RANGE 1770-1835 ---
+ 1770:                       key={order.id}
+ 1771:                       className={`p-2.5 rounded-lg border cursor-pointer transition-colors ${isSelected ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+ 1772:                       onClick={() => setSelectedOrderId(order.id)}
+ 1773:                     >
+ 1774:                       <div className="flex items-center justify-between mb-1">
+ 1775:                         <div className="flex items-center gap-2">
+ 1776:                           <span className="text-sm font-medium text-slate-800">{guestName(order)}</span>
+ 1777:                           <span className="text-xs text-slate-400">{orderTime}</span>
+ 1778:                         </div>
+ 1779:                         <div className="flex items-center gap-2">
+ 1780:                           <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 ${config.badgeClass || ''}`} style={badgeStyle}>{config.label}</Badge>
+ 1781:                           <span className="text-red-500 text-sm font-bold">(!)</span>
+ 1782:                         </div>
+ 1783:                       </div>
+ 1784:                       {orderItems.length > 0 ? (
+ 1785:                         <div className="mt-1 space-y-0.5">
+ 1786:                           {orderItems.map((item, idx) => (
+ 1787:                             <div key={item.id || idx} className="text-xs text-slate-500">
+ 1788:                               Â· {item.dish_name} Ã—{item.quantity}
+ succeeded in 29.31s:
+ 1490:       );
+ 1491:     }
+ 1492:   }, [inProgressExpanded, subGroups]);
+ 1493: 
+ 1494:   // Auto-select most urgent order (new > ready > cooking, oldest first)
+ 1495:   const autoSelected = useMemo(() => {
+ 1496:     if (!activeOrders.length) return null;
+ 1497:     const sorted = [...activeOrders].sort((a, b) => {
+ 1498:       const ac = getStatusConfig(a);
+ 1499:       const bc = getStatusConfig(b);
+ 1500:       const ap = ac.isFirstStage ? 0 : ac.isFinishStage ? 1 : 2;
+ 1501:       const bp = bc.isFirstStage ? 0 : bc.isFinishStage ? 1 : 2;
+ 1502:       if (ap !== bp) return ap - bp;
+ 1503:       return safeParseDate(a.created_date).getTime() - safeParseDate(b.created_date).getTime();
+ 1504:     });
+ 1505:     return sorted[0];
+ 1506:   }, [activeOrders, getStatusConfig]);
+ 1507: 
+ 1508:   const selectedOrder = (selectedOrderId ? activeOrders.find(o => o.id === selectedOrderId) : null) || autoSelected;
+ 1509: 
+ succeeded in 28.55s:
+---
+version: "4.0.1"
+updated: "2026-03-06"
+session: 90
+deployed: "2026-03-02 S69"
+---
+
+# StaffOrdersMobile â€” ÐœÐ¾Ð±Ð¸Ð»ÑŒÐ½Ñ‹Ð¹ Ð¸Ð½Ñ‚ÐµÑ€Ñ„ÐµÐ¹Ñ Ð¿ÐµÑ€ÑÐ¾Ð½Ð°Ð»Ð°
+
+## ÐžÐ¿Ð¸ÑÐ°Ð½Ð¸Ðµ
+ÐœÐ¾Ð±Ð¸Ð»ÑŒÐ½Ñ‹Ð¹ Ð¸Ð½Ñ‚ÐµÑ€Ñ„ÐµÐ¹Ñ Ð´Ð»Ñ Ð¿ÐµÑ€ÑÐ¾Ð½Ð°Ð»Ð° Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð°. ÐŸÑ€Ð¸Ñ‘Ð¼ Ð·Ð°ÐºÐ°Ð·Ð¾Ð², ÑÐ¼ÐµÐ½Ð° ÑÑ‚Ð°Ñ‚ÑƒÑÐ¾Ð², Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹ Ð¿Ð¾Ð¼Ð¾Ñ‰Ð¸, Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€Ð¾Ð²ÐºÐ° Ð¿Ð¾ ÑÑ‚Ð¾Ð»Ð°Ð¼. Ð¡Ð°Ð¼Ñ‹Ð¹ ÑÐ»Ð¾Ð¶Ð½Ñ‹Ð¹ Ñ„Ð°Ð¹Ð» Ð¿Ñ€Ð¾ÐµÐºÑ‚Ð° (v3.6.0 â€” stale data + close table confirm S74).
+
+**Route:** `/staffordersmobile`
+**Roles:** partner_manager, partner_staff, kitchen
+**Ð Ð°Ð·Ð¼ÐµÑ€:** ~3940 ÑÑ‚Ñ€Ð¾Ðº (v3.2.0)
+
+## ÐÑ€Ñ…Ð¸Ñ‚ÐµÐºÑ‚ÑƒÑ€Ð°
+
+### ÐšÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚Ñ‹ (14)
+- `StaffOrdersMobile` â€” Ð³Ð»Ð°Ð²Ð½Ñ‹Ð¹
+ exited 124 in 30.77s:
+1518:else label = config.actionLabel || '\u0414\u0430\u043B\u0435\u0435';
+1795:{(config.actionLabel || config.isFinishStage) && (() => {
+1797:const dishWord = n === 1 ? '\u0431\u043B\u044E\u0434\u043E' : (n >= 2 && n <= 4) ? '\u0431\u043B\u044E\u0434\u0430' : '\u0431\u043B\u044E\u0434';
+1808:? `\u0412\u0441\u0435 ${n} ${dishWord}`
+1809:: (config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')
+1872:{(config.actionLabel || config.isFinishStage) && (() => {
+1874:const dishWord = n === 1 ? '\u0431\u043B\u044E\u0434\u043E' : (n >= 2 && n <= 4) ? '\u0431\u043B\u044E\u0434\u0430' : '\u0431\u043B\u044E\u0434';
+1885:? `\u0412\u0441\u0435 ${n} ${dishWord}`
+1886:: (config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')
+1928:const dishWord = n === 1 ? '\u0431\u043B\u044E\u0434\u043E' : (n >= 2 && n <= 4) ? '\u0431\u043B\u044E\u0434\u0430' : '\u0431\u043B\u044E\u0434';
+1953:{(config.actionLabel || config.isFinishStage) && (
+1963:? `\u0412\u0441\u0435 ${n} ${dishWord}`
+1964:: (config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')
+1981:const raw = cfg.actionLabel || '';
+2018:const dishWord = n === 1 ? '\u0431\u043B\u044E\u0434\u043E' : (n >= 2 && n <= 4) ? '\u0431\u043B\u044E\u0434\u0430' : '\u0431\u043B\u044E\u0434';
+2043:{(config.actionLabel || config.isFinishStage) && (
+2053:? `\u0412\u0441\u0435 ${n} ${dishWord}`
+2054:: (config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')
+3238:actionLabel: flow?.actionLabel || null,
+codex
+The four old label expressions are still present. I’m checking whether any undo-toast state, handler, or toast markup exists anywhere in this component so I can distinguish “missing entirely” from “partially wired and wrong.”
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'undoToast|handleUndo|Выдан гостю|Отменить' | ForEach-Object { '{0}:{1}' -f "'$_.LineNumber,$_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$start=2080; $end=2175; $lines=Get-Content $path; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ '"'{0,5}: {1}' -f "'$i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$start=1310; $end=1395; $lines=Get-Content $path; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ '"'{0,5}: {1}' -f "'$i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'function OrderGroupCard|const OrderGroupCard|function TableCard|const TableCard' | ForEach-Object { '{0}:{1}' -f "'$_.LineNumber,$_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 30.53s:
+ 2080:           {group.type === 'table' && billData && billData.total > 0 && (
+ 2081:             <div className={`rounded-lg border p-3 ${hasBillRequest ? 'border-violet-300 bg-violet-50' : 'border-slate-200 bg-slate-50'}`}>
+ 2082:               <div
+ 2083:                 className="flex items-center justify-between cursor-pointer"
+ 2084:                 onClick={() => setBillExpanded(!billExpanded)}
+ 2085:               >
+ 2086:                 <div className="flex items-center gap-2 flex-1 min-w-0">
+ 2087:                   <Receipt className="w-4 h-4 text-slate-500 shrink-0" />
+ 2088:                   <span className="text-sm font-medium text-slate-700 truncate">
+ 2089:                     {'\u0421\u0447\u0451\u0442: '}
+ 2090:                     {billData.guests.length === 1
+ 2091:                       ? `${billData.total.toLocaleString()} \u20B8`
+ 2092:                       : billData.guests.slice(0, 3).map(g => `${g.name} \u2014 ${g.total.toLocaleString()} \u20B8`).join(' \u00B7 ')
+ 2093:                     }
+ 2094:                     {billData.guests.length > 3 && ` \u00B7 \u0415\u0449\u0451 ${billData.guests.length - 3}`}
+ 2095:                   </span>
+ 2096:                 </div>
+ 2097:                 {billData.guests.length > 1 && (
+ 2098:                   <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${billExpanded ? 'rotate-180' : ''}`} />
+ 2099:                 )}
+ exited 124 in 30.71s:
+
+ exited 124 in 31.09s:
+
+ succeeded in 31.04s:
+1301:function OrderGroupCard({
+codex
+I’ve confirmed there’s no toast markup near the end of `OrderGroupCard`. I’m pulling the component’s state block now to verify whether the undo state/handler are missing entirely or just not rendered.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$lines=[System.IO.File]::ReadAllLines((Resolve-Path $path)); for($i=1301;$i -le 1375;$i++){ '"'{0,5}: {1}' -f "'$i,$lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "cmd /c findstr /N /C:\"undoToast\" /C:\"handleUndo\" /C:\"Выдан гостю\" /C:\"Отменить\" \"pages\\StaffOrdersMobile\\staffordersmobile.jsx\"" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "cmd /c findstr /N /C:\"Всё \" /C:\"Выдать всё\" /C:\"Принять всё\" \"pages\\StaffOrdersMobile\\staffordersmobile.jsx\"" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 1 in 22.13s:
+
+ succeeded in 25.24s:
+ 1301: function OrderGroupCard({
+ 1302:   group,
+ 1303:   isExpanded,
+ 1304:   onToggleExpand,
+ 1305:   isHighlighted,
+ 1306:   isFavorite,
+ 1307:   onToggleFavorite,
+ 1308:   getStatusConfig,
+ 1309:   guestsMap,
+ 1310:   effectiveUserId,
+ 1311:   onMutate,
+ 1312:   onCloseTable,
+ 1313:   overdueMinutes,
+ 1314:   notifiedOrderIds,
+ 1315:   onClearNotified,
+ 1316:   tableMap,
+ 1317:   activeRequests,
+ 1318:   onCloseAllOrders,
+ 1319:   onCloseRequest,
+ 1320:   orderStages = [],
+ exited 1 in 27.00s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$lines=[System.IO.File]::ReadAllLines((Resolve-Path $path)); for($i=1376;$i -le 1465;$i++){ '"'{0,5}: {1}' -f "'$i,$lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "cmd /c findstr /N /C:\"useState(\" \"pages\\StaffOrdersMobile\\staffordersmobile.jsx\" | powershell -Command \""'$input | Select-String '"'OrderGroupCard|130|131|132|133|134|135|136|137|138|139|140|141|142|143|144|145|146|147|148|149|150'\"" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 16.68s:
+ 1376:   });
+ 1377: 
+ 1378:   const itemsByOrder = useMemo(() => {
+ 1379:     const map = {};
+ 1380:     group.orders.forEach((order, idx) => {
+ 1381:       if (itemResults[idx]?.data) map[order.id] = itemResults[idx].data;
+ 1382:     });
+ 1383:     return map;
+ 1384:   }, [group.orders, itemResults]);
+ 1385: 
+ 1386:   // Aggregate items for preview (collapsed card)
+ 1387:   const allItems = useMemo(() => {
+ 1388:     const items = [];
+ 1389:     group.orders.forEach(order => {
+ 1390:       (itemsByOrder[order.id] || []).forEach(item => items.push(item));
+ 1391:     });
+ 1392:     return items;
+ 1393:   }, [group.orders, itemsByOrder]);
+ 1394: 
+ 1395:   const itemsPreview = useMemo(() => {
+ exited 1 in 23.21s:
+At line:1 char:2
++  | Select-String 'OrderGroupCard|130|131|132|133|134|135|136|137|138| ...
++  ~
+An empty pipe element is not allowed.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : EmptyPipeElement
+ 
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$lines=[System.IO.File]::ReadAllLines((Resolve-Path $path)); for($i=1466;$i -le 1495;$i++){ '"'{0,5}: {1}' -f "'$i,$lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 14.05s:
+ 1466: 
+ 1467:   // NeedsAction marker
+ 1468:   const needsAction = activeOrders.some(o => {
+ 1469:     const c = getStatusConfig(o);
+ 1470:     return c.isFirstStage || c.isFinishStage;
+ 1471:   }) || tableRequests.length > 0;
+ 1472: 
+ 1473:   // --- Expanded state ---
+ 1474: 
+ 1475:   const [selectedOrderId, setSelectedOrderId] = useState(null);
+ 1476:   const [billExpanded, setBillExpanded] = useState(false);
+ 1477:   const [completedExpanded, setCompletedExpanded] = useState(false);
+ 1478:   const [inProgressExpanded, setInProgressExpanded] = useState(false);
+ 1479:   const [expandedSubGroups, setExpandedSubGroups] = useState({});
+ 1480: 
+ 1481:   // Auto-expand first sub-group when section opens; reset on close so reopen works
+ 1482:   useEffect(() => {
+ 1483:     if (!inProgressExpanded) {
+ 1484:       setExpandedSubGroups({});
+ 1485:       return;
+codex
+The review is scoped down now: Fix 1 is still using the old `Всё N блюд` footer labels in all four targeted spots, and Fix 2 appears to be missing entirely. I’m writing that exact result into the pipeline findings file, plus the repo-required review artifacts in the page folder.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Test-Path 'pipeline/chain-state'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 10.32s:
+
+codex
+I have the two scoped findings. I’m creating the findings file directly now; if the pipeline directory already exists this will finish in one pass, then I’ll mirror the same report into the page-local review artifacts.
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/StaffOrdersMobile/review_2026-03-31.md
+# Codex Writer Findings — StaffOrdersMobile
+Chain: staffordersmobile-260331-204431-401b
+
+## Findings
+1. [P2] Fix 1 not applied on the four per-card footer labels — The target expressions at `staffordersmobile.jsx:1808`, `staffordersmobile.jsx:1885`, `staffordersmobile.jsx:1963`, and `staffordersmobile.jsx:2053` still render the old `\u0412\u0441\u0435 ${n} ${dishWord}` / `(config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')` text. The requested verb-first logic (`\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})` or stripped `config.actionLabel`) was not applied, so the per-card buttons remain unchanged instead of matching SOM-S210-01. FIX: Replace those four expressions with the requested `config.isFinishStage` / stripped-`config.actionLabel` ternary, including the zero-item fallback branch.
+2. [P1] Fix 2 undo toast flow is missing entirely for finish-stage actions — `OrderGroupCard` has no `undoToast` state in its local state block (`staffordersmobile.jsx:1475-1479`), the per-card finish-stage buttons still call `handleBatchAction([order])` directly (`staffordersmobile.jsx:1800-1803`, `staffordersmobile.jsx:1877-1880`, `staffordersmobile.jsx:1955-1958`, `staffordersmobile.jsx:2045-2048`), and there is no `handleUndo` function or toast JSX before the component closes (`staffordersmobile.jsx:2080-2168`). Finish-stage actions therefore remain irreversible from the card UI and do not provide the required 5-second recovery path. FIX: Add `undoToast` state to `OrderGroupCard`, capture `{ orderId, prevStatus, prevStageId }` snapshots before finish-stage actions, clear/reset the timeout, implement `handleUndo`, and render the requested toast using the same order update path already used by `handleBatchAction`.
+
+## Summary
+Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/staffordersmobile-260331-204431-401b-codex-findings.md
+# Codex Writer Findings — StaffOrdersMobile
+Chain: staffordersmobile-260331-204431-401b
+
+## Findings
+1. [P2] Fix 1 not applied on the four per-card footer labels — The target expressions at `staffordersmobile.jsx:1808`, `staffordersmobile.jsx:1885`, `staffordersmobile.jsx:1963`, and `staffordersmobile.jsx:2053` still render the old `\u0412\u0441\u0435 ${n} ${dishWord}` / `(config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')` text. The requested verb-first logic (`\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})` or stripped `config.actionLabel`) was not applied, so the per-card buttons remain unchanged instead of matching SOM-S210-01. FIX: Replace those four expressions with the requested `config.isFinishStage` / stripped-`config.actionLabel` ternary, including the zero-item fallback branch.
+2. [P1] Fix 2 undo toast flow is missing entirely for finish-stage actions — `OrderGroupCard` has no `undoToast` state in its local state block (`staffordersmobile.jsx:1475-1479`), the per-card finish-stage buttons still call `handleBatchAction([order])` directly (`staffordersmobile.jsx:1800-1803`, `staffordersmobile.jsx:1877-1880`, `staffordersmobile.jsx:1955-1958`, `staffordersmobile.jsx:2045-2048`), and there is no `handleUndo` function or toast JSX before the component closes (`staffordersmobile.jsx:2080-2168`). Finish-stage actions therefore remain irreversible from the card UI and do not provide the required 5-second recovery path. FIX: Add `undoToast` state to `OrderGroupCard`, capture `{ orderId, prevStatus, prevStageId }` snapshots before finish-stage actions, clear/reset the timeout, implement `handleUndo`, and render the requested toast using the same order update path already used by `handleBatchAction`.
+
+## Summary
+Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/StaffOrdersMobile/commands_2026-03-31.log
+# Command Log — 2026-03-31
+
+1. `Get-ChildItem -Force "pages/StaffOrdersMobile" | Select-Object Name,Length,LastWriteTime`
+2. `Get-ChildItem -Force 'pages/StaffOrdersMobile' | Format-Table -Auto Name,Length,LastWriteTime`
+3. `Get-Content -Raw 'pages/StaffOrdersMobile/README.md'`
+4. `Get-Content -Raw 'pages/StaffOrdersMobile/BUGS.md'`
+5. `Get-Content -Raw 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'`
+6. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1490; $end=1595; $lines=Get-Content $path; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } }`
+7. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $ranges=@(@{s=1770;e=1835},@{s=1860;e=1908},@{s=1940;e=1988},@{s=2030;e=2085}); $lines=Get-Content $path; foreach($r in $ranges){ "--- RANGE $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } } }`
+8. `Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'undoToast|handleUndo|dishWord|Выдан гостю|Отменить|actionLabel \|\||Выдать всё|Принять всё' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }`
+9. `Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'undoToast|handleUndo|Выдан гостю|Отменить' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }`
+10. `Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'function OrderGroupCard|const OrderGroupCard|function TableCard|const TableCard' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }`
+11. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1310; $end=1395; $lines=Get-Content $path; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } }`
+12. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2080; $end=2175; $lines=Get-Content $path; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } }`
+13. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines=[System.IO.File]::ReadAllLines((Resolve-Path $path)); for($i=1301;$i -le 1375;$i++){ '{0,5}: {1}' -f $i,$lines[$i-1] }`
+14. `cmd /c findstr /N /C:"undoToast" /C:"handleUndo" /C:"Выдан гостю" /C:"Отменить" "pages\StaffOrdersMobile\staffordersmobile.jsx"`
+15. `cmd /c findstr /N /C:"Всё " /C:"Выдать всё" /C:"Принять всё" "pages\StaffOrdersMobile\staffordersmobile.jsx"`
+16. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines=[System.IO.File]::ReadAllLines((Resolve-Path $path)); for($i=1376;$i -le 1465;$i++){ '{0,5}: {1}' -f $i,$lines[$i-1] }`
+17. `cmd /c findstr /N /C:"useState(" "pages\StaffOrdersMobile\staffordersmobile.jsx" | powershell -Command "$input | Select-String 'OrderGroupCard|130|131|132|133|134|135|136|137|138|139|140|141|142|143|144|145|146|147|148|149|150'"`
+18. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines=[System.IO.File]::ReadAllLines((Resolve-Path $path)); for($i=1466;$i -le 1495;$i++){ '{0,5}: {1}' -f $i,$lines[$i-1] }`
+19. `Test-Path 'pipeline/chain-state'`
+apply_patch(auto_approved=true) exited 0 in 832ms:
+Success. Updated the following files:
+A pipeline/chain-state/staffordersmobile-260331-204431-401b-codex-findings.md
+A pages/StaffOrdersMobile/review_2026-03-31.md
+A pages/StaffOrdersMobile/commands_2026-03-31.log
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-03-31.log b/pages/StaffOrdersMobile/commands_2026-03-31.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..3b95e706e86fe78e29b2b20df2bc6c73a01006c3
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-03-31.log
+@@ -0,0 +1,21 @@
++# Command Log — 2026-03-31
++
++1. `Get-ChildItem -Force "pages/StaffOrdersMobile" | Select-Object Name,Length,LastWriteTime`
++2. `Get-ChildItem -Force 'pages/StaffOrdersMobile' | Format-Table -Auto Name,Length,LastWriteTime`
++3. `Get-Content -Raw 'pages/StaffOrdersMobile/README.md'`
++4. `Get-Content -Raw 'pages/StaffOrdersMobile/BUGS.md'`
++5. `Get-Content -Raw 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'`
++6. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1490; $end=1595; $lines=Get-Content $path; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } }`
++7. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $ranges=@(@{s=1770;e=1835},@{s=1860;e=1908},@{s=1940;e=1988},@{s=2030;e=2085}); $lines=Get-Content $path; foreach($r in $ranges){ "--- RANGE $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } } }`
++8. `Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'undoToast|handleUndo|dishWord|Выдан гостю|Отменить|actionLabel \|\||Выдать всё|Принять всё' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }`
++9. `Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'undoToast|handleUndo|Выдан гостю|Отменить' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }`
++10. `Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'function OrderGroupCard|const OrderGroupCard|function TableCard|const TableCard' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }`
++11. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1310; $end=1395; $lines=Get-Content $path; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } }`
++12. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2080; $end=2175; $lines=Get-Content $path; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } }`
++13. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines=[System.IO.File]::ReadAllLines((Resolve-Path $path)); for($i=1301;$i -le 1375;$i++){ '{0,5}: {1}' -f $i,$lines[$i-1] }`
++14. `cmd /c findstr /N /C:"undoToast" /C:"handleUndo" /C:"Выдан гостю" /C:"Отменить" "pages\StaffOrdersMobile\staffordersmobile.jsx"`
++15. `cmd /c findstr /N /C:"Всё " /C:"Выдать всё" /C:"Принять всё" "pages\StaffOrdersMobile\staffordersmobile.jsx"`
++16. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines=[System.IO.File]::ReadAllLines((Resolve-Path $path)); for($i=1376;$i -le 1465;$i++){ '{0,5}: {1}' -f $i,$lines[$i-1] }`
++17. `cmd /c findstr /N /C:"useState(" "pages\StaffOrdersMobile\staffordersmobile.jsx" | powershell -Command "$input | Select-String 'OrderGroupCard|130|131|132|133|134|135|136|137|138|139|140|141|142|143|144|145|146|147|148|149|150'"`
++18. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines=[System.IO.File]::ReadAllLines((Resolve-Path $path)); for($i=1466;$i -le 1495;$i++){ '{0,5}: {1}' -f $i,$lines[$i-1] }`
++19. `Test-Path 'pipeline/chain-state'`
+diff --git a/pages/StaffOrdersMobile/review_2026-03-31.md b/pages/StaffOrdersMobile/review_2026-03-31.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..100b56496e16086920e4949fe988f6bd7cd4a50f
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-03-31.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260331-204431-401b
++
++## Findings
++1. [P2] Fix 1 not applied on the four per-card footer labels — The target expressions at `staffordersmobile.jsx:1808`, `staffordersmobile.jsx:1885`, `staffordersmobile.jsx:1963`, and `staffordersmobile.jsx:2053` still render the old `\u0412\u0441\u0435 ${n} ${dishWord}` / `(config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')` text. The requested verb-first logic (`\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})` or stripped `config.actionLabel`) was not applied, so the per-card buttons remain unchanged instead of matching SOM-S210-01. FIX: Replace those four expressions with the requested `config.isFinishStage` / stripped-`config.actionLabel` ternary, including the zero-item fallback branch.
++2. [P1] Fix 2 undo toast flow is missing entirely for finish-stage actions — `OrderGroupCard` has no `undoToast` state in its local state block (`staffordersmobile.jsx:1475-1479`), the per-card finish-stage buttons still call `handleBatchAction([order])` directly (`staffordersmobile.jsx:1800-1803`, `staffordersmobile.jsx:1877-1880`, `staffordersmobile.jsx:1955-1958`, `staffordersmobile.jsx:2045-2048`), and there is no `handleUndo` function or toast JSX before the component closes (`staffordersmobile.jsx:2080-2168`). Finish-stage actions therefore remain irreversible from the card UI and do not provide the required 5-second recovery path. FIX: Add `undoToast` state to `OrderGroupCard`, capture `{ orderId, prevStatus, prevStageId }` snapshots before finish-stage actions, clear/reset the timeout, implement `handleUndo`, and render the requested toast using the same order update path already used by `handleBatchAction`.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/staffordersmobile-260331-204431-401b-codex-findings.md b/pipeline/chain-state/staffordersmobile-260331-204431-401b-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..100b56496e16086920e4949fe988f6bd7cd4a50f
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260331-204431-401b-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260331-204431-401b
++
++## Findings
++1. [P2] Fix 1 not applied on the four per-card footer labels — The target expressions at `staffordersmobile.jsx:1808`, `staffordersmobile.jsx:1885`, `staffordersmobile.jsx:1963`, and `staffordersmobile.jsx:2053` still render the old `\u0412\u0441\u0435 ${n} ${dishWord}` / `(config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')` text. The requested verb-first logic (`\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})` or stripped `config.actionLabel`) was not applied, so the per-card buttons remain unchanged instead of matching SOM-S210-01. FIX: Replace those four expressions with the requested `config.isFinishStage` / stripped-`config.actionLabel` ternary, including the zero-item fallback branch.
++2. [P1] Fix 2 undo toast flow is missing entirely for finish-stage actions — `OrderGroupCard` has no `undoToast` state in its local state block (`staffordersmobile.jsx:1475-1479`), the per-card finish-stage buttons still call `handleBatchAction([order])` directly (`staffordersmobile.jsx:1800-1803`, `staffordersmobile.jsx:1877-1880`, `staffordersmobile.jsx:1955-1958`, `staffordersmobile.jsx:2045-2048`), and there is no `handleUndo` function or toast JSX before the component closes (`staffordersmobile.jsx:2080-2168`). Finish-stage actions therefore remain irreversible from the card UI and do not provide the required 5-second recovery path. FIX: Add `undoToast` state to `OrderGroupCard`, capture `{ orderId, prevStatus, prevStageId }` snapshots before finish-stage actions, clear/reset the timeout, implement `handleUndo`, and render the requested toast using the same order update path already used by `handleBatchAction`.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-03-31.log b/pages/StaffOrdersMobile/commands_2026-03-31.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..3b95e706e86fe78e29b2b20df2bc6c73a01006c3
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-03-31.log
+@@ -0,0 +1,21 @@
++# Command Log — 2026-03-31
++
++1. `Get-ChildItem -Force "pages/StaffOrdersMobile" | Select-Object Name,Length,LastWriteTime`
++2. `Get-ChildItem -Force 'pages/StaffOrdersMobile' | Format-Table -Auto Name,Length,LastWriteTime`
++3. `Get-Content -Raw 'pages/StaffOrdersMobile/README.md'`
++4. `Get-Content -Raw 'pages/StaffOrdersMobile/BUGS.md'`
++5. `Get-Content -Raw 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'`
++6. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1490; $end=1595; $lines=Get-Content $path; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } }`
++7. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $ranges=@(@{s=1770;e=1835},@{s=1860;e=1908},@{s=1940;e=1988},@{s=2030;e=2085}); $lines=Get-Content $path; foreach($r in $ranges){ "--- RANGE $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } } }`
++8. `Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'undoToast|handleUndo|dishWord|Выдан гостю|Отменить|actionLabel \|\||Выдать всё|Принять всё' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }`
++9. `Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'undoToast|handleUndo|Выдан гостю|Отменить' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }`
++10. `Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'function OrderGroupCard|const OrderGroupCard|function TableCard|const TableCard' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }`
++11. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1310; $end=1395; $lines=Get-Content $path; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } }`
++12. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2080; $end=2175; $lines=Get-Content $path; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } }`
++13. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines=[System.IO.File]::ReadAllLines((Resolve-Path $path)); for($i=1301;$i -le 1375;$i++){ '{0,5}: {1}' -f $i,$lines[$i-1] }`
++14. `cmd /c findstr /N /C:"undoToast" /C:"handleUndo" /C:"Выдан гостю" /C:"Отменить" "pages\StaffOrdersMobile\staffordersmobile.jsx"`
++15. `cmd /c findstr /N /C:"Всё " /C:"Выдать всё" /C:"Принять всё" "pages\StaffOrdersMobile\staffordersmobile.jsx"`
++16. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines=[System.IO.File]::ReadAllLines((Resolve-Path $path)); for($i=1376;$i -le 1465;$i++){ '{0,5}: {1}' -f $i,$lines[$i-1] }`
++17. `cmd /c findstr /N /C:"useState(" "pages\StaffOrdersMobile\staffordersmobile.jsx" | powershell -Command "$input | Select-String 'OrderGroupCard|130|131|132|133|134|135|136|137|138|139|140|141|142|143|144|145|146|147|148|149|150'"`
++18. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines=[System.IO.File]::ReadAllLines((Resolve-Path $path)); for($i=1466;$i -le 1495;$i++){ '{0,5}: {1}' -f $i,$lines[$i-1] }`
++19. `Test-Path 'pipeline/chain-state'`
+diff --git a/pages/StaffOrdersMobile/review_2026-03-31.md b/pages/StaffOrdersMobile/review_2026-03-31.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..100b56496e16086920e4949fe988f6bd7cd4a50f
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-03-31.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260331-204431-401b
++
++## Findings
++1. [P2] Fix 1 not applied on the four per-card footer labels — The target expressions at `staffordersmobile.jsx:1808`, `staffordersmobile.jsx:1885`, `staffordersmobile.jsx:1963`, and `staffordersmobile.jsx:2053` still render the old `\u0412\u0441\u0435 ${n} ${dishWord}` / `(config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')` text. The requested verb-first logic (`\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})` or stripped `config.actionLabel`) was not applied, so the per-card buttons remain unchanged instead of matching SOM-S210-01. FIX: Replace those four expressions with the requested `config.isFinishStage` / stripped-`config.actionLabel` ternary, including the zero-item fallback branch.
++2. [P1] Fix 2 undo toast flow is missing entirely for finish-stage actions — `OrderGroupCard` has no `undoToast` state in its local state block (`staffordersmobile.jsx:1475-1479`), the per-card finish-stage buttons still call `handleBatchAction([order])` directly (`staffordersmobile.jsx:1800-1803`, `staffordersmobile.jsx:1877-1880`, `staffordersmobile.jsx:1955-1958`, `staffordersmobile.jsx:2045-2048`), and there is no `handleUndo` function or toast JSX before the component closes (`staffordersmobile.jsx:2080-2168`). Finish-stage actions therefore remain irreversible from the card UI and do not provide the required 5-second recovery path. FIX: Add `undoToast` state to `OrderGroupCard`, capture `{ orderId, prevStatus, prevStageId }` snapshots before finish-stage actions, clear/reset the timeout, implement `handleUndo`, and render the requested toast using the same order update path already used by `handleBatchAction`.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/staffordersmobile-260331-204431-401b-codex-findings.md b/pipeline/chain-state/staffordersmobile-260331-204431-401b-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..100b56496e16086920e4949fe988f6bd7cd4a50f
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260331-204431-401b-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260331-204431-401b
++
++## Findings
++1. [P2] Fix 1 not applied on the four per-card footer labels — The target expressions at `staffordersmobile.jsx:1808`, `staffordersmobile.jsx:1885`, `staffordersmobile.jsx:1963`, and `staffordersmobile.jsx:2053` still render the old `\u0412\u0441\u0435 ${n} ${dishWord}` / `(config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')` text. The requested verb-first logic (`\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})` or stripped `config.actionLabel`) was not applied, so the per-card buttons remain unchanged instead of matching SOM-S210-01. FIX: Replace those four expressions with the requested `config.isFinishStage` / stripped-`config.actionLabel` ternary, including the zero-item fallback branch.
++2. [P1] Fix 2 undo toast flow is missing entirely for finish-stage actions — `OrderGroupCard` has no `undoToast` state in its local state block (`staffordersmobile.jsx:1475-1479`), the per-card finish-stage buttons still call `handleBatchAction([order])` directly (`staffordersmobile.jsx:1800-1803`, `staffordersmobile.jsx:1877-1880`, `staffordersmobile.jsx:1955-1958`, `staffordersmobile.jsx:2045-2048`), and there is no `handleUndo` function or toast JSX before the component closes (`staffordersmobile.jsx:2080-2168`). Finish-stage actions therefore remain irreversible from the card UI and do not provide the required 5-second recovery path. FIX: Add `undoToast` state to `OrderGroupCard`, capture `{ orderId, prevStatus, prevStageId }` snapshots before finish-stage actions, clear/reset the timeout, implement `handleUndo`, and render the requested toast using the same order update path already used by `handleBatchAction`.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+Findings saved to [staffordersmobile-260331-204431-401b-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/staffordersmobile-260331-204431-401b-codex-findings.md).
+
+Scoped result: 2 findings. Fix 1 is still not applied in the four targeted per-card footer label expressions at [staffordersmobile.jsx:1808](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1808), [staffordersmobile.jsx:1885](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1885), [staffordersmobile.jsx:1963](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1963), and [staffordersmobile.jsx:2053](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2053). Fix 2 is missing entirely: no `undoToast` state in [staffordersmobile.jsx:1475](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1475), no undo handler, and no toast UI before the component ends near [staffordersmobile.jsx:2168](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2168).
+
+Repo-required copies were also written to [review_2026-03-31.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/review_2026-03-31.md) and [commands_2026-03-31.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/commands_2026-03-31.log).
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-03-31.log b/pages/StaffOrdersMobile/commands_2026-03-31.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..3b95e706e86fe78e29b2b20df2bc6c73a01006c3
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-03-31.log
+@@ -0,0 +1,21 @@
++# Command Log — 2026-03-31
++
++1. `Get-ChildItem -Force "pages/StaffOrdersMobile" | Select-Object Name,Length,LastWriteTime`
++2. `Get-ChildItem -Force 'pages/StaffOrdersMobile' | Format-Table -Auto Name,Length,LastWriteTime`
++3. `Get-Content -Raw 'pages/StaffOrdersMobile/README.md'`
++4. `Get-Content -Raw 'pages/StaffOrdersMobile/BUGS.md'`
++5. `Get-Content -Raw 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'`
++6. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1490; $end=1595; $lines=Get-Content $path; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } }`
++7. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $ranges=@(@{s=1770;e=1835},@{s=1860;e=1908},@{s=1940;e=1988},@{s=2030;e=2085}); $lines=Get-Content $path; foreach($r in $ranges){ "--- RANGE $($r.s)-$($r.e) ---"; for($i=$r.s;$i -le $r.e;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } } }`
++8. `Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'undoToast|handleUndo|dishWord|Выдан гостю|Отменить|actionLabel \|\||Выдать всё|Принять всё' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }`
++9. `Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'undoToast|handleUndo|Выдан гостю|Отменить' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }`
++10. `Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'function OrderGroupCard|const OrderGroupCard|function TableCard|const TableCard' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }`
++11. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1310; $end=1395; $lines=Get-Content $path; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } }`
++12. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2080; $end=2175; $lines=Get-Content $path; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i,$lines[$i-1] } }`
++13. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines=[System.IO.File]::ReadAllLines((Resolve-Path $path)); for($i=1301;$i -le 1375;$i++){ '{0,5}: {1}' -f $i,$lines[$i-1] }`
++14. `cmd /c findstr /N /C:"undoToast" /C:"handleUndo" /C:"Выдан гостю" /C:"Отменить" "pages\StaffOrdersMobile\staffordersmobile.jsx"`
++15. `cmd /c findstr /N /C:"Всё " /C:"Выдать всё" /C:"Принять всё" "pages\StaffOrdersMobile\staffordersmobile.jsx"`
++16. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines=[System.IO.File]::ReadAllLines((Resolve-Path $path)); for($i=1376;$i -le 1465;$i++){ '{0,5}: {1}' -f $i,$lines[$i-1] }`
++17. `cmd /c findstr /N /C:"useState(" "pages\StaffOrdersMobile\staffordersmobile.jsx" | powershell -Command "$input | Select-String 'OrderGroupCard|130|131|132|133|134|135|136|137|138|139|140|141|142|143|144|145|146|147|148|149|150'"`
++18. `$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $lines=[System.IO.File]::ReadAllLines((Resolve-Path $path)); for($i=1466;$i -le 1495;$i++){ '{0,5}: {1}' -f $i,$lines[$i-1] }`
++19. `Test-Path 'pipeline/chain-state'`
+diff --git a/pages/StaffOrdersMobile/review_2026-03-31.md b/pages/StaffOrdersMobile/review_2026-03-31.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..100b56496e16086920e4949fe988f6bd7cd4a50f
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-03-31.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260331-204431-401b
++
++## Findings
++1. [P2] Fix 1 not applied on the four per-card footer labels — The target expressions at `staffordersmobile.jsx:1808`, `staffordersmobile.jsx:1885`, `staffordersmobile.jsx:1963`, and `staffordersmobile.jsx:2053` still render the old `\u0412\u0441\u0435 ${n} ${dishWord}` / `(config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')` text. The requested verb-first logic (`\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})` or stripped `config.actionLabel`) was not applied, so the per-card buttons remain unchanged instead of matching SOM-S210-01. FIX: Replace those four expressions with the requested `config.isFinishStage` / stripped-`config.actionLabel` ternary, including the zero-item fallback branch.
++2. [P1] Fix 2 undo toast flow is missing entirely for finish-stage actions — `OrderGroupCard` has no `undoToast` state in its local state block (`staffordersmobile.jsx:1475-1479`), the per-card finish-stage buttons still call `handleBatchAction([order])` directly (`staffordersmobile.jsx:1800-1803`, `staffordersmobile.jsx:1877-1880`, `staffordersmobile.jsx:1955-1958`, `staffordersmobile.jsx:2045-2048`), and there is no `handleUndo` function or toast JSX before the component closes (`staffordersmobile.jsx:2080-2168`). Finish-stage actions therefore remain irreversible from the card UI and do not provide the required 5-second recovery path. FIX: Add `undoToast` state to `OrderGroupCard`, capture `{ orderId, prevStatus, prevStageId }` snapshots before finish-stage actions, clear/reset the timeout, implement `handleUndo`, and render the requested toast using the same order update path already used by `handleBatchAction`.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/staffordersmobile-260331-204431-401b-codex-findings.md b/pipeline/chain-state/staffordersmobile-260331-204431-401b-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..100b56496e16086920e4949fe988f6bd7cd4a50f
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260331-204431-401b-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260331-204431-401b
++
++## Findings
++1. [P2] Fix 1 not applied on the four per-card footer labels — The target expressions at `staffordersmobile.jsx:1808`, `staffordersmobile.jsx:1885`, `staffordersmobile.jsx:1963`, and `staffordersmobile.jsx:2053` still render the old `\u0412\u0441\u0435 ${n} ${dishWord}` / `(config.actionLabel || '\u0412\u044B\u0434\u0430\u0442\u044C')` text. The requested verb-first logic (`\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})` or stripped `config.actionLabel`) was not applied, so the per-card buttons remain unchanged instead of matching SOM-S210-01. FIX: Replace those four expressions with the requested `config.isFinishStage` / stripped-`config.actionLabel` ternary, including the zero-item fallback branch.
++2. [P1] Fix 2 undo toast flow is missing entirely for finish-stage actions — `OrderGroupCard` has no `undoToast` state in its local state block (`staffordersmobile.jsx:1475-1479`), the per-card finish-stage buttons still call `handleBatchAction([order])` directly (`staffordersmobile.jsx:1800-1803`, `staffordersmobile.jsx:1877-1880`, `staffordersmobile.jsx:1955-1958`, `staffordersmobile.jsx:2045-2048`), and there is no `handleUndo` function or toast JSX before the component closes (`staffordersmobile.jsx:2080-2168`). Finish-stage actions therefore remain irreversible from the card UI and do not provide the required 5-second recovery path. FIX: Add `undoToast` state to `OrderGroupCard`, capture `{ orderId, prevStatus, prevStageId }` snapshots before finish-stage actions, clear/reset the timeout, implement `handleUndo`, and render the requested toast using the same order update path already used by `handleBatchAction`.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+tokens used
+51 934
+Findings saved to [staffordersmobile-260331-204431-401b-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/staffordersmobile-260331-204431-401b-codex-findings.md).
+
+Scoped result: 2 findings. Fix 1 is still not applied in the four targeted per-card footer label expressions at [staffordersmobile.jsx:1808](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1808), [staffordersmobile.jsx:1885](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1885), [staffordersmobile.jsx:1963](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1963), and [staffordersmobile.jsx:2053](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2053). Fix 2 is missing entirely: no `undoToast` state in [staffordersmobile.jsx:1475](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1475), no undo handler, and no toast UI before the component ends near [staffordersmobile.jsx:2168](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2168).
+
+Repo-required copies were also written to [review_2026-03-31.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/review_2026-03-31.md) and [commands_2026-03-31.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/commands_2026-03-31.log).

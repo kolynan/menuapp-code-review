@@ -1,0 +1,3477 @@
+<!-- Auto-extracted from task.log by watcher post-step (KB-165 fix, S296).
+     Codex sandbox blocked direct write to pipeline/chain-state/; findings recovered from stdout.
+     Source task: task-260416-212809-018  Chain: staffordersmobile-260416-212808-43bb -->
+
+# Codex Reviewer Findings â€” ÐŸÐ¡Ð¡Ðš Prompt Quality Review
+(The pipeline uses regex extraction on your stdout. If this header is not the first line â†’ your findings are invisible to the watcher â†’ review treated as skipped.)
+
+FORMAT (MANDATORY â€” follow exactly, do NOT skip any section):
+# Codex Reviewer Findings â€” ÐŸÐ¡Ð¡Ðš Prompt Quality Review
+Chain: staffordersmobile-260416-212808-43bb
+
+## Issues Found
+1. [CRITICAL/MEDIUM/LOW] Title â€” Description. PROMPT FIX: ...
+2. ...
+
+## Summary
+Total: N issues (X CRITICAL, Y MEDIUM, Z LOW)
+
+## Additional Risks
+Any risks the prompt author may not have considered.
+
+## Prompt Clarity (MANDATORY â€” do NOT skip)
+- Overall clarity: [1-5]
+- What was most clear:
+- What was ambiguous or could cause hesitation:
+- Missing context:
+
+## Fix Ratings (MANDATORY â€” ALWAYS include this section, even if no issues found)
+Rate each Fix mentioned in the prompt. Scale: 1=Rewrite needed, 2=Major issues, 3=Needs clarification, 4=Minor issues, 5=Clear.
+
+| Fix | Rating (1-5) | Verdict | Key issue (if any) |
+|-----|-------------|---------|-------------------|
+| Fix1 | X/5 | Clear / Needs clarification / Rewrite needed | ... |
+| Fix2 | X/5 | ... | ... |
+| Fix3 | X/5 | ... | ... |
+
+Overall prompt verdict: APPROVED (all â‰¥4/5) / NEEDS REVISION (any <4/5)
+
+Do NOT apply any fixes to code files. Analysis only.
+
+=== SOURCE CODE ===
+Read the target file(s) yourself using the Read tool.
+Paths are specified in TASK CONTEXT below (look for "Ð¤Ð°Ð¹Ð» Ð¸ Ð»Ð¾ÐºÐ°Ñ†Ð¸Ñ", "Ð¤Ð°Ð¹Ð»:", or "Target file:").
+Self-read mode (S283-Ch4 fix for WinError 206 on files >500 lines).
+=== END SOURCE CODE ===
+
+=== TASK CONTEXT ===
+Read the ÐŸÐ¡Ð¡Ðš draft at `pipeline/drafts/pssk-som-b2-1-260416-v7.md` and review it.
+
+Your findings file: `pipeline/chain-state/staffordersmobile-260416-212808-43bb-{{RUNNER}}-findings.md`
+=== END ===
+
+
+=== FINAL STEPS ===
+1. Use the Write tool to write the final summary to:
+   C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/cc-analysis-task-260416-212809-018.txt
+2. Use the Write tool to append one line to the progress file:
+   C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/progress-task-260416-212809-018.txt
+   Line: [OK] HH:MM DONE
+Do NOT use shell commands for these final writes â€” use the Write tool.
+=== END FINAL STEPS ===
+
+codex
+I’ve loaded the task contract and I’m switching to the required artifacts now: start marker, progress tracking, then the prompt-draft review itself. After that I’ll read the draft and the referenced source file only, stay within the review budget, and write the findings file plus final pipeline summary.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Date -Format "o`nHH:mm"' in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+2026-04-16T16:32:07.947736Z ERROR codex_core::tools::router: error=Exit code: 124
+Wall time: 11.8 seconds
+Output:
+command timed out after 11849 milliseconds
+
+ exited 124 in 11849ms:
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Date -Format "o`nHH:mm"' in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 26861ms:
+o
+21:32
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "(Get-Date).ToString('o'); (Get-Date).ToString('HH:mm')" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 24726ms:
+2026-04-16T21:33:07.5006546+05:00
+21:33
+
+2026-04-16T16:33:20.929794Z ERROR codex_core::tools::router: error=patch rejected: writing outside of the project; rejected by user approval settings
+codex
+The required pipeline writes are outside the writable workspace, so `apply_patch` cannot create them. I’m testing whether the shell sandbox allows the mandated output path at all; if it doesn’t, I’ll still complete the review content locally and report the exact blocker.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Set-Content -LiteralPath 'C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/started-task-260416-212809-018.md' -Value 'started 2026-04-16T21:33:07.5006546+05:00'" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+2026-04-16T16:34:12.695344Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 38.8 seconds
+Output:
+Set-Content : Access to the path 'C:\Users\ASUS\Dev\Menu AI Cowork\pipeline\started-task-260416-212809-018.md' is 
+denied.
+At line:2 char:1
++ Set-Content -LiteralPath 'C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/s ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (C:\Users\ASUS\D...6-212809-018.md:String) [Set-Content], Unauthorized 
+   AccessException
+    + FullyQualifiedErrorId : GetContentWriterUnauthorizedAccessError,Microsoft.PowerShell.Commands.SetContentCommand
+ 
+
+ exited 1 in 38824ms:
+Set-Content : Access to the path 'C:\Users\ASUS\Dev\Menu AI Cowork\pipeline\started-task-260416-212809-018.md' is 
+denied.
+At line:2 char:1
++ Set-Content -LiteralPath 'C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/s ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (C:\Users\ASUS\D...6-212809-018.md:String) [Set-Content], Unauthorized 
+   AccessException
+    + FullyQualifiedErrorId : GetContentWriterUnauthorizedAccessError,Microsoft.PowerShell.Commands.SetContentCommand
+ 
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/drafts/pssk-som-b2-1-260416-v7.md' -Raw" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 30467ms:
+# SOM Ð‘2.1 â€” Fix BUG-SM-015: New Order on Closed Table (v7)
+
+<!-- PC-VERDICT: GO (Cowork S304, 2026-04-16; v7 changes vs v6: CRITICAL path fix menuapp-code-review/pages/â†’pages/, Fix B.5 explicit old_string, staleTime:0 bullet removed from Fix A Should-NOT, ServiceRequest phantom-card comment, Safety Guards inline commit message) -->
+
+## Context
+
+**TARGET FILES (Ð±ÑƒÐ´ÑƒÑ‚ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ñ‹):**
+- `pages/StaffOrdersMobile/staffordersmobile.jsx` (4617 lines Ð² HEAD, `260415-01 StaffOrdersMobile RELEASE.jsx` = 4617 lines â€” Ð¸ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº Ð¸ÑÑ‚Ð¸Ð½Ñ‹)
+
+**CONTEXT FILES (Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð´Ð»Ñ Ñ‡Ñ‚ÐµÐ½Ð¸Ñ, Ð½Ðµ Ð¼ÐµÐ½ÑÑ‚ÑŒ):**
+- `components/sessionHelpers.js` (232 lines, v1.1 Ð¾Ñ‚ S70) â€” ÑÐ¾Ð´ÐµÑ€Ð¶Ð¸Ñ‚ `getOrCreateSession`, `closeSession`
+- `pages/PublicMenu/useTableSession.jsx` â€” guest-side session restore (ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ)
+
+**Ð—Ð°Ð´Ð°Ñ‡Ð°:** Ð¤Ð¸ÐºÑ BUG-SM-015 â€” Ð¿Ñ€Ð¸ Ð·Ð°ÐºÐ°Ð·Ðµ Ð³Ð¾ÑÑ‚ÐµÐ¼ Ð½Ð° Ñ€Ð°Ð½ÐµÐµ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ð¹ ÑÑ‚Ð¾Ð» Ð½Ð¾Ð²Ð°Ñ TableSession Ð´Ð¾Ð»Ð¶Ð½Ð° ÑÑ€Ð°Ð·Ñƒ Ð¾Ñ‚Ð¾Ð±Ñ€Ð°Ð¶Ð°Ñ‚ÑŒÑÑ ÐºÐ°Ðº Ð½Ð¾Ð²Ð°Ñ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° Ð² Ñ‚Ð°Ð±Ðµ Â«ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹ÐµÂ», Ð° Ð½Ðµ ÑÐ»Ð¸Ð²Ð°Ñ‚ÑŒÑÑ Ñ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ Ð² Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹Ñ…Â».
+
+**Ð‘ÑŽÐ´Ð¶ÐµÑ‚:** $14 | **Ð¨Ð°Ð±Ð»Ð¾Ð½:** `consensus-with-discussion-v2` (Ð¡5v2) | **Ð’ÐµÑ:** M (3 Fix, ÑÐ²ÑÐ·Ð°Ð½Ð½Ñ‹Ðµ) | **ÐœÐ¾Ð´ÐµÐ»ÑŒ:** claude-sonnet-4-5
+
+**BACKLOG:** #BUG-SM-015 (P0), #347 (M â€” session-aware orderGroups)
+
+---
+
+## Root Cause (VERIFIED via code reading â€” Ð½Ðµ Ð¿Ñ€ÐµÐ´Ð¿Ð¾Ð»Ð¾Ð¶ÐµÐ½Ð¸Ñ)
+
+ÐŸÑ€Ð¾Ñ‡Ð¸Ñ‚Ð°Ð» `260415-01 StaffOrdersMobile RELEASE.jsx` ÑÑ‚Ñ€Ð¾ÐºÐ¸ 3541-3908 + `components/sessionHelpers.js`:
+
+1. **`openSessions` query** (ÑÑ‚Ñ€Ð¾ÐºÐ¸ 3541-3552) Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ `queryKey: ["openSessions", partnerId]` + `staleTime: 30_000` â€” SOM Ð½Ðµ Ð·Ð½Ð°ÐµÑ‚ Ð¾ Ð½Ð¾Ð²Ð¾Ð¹ TableSession Ð´Ð¾ 30 ÑÐµÐºÑƒÐ½Ð´. [V5-C1]
+2. **`orderGroups` useMemo** (ÑÑ‚Ñ€Ð¾ÐºÐ¸ 3768-3819) Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€ÑƒÐµÑ‚ hall-Ð·Ð°ÐºÐ°Ð·Ñ‹ Ð¿Ð¾ `tableId` Ð¾Ð´Ð¸Ð½-Ðº-Ð¾Ð´Ð½Ð¾Ð¼Ñƒ Ñ‡ÐµÑ€ÐµÐ· `tableGroups[tableId]` â€” ÑÑ‚Ð°Ñ€Ñ‹Ðµ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ðµ Ð¸ Ð½Ð¾Ð²Ñ‹Ðµ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ñ‹Ðµ Ð·Ð°ÐºÐ°Ð·Ñ‹ ÑÑ‚Ð¾Ð»Ð° ÑÐ»Ð¸Ð²Ð°ÑŽÑ‚ÑÑ Ð² ÐžÐ”ÐÐ£ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÑƒ.
+3. **`filteredGroups` / `tabCounts`** (3862-3908) Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÑÐµÑ‚ Ñ‚Ð°Ð± Ð¿Ð¾ `!!openSessionByTableId[group.id]`. Ð•ÑÐ»Ð¸ ÑÐµÑÑÐ¸Ñ Ð½Ðµ Ð¾Ð±Ð½Ð°Ñ€ÑƒÐ¶ÐµÐ½Ð° â†’ Ð³Ñ€ÑƒÐ¿Ð¿Ð° Ð¸Ð´Ñ‘Ñ‚ Ð² Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹ÐµÂ», Ð½Ð¾ ÐºÐ¾Ð³Ð´Ð° ÑÐµÑÑÐ¸Ñ Ð¿Ð¾ÑÐ²Ð¸Ñ‚ÑÑ (Ð¿Ð¾ÑÐ»Ðµ stale expire), Ð’Ð¡Ð¯ Ð¾Ð±ÑŠÐµÐ´Ð¸Ð½Ñ‘Ð½Ð½Ð°Ñ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° Ð¿ÐµÑ€ÐµÐµÐ´ÐµÑ‚ Ð² Â«ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹ÐµÂ» â€” Ð²ÐºÐ»ÑŽÑ‡Ð°Ñ ÑÑ‚Ð°Ñ€Ñ‹Ðµ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ðµ Ð·Ð°ÐºÐ°Ð·Ñ‹.
+
+**Sequence of the bug:**
+- ÐžÑ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚ Ð·Ð°ÐºÑ€Ñ‹Ð²Ð°ÐµÑ‚ ÑÑ‚Ð¾Ð» â†’ `closeSession(sessionId, tableId)` â†’ TableSession.status = 'closed', Ð²ÑÐµ Orders = 'closed' (sessionHelpers.js:158-173).
+- Ð“Ð¾ÑÑ‚ÑŒ Ð·Ð°ÐºÐ°Ð·Ñ‹Ð²Ð°ÐµÑ‚ â†’ `getOrCreateSession` (sessionHelpers.js:69-88) Ð²Ð¸Ð´Ð¸Ñ‚, Ñ‡Ñ‚Ð¾ `status: 'open'` ÑÐµÑÑÐ¸Ð¹ Ð½ÐµÑ‚ â†’ ÑÐ¾Ð·Ð´Ð°Ñ‘Ñ‚ ÐÐžÐ’Ð£Ð® TableSession.
+- Guest SDK ÑÐ¾Ð·Ð´Ð°Ñ‘Ñ‚ Ð½Ð¾Ð²Ñ‹Ð¹ Order Ñ `table_session` = ID Ð½Ð¾Ð²Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸.
+- SOM Ð² Ñ‚ÐµÑ‡ÐµÐ½Ð¸Ðµ 30 ÑÐµÐº Ð½Ðµ Ð¿Ð¾Ð´Ñ…Ð²Ð°Ñ‚Ñ‹Ð²Ð°ÐµÑ‚ Ð½Ð¾Ð²ÑƒÑŽ ÑÐµÑÑÐ¸ÑŽ (staleTime). `orderGroups` Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€ÑƒÐµÑ‚ Ð½Ð¾Ð²Ñ‹Ð¹ Order Ð² Ñ‚Ð¾Ñ‚ Ð¶Ðµ `tableGroups[tableId]` Ñ‡Ñ‚Ð¾ Ð¸ ÑÑ‚Ð°Ñ€Ñ‹Ðµ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ðµ Orders. `openSessionByTableId[tableId]` = undefined â†’ Ð³Ñ€ÑƒÐ¿Ð¿Ð° Ð¸Ð´Ñ‘Ñ‚ Ð² Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹ÐµÂ».
+- ÐŸÐ¾ÑÐ»Ðµ refetch (30 ÑÐµÐº+) `openSessionByTableId[tableId]` Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚ÑÑ â†’ Ð²ÑÑ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° (Ð½Ð¾Ð²Ñ‹Ðµ + ÑÑ‚Ð°Ñ€Ñ‹Ðµ) Ð¿ÐµÑ€ÐµÐµÐ´ÐµÑ‚ Ð² Â«ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹ÐµÂ».
+
+**Ð¦ÐµÐ»ÑŒ Ñ„Ð¸ÐºÑÐ°:** Ð¾Ñ‚Ð´ÐµÐ»Ð¸Ñ‚ÑŒ Orders Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ Ð¾Ñ‚ Orders Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ñ… ÑÐµÑÑÐ¸Ð¹ Ð½Ð° ÑƒÑ€Ð¾Ð²Ð½Ðµ `orderGroups`, Ñ‡Ñ‚Ð¾Ð±Ñ‹ ÐºÐ°Ð¶Ð´Ð°Ñ ÑÐµÑÑÐ¸Ñ Ð¸Ð¼ÐµÐ»Ð° ÑÐ²Ð¾ÑŽ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÑƒ Ñ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ñ‹Ð¼ Ñ‚Ð°Ð±Ð¾Ð¼.
+
+---
+
+## UX Reference
+
+- Ð¡ÐºÑ€Ð¸Ð½ÑˆÐ¾Ñ‚Ñ‹: `pages/StaffOrdersMobile/screenshots/current/`
+- BUGS: `pages/StaffOrdersMobile/BUGS.md` Â§BUG-SM-015
+- Ð›Ð¾Ð³Ð¸ÐºÐ° Ñ‚Ð°Ð±Ð¾Ð² (SOM_Progress_S274 TL-01..TL-18): Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð°Ñ ÑÐµÑÑÐ¸Ñ Ð² Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹Ñ…Â» Ð¾ÑÑ‚Ð°Ñ‘Ñ‚ÑÑ visible, Ð½Ð¾Ð²Ð°Ñ ÑÐµÑÑÐ¸Ñ ÑÐ¾Ð·Ð´Ð°Ñ‘Ñ‚ Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½ÑƒÑŽ Ð·Ð°Ð¿Ð¸ÑÑŒ Ð² Â«ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹Ñ…Â».
+
+---
+
+## FROZEN UX / FROZEN BEHAVIOR (ÐÐ• ÐœÐ•ÐÐ¯Ð¢Ð¬)
+
+**Ð¡Ð¿Ð¸ÑÐ¾Ðº Ð¿Ñ€Ð°Ð²Ð¸Ð», ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ðµ Ð—ÐÐŸÐ Ð•Ð©Ð•ÐÐž Ð½Ð°Ñ€ÑƒÑˆÐ°Ñ‚ÑŒ Ð»ÑŽÐ±Ñ‹Ð¼ Fix:**
+
+- `effectivePollingInterval` (polling ÐºÐ°Ð¶Ð´Ñ‹Ðµ 10-60Ñ) â€” Ð½Ðµ Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ
+- `closeSession` Ñ„ÑƒÐ½ÐºÑ†Ð¸Ñ Ð² `sessionHelpers.js` â€” ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ (Ð‘2 Ñ„Ð¸ÐºÑ, Ð¿Ñ€Ð¾Ñ‚ÐµÑÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½)
+- `getOrCreateSession` Ð² `sessionHelpers.js` â€” ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ (guest-side Ð»Ð¾Ð³Ð¸ÐºÐ°)
+- `handleCloseTableClick` useCallback (ÑÑ‚Ñ€Ð¾ÐºÐ¸ ~2164-2177) â€” ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚Ñ€Ð°ÐºÑ‚ `onCloseTable(sessionId, identifier, tableId)`
+- `confirmCloseTable` handler (~4183-4197) â€” ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ Ñ„Ð»Ð¾Ñƒ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð¸Ñ
+- `activeOrders` status-Ñ„Ð¸Ð»ÑŒÑ‚Ñ€ (3593-3617) â€” ÐÐ• Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ (closed/cancelled exclusion)
+- `sortedStages`, `stagesMap`, `getStatusConfig` â€” ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ
+- `favorites` / `isFavorite` / `toggleFavorite` â€” Ð¿Ñ€Ð¸Ð²ÑÐ·ÐºÐ° Ðº `tableId`, ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚Ñ€Ð°ÐºÑ‚ (Ñ„Ð°Ð²Ð¾Ñ€Ð¸Ñ‚Ñ‹ Ð´Ð¾Ð»Ð¶Ð½Ñ‹ Ð²Ñ‹Ð¶Ð¸Ð²Ð°Ñ‚ÑŒ ÑÐ¼ÐµÐ½Ñƒ ÑÐµÑÑÐ¸Ð¸ â€” ÑÑ‚Ð¾ Ð¶ÐµÐ»Ð°ÐµÐ¼Ð¾Ðµ Ð¿Ð¾Ð²ÐµÐ´ÐµÐ½Ð¸Ðµ)
+- `["servedOrders", group.id]` queryKey â€” Ð¾ÑÑ‚Ð°Ð²Ð¸Ñ‚ÑŒ Ð½Ð° `group.id` (ÑÑ‚Ð¾ tableId; Ð¿ÐµÑ€ÐµÐ½Ð¾Ñ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ñ… served-Ð·Ð°ÐºÐ°Ð·Ð¾Ð² Ð² Ð½Ð¾Ð²ÑƒÑŽ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÑƒ Ð½Ðµ Ð½ÑƒÐ¶ÐµÐ½)
+- OrderGroupCard Ñ€ÐµÐ½Ð´ÐµÑ€ UI â€” ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ, Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¿Ñ€Ð¾Ð¿ÑÑ‹
+- Pickup/Delivery groups (`group.type !== 'table'`) â€” ÐÐ• Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ, Ð¿Ñ€Ð¾Ð´Ð¾Ð»Ð¶Ð°ÑŽÑ‚ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ `o.id` ÐºÐ°Ðº Ð³Ñ€ÑƒÐ¿Ð¿Ð°
+- Tab Ð¡Ñ‚Ð¾Ð» (Ð²Ð½ÑƒÑ‚Ñ€Ð¸ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ¸ ÑÑ‚Ð¾Ð»Ð°) â€” OUT OF SCOPE
+- i18n ÐºÐ»ÑŽÑ‡Ð¸ â€” ÐÐ• Ð´Ð¾Ð±Ð°Ð²Ð»ÑÑ‚ÑŒ
+- `buildBannerInfo` (~ÑÑ‚Ñ€Ð¾ÐºÐ¸ 4079-4090) â€” ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ (Ð¸ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº `banner.groupId` = tableId, Ð¿Ð¾Ñ‚Ñ€ÐµÐ±Ð»ÑÐµÑ‚ÑÑ `onNavigate`) [V5-L6]
+- `onNavigate(banner.groupId)` call-site (~ÑÑ‚Ñ€Ð¾ÐºÐ° 2825) â€” ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ; banner dispatcher Ð¿ÐµÑ€ÐµÐ´Ð°Ñ‘Ñ‚ Ñ‡Ð¸ÑÑ‚Ñ‹Ð¹ tableId [V5-L6]
+
+**SCOPE LOCK:**
+- âœ… ÐœÐ¾Ð¶Ð½Ð¾ Ð¼ÐµÐ½ÑÑ‚ÑŒ: `orderGroups` useMemo, `filteredGroups` useMemo, `tabCounts` useMemo, `openSessions` useQuery staleTime (Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ðµ), `data-group-id` Ð°Ñ‚Ñ€Ð¸Ð±ÑƒÑ‚ (Ñ‚Ð¾Ð»ÑŒÐºÐ¾ live JSX), `key={}` Ð´Ð»Ñ OrderGroupCard, `handleToggleExpand` Ð²Ñ‹Ð·Ð¾Ð², `handleBannerNavigate`, Ð¾Ð´Ð¸Ð½ Ð½Ð¾Ð²Ñ‹Ð¹ useEffect (Fix C)
+- â›” Ð—Ð°Ð¿Ñ€ÐµÑ‰ÐµÐ½Ð¾ Ð¼ÐµÐ½ÑÑ‚ÑŒ: sessionHelpers.js, useTableSession.jsx, OrderGroupCard Ð²Ð½ÑƒÑ‚Ñ€ÐµÐ½Ð½Ð¾ÑÑ‚Ð¸, Order/TableSession entities (B44), `queryKey: ["openSessions", partnerId]` Ð¼Ð°ÑÑÐ¸Ð² (Ñ‚Ð¾Ð»ÑŒÐºÐ¾ `staleTime` Ð²Ð½ÑƒÑ‚Ñ€Ð¸ Ð±Ð»Ð¾ÐºÐ°), Ð»ÑŽÐ±Ñ‹Ðµ Ð´Ñ€ÑƒÐ³Ð¸Ðµ useMemo/useQuery/useCallback Ð·Ð° Ð¿Ñ€ÐµÐ´ÐµÐ»Ð°Ð¼Ð¸ Ð¿ÐµÑ€ÐµÑ‡Ð¸ÑÐ»ÐµÐ½Ð½Ñ‹Ñ… Ð²Ñ‹ÑˆÐµ, i18n ÑÐ»Ð¾Ð²Ð°Ñ€Ð¸, Ð´Ñ€ÑƒÐ³Ð¸Ðµ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹, `buildBannerInfo`, `onNavigate(banner.groupId)` call-site
+
+---
+
+## Preparation (Ð²Ñ‹Ð¿Ð¾Ð»Ð½Ð¸Ñ‚ÑŒ ÐŸÐ•Ð Ð•Ð” Pre-flight) â€” [v3: C1, v4: L6 + M6, v5: L2 + M3]
+
+Ð Ð°Ð±Ð¾Ñ‡Ð°Ñ ÐºÐ¾Ð¿Ð¸Ñ (working copy) Ð¼Ð¾Ð¶ÐµÑ‚ Ð¾Ñ‚ÑÑ‚Ð°Ð²Ð°Ñ‚ÑŒ Ð¾Ñ‚ RELEASE-Ñ„Ð°Ð¹Ð»Ð° (HEAD Ð½Ð° Ð¼Ð¾Ð¼ÐµÐ½Ñ‚ Ð½Ð°Ð¿Ð¸ÑÐ°Ð½Ð¸Ñ ÐŸÐ¡Ð¡Ðš = 4617 ÑÑ‚Ñ€Ð¾Ðº, worktree Ð¼Ð¾Ð¶ÐµÑ‚ ÑÐ¾Ð´ÐµÑ€Ð¶Ð°Ñ‚ÑŒ Ð±Ð¾Ð»ÐµÐµ ÑÑ‚Ð°Ñ€ÑƒÑŽ Ð²ÐµÑ€ÑÐ¸ÑŽ). Ð¡Ð¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ Ð¿ÐµÑ€ÐµÐ´ Ð»ÑŽÐ±Ñ‹Ð¼Ð¸ Ð¿Ñ€Ð°Ð²ÐºÐ°Ð¼Ð¸:
+
+```bash
+# 0.0 [v5-L2] Ð—Ð°Ñ‰Ð¸Ñ‚Ð° Ð¾Ñ‚ Ð¿ÐµÑ€ÐµÐ·Ð°Ð¿Ð¸ÑÐ¸ Ð½ÐµÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ñ… Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹: gate Ñ‡ÐµÑ€ÐµÐ· git
+#     Ð•ÑÐ»Ð¸ working copy Ð¸Ð¼ÐµÐµÑ‚ uncommitted diff vs HEAD â€” STOP, ÑÐ¿Ñ€Ð¾ÑÐ¸Ñ‚ÑŒ Arman.
+if ! git diff --quiet -- pages/StaffOrdersMobile/staffordersmobile.jsx; then
+  echo "STOP: working copy has uncommitted changes vs HEAD."
+  echo "       Backup Ð±ÑƒÐ´ÐµÑ‚ ÑÐ¾Ð·Ð´Ð°Ð½ Ð² .bak, Ð½Ð¾ overwrite Ð¾Ñ‚ÐºÐ»Ð°Ð´Ñ‹Ð²Ð°ÐµÑ‚ÑÑ Ð´Ð¾ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ð¸Ñ Arman."
+  echo "       Ð’Ñ‹Ð¿Ð¾Ð»Ð½Ð¸: git status + git diff ... Ð¸ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸ safe to overwrite."
+  exit 1
+fi
+
+# 0.1 Backup working copy (Ð²ÑÐµÐ³Ð´Ð°, Ð´Ð°Ð¶Ðµ ÐµÑÐ»Ð¸ diff Ð¿ÑƒÑÑ‚Ð¾Ð¹ â€” ÑÑ‚Ñ€Ð°Ñ…Ð¾Ð²ÐºÐ°)
+if [ -f "pages/StaffOrdersMobile/staffordersmobile.jsx" ]; then
+  cp "pages/StaffOrdersMobile/staffordersmobile.jsx" \
+     "pages/StaffOrdersMobile/staffordersmobile.jsx.bak" 2>/dev/null || true
+fi
+
+# 1. Ð¡ÐºÐ¾Ð¿Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ RELEASE â†’ Ñ€Ð°Ð±Ð¾Ñ‡ÑƒÑŽ ÐºÐ¾Ð¿Ð¸ÑŽ
+cp "pages/StaffOrdersMobile/260415-01 StaffOrdersMobile RELEASE.jsx" \
+   "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: ÐºÐ¾Ð¼Ð°Ð½Ð´Ð° Ð·Ð°Ð²ÐµÑ€ÑˆÐ°ÐµÑ‚ÑÑ Ð±ÐµÐ· Ð¾ÑˆÐ¸Ð±ÐºÐ¸, Ñ€Ð°Ð±Ð¾Ñ‡Ð°Ñ ÐºÐ¾Ð¿Ð¸Ñ Ñ‚ÐµÐ¿ÐµÑ€ÑŒ = 4617 ÑÑ‚Ñ€Ð¾Ðº
+
+# 2. Pre-check: Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ñ‚ÑŒ origin `getLinkId` â€” ÑÑ‚Ð¾ Ð²Ð»Ð¸ÑÐµÑ‚ Ð½Ð° Fix C deps array
+grep -n "^import.*getLinkId\|^const getLinkId\|^function getLinkId\|from.*getLinkId" \
+     "pages/StaffOrdersMobile/staffordersmobile.jsx" | head -3
+# Ð’Ð°Ñ€Ð¸Ð°Ð½Ñ‚Ñ‹:
+#   - Import Ð¾Ñ‚ components/... Ð¸Ð»Ð¸ @/... â†’ `getLinkId` Ñ‡Ð¸ÑÑ‚Ð°Ñ, ÐÐ• Ð²ÐºÐ»ÑŽÑ‡Ð°Ñ‚ÑŒ Ð² Fix C useEffect deps.
+#   - `const getLinkId = ...` Ð²Ð½ÑƒÑ‚Ñ€Ð¸ ÐºÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚Ð° â†’ Ð²ÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÑŒ Ð² deps Ð˜Ð›Ð˜ Ð¾Ð±ÐµÑ€Ð½ÑƒÑ‚ÑŒ useCallback.
+#   - ÐÐµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾ â†’ `getLinkId` Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½ Ð³Ð´Ðµ-Ñ‚Ð¾ ÐµÑ‰Ñ‘; Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ `grep -rn "getLinkId" menuapp-code-review/` Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð½Ð°Ð¹Ñ‚Ð¸ origin Ð¿ÐµÑ€ÐµÐ´ Fix C.
+# Ð—Ð°Ñ„Ð¸ÐºÑÐ¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ Ñ€ÐµÐ·ÑƒÐ»ÑŒÑ‚Ð°Ñ‚ mental-flag â†’ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ÑÑ Ð¿Ñ€Ð¸ Ð¿Ñ€Ð¸Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¸ Fix C deps.
+
+# 3. [v5-M3] Pre-check: `queryClient` scope Ð´Ð»Ñ Fix C.
+#    Fix C Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ `queryClient.invalidateQueries(...)` â€” Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½Ð°Ñ Ð´Ð¾Ð»Ð¶Ð½Ð° Ð±Ñ‹Ñ‚ÑŒ Ð² scope
+#    Ð²Ð½ÑƒÑ‚Ñ€Ð¸ ÐºÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚Ð° StaffOrdersMobile Ñ‡ÐµÑ€ÐµÐ· `const queryClient = useQueryClient()`.
+grep -n "useQueryClient\|const queryClient" \
+     "pages/StaffOrdersMobile/staffordersmobile.jsx" | head -5
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: ÐºÐ°Ðº Ð¼Ð¸Ð½Ð¸Ð¼ÑƒÐ¼ 2 hits:
+#   - `import { ..., useQueryClient } from '@tanstack/react-query'` (Ð¸Ð»Ð¸ similar path)
+#   - `const queryClient = useQueryClient();` Ð²Ð½ÑƒÑ‚Ñ€Ð¸ ÐºÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚Ð°
+# Ð•ÑÐ»Ð¸ Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½Ð°Ñ Ð½Ð°Ð·Ð²Ð°Ð½Ð° Ð¸Ð½Ð°Ñ‡Ðµ (Ð½Ð°Ð¿Ñ€Ð¸Ð¼ÐµÑ€ `qc`, `qClient`) â†’ Ð¿ÐµÑ€ÐµÐ¸Ð¼ÐµÐ½Ð¾Ð²Ð°Ñ‚ÑŒ Ð² Fix C ÐºÐ¾Ð´ Ð½Ð¸Ð¶Ðµ.
+# Ð•ÑÐ»Ð¸ useQueryClient Ð½Ðµ Ð¸Ð¼Ð¿Ð¾Ñ€Ñ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½ â†’ STOP, ÑÐ¿Ñ€Ð¾ÑÐ¸Ñ‚ÑŒ Arman (Ð°Ñ€Ñ…Ð¸Ñ‚ÐµÐºÑ‚ÑƒÑ€Ð½Ð¾Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ðµ scope).
+
+# 4. [v5-L5] Pre-check: react import line â€” Ð´Ð»Ñ Fix C (useRef)
+grep -n "from 'react'" "pages/StaffOrdersMobile/staffordersmobile.jsx" | head -3
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ Ð»Ð¸Ð±Ð¾ Ð¾Ð´Ð½Ð¾linear `import { useState, useEffect, ... } from 'react';`
+# Ð»Ð¸Ð±Ð¾ multi-line. Ð•ÑÐ»Ð¸ multi-line (Ñ‡ÐµÑ€ÐµÐ· Ð·Ð°Ð¿ÑÑ‚ÑƒÑŽ Ð½Ð° Ð½ÐµÑÐºÐ¾Ð»ÑŒÐºÐ¾ ÑÑ‚Ñ€Ð¾Ðº) â†’ Ð·Ð°Ñ„Ð¸ÐºÑÐ¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ Ñ‚Ð¾Ñ‡Ð½ÑƒÑŽ Ñ„Ð¾Ñ€Ð¼Ñƒ
+# Ð´Ð»Ñ Edit Ð² Fix C (useRef Ð¼Ð¾Ð¶ÐµÑ‚ ÑƒÐ¶Ðµ Ð±Ñ‹Ñ‚ÑŒ Ð² ÑÐ¿Ð¸ÑÐºÐµ Ð¸Ð»Ð¸ Ð½ÑƒÐ¶Ð½Ð¾ Ð´Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ).
+grep -c "useRef" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: â‰¥1 (useRef ÑƒÐ¶Ðµ Ð¸Ð¼Ð¿Ð¾Ñ€Ñ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½) Ð¸Ð»Ð¸ 0 (Ð½ÑƒÐ¶Ð½Ð¾ Ð´Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ Ð² react import).
+```
+
+âš ï¸ Ð•ÑÐ»Ð¸ RELEASE-Ñ„Ð°Ð¹Ð» Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½ â€” STOP, ÑÐ¾Ð¾Ð±Ñ‰Ð¸Ñ‚ÑŒ Arman (deploy Ð½Ðµ Ð·Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½ Ð¸Ð»Ð¸ Ñ„Ð°Ð¹Ð» Ð² Ð´Ñ€ÑƒÐ³Ð¾Ð¼ Ð¼ÐµÑÑ‚Ðµ).
+
+---
+
+## Pre-flight (Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÑŒÐ½Ñ‹Ðµ ÐºÐ¾Ð¼Ð°Ð½Ð´Ñ‹ Ð”Ðž Ð¿Ñ€Ð°Ð²ÐºÐ¸)
+
+```bash
+# 1. ÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ Ñ€Ð°Ð·Ð¼ÐµÑ€ Ñ„Ð°Ð¹Ð»Ð°
+wc -l "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 4617 +70/-35 (Ð´Ð¸Ð°Ð¿Ð°Ð·Ð¾Ð½ 4582-4687). [v5-M5: Ð±Ñ‹Ð»Ð¾ Â«Â±35Â» Ñ‡Ñ‚Ð¾ Ð¼Ð°Ñ‚ÐµÐ¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ 4582-4652, Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ñ„Ð¾Ñ€Ð¼ÑƒÐ»Ð° ÑÐ²Ð½Ð°Ñ]
+
+# 2. ÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ Ñ‡Ñ‚Ð¾ RELEASE-Ñ„Ð°Ð¹Ð» ÑÐ¾Ð²Ð¿Ð°Ð´Ð°ÐµÑ‚ Ñ Ñ€Ð°Ð±Ð¾Ñ‡ÐµÐ¹ ÐºÐ¾Ð¿Ð¸ÐµÐ¹
+diff -q "pages/StaffOrdersMobile/staffordersmobile.jsx" \
+        "pages/StaffOrdersMobile/260415-01 StaffOrdersMobile RELEASE.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: Ð¿ÑƒÑÑ‚Ð¾. Ð•ÑÐ»Ð¸ diff ÐÐ•Ð¢Ð Ð˜Ð’Ð˜ÐÐ›Ð¬ÐÐ«Ð™ (Ð½Ðµ trailing newline) â†’ STOP, ÑÐ¿Ñ€Ð¾ÑÐ¸Ñ‚ÑŒ Arman.
+
+# 3. ÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ Ð¾Ð¶Ð¸Ð´Ð°ÐµÐ¼Ñ‹Ðµ ÑÑ‚Ñ€Ð¾ÐºÐ¸ Ð´Ð»Ñ grep-ÑÐºÐ¾Ñ€ÐµÐ¹
+grep -n "staleTime: 30_000" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~3548 Ð²Ð½ÑƒÑ‚Ñ€Ð¸ openSessions useQuery.
+
+# 3a. [v5-C1] ÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ real queryKey shape Ð´Ð»Ñ openSessions
+grep -n 'queryKey: \["openSessions"' "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~3542, Ñ‚ÐµÐºÑÑ‚ `queryKey: ["openSessions", partnerId],`.
+# ÐÐ• Ð¿ÑƒÑ‚Ð°Ñ‚ÑŒ Ñ `invalidateQueries({ queryKey: ["openSessions"] })` â€” Ñ‚Ð°Ð¼ prefix invalidate legit.
+
+grep -n "const orderGroups = useMemo" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~3768.
+
+grep -n "const filteredGroups = useMemo" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~3862.
+
+grep -n "const tabCounts = useMemo" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~3886.
+
+# 4. [v5-M2] Pre-pin counts Ð´Ð»Ñ Ð²ÑÐµÑ… 4 Fix B.4 Edit anchors
+grep -n "key={group.id}" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: â‰¥1 hit Ð² v2SortedGroups.map (~4458). ÐœÐ¾Ð¶ÐµÑ‚ Ð±Ñ‹Ñ‚ÑŒ >1 â€” Ñ‚Ð¾Ð³Ð´Ð° Ð¿Ð¸Ð½Ñ‹ Ð¿Ð¾ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚Ñƒ (ÑÐ¼. B.4 Ð½Ð¸Ð¶Ðµ).
+
+grep -n "expandedGroupId === group.id" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~4461 (OrderGroupCard prop).
+
+grep -n "onToggleExpand={() => handleToggleExpand(group.id)}" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~4462.
+
+grep -n "isHighlighted={highlightGroupId === group.id}" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit (Ð´Ð¾Ð»Ð¶ÐµÐ½ Ð±Ñ‹Ñ‚ÑŒ Ð²Ð½ÑƒÑ‚Ñ€Ð¸ v2SortedGroups.map).
+# Ð•ÑÐ»Ð¸ hits != 1 â€” STOP, Ð¿Ñ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ pickup/delivery map (Ð½Ðµ Ð¼ÐµÐ½ÑÑ‚ÑŒ ÐµÐ³Ð¾ prop highlightGroupId).
+
+# 5. [v5-M1] Pre-pin Ð´Ð»Ñ data-group-id: Ñ€Ð°Ð·Ð»Ð¸Ñ‡Ð°Ñ‚ÑŒ live JSX vs block-comment
+grep -n "data-group-id={group.id}" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: Ñ€Ð¾Ð²Ð½Ð¾ 3 hits (~565, ~1173, ~2292).
+# âš ï¸ [v5-M1] Ð˜Ð— ÐÐ˜Ð¥: Ñ‚Ð¾Ð»ÑŒÐºÐ¾ ~2292 = live JSX Ð²Ð½ÑƒÑ‚Ñ€Ð¸ Ñ€ÐµÐ°Ð»ÑŒÐ½Ð¾Ð³Ð¾ OrderGroupCard Ñ€ÐµÐ½Ð´ÐµÑ€Ð°.
+#    ~565 Ð¸ ~1173 Ð½Ð°Ñ…Ð¾Ð´ÑÑ‚ÑÑ Ð²Ð½ÑƒÑ‚Ñ€Ð¸ block-comment (legacy snapshot Ð¸Ð»Ð¸ docstring).
+# Ð’Ð¸Ð·ÑƒÐ°Ð»ÑŒÐ½Ð°Ñ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ°: sed -n '560,570p' Ð¸ sed -n '1168,1178p' â†’ Ð´Ð¾Ð»Ð¶Ð½Ñ‹ ÑÐ¾Ð´ÐµÑ€Ð¶Ð°Ñ‚ÑŒ `/*` Ð¸Ð»Ð¸ `*/` Ð²Ð¾ÐºÑ€ÑƒÐ³.
+sed -n '560,575p' "pages/StaffOrdersMobile/staffordersmobile.jsx" | head -20
+sed -n '1168,1180p' "pages/StaffOrdersMobile/staffordersmobile.jsx" | head -15
+
+# 6. [v5-C3] handleBannerNavigate â€” CALL-CHAIN CHECK (Ð½Ðµ hit-count gate!)
+grep -n "handleBannerNavigate" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: Ð ÐžÐ’ÐÐž 2 direct hits:
+#   - ÑÑ‚Ñ€Ð¾ÐºÐ° ~4142: `const handleBannerNavigate = useCallback(...)`  (Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ðµ)
+#   - ÑÑ‚Ñ€Ð¾ÐºÐ° ~4610: `onNavigate={handleBannerNavigate}`              (prop pass Ð² banner ÐºÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚)
+# Ð•ÑÐ»Ð¸ hits != 2 â€” STOP, Ð¿Ñ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ ÑÑ‚Ñ€ÑƒÐºÑ‚ÑƒÑ€Ñƒ Ð²Ñ€ÑƒÑ‡Ð½ÑƒÑŽ.
+
+grep -n "onNavigate(banner.groupId)" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~2825 (indirect call Ð¸Ð· banner-ÐºÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚Ð°).
+# banner.groupId = tableId (ÑÐ¼. buildBannerInfo ~4079-4090, Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ `groupId: table.id`).
+
+grep -n "buildBannerInfo\|banner\.groupId" "pages/StaffOrdersMobile/staffordersmobile.jsx" | head -10
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: â‰¥3 hits â€” Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ðµ buildBannerInfo ~4079-4090 + Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ð½Ð¸Ðµ banner.groupId Ð² dispatcher.
+# Ð­Ñ‚Ð¾ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´Ð°ÐµÑ‚: handleBannerNavigate Ð’Ð¡Ð•Ð“Ð”Ð Ð¿Ð¾Ð»ÑƒÑ‡Ð°ÐµÑ‚ tableId (Ð½Ðµ compositeKey), Ð¸ Fix B.6
+# Ð”ÐžÐ›Ð–Ð•Ð Ñ€ÐµÐ·Ð¾Ð»Ð²Ð¸Ñ‚ÑŒ tableId â†’ compositeKey (defensive Ð²ÐµÑ€ÑÐ¸Ñ ÑÐ¿Ñ€Ð°Ð²Ð»ÑÐµÑ‚ÑÑ).
+```
+
+Ð•ÑÐ»Ð¸ Ð»ÑŽÐ±Ð¾Ð¹ grep Ð´Ð°Ð» Ð´Ñ€ÑƒÐ³Ð¾Ðµ ÐºÐ¾Ð»Ð¸Ñ‡ÐµÑÑ‚Ð²Ð¾ â€” STOP Ð¸ ÑÐ²ÐµÑ€ÑÑ‚ÑŒÑÑ Ñ Arman. ÐÐ• Ð¿Ñ€Ð¾Ð´Ð¾Ð»Ð¶Ð°Ñ‚ÑŒ Ñ€Ð°Ð±Ð¾Ñ‚Ñƒ Ð¿Ð¾ Ð½ÐµÐ²ÐµÑ€Ð½Ñ‹Ð¼ ÑÐºÐ¾Ñ€ÑÐ¼.
+
+**[v4-M9] Semantic anchor rule:** grep count â€” Ð½ÐµÐ¾Ð±Ñ…Ð¾Ð´Ð¸Ð¼Ð¾Ðµ ÑƒÑÐ»Ð¾Ð²Ð¸Ðµ, Ð½Ð¾ ÐÐ• Ð´Ð¾ÑÑ‚Ð°Ñ‚Ð¾Ñ‡Ð½Ð¾Ðµ. ÐŸÐµÑ€ÐµÐ´ ÐºÐ°Ð¶Ð´Ð¾Ð¹ Ð·Ð°Ð¼ÐµÐ½Ð¾Ð¹ ÑƒÐ±ÐµÐ´Ð¸Ñ‚ÑŒÑÑ, Ñ‡Ñ‚Ð¾ Ð½Ð°Ð¹Ð´ÐµÐ½Ð½Ð°Ñ ÑÑ‚Ñ€Ð¾ÐºÐ° Ð¿Ñ€Ð¸Ð½Ð°Ð´Ð»ÐµÐ¶Ð¸Ñ‚ Ð¾Ð¶Ð¸Ð´Ð°ÐµÐ¼Ð¾Ð¹ Ñ„ÑƒÐ½ÐºÑ†Ð¸Ð¸ (Ñ‡Ð¸Ñ‚Ð°Ñ‚ÑŒ 3-5 ÑÑ‚Ñ€Ð¾Ðº Ð²Ð¾ÐºÑ€ÑƒÐ³ match: `sed -n '${LINE-3},${LINE+3}p'`). Ð•ÑÐ»Ð¸ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚ Ð½Ðµ ÑÐ¾Ð²Ð¿Ð°Ð´Ð°ÐµÑ‚ â€” STOP.
+
+---
+
+## Fix Priority & Dependencies
+
+**ÐŸÐ¾Ñ€ÑÐ´Ð¾Ðº Ð¿Ñ€Ð¸Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ:**
+1. Fix A Ð¿ÐµÑ€Ð²Ñ‹Ð¼ (Ð¾Ð´Ð½Ð° ÑÑ‚Ñ€Ð¾ÐºÐ°, Ð½Ðµ Ð»Ð¾Ð¼Ð°ÐµÑ‚ Ð½Ð¸Ñ‡ÐµÐ³Ð¾).
+2. Fix B Ð²Ñ‚Ð¾Ñ€Ñ‹Ð¼ (Ð¾ÑÐ½Ð¾Ð²Ð½Ð¾Ð¹ UX-Ñ„Ð¸ÐºÑ, Ñ‚Ñ€ÐµÐ±ÑƒÐµÑ‚ ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð½Ñ‹Ñ… Ð¿Ñ€Ð°Ð²Ð¾Ðº 5 Ð¼ÐµÑÑ‚).
+3. Fix C Ð¿Ð¾ÑÐ»ÐµÐ´Ð½Ð¸Ð¼ (Ð·Ð°Ð²Ð¸ÑÐ¸Ñ‚ Ð¾Ñ‚ Ñ‚Ð¸Ð¿Ð° group Ð¸Ð· Fix B â€” `group.sessionId`).
+
+âš ï¸ **ORDER:** Fix B MUST be applied before Fix C (Fix C Ñ‡Ð¸Ñ‚Ð°ÐµÑ‚ `group.sessionId` field, ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ð¹ ÑÐ¾Ð·Ð´Ð°Ñ‘Ñ‚ÑÑ Ð² Fix B).
+
+Ð•ÑÐ»Ð¸ Ð¾Ð´Ð¸Ð½ Ð¸Ð· Fix Ð¿Ñ€Ð¾Ð²Ð°Ð»Ð¸Ð²Ð°ÐµÑ‚ÑÑ (syntax error / conflict) â†’ Ð¾Ñ‚ÐºÐ°Ñ‚Ð¸Ñ‚ÑŒ Ð¢ÐžÐ›Ð¬ÐšÐž ÑÑ‚Ð¾Ñ‚ Fix, Ð¾ÑÑ‚Ð°Ð»ÑŒÐ½Ñ‹Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ. Fix A + Fix B Ð´Ð°ÑŽÑ‚ 80% ÑÑ„Ñ„ÐµÐºÑ‚Ð°. Fix C â€” optimization.
+
+---
+
+## Identifier Contract (ÐšÐ Ð˜Ð¢Ð˜Ð§ÐÐž â€” Ñ‡Ð¸Ñ‚Ð°Ñ‚ÑŒ Ð”Ðž Fix B) â€” [v4-C2, v5-L6]
+
+Ð’ Fix B Ð²Ð²Ð¾Ð´Ð¸Ñ‚ÑÑ Ð½Ð¾Ð²Ð¾Ðµ Ð¿Ð¾Ð»Ðµ `group.compositeKey` (= `${tableId}__${sessionId}`). Ð­Ñ‚Ð¾ ÑÐ¾Ð·Ð´Ð°Ñ‘Ñ‚ Ð”Ð’Ð Ñ€Ð°Ð·Ð½Ñ‹Ñ… Ñ‚Ð¸Ð¿Ð° Ð¸Ð´ÐµÐ½Ñ‚Ð¸Ñ„Ð¸ÐºÐ°Ñ‚Ð¾Ñ€Ð¾Ð² Ð² OrderGroupCard'Ð°Ñ…. Ð›ÑŽÐ±Ð°Ñ Ð¿ÑƒÑ‚Ð°Ð½Ð¸Ñ†Ð° Ð»Ð¾Ð¼Ð°ÐµÑ‚ Ñ„ÑƒÐ½ÐºÑ†Ð¸Ð¾Ð½Ð°Ð». Ð­Ñ‚Ð° Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° â€” ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½Ñ‹Ð¹ Ð¸ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº Ð¸ÑÑ‚Ð¸Ð½Ñ‹:
+
+| Ð“Ð´Ðµ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ | Ð˜Ð´ÐµÐ½Ñ‚Ð¸Ñ„Ð¸ÐºÐ°Ñ‚Ð¾Ñ€ | ÐŸÐ¾Ñ‡ÐµÐ¼Ñƒ | ÐœÐµÐ½ÑÐµÐ¼ Ð»Ð¸ Ð² Fix B? |
+|---|---|---|---|
+| **Render identity** (Ð²Ð¸Ð·ÑƒÐ°Ð»ÑŒÐ½Ð°Ñ, UI) | | | |
+| `key={...}` Ð´Ð»Ñ OrderGroupCard Ð² map | `group.compositeKey` | React reconciliation â€” ÐºÐ°Ð¶Ð´Ð°Ñ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° ÑƒÐ½Ð¸ÐºÐ°Ð»ÑŒÐ½Ð° | âœ… Ð”Ð (Fix B.4) |
+| `data-group-id={...}` Ð°Ñ‚Ñ€Ð¸Ð±ÑƒÑ‚ (live JSX @ ~2292) | `group.compositeKey` | DOM-ÑÐµÐ»ÐµÐºÑ‚Ð¾Ñ€ Ð´Ð»Ñ banner scroll | âœ… Ð”Ð (Fix B.5) |
+| `expandedGroupId === group.compositeKey` | `group.compositeKey` | ÐºÐ°Ð¶Ð´Ð°Ñ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° expand/collapse Ð½ÐµÐ·Ð°Ð²Ð¸ÑÐ¸Ð¼Ð¾ | âœ… Ð”Ð (Fix B.4) |
+| `highlightGroupId === group.compositeKey` | `group.compositeKey` | Ð¿Ð¾Ð´ÑÐ²ÐµÑ‚ÐºÐ° Ð¿Ð¾ÑÐ»Ðµ banner-navigate | âœ… Ð”Ð (Fix B.4) |
+| `handleToggleExpand(group.compositeKey)` | `group.compositeKey` | Ð¿ÐµÑ€ÐµÐ´Ð°Ñ‘Ñ‚ÑÑ Ð² setExpandedGroupId | âœ… Ð”Ð (Fix B.4) |
+| Tab bucketing (active/completed) â€” `isCurrentOpenSession` | `group.sessionId` (Ð¿Ð¾Ð»Ðµ) ÑÑ€Ð°Ð²Ð½Ð¸Ð²Ð°ÐµÑ‚ÑÑ Ñ `openSessionByTableId[group.id]?.id` | ÐºÐ°Ð¶Ð´Ð°Ñ ÑÐµÑÑÐ¸Ñ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÑÐµÑ‚ ÑÐ²Ð¾Ð¹ Ñ‚Ð°Ð± Ð½ÐµÐ·Ð°Ð²Ð¸ÑÐ¸Ð¼Ð¾ | âœ… Ð”Ð (Fix B.2/B.3) |
+| `setExpandedGroupId(targetKey)` Ð² banner-navigate | `compositeKey` (Ñ€ÐµÐ·Ð¾Ð»Ð² Ð¸Ð· tableId Ñ‡ÐµÑ€ÐµÐ· defensive helper) | scroll Ð¸ expand Ð¾Ð´Ð½Ð¾Ð¹ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ¸ | âœ… Ð”Ð (Fix B.6) |
+| **Business identity** (Ð´Ð¾Ð¼ÐµÐ½, Ð‘Ð”, ÐºÑÑˆ) | | | |
+| `isFavorite('table', group.id)` | `group.id` (= tableId) | favorites Ð¿Ñ€Ð¸Ð²ÑÐ·Ð°Ð½Ñ‹ Ðº ÑÑ‚Ð¾Ð»Ñƒ, Ð²Ñ‹Ð¶Ð¸Ð²Ð°ÑŽÑ‚ ÑÐ¼ÐµÐ½Ñƒ ÑÐµÑÑÐ¸Ð¸ | â›” ÐÐ•Ð¢ |
+| `toggleFavorite('table', group.id)` | `group.id` (= tableId) | Ñ‚Ð¾ Ð¶Ðµ | â›” ÐÐ•Ð¢ |
+| `["servedOrders", group.id]` queryKey | `group.id` (= tableId) | served orders persist Ñ‡ÐµÑ€ÐµÐ· ÑÐµÑÑÐ¸Ð¸ (history ÑÑ‚Ð¾Ð»Ð°) | â›” ÐÐ•Ð¢ |
+| `onCloseTable(group.openSessionId, group.displayName, group.id)` | `group.openSessionId` + `group.id` | Ð·Ð°ÐºÑ€Ñ‹Ð²Ð°ÐµÐ¼ ÑÐµÑÑÐ¸ÑŽ Ð´Ð»Ñ ÐºÐ¾Ð½ÐºÑ€ÐµÑ‚Ð½Ð¾Ð³Ð¾ ÑÑ‚Ð¾Ð»Ð° | â›” ÐÐ•Ð¢ |
+| `tableMap[tableId]` lookup | `group.id` (= tableId) | Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° ÑÐ¿Ñ€Ð°Ð²Ð¾Ñ‡Ð½Ð¸ÐºÐ¾Ð² ÑÑ‚Ð¾Ð»Ð¾Ð² Ð² B44 | â›” ÐÐ•Ð¢ |
+| `getLinkId(req.table) === group.id` Ð² `hasActiveRequest` | `group.id` (= tableId) | ServiceRequest Ð¿Ñ€Ð¸Ð²ÑÐ·Ð°Ð½ Ðº tableId | â›” ÐÐ•Ð¢ |
+| `Order.table_session` Ð² Ð‘Ð” | NEVER Ð˜Ð—ÐœÐ•ÐÐ¯Ð¢Ð¬ | source of truth Ð´Ð»Ñ Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€Ð¾Ð²ÐºÐ¸ | â›” ÐÐ•Ð¢ |
+| **Upstream (banner dispatcher â†’ handleBannerNavigate)** â€” [V5-L6] | | | |
+| `onNavigate(banner.groupId)` call @ ~2825 | `banner.groupId` = tableId (Ð¸Ð· `buildBannerInfo` @ ~4079-4090) | banner Ð·Ð½Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ tableId (Ð¾Ð´Ð¸Ð½ Ð±Ð°Ð½ÐµÑ€ Ð½Ð° ÑÑ‚Ð¾Ð») | â›” ÐÐ•Ð¢ (upstream) |
+| `buildBannerInfo` return `{ groupId: table.id, ... }` @ ~4079-4090 | tableId | banner Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°ÐµÑ‚ alert Ð¿Ñ€Ð¾ ÑÑ‚Ð¾Ð», Ð½Ðµ Ð¿Ñ€Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½ÑƒÑŽ ÑÐµÑÑÐ¸ÑŽ | â›” ÐÐ•Ð¢ (upstream) |
+| Ð’Ð½ÑƒÑ‚Ñ€Ð¸ `handleBannerNavigate` Ñ‚ÐµÐ»Ð¾ | Ð¿Ñ€Ð¸Ð½Ð¸Ð¼Ð°ÐµÑ‚ tableId, Ñ€ÐµÐ·Ð¾Ð»Ð²Ð¸Ñ‚ Ð² compositeKey | defensive â€” Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð¸ Ñ Ñ‡Ð¸ÑÑ‚Ñ‹Ð¼ tableId (Ð½Ð°Ñˆ ÑÐ»ÑƒÑ‡Ð°Ð¹) Ð¸ Ñ compositeKey (Ð½Ðµ Ð²ÑÑ‚Ñ€ÐµÑ‡Ð°ÐµÑ‚ÑÑ today, Ð½Ð¾ Ð±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ð¾) | âœ… Ð”Ð (Fix B.6) |
+
+âš ï¸ **ÐŸÑ€Ð°Ð²Ð¸Ð»Ð¾ Ð¿Ñ€Ð¸ Ð¿Ñ€Ð°Ð²ÐºÐµ:** ÐµÑÐ»Ð¸ ÐºÐ¾Ð´ Â«Ñ‚Ñ€Ð¾Ð³Ð°ÐµÑ‚ DOM/React stateÂ» â†’ `compositeKey`. Ð•ÑÐ»Ð¸ ÐºÐ¾Ð´ Â«Ñ‚Ñ€Ð¾Ð³Ð°ÐµÑ‚ B44 entity / API / favorites / upstream bannerÂ» â†’ `tableId` (= `group.id`).
+
+âš ï¸ **ÐÐ½Ñ‚Ð¸-Ð¿Ð°Ñ‚Ñ‚ÐµÑ€Ð½:** Ð·Ð°Ð¼ÐµÐ½Ð° `group.id` â†’ `group.compositeKey` Ð³Ð»Ð¾Ð±Ð°Ð»ÑŒÐ½Ð¾ Ñ‡ÐµÑ€ÐµÐ· find-replace Ð¡Ð›ÐžÐœÐÐ•Ð¢ favorites + servedOrders + close-table + upstream banner. Ð¢Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¼ÐµÑÑ‚Ð°Ñ… Ð¸Ð· Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹ Ð²Ñ‹ÑˆÐµ.
+
+âš ï¸ **Call-chain Ð´Ð»Ñ banner-navigate:** `buildBannerInfo â†’ banner.groupId (tableId) â†’ onNavigate(banner.groupId) @ 2825 â†’ prop onNavigate @ 4610 â†’ handleBannerNavigate @ 4142 â†’ defensive Ñ€ÐµÐ·Ð¾Ð»Ð² â†’ compositeKey â†’ scroll+expand`. handleBannerNavigate â€” ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½Ð°Ñ Ñ‚Ð¾Ñ‡ÐºÐ° Ð¿Ñ€ÐµÐ¾Ð±Ñ€Ð°Ð·Ð¾Ð²Ð°Ð½Ð¸Ñ tableId â†’ compositeKey.
+
+---
+
+## Codex Execution Mode (Ð´Ð»Ñ codex-writer-v2 step) â€” [v4-M8, v5-M4 ÑƒÐ¿Ñ€Ð¾Ñ‰Ñ‘Ð½]
+
+`staffordersmobile.jsx` = 4617 ÑÑ‚Ñ€Ð¾Ðº. ÐÐ° Windows Codex CLI chanced to timeout Ð¿Ñ€Ð¸ Ð±Ð¾Ð»ÑŒÑˆÐ¸Ñ… inline prompt'Ð°Ñ…. Ð•Ð´Ð¸Ð½Ñ‹Ð¹ supported Ð¿ÑƒÑ‚ÑŒ:
+
+1. **Self-read Ñ‡ÐµÑ€ÐµÐ· tool `Read` (MCP/Claude).** Ð•ÑÐ»Ð¸ Ð´Ð¾ÑÑ‚ÑƒÐ¿ÐµÐ½ Read tool â€” Ñ‡Ð¸Ñ‚Ð°Ð¹ Ñ€Ð°Ð±Ð¾Ñ‡ÑƒÑŽ ÐºÐ¾Ð¿Ð¸ÑŽ Ð½Ð°Ð¿Ñ€ÑÐ¼ÑƒÑŽ: `pages/StaffOrdersMobile/staffordersmobile.jsx`. Ð”Ð»Ñ Ð±Ð¾Ð»ÑŒÑˆÐ¸Ñ… Ñ„Ð°Ð¹Ð»Ð¾Ð² Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐ¹ `offset`/`limit` Ð¿Ð°Ñ€Ð°Ð¼ÐµÑ‚Ñ€Ñ‹ Read Ð´Ð»Ñ range-reads (50-100 ÑÑ‚Ñ€Ð¾Ðº Ð²Ð¾ÐºÑ€ÑƒÐ³ ÑÐºÐ¾Ñ€Ñ).
+
+2. **Ð•ÑÐ»Ð¸ Read tool Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿ÐµÐ½:** Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐ¹ bash `grep -n` + `sed -n 'X,Yp'` (10-30 ÑÑ‚Ñ€Ð¾Ðº Ð²Ð¾ÐºÑ€ÑƒÐ³ ÑÐºÐ¾Ñ€Ñ) Ñ‡ÐµÑ€ÐµÐ· Ð¾Ð´Ð¸Ð½ shell-pass. ÐÐ• Ð·Ð°Ð¿ÑƒÑÐºÐ°Ð¹ PowerShell wrappers (timeout >15s).
+
+3. **Output path (findings):** Ð¿Ð¸ÑˆÐ¸ Ð² ÑÐ¾Ð³Ð»Ð°ÑÐ¾Ð²Ð°Ð½Ð½Ñ‹Ð¹ chain-state path (watcher v5.3+ KB-165 retrieval Ð°ÐºÑ‚Ð¸Ð²ÐµÐ½ â€” Ð´Ð°Ð¶Ðµ ÐµÑÐ»Ð¸ sandbox Ð±Ð»Ð¾ÐºÐ¸Ñ€ÑƒÐµÑ‚ write, Cowork Ð¸Ð·Ð²Ð»ÐµÑ‡Ñ‘Ñ‚ findings Ð¸Ð· task.log). ÐÐ• ÑÐ¾Ð·Ð´Ð°Ð²Ð°Ð¹ side-Ñ„Ð°Ð¹Ð»Ñ‹ `result-codex.md` Ð¸Ð»Ð¸ Ð²Ñ€ÐµÐ¼ÐµÐ½Ð½Ñ‹Ðµ markdown-Ñ„Ð°Ð¹Ð»Ñ‹ Ð² Ñ€Ð°Ð±Ð¾Ñ‡ÐµÐ¼ ÐºÐ°Ñ‚Ð°Ð»Ð¾Ð³Ðµ Ñ€ÐµÐ¿Ð¾ â€” Ð¾Ð½Ð¸ Ð¼Ð¾Ð³ÑƒÑ‚ ÑÐ»ÑƒÑ‡Ð°Ð¹Ð½Ð¾ Ð¿Ð¾Ð¿Ð°ÑÑ‚ÑŒ Ð² git commit.
+
+4. **Ð—Ð°Ð¿Ñ€ÐµÑ‰ÐµÐ½Ð¾:**
+   - Ð—Ð°Ð³Ñ€ÑƒÐ¶Ð°Ñ‚ÑŒ **Ð²ÐµÑÑŒ** Ñ„Ð°Ð¹Ð» Ð² ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚ (4617 ÑÑ‚Ñ€Ð¾Ðº, ~250 KB).
+   - Inline JSON dump Ð¿Ð¾Ð»Ð½Ð¾Ð³Ð¾ Ñ„Ð°Ð¹Ð»Ð° Ð² response.
+   - Ð—Ð°Ð¿ÑƒÑÐº Ð´Ð»Ð¸Ð½Ð½Ñ‹Ñ… PowerShell-Ð¾Ð±Ñ‘Ñ€Ñ‚Ð¾Ðº (>10 ÑÐµÐºÑƒÐ½Ð´ startup) â€” ÑÑ‚Ð¾ Ñ‚Ð°Ð¹Ð¼Ð°ÑƒÑ‚Ð¸Ñ‚ Codex.
+
+5. **Ð’Ñ€ÐµÐ¼Ñ.** Ð¦ÐµÐ»ÐµÐ²Ð¾Ðµ Ð²Ñ€ÐµÐ¼Ñ Codex review: 8-15 Ð¼Ð¸Ð½ÑƒÑ‚. Ð•ÑÐ»Ð¸ ÑƒÐ¿Ñ‘Ñ€ÑÑ Ð² Ñ‚ÐµÑ…Ð½Ð¸Ñ‡ÐµÑÐºÐ¸Ð¹ blocker (sandbox, timeout) â€” Ñ„Ð¸ÐºÑÐ¸Ñ€ÑƒÐ¹ Ð² findings Ð¸ Ð¿Ñ€Ð¾Ð´Ð¾Ð»Ð¶Ð°Ð¹ ÑÐ¾ ÑÐ»ÐµÐ´ÑƒÑŽÑ‰Ð¸Ð¼ Fix. ÐÐµ Ð±Ð»Ð¾ÐºÐ¸Ñ€ÑƒÐ¹ÑÑ.
+
+---
+
+## Fix A: staleTime Ð´Ð»Ñ openSessions 30s â†’ 5s
+
+### Ð¡Ñ‚Ð°Ñ‚ÑƒÑ: [FIX]
+**ÐŸÑ€Ð¾Ð±Ð»ÐµÐ¼Ð° (verified):** `staleTime: 30_000` Ð² `openSessions` useQuery (ÑÑ‚Ñ€Ð¾ÐºÐ° ~3548) Ð¾Ð·Ð½Ð°Ñ‡Ð°ÐµÑ‚, Ñ‡Ñ‚Ð¾ Ð¿Ð¾ÑÐ»Ðµ ÑÐ¾Ð·Ð´Ð°Ð½Ð¸Ñ Ð½Ð¾Ð²Ð¾Ð¹ TableSession Ð½Ð° Base44 SOM Ð½Ðµ Ð±ÑƒÐ´ÐµÑ‚ ÐµÑ‘ Ð²Ð¸Ð´ÐµÑ‚ÑŒ Ð´Ð¾ 30 ÑÐµÐºÑƒÐ½Ð´. Ð’ÑÑ‘ ÑÑ‚Ð¾ Ð²Ñ€ÐµÐ¼Ñ Ð½Ð¾Ð²Ñ‹Ðµ Orders Ð¾Ñ‚Ð¾Ð±Ñ€Ð°Ð¶Ð°ÑŽÑ‚ÑÑ Ð² ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐµ ÑÑ‚Ð°Ñ€Ð¾Ð¹ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸.
+
+### Change
+
+**Grep-ÑÐºÐ¾Ñ€ÑŒ:** `staleTime: 30_000` (Ð¾Ð¶Ð¸Ð´Ð°ÐµÑ‚ÑÑ 1 hit, Ð² Ð±Ð»Ð¾ÐºÐµ `openSessions` useQuery, ÑÑ‚Ñ€Ð¾ÐºÐ¸ 3541-3552).
+
+**Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ ÐºÐ¾Ð´ (ÑÑ‚Ñ€Ð¾ÐºÐ° ~3548):**
+```js
+    enabled: canFetch && !!partnerId && !rateLimitHit,
+    staleTime: 30_000,
+    refetchInterval: effectivePollingInterval,
+```
+
+**ÐÐ¾Ð²Ñ‹Ð¹ ÐºÐ¾Ð´ (Ð·Ð°Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ñ€Ð¾Ð²Ð½Ð¾ Ð¾Ð´Ð½Ñƒ ÑÑ‚Ñ€Ð¾ÐºÑƒ):**
+```js
+    enabled: canFetch && !!partnerId && !rateLimitHit,
+    staleTime: 5_000,
+    refetchInterval: effectivePollingInterval,
+```
+
+### Should NOT â€” [v4-M1, v5-C1]
+
+**Ð¦ÐµÐ»ÐµÐ²Ð¾Ð¹ queryKey:** `["openSessions", partnerId]` (1 hit @ ~3542). **ÐÐ• ÐœÐ•ÐÐ¯Ð¢Ð¬** queryKey shape â€” ÑÑ‚Ð¾ Ð¿Ð¾Ð²Ð»Ð¸ÑÐµÑ‚ Ð½Ð° ÐºÑÑˆ-Ð¿Ð°Ñ€Ñ‚Ð¸Ñ†Ð¸Ð¾Ð½Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ðµ Ð¸ ÑÐ»Ð¾Ð¼Ð°ÐµÑ‚ Ð²ÑÐµ Ð¼ÐµÑÑ‚Ð°, ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ðµ Ñ‡Ð¸Ñ‚Ð°ÑŽÑ‚ cache Ð´Ð»Ñ ÐºÐ¾Ð½ÐºÑ€ÐµÑ‚Ð½Ð¾Ð³Ð¾ partner. [V5-C1]
+
+**Ð’Ð°Ð¶Ð½Ð¾:** `queryClient.invalidateQueries({ queryKey: ["openSessions"] })` Ð² Fix C Ð½Ð¸Ð¶Ðµ â€” ÑÑ‚Ð¾ **prefix invalidate** (react-query Ð¿Ð¾ ÑƒÐ¼Ð¾Ð»Ñ‡Ð°Ð½Ð¸ÑŽ Ð¼Ð°Ñ‚Ñ‡Ð¸Ñ‚ `["openSessions", partnerId]` Ñ‡ÐµÑ€ÐµÐ· `exact: false`). ÐÐ• Ð½ÑƒÐ¶Ð½Ð¾ Ð¼ÐµÐ½ÑÑ‚ÑŒ Ð½Ð° `["openSessions", partnerId]` â€” prefix Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾ Ð´Ð»Ñ Ð»ÑŽÐ±Ð¾Ð³Ð¾ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ³Ð¾ partnerId.
+
+**Ð¡Ð¿Ð¸ÑÐ¾Ðº staleTime Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ð¹ Ð² Ñ„Ð°Ð¹Ð»Ðµ, ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ðµ Ð—ÐÐŸÐ Ð•Ð©Ð•ÐÐž Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ** (pre-check `grep -n "staleTime:" file`):
+- `staleTime: 60_000` Ð´Ð»Ñ `["tables", partnerId]` / `["stages", partnerId]` / `["partner"]` queries â€” ÑÑ‚Ð°Ñ‚Ð¸Ñ‡Ð½Ñ‹Ð¹ ÐºÐ¾Ð½Ñ„Ð¸Ð³, Ð½Ðµ Ð¼ÐµÐ½ÑÑ‚ÑŒ.
+- `["orders", partnerId]` useQuery â€” ÐÐ• Ð¸Ð¼ÐµÐµÑ‚ ÑÐ²Ð½Ð¾Ð³Ð¾ `staleTime` (Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ `refetchInterval`); Ð½Ðµ Ð´Ð¾Ð±Ð°Ð²Ð»ÑÑ‚ÑŒ staleTime Ñ‚ÑƒÐ´Ð°.
+- Ð›ÑŽÐ±Ð¾Ð¹ Ð´Ñ€ÑƒÐ³Ð¾Ð¹ `staleTime: ...` ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ð¹ Ð½Ðµ Ð½Ð°Ñ…Ð¾Ð´Ð¸Ñ‚ÑÑ Ð² `useQuery({ queryKey: ["openSessions", partnerId], ... })` Ð±Ð»Ð¾ÐºÐµ â€” ÐÐ• Ð¢Ð ÐžÐ“ÐÐ¢Ð¬.
+
+**Ð¢Ð°ÐºÐ¶Ðµ ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ Ð² `["openSessions", partnerId]` useQuery:**
+- `queryKey` (= `["openSessions", partnerId]`) â€” Ð¼ÐµÐ½ÑÑ‚ÑŒ ÑÐ»Ð¾Ð¼Ð°ÐµÑ‚ partitioning Ð¸ Fix C invalidate + tabCounts.
+- `queryFn` (`OpenSessions.list(...)` Ð¸Ð»Ð¸ Ð°Ð½Ð°Ð»Ð¾Ð³) â€” ÑÑ‚Ð¾ backend ÐºÐ¾Ð½Ñ‚Ñ€Ð°ÐºÑ‚.
+- `refetchInterval: effectivePollingInterval` â€” polling ÑƒÐ¿Ñ€Ð°Ð²Ð»ÑÐµÑ‚ÑÑ Ñ‡ÐµÑ€ÐµÐ· Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½ÑƒÑŽ, Ð½Ðµ Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ.
+- `refetchIntervalInBackground` / `retry` / `enabled` (Ð·Ð° Ð¸ÑÐºÐ»ÑŽÑ‡ÐµÐ½Ð¸ÐµÐ¼ ÑƒÐ¶Ðµ ÑÑ‚Ð¾ÑÑ‰Ð¸Ñ… ÑƒÑÐ»Ð¾Ð²Ð¸Ð¹) â€” Ð½Ðµ Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ.
+
+### Verification Ð¿Ð¾ÑÐ»Ðµ Fix A
+```bash
+# 1. Ð£Ð±ÐµÐ´Ð¸Ñ‚ÑŒÑÑ Ñ‡Ñ‚Ð¾ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð° Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¾Ð´Ð½Ð° ÑÑ‚Ñ€Ð¾ÐºÐ°
+grep -n "staleTime:" "pages/StaffOrdersMobile/staffordersmobile.jsx" | grep "5_000"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~3548.
+
+# 2. Ð£Ð±ÐµÐ´Ð¸Ñ‚ÑŒÑÑ Ñ‡Ñ‚Ð¾ 30_000 Ð¸ÑÑ‡ÐµÐ·
+grep -n "staleTime: 30_000" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 0 hits.
+
+# 3. [v5-C1] Ð£Ð±ÐµÐ´Ð¸Ñ‚ÑŒÑÑ Ñ‡Ñ‚Ð¾ queryKey shape ÐÐ• Ð¸Ð·Ð¼ÐµÐ½Ð¸Ð»ÑÑ
+grep -n 'queryKey: \["openSessions", partnerId\]' "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~3542 (ÐºÐ°Ðº Ð¸ Ð´Ð¾ Ñ„Ð¸ÐºÑÐ°).
+
+grep -n 'queryKey: \["openSessions"\]' "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 0 hits Ð² `useQuery(...)` ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚Ðµ. ÐœÐ¾Ð¶ÐµÑ‚ Ð±Ñ‹Ñ‚ÑŒ â‰¥1 hit Ð² `invalidateQueries(...)` ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚Ðµ â€” ÑÑ‚Ð¾ prefix invalidate, ÑÑ‚Ð¾ OK.
+
+# 4. wc -l Ð½Ðµ Ð´Ð¾Ð»Ð¶ÐµÐ½ Ð¸Ð·Ð¼ÐµÐ½Ð¸Ñ‚ÑŒÑÑ
+wc -l "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 4617 +70/-35 (Ð·Ð°Ð¼ÐµÐ½Ð¸Ð»Ð¸ 1 ÑÑ‚Ñ€Ð¾ÐºÑƒ, ÑÑ‡Ñ‘Ñ‚Ñ‡Ð¸Ðº Ð½Ðµ Ð´Ð¾Ð»Ð¶ÐµÐ½ Ð²Ñ‹Ñ€Ð°ÑÑ‚Ð¸).
+```
+
+---
+
+## Fix B: Session-aware orderGroups (#347) + coordinated call-site updates
+
+### Ð¡Ñ‚Ð°Ñ‚ÑƒÑ: [FIX] (Ð¾ÑÐ½Ð¾Ð²Ð½Ð¾Ð¹ UX-Ñ„Ð¸ÐºÑ)
+**ÐŸÑ€Ð¾Ð±Ð»ÐµÐ¼Ð° (verified):** `orderGroups` Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€ÑƒÐµÑ‚ hall-Orders Ð¿Ð¾ `tableId`. ÐŸÑ€Ð¸ Ð¿Ð¾ÑÐ»ÐµÐ´Ð¾Ð²Ð°Ñ‚ÐµÐ»ÑŒÐ½Ñ‹Ñ… ÑÐµÑÑÐ¸ÑÑ… (ÑÑ‚Ð°Ñ€Ð°Ñ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð° â†’ Ð½Ð¾Ð²Ð°Ñ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð°) Ð’Ð¡Ð• Orders ÑÑ‚Ð¾Ð»Ð° Ð¿Ð¾Ð¿Ð°Ð´Ð°ÑŽÑ‚ Ð² Ð¾Ð´Ð½Ñƒ `tableGroups[tableId]` â†’ Ð¾Ð´Ð½Ð° ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ°. ÐÑƒÐ¶Ð½Ð¾ Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ Ð¿Ð¾ `(tableId, sessionId)`, Ñ‡Ñ‚Ð¾Ð±Ñ‹ ÐºÐ°Ð¶Ð´Ð°Ñ TableSession Ð¸Ð¼ÐµÐ»Ð° Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½ÑƒÑŽ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÑƒ.
+
+### Wireframe (Ð±Ñ‹Ð»Ð¾ â†’ Ð´Ð¾Ð»Ð¶Ð½Ð¾ Ð±Ñ‹Ñ‚ÑŒ)
+
+```
+Ð‘Ð«Ð›Ðž (BUG-SM-015):                      Ð”ÐžÐ›Ð–ÐÐž Ð‘Ð«Ð¢Ð¬:
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—    â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘ Ñ‚Ð°Ð± Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹ÐµÂ»                â•‘    â•‘ Ñ‚Ð°Ð± Â«ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹ÐµÂ»                â•‘
+â•‘ â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â•‘    â•‘ â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â•‘
+â•‘ â”‚ Ð¡Ñ‚Ð¾Ð» 3                       â”‚ â•‘    â•‘ â”‚ Ð¡Ñ‚Ð¾Ð» 3 (new session)      â”‚ â•‘
+â•‘ â”‚  - Ð·Ð°ÐºÐ°Ð· 1 (closed)          â”‚ â•‘    â•‘ â”‚  - Ð·Ð°ÐºÐ°Ð· 2 (new)          â”‚ â•‘
+â•‘ â”‚  - Ð·Ð°ÐºÐ°Ð· 2 (new) â† WRONG!    â”‚ â•‘    â•‘ â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â•‘
+â•‘ â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â•‘    â•‘                               â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•    â•‘ Ñ‚Ð°Ð± Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹ÐµÂ»             â•‘
+                                        â•‘ â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â•‘
+                                        â•‘ â”‚ Ð¡Ñ‚Ð¾Ð» 3 (closed session)   â”‚ â•‘
+                                        â•‘ â”‚  - Ð·Ð°ÐºÐ°Ð· 1 (closed)       â”‚ â•‘
+                                        â•‘ â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â•‘
+                                        â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+```
+
+### Changes â€” 5 ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð½Ñ‹Ñ… Ð¿Ñ€Ð°Ð²Ð¾Ðº
+
+**B.1 â€” `orderGroups` useMemo (~ÑÑ‚Ñ€Ð¾ÐºÐ¸ 3768-3819)**
+
+Grep-ÑÐºÐ¾Ñ€ÑŒ: `const orderGroups = useMemo` (1 hit). Ð§Ð¸Ñ‚Ð°ÐµÑ‚ÑÑ ÐºÐ°Ðº:
+```js
+  // v2.7.0: Order groups model (hall by table, pickup/delivery individual)
+  const orderGroups = useMemo(() => {
+    if (isKitchen) return null;
+    
+    const groups = [];
+    const tableGroups = {};
+    
+    visibleOrders.forEach(o => {
+      if (o.order_type === 'hall') {
+        const tableId = getLinkId(o.table);
+        if (!tableId) return;
+        if (!tableGroups[tableId]) {
+          const tableName = tableMap[tableId]?.name || '?';
+          tableGroups[tableId] = {
+            type: 'table',
+            id: tableId,
+            displayName: tableName,
+            orders: [],
+            openSessionId: openSessionByTableId[tableId]?.id || null,
+          };
+          groups.push(tableGroups[tableId]);
+        }
+        tableGroups[tableId].orders.push(o);
+      } else {
+        groups.push({
+          type: o.order_type,
+          id: o.id,
+          displayName: o.order_type === 'pickup' 
+            ? `Ð¡Ð’-${o.order_number || o.id.slice(-3)}` 
+            : `Ð”ÐžÐ¡-${o.order_number || o.id.slice(-3)}`,
+          orders: [o],
+        });
+      }
+    });
+
+    activeRequests.forEach((req) => {
+      const tableId = getLinkId(req.table);
+      if (!tableId) return;
+      if (!tableGroups[tableId]) {
+        const tableName = tableMap[tableId]?.name || '?';
+        tableGroups[tableId] = {
+          type: 'table',
+          id: tableId,
+          displayName: tableName,
+          orders: [],
+          openSessionId: openSessionByTableId[tableId]?.id || null,
+        };
+        groups.push(tableGroups[tableId]);
+      }
+    });
+
+    return groups;
+  }, [visibleOrders, tableMap, isKitchen, activeRequests, openSessionByTableId]);
+```
+
+**Ð—Ð°Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð¦Ð•Ð›Ð˜ÐšÐžÐœ Ð±Ð»Ð¾Ðº `const orderGroups = useMemo(...)` ÑÐ»ÐµÐ´ÑƒÑŽÑ‰Ð¸Ð¼ (Ð‘Ð•Ð— Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ deps):**
+
+```js
+  // v2.7.0 + Ð‘2.1: Order groups model (hall by table+session, pickup/delivery individual)
+  // BUG-SM-015: Split table orders by session_id so closed session stays in
+  // Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹ÐµÂ» while new session appears as a fresh card in Â«ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹ÐµÂ».
+  const orderGroups = useMemo(() => {
+    if (isKitchen) return null;
+
+    const groups = [];
+    const tableGroups = {}; // key: `${tableId}__${sessionKey}` where sessionKey = sessionId || 'no-session'
+
+    visibleOrders.forEach(o => {
+      if (o.order_type === 'hall') {
+        const tableId = getLinkId(o.table);
+        if (!tableId) return;
+
+        const orderSessionId = getLinkId(o.table_session) || 'no-session';
+        const openSessionId = openSessionByTableId[tableId]?.id || null;
+        const compositeKey = `${tableId}__${orderSessionId}`;
+
+        if (!tableGroups[compositeKey]) {
+          const tableName = tableMap[tableId]?.name || '?';
+          tableGroups[compositeKey] = {
+            type: 'table',
+            id: tableId,                   // tableId â€” Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ÑÑ Ð´Ð»Ñ favorites, servedOrders query, onCloseTable callback
+            sessionId: orderSessionId === 'no-session' ? null : orderSessionId, // NEW: ÑÐµÑÑÐ¸Ñ ÑÑ‚Ð¾Ð¹ Ð³Ñ€ÑƒÐ¿Ð¿Ñ‹ (null Ð´Ð»Ñ legacy orders Ð±ÐµÐ· session)
+            compositeKey,                  // NEW: React key + data-group-id + expand/highlight tracking
+            displayName: tableName,
+            orders: [],
+            openSessionId,                 // ID Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ Ð´Ð»Ñ ÑÑ‚Ð¾Ð³Ð¾ ÑÑ‚Ð¾Ð»Ð° (Ð¼Ð¾Ð¶ÐµÑ‚ != sessionId ÐµÑÐ»Ð¸ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð°Ñ)
+          };
+          groups.push(tableGroups[compositeKey]);
+        }
+        tableGroups[compositeKey].orders.push(o);
+      } else {
+        // Pickup/Delivery â€” ÑƒÐ½Ð¸ÐºÐ°Ð»ÑŒÐ½Ñ‹ Ð¿Ð¾ orderId, Ð½Ðµ Ð¼ÐµÐ½ÑÐµÐ¼ Ð»Ð¾Ð³Ð¸ÐºÑƒ.
+        groups.push({
+          type: o.order_type,
+          id: o.id,
+          sessionId: null,
+          compositeKey: `${o.order_type}__${o.id}`,
+          displayName: o.order_type === 'pickup'
+            ? `Ð¡Ð’-${o.order_number || o.id.slice(-3)}`
+            : `Ð”ÐžÐ¡-${o.order_number || o.id.slice(-3)}`,
+          orders: [o],
+        });
+      }
+    });
+
+    // ServiceRequest â†’ Ð¿Ñ€Ð¸Ð²ÑÐ·Ð°Ñ‚ÑŒ Ðº Ð³Ñ€ÑƒÐ¿Ð¿Ðµ Ð¢Ð•ÐšÐ£Ð©Ð•Ð™ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ (ÐµÑÐ»Ð¸ ÐµÑÑ‚ÑŒ),
+    // Ð¸Ð½Ð°Ñ‡Ðµ Ðº `${tableId}__no-session`. Ð—Ð°Ð¿Ñ€Ð¾ÑÑ‹ Ð¾Ñ‚ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ñ… ÑÐµÑÑÐ¸Ð¹ ÑƒÐ¶Ðµ Ð² ÑÑ‚Ð°Ñ‚ÑƒÑÐµ 'done'
+    // (ÑÐ¼. closeSession Ð² sessionHelpers.js:175-188), Ð¿Ð¾ÑÑ‚Ð¾Ð¼Ñƒ Ð² activeRequests Ð½Ðµ Ð¿Ð¾Ð¿Ð°Ð´Ð°ÑŽÑ‚.
+    //
+    // âš ï¸ [v7-M1] INTENTIONAL: ÐµÑÐ»Ð¸ Ñƒ ÑÑ‚Ð¾Ð»Ð° Ð½ÐµÑ‚ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ (openSessionId = null),
+    // ÑÐ¾Ð·Ð´Ð°Ñ‘Ñ‚ÑÑ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° Ñ `orders: []`, `sessionId: null`, `compositeKey: ${tableId}__no-session`.
+    // Ð¢Ð°ÐºÐ°Ñ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° Ð¿Ð¾Ð¿Ð°Ð´Ñ‘Ñ‚ Ð² Ñ‚Ð°Ð± Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹ÐµÂ» (filteredGroups: isCurrentOpenSession = false).
+    // Ð­Ñ‚Ð¾ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ðµ Ð¿Ð¾Ð²ÐµÐ´ÐµÐ½Ð¸Ðµ: ServiceRequest Ð±ÐµÐ· Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ â€” Ð·Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹Ð¹ Ð·Ð°Ð¿Ñ€Ð¾Ñ.
+    // Ð•ÑÐ»Ð¸ Ð² Ð±ÑƒÐ´ÑƒÑ‰ÐµÐ¼ Ð¾Ñ‚ÐºÑ€Ð¾ÐµÑ‚ÑÑ ÑÐµÑÑÐ¸Ñ â†’ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° Ð´Ð»Ñ Ð½ÐµÑ‘ ÑÐ¾Ð·Ð´Ð°ÑÑ‚ÑÑ Ñ‡ÐµÑ€ÐµÐ· visibleOrders.
+    activeRequests.forEach((req) => {
+      const tableId = getLinkId(req.table);
+      if (!tableId) return;
+
+      const openSessionId = openSessionByTableId[tableId]?.id || null;
+      const targetSessionKey = openSessionId || 'no-session';
+      const compositeKey = `${tableId}__${targetSessionKey}`;
+
+      if (!tableGroups[compositeKey]) {
+        const tableName = tableMap[tableId]?.name || '?';
+        tableGroups[compositeKey] = {
+          type: 'table',
+          id: tableId,
+          sessionId: openSessionId,       // null ÐµÑÐ»Ð¸ no open session
+          compositeKey,
+          displayName: tableName,
+          orders: [],
+          openSessionId,
+        };
+        groups.push(tableGroups[compositeKey]);
+      }
+    });
+
+    return groups;
+  }, [visibleOrders, tableMap, isKitchen, activeRequests, openSessionByTableId]);
+```
+
+**NOTE:** Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÐµÑ‚ÑÑ Ñ‚Ð¾Ñ‚ Ð¶Ðµ dependency array (Ð´Ð¾Ð±Ð°Ð²Ð»ÑÑ‚ÑŒ Ð·Ð°Ð²Ð¸ÑÐ¸Ð¼Ð¾ÑÑ‚Ð¸ Ð½Ðµ Ñ‚Ñ€ÐµÐ±ÑƒÐµÑ‚ÑÑ â€” Ð²ÑÐµ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÐ¼Ñ‹Ðµ Ð² Ñ‚ÐµÐ»Ðµ Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½Ñ‹Ðµ ÑƒÐ¶Ðµ Ð±Ñ‹Ð»Ð¸ Ð² ÑÑ‚Ð°Ñ€Ð¾Ð¼ Ð¼Ð°ÑÑÐ¸Ð²Ðµ).
+
+**B.2 â€” `filteredGroups` useMemo (~ÑÑ‚Ñ€Ð¾ÐºÐ¸ 3862-3883)**
+
+Grep-ÑÐºÐ¾Ñ€ÑŒ: `const filteredGroups = useMemo` (1 hit).
+
+**Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ ÐºÐ¾Ð´:**
+```js
+  const filteredGroups = useMemo(() => {
+    if (!orderGroups) return [];
+
+    return orderGroups.filter(group => {
+      if (group.type === 'table') {
+        const hasOpenSession = !!openSessionByTableId[group.id];
+        if (!hasOpenSession) return activeTab === 'completed';
+      }
+      const hasActiveOrder = group.orders.some(o => {
+        const config = getStatusConfig(o);
+        return !config.isFinishStage && o.status !== 'cancelled';
+      });
+      const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+      const hasServedButNotClosed = group.orders.some(o => {
+        const config = getStatusConfig(o);
+        return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+      });
+      return activeTab === 'active'
+        ? (hasActiveOrder || hasActiveRequest || hasServedButNotClosed)
+        : (!hasActiveOrder && !hasActiveRequest && !hasServedButNotClosed);
+    });
+  }, [orderGroups, activeTab, getStatusConfig, activeRequests, openSessionByTableId]);
+```
+
+**[v4-M2] Ð—Ð°Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð’Ð•Ð¡Ð¬ Ð±Ð»Ð¾Ðº `const filteredGroups = useMemo(...)` ÑÐ»ÐµÐ´ÑƒÑŽÑ‰Ð¸Ð¼ (Ð¾Ñ‚Ð»Ð¸Ñ‡Ð¸Ñ Ð¾Ñ‚ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ³Ð¾: Ð¢ÐžÐ›Ð¬ÐšÐž Ð¿ÐµÑ€Ð²Ñ‹Ð¹ `if (group.type === 'table')` Ð±Ð»Ð¾Ðº â€” Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ðµ `isCurrentOpenSession` Ñ‡ÐµÑ€ÐµÐ· `openId` + `group.sessionId`, Ð²Ð¼ÐµÑÑ‚Ð¾ `hasOpenSession = !!openSessionByTableId[group.id]`). Ð’ÑÐµ Ð¾ÑÑ‚Ð°Ð»ÑŒÐ½Ñ‹Ðµ ÑÑ‚Ñ€Ð¾ÐºÐ¸ â€” `hasActiveOrder`, `hasActiveRequest`, `hasServedButNotClosed`, return â€” Ð˜Ð”Ð•ÐÐ¢Ð˜Ð§ÐÐ« Ð¾Ñ€Ð¸Ð³Ð¸Ð½Ð°Ð»Ñƒ. Deps array ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ.**
+
+```js
+  const filteredGroups = useMemo(() => {
+    if (!orderGroups) return [];
+
+    return orderGroups.filter(group => {
+      if (group.type === 'table') {
+        // Ð‘2.1: Ð³Ñ€ÑƒÐ¿Ð¿Ð° Ð¿Ñ€Ð¸Ð½Ð°Ð´Ð»ÐµÐ¶Ð¸Ñ‚ Â«ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹Ð¼Â» Ð¢ÐžÐ›Ð¬ÐšÐž ÐµÑÐ»Ð¸ ÐµÑ‘ sessionId ÑÐ¾Ð²Ð¿Ð°Ð´Ð°ÐµÑ‚ Ñ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹
+        // Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸ÐµÐ¹ Ð´Ð»Ñ ÑÑ‚Ð¾Ð»Ð°. Ð—Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ðµ ÑÐµÑÑÐ¸Ð¸ (group.sessionId !== openId Ð¸Ð»Ð¸ no-session) â†’ Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹ÐµÂ».
+        const openId = openSessionByTableId[group.id]?.id || null;
+        const isCurrentOpenSession = !!openId && group.sessionId === openId;
+        if (!isCurrentOpenSession) return activeTab === 'completed';
+      }
+      const hasActiveOrder = group.orders.some(o => {
+        const config = getStatusConfig(o);
+        return !config.isFinishStage && o.status !== 'cancelled';
+      });
+      const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+      const hasServedButNotClosed = group.orders.some(o => {
+        const config = getStatusConfig(o);
+        return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+      });
+      return activeTab === 'active'
+        ? (hasActiveOrder || hasActiveRequest || hasServedButNotClosed)
+        : (!hasActiveOrder && !hasActiveRequest && !hasServedButNotClosed);
+    });
+  }, [orderGroups, activeTab, getStatusConfig, activeRequests, openSessionByTableId]);
+```
+
+âš ï¸ **Ð’Ð°Ð¶Ð½Ð¾:** `hasActiveRequest` Ð¿Ñ€Ð¾Ð´Ð¾Ð»Ð¶Ð°ÐµÑ‚ Ñ„Ð¸Ð»ÑŒÑ‚Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ Ð¿Ð¾ `getLinkId(r.table) === group.id` (tableId). Ð­Ñ‚Ð¾ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾: ÐµÑÐ»Ð¸ Ñƒ ÑÑ‚Ð¾Ð»Ð° ÐµÑÑ‚ÑŒ request, Ð¾Ð½ Ð¿Ð¾ Fix B.1 ÑƒÐ¶Ðµ Ð¿Ñ€Ð¸ÐºÑ€ÐµÐ¿Ð»Ñ‘Ð½ Ðº compositeKey Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ â€” Ð·Ð½Ð°Ñ‡Ð¸Ñ‚ ÑÑ‚Ð° Ð³Ñ€ÑƒÐ¿Ð¿Ð° (Ñ `isCurrentOpenSession=true`) ÐµÐ³Ð¾ ÑƒÐ²Ð¸Ð´Ð¸Ñ‚; Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð°Ñ Ð³Ñ€ÑƒÐ¿Ð¿Ð° (Ñ `group.sessionId !== openId`) ÑƒÐ¶Ðµ Ð´Ñ€Ð¾Ð¿Ð½ÑƒÐ»Ð°ÑÑŒ Ð² `completed` Ð½Ð° Ñ€Ð°Ð½Ð½ÐµÐ¼ return.
+
+**B.3 â€” `tabCounts` useMemo (~ÑÑ‚Ñ€Ð¾ÐºÐ¸ 3886-3908)**
+
+Grep-ÑÐºÐ¾Ñ€ÑŒ: `const tabCounts = useMemo` (1 hit).
+
+**Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ ÐºÐ¾Ð´ (relevant Ñ‡Ð°ÑÑ‚ÑŒ):**
+```js
+    orderGroups.forEach(group => {
+      if (group.type === 'table' && !openSessionByTableId[group.id]) {
+        completed++;
+        return;
+      }
+      ...
+```
+
+**[v4-M2] Ð—Ð°Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð’Ð•Ð¡Ð¬ Ð±Ð»Ð¾Ðº `const tabCounts = useMemo(...)` ÑÐ»ÐµÐ´ÑƒÑŽÑ‰Ð¸Ð¼ (Ð¾Ñ‚Ð»Ð¸Ñ‡Ð¸Ñ Ð¾Ñ‚ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ³Ð¾: Ð¢ÐžÐ›Ð¬ÐšÐž Ð²Ð½ÑƒÑ‚Ñ€ÐµÐ½Ð½Ð¸Ð¹ `if (group.type === 'table' && !openSessionByTableId[group.id])` Ð±Ð»Ð¾Ðº â€” Ð·Ð°Ð¼ÐµÐ½Ñ‘Ð½ Ð½Ð° `isCurrentOpenSession` Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÑƒ Ñ‡ÐµÑ€ÐµÐ· `group.sessionId`. ÐžÑÑ‚Ð°Ð»ÑŒÐ½Ð¾Ðµ â€” `hasActiveOrder`, `hasActiveRequest`, `hasServedButNotClosed`, Ð¸Ð½ÐºÑ€ÐµÐ¼ÐµÐ½Ñ‚ `active/completed`, return â€” Ð˜Ð”Ð•ÐÐ¢Ð˜Ð§ÐÐž Ð¾Ñ€Ð¸Ð³Ð¸Ð½Ð°Ð»Ñƒ. Deps array ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ.**
+
+```js
+  // v2.7.1: Tab counts
+  const tabCounts = useMemo(() => {
+    if (!orderGroups) return { active: 0, completed: 0 };
+
+    let active = 0, completed = 0;
+    orderGroups.forEach(group => {
+      if (group.type === 'table') {
+        // Ð‘2.1: Ð³Ñ€ÑƒÐ¿Ð¿Ð° Ð¿Ñ€Ð¸Ð½Ð°Ð´Ð»ÐµÐ¶Ð¸Ñ‚ Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹Ð¼Â» ÐµÑÐ»Ð¸ ÑÑ‚Ð¾ ÐÐ• Ð³Ñ€ÑƒÐ¿Ð¿Ð° Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸
+        const openId = openSessionByTableId[group.id]?.id || null;
+        const isCurrentOpenSession = !!openId && group.sessionId === openId;
+        if (!isCurrentOpenSession) {
+          completed++;
+          return;
+        }
+      }
+      const hasActiveOrder = group.orders.some(o => {
+        const config = getStatusConfig(o);
+        return !config.isFinishStage && o.status !== 'cancelled';
+      });
+      const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+      const hasServedButNotClosed = group.orders.some(o => {
+        const config = getStatusConfig(o);
+        return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+      });
+      if (hasActiveOrder || hasActiveRequest || hasServedButNotClosed) active++; else completed++;
+    });
+
+    return { active, completed };
+  }, [orderGroups, getStatusConfig, activeRequests, openSessionByTableId]);
+```
+
+**B.4 â€” Call-site updates Ð² OrderGroupCard map (~ÑÑ‚Ñ€Ð¾ÐºÐ¸ 4457-4486) â€” [v4-M3, v5-M2]**
+
+Grep-ÑÐºÐ¾Ñ€ÑŒ: `v2SortedGroups.map(group => (` (1 hit). ÐœÐµÐ½ÑÐµÐ¼ Ð ÐžÐ’ÐÐž 4 ÑÑ‚Ñ€Ð¾ÐºÐ¸ props Ñ‡ÐµÑ€ÐµÐ· 4 Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½Ñ‹Ñ… Edit.
+
+âš ï¸ **[V5-M2] Pre-pinned counts** (Ð¸Ð· Pre-flight ÑˆÐ°Ð³ 4, ÑƒÐ±ÐµÐ´Ð¸ÑÑŒ Ñ‡Ñ‚Ð¾ ÑÐ¾Ð¾Ñ‚Ð²ÐµÑ‚ÑÑ‚Ð²ÑƒÐµÑ‚):
+- `key={group.id}` â€” â‰¥1 hit (Ð¼Ð¾Ð¶ÐµÑ‚ Ð±Ñ‹Ñ‚ÑŒ Ð² Ð½ÐµÑÐºÐ¾Ð»ÑŒÐºÐ¸Ñ… map-Ð±Ð»Ð¾ÐºÐ°Ñ…; ÑÐ¼. context requirements Ð½Ð¸Ð¶Ðµ)
+- `expandedGroupId === group.id` â€” Ð ÐžÐ’ÐÐž 1 hit (~4461)
+- `onToggleExpand={() => handleToggleExpand(group.id)}` â€” Ð ÐžÐ’ÐÐž 1 hit (~4462)
+- `isHighlighted={highlightGroupId === group.id}` â€” Ð ÐžÐ’ÐÐž 1 hit
+
+Ð•ÑÐ»Ð¸ `key={group.id}` Ð´Ð°Ñ‘Ñ‚ >1 hit â€” ÑÑ‚Ð¾ Ð¾Ð¶Ð¸Ð´Ð°ÐµÐ¼Ð¾ (ÐµÑÑ‚ÑŒ Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½Ñ‹Ð¹ map Ð´Ð»Ñ pickup/delivery OrderCard â€” ÐÐ• Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ). Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÐ¼ surrounding context Ñ‡Ñ‚Ð¾Ð±Ñ‹ Edit Ð·Ð°Ñ‚Ñ€Ð¾Ð½ÑƒÐ» Ñ‚Ð¾Ð»ÑŒÐºÐ¾ `v2SortedGroups.map` Ð±Ð»Ð¾Ðº.
+
+âš ï¸ **Ð­Ñ‚Ð¸ 4 Edit'Ð° â€” ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½Ð¾Ðµ Ñ‡Ñ‚Ð¾ Ð¼ÐµÐ½ÑÐµÑ‚ÑÑ Ð² B.4. Ð’ÑÐµ Ð¾ÑÑ‚Ð°Ð»ÑŒÐ½Ñ‹Ðµ props Ð² ÑÑ‚Ð¾Ð¼ `<OrderGroupCard ... />` ÐÐ• Ð¢Ð ÐžÐ“ÐÐ¢Ð¬. ÐÐ¸ÐºÐ°ÐºÐ¸Ñ… `...` placeholder'Ð¾Ð² Ð² `new_string`.**
+
+**Edit 1 â€” `key` (Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÐ¼ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚ Ð´Ð»Ñ disambiguation):**
+- old_string:
+  ```
+              v2SortedGroups.map(group => (
+                <OrderGroupCard
+                  key={group.id}
+  ```
+- new_string:
+  ```
+              v2SortedGroups.map(group => (
+                <OrderGroupCard
+                  key={group.compositeKey}
+  ```
+
+**Edit 2 â€” `isExpanded` (ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½Ñ‹Ð¹ hit, ÑƒÐ½Ð¸ÐºÐ°Ð»ÐµÐ½):**
+- old_string: `                  isExpanded={expandedGroupId === group.id}`
+- new_string: `                  isExpanded={expandedGroupId === group.compositeKey}`
+
+**Edit 3 â€” `onToggleExpand` (ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½Ñ‹Ð¹ hit, ÑƒÐ½Ð¸ÐºÐ°Ð»ÐµÐ½):**
+- old_string: `                  onToggleExpand={() => handleToggleExpand(group.id)}`
+- new_string: `                  onToggleExpand={() => handleToggleExpand(group.compositeKey)}`
+
+**Edit 4 â€” `isHighlighted` (ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½Ñ‹Ð¹ hit, ÑƒÐ½Ð¸ÐºÐ°Ð»ÐµÐ½):**
+- old_string: `                  isHighlighted={highlightGroupId === group.id}`
+- new_string: `                  isHighlighted={highlightGroupId === group.compositeKey}`
+
+**Ð˜Ð»Ð»ÑŽÑÑ‚Ñ€Ð°Ñ†Ð¸Ñ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚Ð° (ÐÐ• ÐºÐ¾Ð¿Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ Ð² Edit â€” ÑÑ‚Ð¾ Ð´Ð»Ñ Ð¿Ð¾Ð½Ð¸Ð¼Ð°Ð½Ð¸Ñ, ÑÐ¼. Identifier Contract Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð²Ñ‹ÑˆÐµ):**
+```jsx
+              v2SortedGroups.map(group => (
+                <OrderGroupCard
+                  key={group.compositeKey}                                                /* CHANGED */
+                  group={group}
+                  isExpanded={expandedGroupId === group.compositeKey}                     /* CHANGED */
+                  onToggleExpand={() => handleToggleExpand(group.compositeKey)}           /* CHANGED */
+                  isHighlighted={highlightGroupId === group.compositeKey}                 /* CHANGED */
+                  isFavorite={isFavorite(group.type === 'table' ? 'table' : 'order', group.id)} /* group.id â€” ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ (tableId Ð´Ð»Ñ favorites) */
+                  onToggleFavorite={toggleFavorite}                                       /* ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ */
+                  /* Ð¾ÑÑ‚Ð°Ð»ÑŒÐ½Ñ‹Ðµ props â€” onCloseTable, activeRequests, onBatchCloseRequestAsync Ð¸ Ð´Ñ€. â€” ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ */
+                />
+              ))
+```
+
+âš ï¸ **ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ (Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€ Ð´Ð»Ñ Ð±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ð¾ÑÑ‚Ð¸):**
+- `isFavorite(...)` Ð²Ñ‹Ð·Ð¾Ð² â€” Ð¾ÑÑ‚Ð°Ñ‘Ñ‚ÑÑ Ð½Ð° `group.id` (tableId). Ð¤Ð°Ð²Ð¾Ñ€Ð¸Ñ‚Ñ‹ Ð´Ð¾Ð»Ð¶Ð½Ñ‹ Ð²Ñ‹Ð¶Ð¸Ð²Ð°Ñ‚ÑŒ ÑÐ¼ÐµÐ½Ñƒ ÑÐµÑÑÐ¸Ð¸.
+- `onToggleFavorite` â€” Ð¾ÑÑ‚Ð°Ñ‘Ñ‚ÑÑ `toggleFavorite` Ð±ÐµÐ· wrapper'Ð° (ÑÐ¸Ð³Ð½Ð°Ñ‚ÑƒÑ€Ð° `(type, id)` Ð½Ðµ Ð¼ÐµÐ½ÑÐµÑ‚ÑÑ).
+- ÐžÑÑ‚Ð°Ð»ÑŒÐ½Ñ‹Ðµ props (`onCloseTable`, `activeRequests`, `onBatchCloseRequestAsync`, etc.) â€” Ð½Ðµ Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ.
+
+**B.5 â€” `data-group-id` (live JSX only) â€” [v4-M4, v5-M1 ÐºÑ€Ð¸Ñ‚Ð¸Ñ‡Ð½Ð¾]**
+
+[V5-M1] **Ð¢Ð¾Ð»ÑŒÐºÐ¾ 1 live JSX replacement Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÐµÐ½. 2 Ð´Ñ€ÑƒÐ³Ð¸Ñ… â€” non-blocking commented snapshots.**
+
+Pre-check (Ð¸Ð· Pre-flight Â§5) Ð´Ð¾Ð»Ð¶ÐµÐ½ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ:
+- `~2292` â€” live JSX Ð²Ð½ÑƒÑ‚Ñ€Ð¸ Ñ€ÐµÐ°Ð»ÑŒÐ½Ð¾Ð³Ð¾ OrderGroupCard root element (Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð° Ð·Ð°Ð¼ÐµÐ½Ð°).
+- `~565` Ð¸ `~1173` â€” Ð²Ð½ÑƒÑ‚Ñ€Ð¸ block-comment (`/* ... */` Ð¸Ð»Ð¸ JSX comment `{/* ... */}`). Ð—Ð°Ð¼ÐµÐ½Ð° non-blocking: Ð¼Ð¾Ð¶Ð½Ð¾ Ð»Ð¸Ð±Ð¾ Ð¿Ñ€Ð¾Ð¿ÑƒÑÑ‚Ð¸Ñ‚ÑŒ (safer), Ð»Ð¸Ð±Ð¾ Ð·Ð°Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð´Ð»Ñ ÐºÐ¾Ð½ÑÐ¸ÑÑ‚ÐµÐ½Ñ‚Ð½Ð¾ÑÑ‚Ð¸ (optional).
+
+**Ð¡Ñ‚Ñ€Ð°Ñ‚ÐµÐ³Ð¸Ñ:**
+
+**Ð¨Ð°Ð³ 1 â€” ÐžÐ‘Ð¯Ð—ÐÐ¢Ð•Ð›Ð¬ÐÐÐ¯ Ð·Ð°Ð¼ÐµÐ½Ð° live JSX (~2292):**
+
+Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° Ð¿Ñ€Ð¾Ñ‡Ð¸Ñ‚Ð°Ñ‚ÑŒ Ñ‚Ð¾Ñ‡Ð½Ñ‹Ð¹ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚:
+```bash
+sed -n '2285,2298p' "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: JSX ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚ WITHOUT `/*` Ð¸Ð»Ð¸ `{/*` â€” ÑÑ‚Ð¾ live render.
+# ÐšÐ»ÑŽÑ‡ÐµÐ²Ñ‹Ðµ Ð¼Ð°Ñ€ÐºÐµÑ€Ñ‹ ÑƒÐ½Ð¸ÐºÐ°Ð»ÑŒÐ½Ð¾ÑÑ‚Ð¸ (ÐžÐ¢Ð¡Ð£Ð¢Ð¡Ð¢Ð’Ð£Ð®Ð¢ Ð² ~565 Ð¸ ~1173):
+#   - ÑÑ‚Ñ€Ð¾ÐºÐ° `highlightRing` Ð¸Ð»Ð¸ Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½Ð°Ñ Ñ ÑÑ‚Ð¸Ð¼ Ð¸Ð¼ÐµÐ½ÐµÐ¼ (~2285-2292)
+#   - ÐºÐ¾Ð½ÑÑ‚Ñ€ÑƒÐºÑ†Ð¸Ñ `return (` Ð² Ð¿Ñ€ÐµÐ´ÐµÐ»Ð°Ñ… 5 ÑÑ‚Ñ€Ð¾Ðº Ð´Ð¾ data-group-id
+```
+
+Edit pair (Ð—ÐÐŸÐžÐ›ÐÐ˜Ð¢Ð¬ Ñ‚Ð¾Ñ‡Ð½Ñ‹Ð¼Ð¸ ÑÑ‚Ñ€Ð¾ÐºÐ°Ð¼Ð¸ Ð¸Ð· sed-output Ð²Ñ‹ÑˆÐµ):
+
+1. ÐŸÑ€Ð¾Ñ‡Ð¸Ñ‚Ð°Ñ‚ÑŒ Ð²Ñ‹Ð²Ð¾Ð´ `sed -n '2285,2298p'` Ð¸ Ð½Ð°Ð¹Ñ‚Ð¸ ÑƒÐ½Ð¸ÐºÐ°Ð»ÑŒÐ½Ñ‹Ð¹ Ð±Ð»Ð¾Ðº: ÑÑ‚Ñ€Ð¾ÐºÐ¸ Ð¾Ñ‚ `highlightRing`
+   (Ð¸Ð»Ð¸ `return (`) Ð”Ðž Ð¸ Ð²ÐºÐ»ÑŽÑ‡Ð°Ñ `data-group-id={group.id}`.
+2. Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ ÑÑ‚Ð¸ 3-5 ÑÑ‚Ñ€Ð¾Ðº ÐºÐ°Ðº `old_string` â€” Ð²ÐºÐ»ÑŽÑ‡Ð°Ñ `highlightRing` Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½ÑƒÑŽ Ð¸Ð»Ð¸ `return (`
+   ÐºÐ°Ðº Ð¿ÐµÑ€Ð²ÑƒÑŽ ÑÑ‚Ñ€Ð¾ÐºÑƒ (ÑÑ‚Ð¾ Ð´ÐµÐ»Ð°ÐµÑ‚ anchor ÑƒÐ½Ð¸ÐºÐ°Ð»ÑŒÐ½Ñ‹Ð¼: Ñ‚Ð°ÐºÐ¸Ñ… ÑÑ‚Ñ€Ð¾Ðº Ð½ÐµÑ‚ Ð² ~565/~1173 comments).
+3. `new_string` â€” Ñ‚Ðµ Ð¶Ðµ ÑÑ‚Ñ€Ð¾ÐºÐ¸ Ñ ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½Ð¾Ð¹ Ð·Ð°Ð¼ÐµÐ½Ð¾Ð¹ `data-group-id={group.id}` â†’ `data-group-id={group.compositeKey}`.
+
+ÐžÐ¶Ð¸Ð´Ð°ÐµÐ¼Ñ‹Ð¹ Ð²Ð¸Ð´ (Ñ‚Ð¾Ñ‡Ð½Ñ‹Ðµ ÑÑ‚Ñ€Ð¾ÐºÐ¸ Ð·Ð°Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð¸Ð· sed-output):
+```jsx
+  // old_string Ð¿Ñ€Ð¸Ð¼ÐµÑ€ (Ð²Ð·ÑÑ‚ÑŒ Ñ‚Ð¾Ñ‡Ð½Ñ‹Ð¹ Ñ‚ÐµÐºÑÑ‚ Ð¸Ð· sed â€” ÐÐ• ÐºÐ¾Ð¿Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ ÑÑ‚Ð¾Ñ‚ ÑˆÐ°Ð±Ð»Ð¾Ð½):
+  const highlightRing = highlightGroupId === group.compositeKey;
+  return (
+    <div
+      data-group-id={group.id}
+```
+```jsx
+  // new_string (Ñ‚Ð° Ð¶Ðµ ÑÑ‚Ñ€ÑƒÐºÑ‚ÑƒÑ€Ð°, Ñ‚Ð¾Ð»ÑŒÐºÐ¾ data-group-id Ð·Ð°Ð¼ÐµÐ½Ñ‘Ð½):
+  const highlightRing = highlightGroupId === group.compositeKey;
+  return (
+    <div
+      data-group-id={group.compositeKey}
+```
+
+âš ï¸ **ÐÐ• Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ `data-group-id={group.id}` ÐºÐ°Ðº ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½ÑƒÑŽ ÑÑ‚Ñ€Ð¾ÐºÑƒ old_string** â€” ÑÑ‚Ð¾ Ð¼Ð¾Ð¶ÐµÑ‚ ÑÐ¾Ð²Ð¿Ð°ÑÑ‚ÑŒ Ñ block-comments @ ~565 / ~1173. Ð’ÑÐµÐ³Ð´Ð° Ð²ÐºÐ»ÑŽÑ‡Ð°Ñ‚ÑŒ `highlightRing` Ð¸Ð»Ð¸ `return (` ÑÑ‚Ñ€Ð¾ÐºÑƒ Ð”Ðž `data-group-id` Ð´Ð»Ñ Ð¾Ð´Ð½Ð¾Ð·Ð½Ð°Ñ‡Ð½Ð¾Ð¹ Ð¸Ð´ÐµÐ½Ñ‚Ð¸Ñ„Ð¸ÐºÐ°Ñ†Ð¸Ð¸.
+
+**Ð¨Ð°Ð³ 2 â€” OPTIONAL Ð·Ð°Ð¼ÐµÐ½Ð° comment-only snapshots (~565, ~1173):**
+
+Ð­Ñ‚Ð¸ hits Ð² block-comments (Ð¸ÑÑ‚Ð¾Ñ€Ð¸Ñ‡ÐµÑÐºÐ¸Ðµ snapshots/docstrings). Ð ÐµÐ½Ð´ÐµÑ€ DOM Ð½Ðµ Ð·Ð°Ñ‚Ñ€Ð°Ð³Ð¸Ð²Ð°ÑŽÑ‚. Ð—Ð°Ð¼ÐµÐ½Ñƒ Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÑÑ‚ÑŒ **Ñ‚Ð¾Ð»ÑŒÐºÐ¾ ÐµÑÐ»Ð¸ Ð¾ÑÑ‚Ð°Ð»ÑŒÐ½Ñ‹Ðµ Fix Ð¿Ñ€Ð¾ÑˆÐ»Ð¸ Ð±ÐµÐ· Ð¾ÑˆÐ¸Ð±Ð¾Ðº** Ð¸ ÐµÑÑ‚ÑŒ Ð±ÑŽÐ´Ð¶ÐµÑ‚ Ð²Ñ€ÐµÐ¼ÐµÐ½Ð¸. Non-blocking. Ð•ÑÐ»Ð¸ Ð¿Ñ€Ð¾Ð¿ÑƒÑÐºÐ°ÐµÐ¼ â€” Ð·Ð°Ð¿Ð¸ÑÐ°Ñ‚ÑŒ Ð² ÐºÐ¾Ð¼Ð¼Ð¸Ñ‚Ðµ `/* v5-M1: commented snapshots @ 565, 1173 preserved as legacy docs */`.
+
+**Verification B.5 (Ð¿Ð¾ÑÑ‚-Ñ„Ð¸ÐºÑ):**
+```bash
+# Live JSX Ð·Ð°Ð¼ÐµÐ½Ñ‘Ð½ (Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð¾)
+grep -c "data-group-id={group.compositeKey}" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: â‰¥1 (ÐµÑÐ»Ð¸ Ð¿Ñ€Ð¾Ð¿ÑƒÑÑ‚Ð¸Ð»Ð¸ comments) Ð¸Ð»Ð¸ =3 (ÐµÑÐ»Ð¸ Ð·Ð°Ð¼ÐµÐ½Ð¸Ð»Ð¸ Ð²ÑÑ‘).
+
+# Ð¡Ñ‚Ð°Ñ€Ñ‹Ð¹ Ð°Ñ‚Ñ€Ð¸Ð±ÑƒÑ‚ data-group-id={group.id} â€” 0 Ð’ÐÐ• comments:
+#   Ð•ÑÐ»Ð¸ Ñ€ÐµÑˆÐ¸Ð»Ð¸ Ð½Ðµ Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ comments â†’ ÑÑ‚Ð°Ñ€Ñ‹Ðµ 2 hits Ð¾ÑÑ‚Ð°Ð½ÑƒÑ‚ÑÑ Ð² comments (OK).
+#   [v5-L4] Loose regex â€” Ð´Ð¾Ð¿ÑƒÑÐºÐ°ÐµÑ‚ optional spaces Ð²Ð¾ÐºÑ€ÑƒÐ³ group.compositeKey (formatter-tolerant):
+grep -cE "data-group-id=\{ *group\.compositeKey *\}" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: â‰¥1 (Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ live JSX Ð¼Ð¾Ð¶ÐµÑ‚ Ð¼ÐµÐ½ÑÑ‚ÑŒÑÑ Ð¿Ð¾ÑÐ»Ðµ Ñ„Ð¾Ñ€Ð¼attÐµÑ€Ð°).
+
+# ÐšÐ Ð˜Ð¢Ð˜Ð§ÐÐž: live JSX @ ~2292 Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð¾ Ð½Ð° compositeKey:
+sed -n '2285,2298p' "pages/StaffOrdersMobile/staffordersmobile.jsx" | grep -c "compositeKey"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit.
+```
+
+âš ï¸ ÐšÐ Ð˜Ð¢Ð˜Ð§ÐÐž: `handleBannerNavigate` Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ ÑÐµÐ»ÐµÐºÑ‚Ð¾Ñ€ `[data-group-id="${CSS.escape(String(targetKey))}"]`. Ð•ÑÐ»Ð¸ LIVE `data-group-id` (@~2292) Ð¾ÑÑ‚Ð°Ð½ÐµÑ‚ÑÑ Ð½Ð° `group.id`, Ð±Ð°Ð½Ð½ÐµÑ€ Ð±ÑƒÐ´ÐµÑ‚ ÑÐºÑ€Ð¾Ð»Ð»Ð¸Ñ‚ÑŒ Ðº Ð¿ÐµÑ€Ð²Ð¾Ð¹ ÑÐ»ÑƒÑ‡Ð°Ð¹Ð½Ð¾Ð¹ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐµ (React key conflict + Ð½ÐµÐ¿Ñ€Ð°Ð²Ð¸Ð»ÑŒÐ½Ñ‹Ð¹ DOM selector). Commented hits Ð½Ð° Ñ€ÐµÐ½Ð´ÐµÑ€ ÐÐ• Ð²Ð»Ð¸ÑÑŽÑ‚.
+
+**B.6 â€” `handleBannerNavigate` Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ Ð´Ð»Ñ compositeKey (~ÑÑ‚Ñ€Ð¾ÐºÐ° 4142) â€” [V5-L3]**
+
+Grep-ÑÐºÐ¾Ñ€ÑŒ: `const handleBannerNavigate = useCallback` (1 hit, Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ðµ @ ~4142). Call-site: `onNavigate={handleBannerNavigate}` @ ~4610. Upstream: `onNavigate(banner.groupId)` @ ~2825, Ð³Ð´Ðµ `banner.groupId = tableId` Ð¸Ð· `buildBannerInfo @ ~4079-4090`.
+
+**Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ ÐºÐ¾Ð´:**
+```js
+  const handleBannerNavigate = useCallback((groupId) => {
+    if (!groupId) return;
+    setExpandedGroupId(groupId);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-group-id="${CSS.escape(String(groupId))}"]`);
+        ...
+```
+
+**[v3: M1] â€” Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÐ¼ defensive Ñ€ÐµÐ°Ð»Ð¸Ð·Ð°Ñ†Ð¸ÑŽ unconditionally** (CC review: "two alternatives with no decision rule â†’ pick defensive one").
+
+ÐÐµÐ·Ð°Ð²Ð¸ÑÐ¸Ð¼Ð¾ Ð¾Ñ‚ Ñ‚Ð¾Ð³Ð¾, Ñ‡Ñ‚Ð¾ Ð¿ÐµÑ€ÐµÐ´Ð°Ñ‘Ñ‚ call-site (upstream Ð¿ÐµÑ€ÐµÐ´Ð°Ñ‘Ñ‚ Ð§Ð˜Ð¡Ð¢Ð«Ð™ `tableId` Ð¸Ð· `banner.groupId`) â€” defensive Ð²ÐµÑ€ÑÐ¸Ñ Ñ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¾Ð¹ `__` Ð±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ð° Ð´Ð»Ñ Ð¾Ð±Ð¾Ð¸Ñ… ÑÐ»ÑƒÑ‡Ð°ÐµÐ².
+
+**Ð—Ð°Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð¦Ð•Ð›Ð˜ÐšÐžÐœ `handleBannerNavigate` useCallback:**
+```js
+  const handleBannerNavigate = useCallback((maybeTableIdOrCompositeKey) => {
+    if (!maybeTableIdOrCompositeKey) return;
+
+    // Ð‘2.1: ÐµÑÐ»Ð¸ Ð¿ÐµÑ€ÐµÐ´Ð°Ð½ tableId Ð±ÐµÐ· sessionId (current flow: banner.groupId = tableId) â€”
+    // Ñ€ÐµÐ·Ð¾Ð»Ð²Ð¸Ð¼ Ðº compositeKey Ð¢Ð•ÐšÐ£Ð©Ð•Ð™ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ ÑÑ‚Ð¾Ð³Ð¾ ÑÑ‚Ð¾Ð»Ð°.
+    // Defensive: Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð¸ ÐºÐ¾Ð³Ð´Ð° caller ÑƒÐ¶Ðµ Ð¿ÐµÑ€ÐµÐ´Ð°Ñ‘Ñ‚ compositeKey (ÑÐ¾Ð´ÐµÑ€Ð¶Ð¸Ñ‚ '__').
+    let targetKey = String(maybeTableIdOrCompositeKey);
+    if (!targetKey.includes('__')) {
+      const openId = openSessionByTableId[targetKey]?.id || null;
+      targetKey = openId
+        ? `${targetKey}__${openId}`
+        : `${targetKey}__no-session`;
+    }
+
+    setExpandedGroupId(targetKey);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-group-id="${CSS.escape(targetKey)}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setHighlightGroupId(targetKey);
+          if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+          highlightTimerRef.current = setTimeout(() => setHighlightGroupId(null), 1500);
+        }
+      });
+    });
+  }, [openSessionByTableId]);
+```
+
+âš ï¸ Ð”Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ `openSessionByTableId` Ð² dependency array useCallback (Ð½Ð¾Ð²Ð°Ñ Ð·Ð°Ð²Ð¸ÑÐ¸Ð¼Ð¾ÑÑ‚ÑŒ).
+
+**[V5-L3] Note Ð¿Ñ€Ð¾ identity churn:** ÐÐ¾Ð²Ñ‹Ð¹ dep `openSessionByTableId` Ð¿ÐµÑ€ÐµÑÑ‡Ð¸Ñ‚Ñ‹Ð²Ð°ÐµÑ‚ÑÑ ÐºÐ°Ð¶Ð´Ñ‹Ð¹ refetch `openSessions` query (ÐºÐ°Ð¶Ð´Ñ‹Ðµ ~5s Ð¿Ð¾ÑÐ»Ðµ Fix A). Ð­Ñ‚Ð¾ Ð·Ð½Ð°Ñ‡Ð¸Ñ‚ `handleBannerNavigate` Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ñ‚ **Ð½Ð¾Ð²ÑƒÑŽ identity Ð¿Ñ€Ð¸ ÐºÐ°Ð¶Ð´Ð¾Ð¼ refetch** â€” ÐµÑÐ»Ð¸ bannerComponent Ð¾Ð±Ñ‘Ñ€Ð½ÑƒÑ‚ Ð² `memo` Ñ shallow prop comparison, Ð¾Ð½ Ð±ÑƒÐ´ÐµÑ‚ Ñ€Ðµ-Ñ€ÐµÐ½Ð´ÐµÑ€Ð¸Ñ‚ÑŒÑÑ ÐºÐ°Ð¶Ð´Ñ‹Ðµ 5 ÑÐµÐºÑƒÐ½Ð´.
+
+Impact: **ÐºÐ¾ÑÐ¼ÐµÑ‚Ð¸Ñ‡ÐµÑÐºÐ¸Ð¹** â€” banner Ñ€ÐµÐ½Ð´ÐµÑ€ Ð»Ñ‘Ð³ÐºÐ¸Ð¹ (alert + ÐºÐ½Ð¾Ð¿ÐºÐ°), CPU cost Ð½Ð¸Ñ‡Ñ‚Ð¾Ð¶ÐµÐ½. ÐÐµ Ñ‚Ñ€ÐµÐ±ÑƒÐµÑ‚ Ð¼ÐµÐ¼Ð¾Ð¸Ð·Ð°Ñ†Ð¸Ð¸ `openSessionByTableId` Ð¸Ð»Ð¸ wrapper-hook. ÐŸÑ€Ð¸Ð½Ð¸Ð¼Ð°ÐµÐ¼Ð¾ ÐºÐ°Ðº trade-off Ð·Ð° fresh session info Ð² banner navigation.
+
+**B.7 â€” `confirmCloseTable` Ð¾Ñ‡Ð¸ÑÑ‚ÐºÐ° expanded (~ÑÑ‚Ñ€Ð¾ÐºÐ° 4190)**
+
+Grep-ÑÐºÐ¾Ñ€ÑŒ: `setExpandedGroupId(null); // Collapse expanded card` (1 hit). Ð¡Ñ‚Ñ€Ð¾ÐºÐ° ÐžÐš ÐºÐ°Ðº ÐµÑÑ‚ÑŒ â€” ÑƒÑÑ‚Ð°Ð½Ð°Ð²Ð»Ð¸Ð²Ð°ÐµÑ‚ `null`, Ð½Ð¸ÐºÐ°ÐºÐ¸Ñ… ÑÑÑ‹Ð»Ð¾Ðº Ð½Ð° ID. **ÐÐµ Ð¼ÐµÐ½ÑÑ‚ÑŒ.**
+
+### Should NOT (Ð´Ð»Ñ Fix B Ñ†ÐµÐ»Ð¸ÐºÐ¾Ð¼) â€” [v4-L4: `onCloseTable` = prop, `handleCloseTable` = handler â€” Ð²ÐµÐ·Ð´Ðµ Ð½Ð¸Ð¶Ðµ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÐ¼ `onCloseTable` ÐºÐ°Ðº Ð¸Ð¼Ñ ÐºÐ¾Ð½Ñ‚Ñ€Ð°ÐºÑ‚Ð°]
+- ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ OrderGroupCard ÐºÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚ (Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¿Ñ€Ð¾Ð¿ÑÑ‹).
+- ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ `favorites` Ð¼Ð°ÑÑÐ¸Ð² / `toggleFavorite` / `isFavorite` ÑÐ¸Ð³Ð½Ð°Ñ‚ÑƒÑ€Ñƒ. Favorites Ð¾ÑÑ‚Ð°ÑŽÑ‚ÑÑ Ð¿Ñ€Ð¸Ð²ÑÐ·Ð°Ð½Ñ‹ Ðº tableId.
+- ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ `["servedOrders", group.id]` queryKey â€” tableId Ð½ÑƒÐ¶ÐµÐ½ Ð´Ð»Ñ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ð³Ð¾ filter Ð¿Ð¾ B44.
+- ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ `onCloseTable(sessionId, identifier, tableId)` ÐºÐ¾Ð½Ñ‚Ñ€Ð°ÐºÑ‚ (FROZEN UX: Ð¿Ñ€Ð¾Ð¿Ñ OrderGroupCard'Ð°; Ð²Ð½ÑƒÑ‚Ñ€Ð¸ Ð¼Ð°Ð¿Ð¿Ð¸Ñ‚ÑÑ Ð½Ð° handler `handleCloseTable` Ñ€Ð¾Ð´Ð¸Ñ‚ÐµÐ»Ñ Ñ‡ÐµÑ€ÐµÐ· `group.openSessionId` + `group.displayName` + `group.id`).
+- ÐÐ• Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ `handleCloseTableClick` useCallback Ð²Ð½ÑƒÑ‚Ñ€Ð¸ OrderGroupCard (~2164-2177).
+- ÐÐ• Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ pickup/delivery Ð²ÐµÑ‚ÐºÑƒ Ð² `orderGroups` (Ð¸Ñ… compositeKey ÑƒÐ¶Ðµ ÑƒÐ½Ð¸ÐºÐ°Ð»ÐµÐ½ Ñ‡ÐµÑ€ÐµÐ· `o.id`).
+- ÐÐ• Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ `buildBannerInfo` @ ~4079-4090 Ð¸Ð»Ð¸ `onNavigate(banner.groupId)` @ ~2825 (upstream: Fix B.6 Ð¾Ð±Ñ€Ð°Ð±Ð°Ñ‚Ñ‹Ð²Ð°ÐµÑ‚ tableId Ñ‡ÐµÑ€ÐµÐ· defensive Ñ€ÐµÐ·Ð¾Ð»Ð²). [V5-L6]
+- ÐÐ• Ð´Ð¾Ð±Ð°Ð²Ð»ÑÑ‚ÑŒ Ð½Ð¾Ð²Ñ‹Ðµ state/hooks/queries.
+
+### Ð¡Ð²ÑÐ·Ð¸ Ð¼ÐµÐ¶Ð´Ñƒ Fix'Ð°Ð¼Ð¸
+âš ï¸ **Fix B.1 ÑÐ¾Ð·Ð´Ð°Ñ‘Ñ‚ Ð¿Ð¾Ð»Ðµ `group.sessionId`**, ÐºÐ¾Ñ‚Ð¾Ñ€Ð¾Ðµ:
+- Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ÑÑ Ð² Fix B.2 (`filteredGroups`) Ð¸ Fix B.3 (`tabCounts`) Ð´Ð»Ñ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ñ Ñ‚Ð°Ð±Ð°
+- Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ÑÑ Ð² Fix C (Ð½Ð¸Ð¶Ðµ) Ð´Ð»Ñ Ð´ÐµÑ‚ÐµÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ñ orphan orders
+Ð•ÑÐ»Ð¸ Fix B.1 Ð¿Ð°Ð´Ð°ÐµÑ‚ â€” Fix B.2, B.3 Ð¸ Fix C Ñ‚Ð¾Ð¶Ðµ Ð½ÐµÐ»ÑŒÐ·Ñ Ð¿Ñ€Ð¸Ð¼ÐµÐ½ÑÑ‚ÑŒ.
+
+### Verification Ð¿Ð¾ÑÐ»Ðµ Fix B (Ð’Ð¡Ð• ÐºÐ¾Ð¼Ð°Ð½Ð´Ñ‹ Ð´Ð¾Ð»Ð¶Ð½Ñ‹ Ð¿Ñ€Ð¾Ð¹Ñ‚Ð¸)
+
+```bash
+# 1. compositeKey Ð¿Ð¾ÑÐ²Ð¸Ð»ÑÑ Ð²ÐµÐ·Ð´Ðµ Ð³Ð´Ðµ Ð½ÑƒÐ¶Ð½Ð¾ (â‰¥5 occurrences: 1 key + 1 isExpanded + 1 onToggleExpand + 1 isHighlighted + 1-3 data-group-id)
+grep -c "compositeKey" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: â‰¥5 (4 call-sites B.4 + 1 Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÑŒÐ½Ñ‹Ð¹ data-group-id @ ~2292 + N Ð² orderGroups Ñ‚ÐµÐ»Ð¾).
+
+# 2. Ð¡Ñ‚Ð°Ñ€Ð°Ñ Ð¾Ð´Ð¸Ð½Ð¾Ñ‡Ð½Ð°Ñ Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€Ð¾Ð²ÐºÐ° ÑƒÐ±Ñ€Ð°Ð½Ð°
+grep -n "tableGroups\[tableId\]" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 0 hits (Ð²ÑÑ‘ Ð·Ð°Ð¼ÐµÐ½ÐµÐ½Ð¾ Ð½Ð° tableGroups[compositeKey]).
+
+# 3. Ð¡Ñ‚Ð°Ñ€Ð¾Ðµ ÑƒÑÐ»Ð¾Ð²Ð¸Ðµ Ð² filteredGroups ÑƒÐ±Ñ€Ð°Ð½Ð¾
+grep -n "hasOpenSession = !!openSessionByTableId\[group.id\]" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 0 hits.
+
+# 4. ÐÐ¾Ð²Ð¾Ðµ ÑƒÑÐ»Ð¾Ð²Ð¸Ðµ Ð¿Ñ€Ð¸ÑÑƒÑ‚ÑÑ‚Ð²ÑƒÐµÑ‚
+grep -c "isCurrentOpenSession" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 2 hits (filteredGroups + tabCounts).
+
+# 5. Ð¡Ñ‚Ð°Ñ€Ñ‹Ð¹ key={group.id} Ð²Ð½ÑƒÑ‚Ñ€Ð¸ v2SortedGroups.map ÑƒÐ±Ñ€Ð°Ð½
+sed -n '4455,4490p' "pages/StaffOrdersMobile/staffordersmobile.jsx" | grep -c "key={group.id}"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 0 hits Ð² ÑÑ‚Ð¾Ð¼ Ð´Ð¸Ð°Ð¿Ð°Ð·Ð¾Ð½Ðµ.
+
+# 6. [v5-L4] Live data-group-id @ ~2292 Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ compositeKey (loose regex â€” formatter-tolerant)
+sed -n '2285,2298p' "pages/StaffOrdersMobile/staffordersmobile.jsx" | grep -cE "data-group-id=\{ *group\.compositeKey *\}"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit.
+
+# 7. isFavorite Ð¿Ð¾-Ð¿Ñ€ÐµÐ¶Ð½ÐµÐ¼Ñƒ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ group.id â€” Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ° Ñ‡Ñ‚Ð¾ ÐÐ• ÑÐ»Ð¾Ð¼Ð°Ð»Ð¸
+grep -n "isFavorite(group.type === 'table' ? 'table' : 'order', group.id)" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: â‰¥1 hit (ÑÐ¸Ð³Ð½Ð°Ñ‚ÑƒÑ€Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð°).
+
+# 8. ÐžÐ±Ñ‰ÐµÐµ Ñ‡Ð¸ÑÐ»Ð¾ ÑÑ‚Ñ€Ð¾Ðº Ñ„Ð°Ð¹Ð»Ð° (Ð¿Ñ€Ð¸Ð¼ÐµÑ€Ð½Ð¾Ðµ)
+wc -l "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 4582 â‰¤ wc-l â‰¤ 4687 (base 4617, +70 max Ð¾Ñ‚ Ð½Ð¾Ð²Ñ‹Ñ… ÑÑ‚Ñ€Ð¾Ðº Fix B orderGroups + Fix C useEffect, -35 tolerance Ð·Ð° cleanup). [v5-M5: unambiguous]
+```
+
+---
+
+## Fix C: Invalidate openSessions Ð¿Ñ€Ð¸ orphan-Ð·Ð°ÐºÐ°Ð·Ð°Ñ…
+
+### Ð¡Ñ‚Ð°Ñ‚ÑƒÑ: [NEW CODE â€” performance optimization]
+**ÐŸÑ€Ð¾Ð±Ð»ÐµÐ¼Ð°:** Ð”Ð°Ð¶Ðµ Ñ Fix A (staleTime 5s) Ð¾ÑÑ‚Ð°Ñ‘Ñ‚ÑÑ Ð¾ÐºÐ½Ð¾ Ð´Ð¾ 5 ÑÐµÐºÑƒÐ½Ð´, ÐºÐ¾Ð³Ð´Ð° Ð½Ð¾Ð²Ñ‹Ð¹ Order ÑƒÐ¶Ðµ Ð² Ð‘Ð”, Ð½Ð¾ SOM ÐµÐ³Ð¾ Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€ÑƒÐµÑ‚ Ð±ÐµÐ· Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸. Ð•ÑÐ»Ð¸ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾ Ð¿Ð¾Ð»Ð¸Ð½Ð³ `orders` Ñ€Ð°Ð½ÑŒÑˆÐµ Ñ‡ÐµÐ¼ `openSessions` â€” ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° Ð¿Ð¾ÑÐ²Ð¸Ñ‚ÑÑ Ð² Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹Ñ…Â», Ð¿Ð¾Ñ‚Ð¾Ð¼ Â«Ð¿Ñ€Ñ‹Ð³Ð½ÐµÑ‚Â» Ð² Â«ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹ÐµÂ». Fix C Ð´ÐµÑ‚ÐµÐºÑ‚Ð¸Ñ€ÑƒÐµÑ‚ Ñ‚Ð°ÐºÐ¸Ðµ orphan Orders Ð¸ Ð´ÐµÐ»Ð°ÐµÑ‚ Ð¿Ñ€Ð¸Ð½ÑƒÐ´Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ñ‹Ð¹ invalidate `openSessions` â€” ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° Ð¿Ð¾ÑÐ²Ð¸Ñ‚ÑÑ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾ ÑÑ€Ð°Ð·Ñƒ.
+
+### Change
+
+**[v5-C2] Pre-check Ð¿ÐµÑ€ÐµÐ´ Ð²ÑÑ‚Ð°Ð²ÐºÐ¾Ð¹ â€” Ñ€ÐµÐ°Ð»ÑŒÐ½Ñ‹Ð¹ `orders` alias:**
+
+```bash
+# Real anchor: `data: orders,` Ð²Ð½ÑƒÑ‚Ñ€Ð¸ useQuery destructure @ ~3497
+grep -n "data: orders," "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~3497, Ð²Ð½ÑƒÑ‚Ñ€Ð¸ useQuery({ queryKey: ["orders", partnerId], ... }).
+# Ð­Ñ‚Ð¾ Ð¸ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº `orders` â€” Ð¼Ð°ÑÑÐ¸Ð² Order entities Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÐ¼Ñ‹Ð¹ Ð¿Ð¾ Ð²ÑÐµÐ¼Ñƒ ÐºÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚Ñƒ.
+
+grep -n 'queryKey: \["orders"' "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~3494, Ð±Ð»Ð¾Ðº orders useQuery (Ð´Ð¸Ð°Ð¿Ð°Ð·Ð¾Ð½ ~3494-3512).
+
+# âš ï¸ ÐÐ• Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ pattern `^  const orders ` â€” Ð¾Ð½ Ð¼Ð°Ñ‚Ñ‡Ð¸Ñ‚ inner helper variable @ ~1130 (Ð½Ðµ Ñ‚Ð¾).
+# Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ `data: orders,` ÐºÐ°Ðº ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½Ñ‹Ð¹ ÑÐºÐ¾Ñ€ÑŒ Ð´Ð»Ñ Fix C.
+```
+
+**Placement:** Ð´Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ ÐÐžÐ’Ð«Ð™ useEffect Ð¡Ð ÐÐ—Ð£ ÐŸÐžÐ¡Ð›Ð• Ð·Ð°ÐºÑ€Ñ‹Ð²Ð°ÑŽÑ‰ÐµÐ¹ `}, [openSessions]);` useMemo `openSessionByTableId` (ÑÑ‚Ñ€Ð¾ÐºÐ° ~3561). Grep-ÑÐºÐ¾Ñ€ÑŒ Ð´Ð»Ñ Ñ‚Ð¾Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÑÑ‚Ð°:
+
+```bash
+grep -n "openSessionByTableId = useMemo" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~3554. Ð’ÑÑ‚Ð°Ð²Ð¸Ñ‚ÑŒ useEffect ÑÑ€Ð°Ð·Ñƒ Ð¿Ð¾ÑÐ»Ðµ `}, [openSessions]);` ÑÑ‚Ð¾Ð³Ð¾ useMemo.
+```
+
+**Alternative anchor ÐµÑÐ»Ð¸ closing `}, [openSessions]);` Ð¸Ð¼ÐµÐµÑ‚ Ð½ÐµÑÑ‚Ð°Ð½Ð´Ð°Ñ€Ñ‚Ð½Ð¾Ðµ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ðµ (trailing comment / extra whitespace / multi-line deps):**
+```bash
+# ÐŸÑ€Ð¾Ñ‡Ð¸Ñ‚Ð°Ñ‚ÑŒ ~30 ÑÑ‚Ñ€Ð¾Ðº Ð½Ð°Ñ‡Ð¸Ð½Ð°Ñ Ñ openSessionByTableId useMemo
+sed -n '3554,3585p' "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐÐ°Ð¹Ñ‚Ð¸ Ð¿ÐµÑ€Ð²ÑƒÑŽ ÑÑ‚Ñ€Ð¾ÐºÑƒ Ð¿Ð¾ÑÐ»Ðµ Ð·Ð°ÐºÑ€Ñ‹Ð²Ð°ÑŽÑ‰ÐµÐ¹ `});` Ð¸Ð»Ð¸ `}, [openSessions]);` Ð¸ Ð´Ð¾ `const activeRequests`.
+# Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ Ð¿Ð¾ÑÐ»ÐµÐ´Ð½Ð¸Ðµ 2 ÑÑ‚Ñ€Ð¾ÐºÐ¸ ÑÑ‚Ð¾Ð³Ð¾ useMemo (Ñ ÑƒÐ½Ð¸ÐºÐ°Ð»ÑŒÐ½Ð¾Ð¹ Ñ‚Ð¾Ñ‡Ð½Ð¾ÑÑ‚ÑŒÑŽ) ÐºÐ°Ðº Edit-anchor.
+```
+
+ÐŸÑ€Ð¸Ñ‡Ð¸Ð½Ð° (PQ-099): useEffect Ð´Ð¾Ð»Ð¶ÐµÐ½ Ð±Ñ‹Ñ‚ÑŒ Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½ Ð¿Ð¾ÑÐ»Ðµ Ð²ÑÐµÑ… useMemo/useCallback, Ð¾Ñ‚ ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ñ… Ð·Ð°Ð²Ð¸ÑÐ¸Ñ‚, Ð½Ð¾ Ð´Ð¾ `const activeRequests` (~3565).
+
+**[v4-C1 + v4-M7] ÐÐ¾Ð²Ñ‹Ð¹ ÐºÐ¾Ð´ (Ð²ÑÑ‚Ð°Ð²Ð¸Ñ‚ÑŒ):**
+
+```js
+  // Ð‘2.1 Fix C: ÐµÑÐ»Ð¸ Ð¿Ð¾ÑÐ²Ð¸Ð»ÑÑ hall-Order Ñ table_session, Ð½Ð¾ openSessionByTableId
+  // ÐµÑ‰Ñ‘ Ð½Ðµ Ð·Ð½Ð°ÐµÑ‚ Ð¾ Ð½ÐµÐ¹ (staleTime race) â€” Ð¿Ñ€Ð¸Ð½ÑƒÐ´Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ð¾ Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ openSessions.
+  // Ð­Ñ‚Ð¾ ÑƒÑÐºÐ¾Ñ€ÑÐµÑ‚ Ð¿Ð¾ÑÐ²Ð»ÐµÐ½Ð¸Ðµ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ð¹ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ¸ Ð² Â«ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹Ñ…Â» (Ð´Ð¾ 5Ñ â†’ <1Ñ).
+  //
+  // [v4-C1] FILTER: Ð¸ÑÐºÐ»ÑŽÑ‡Ð°ÐµÐ¼ orders ÑÐ¾ status 'closed'/'cancelled' â€” Ñƒ Ð½Ð¸Ñ… table_session
+  // Ð¾ÑÑ‚Ð°Ñ‘Ñ‚ÑÑ (sessionHelpers.js:158-173), Ð½Ð¾ Ð¾Ð½Ð¸ ÐÐ• Ð´Ð¾Ð»Ð¶Ð½Ñ‹ Ñ‚Ñ€Ð¸Ð³Ð³ÐµÑ€Ð¸Ñ‚ÑŒ invalidate
+  // (Ð¸Ð½Ð°Ñ‡Ðµ Ð´Ð»Ñ ÐºÐ°Ð¶Ð´Ð¾Ð³Ð¾ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð¾Ð³Ð¾ hall-Ð·Ð°ÐºÐ°Ð·Ð° Ð±ÐµÐ· Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ invalidate ÑƒÐ¹Ð´Ñ‘Ñ‚
+  // Ð² ÐºÐ°Ð¶Ð´Ð¾Ð¼ Ñ†Ð¸ÐºÐ»Ðµ polling â†’ Ð±ÐµÑÐºÐ¾Ð½ÐµÑ‡Ð½Ð°Ñ Ð½Ð°Ð³Ñ€ÑƒÐ·ÐºÐ° Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€).
+  //
+  // [v4-M7] ONE-SHOT GUARD: Ð·Ð°Ð¿Ð¾Ð¼Ð¸Ð½Ð°ÐµÐ¼ Â«ÑƒÐ¶Ðµ Ð¸Ð½Ð²Ð°Ð»Ð¸Ð´Ð¸Ñ€Ð¾Ð²Ð°Ð»Ð¸ Ð´Ð»Ñ ÑÑ‚Ð¾Ð¹ ÐºÐ¾Ð¼Ð±Ð¸Ð½Ð°Ñ†Ð¸Ð¸ orphan-ÑÐ¸Ð³Ð½Ð°Ñ‚ÑƒÑ€Â»
+  // Ñ‡ÐµÑ€ÐµÐ· useRef. Ð¡Ð¸Ð³Ð½Ð°Ñ‚ÑƒÑ€Ð° = Ð¾Ñ‚ÑÐ¾Ñ€Ñ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð½Ð°Ñ ÑÑ‚Ñ€Ð¾ÐºÐ° `tableId:sessionId,tableId:sessionId,...`.
+  // ÐšÐ¾Ð³Ð´Ð° ÑÐ¸Ð³Ð½Ð°Ñ‚ÑƒÑ€Ð° Ð½Ðµ Ð¸Ð·Ð¼ÐµÐ½Ð¸Ð»Ð°ÑÑŒ â€” ÐÐ• Ð²Ñ‹Ð·Ñ‹Ð²Ð°ÐµÐ¼ invalidate Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ð¾ (Ð´Ð¾Ð¿. Ð·Ð°Ñ‰Ð¸Ñ‚Ð° Ð¾Ñ‚ race
+  // ÐµÑÐ»Ð¸ openSessions Ð¾Ð±Ð½Ð¾Ð²Ð¸Ð»ÑÑ, Ð½Ð¾ Ð²ÑÑ‘ ÐµÑ‰Ñ‘ Ð½Ðµ ÑÐ¾Ð´ÐµÑ€Ð¶Ð¸Ñ‚ Ð½Ð¾Ð²ÑƒÑŽ ÑÐµÑÑÐ¸ÑŽ).
+  const orphanInvalidateSigRef = useRef(null);
+  useEffect(() => {
+    if (!Array.isArray(orders) || orders.length === 0) return;
+
+    const orphanPairs = [];
+    for (const o of orders) {
+      if (o.order_type !== 'hall') continue;
+      // [v4-C1] Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ðµ/Ð¾Ñ‚Ð¼ÐµÐ½Ñ‘Ð½Ð½Ñ‹Ðµ orders Ð½Ðµ ÑÑ‡Ð¸Ñ‚Ð°ÑŽÑ‚ÑÑ orphan â€” Ð¾Ð½Ð¸ Ð¿Ñ€Ð¸Ð½Ð°Ð´Ð»ÐµÐ¶Ð°Ñ‚ Ð·Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸
+      if (o.status === 'closed' || o.status === 'cancelled') continue;
+      const tableId = getLinkId(o.table);
+      if (!tableId) continue;
+      const sessionId = getLinkId(o.table_session);
+      if (!sessionId) continue;
+      // Order ÑÑÑ‹Ð»Ð°ÐµÑ‚ÑÑ Ð½Ð° table_session, Ð½Ð¾ SOM Ð½Ðµ Ð²Ð¸Ð´Ð¸Ñ‚ ÑÑ‚Ñƒ ÑÐµÑÑÐ¸ÑŽ Ð² openSessions
+      const open = openSessionByTableId[tableId];
+      if (!open || open.id !== sessionId) {
+        orphanPairs.push(`${tableId}:${sessionId}`);
+      }
+    }
+
+    if (orphanPairs.length === 0) {
+      // Reset signature ÐºÐ¾Ð³Ð´Ð° orphan'Ñ‹ Ð¸ÑÑ‡ÐµÐ·Ð»Ð¸ (Ð½Ð¾Ñ€Ð¼Ð°Ð»ÑŒÐ½Ð¾Ðµ ÑÐ¾ÑÑ‚Ð¾ÑÐ½Ð¸Ðµ) â€” Ð¿Ð¾Ð·Ð²Ð¾Ð»Ð¸Ñ‚
+      // ÑÑ€Ð°Ð±Ð¾Ñ‚Ð°Ñ‚ÑŒ invalidate ÐµÑ‰Ñ‘ Ñ€Ð°Ð· ÐµÑÐ»Ð¸ Ð² Ð±ÑƒÐ´ÑƒÑ‰ÐµÐ¼ Ð¿Ð¾ÑÐ²Ð¸Ñ‚ÑÑ Ð½Ð¾Ð²Ñ‹Ð¹ orphan.
+      orphanInvalidateSigRef.current = null;
+      return;
+    }
+
+    // [v4-M7] one-shot guard: ÑƒÐ½Ð¸ÐºÐ°Ð»ÑŒÐ½Ð°Ñ Ð¿Ð¾Ð´Ð¿Ð¸ÑÑŒ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ³Ð¾ Ð½Ð°Ð±Ð¾Ñ€Ð° orphan'Ð¾Ð²
+    const signature = orphanPairs.sort().join(',');
+    if (orphanInvalidateSigRef.current === signature) {
+      // Ð£Ð¶Ðµ Ð¸Ð½Ð²Ð°Ð»Ð¸Ð´Ð¸Ñ€Ð¾Ð²Ð°Ð»Ð¸ Ð´Ð»Ñ ÑÑ‚Ð¾Ð¹ Ð¶Ðµ ÐºÐ¾Ð¼Ð±Ð¸Ð½Ð°Ñ†Ð¸Ð¸ â€” Ð½Ðµ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€ÑÐµÐ¼.
+      return;
+    }
+    orphanInvalidateSigRef.current = signature;
+    // [v5-C1] Prefix invalidate â€” Ð¼Ð°Ñ‚Ñ‡Ð¸Ñ‚ ["openSessions", partnerId] Ð´Ð»Ñ Ð»ÑŽÐ±Ð¾Ð³Ð¾ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ³Ð¾ partnerId.
+    queryClient.invalidateQueries({ queryKey: ["openSessions"] });
+  }, [orders, openSessionByTableId, queryClient]);
+```
+
+**âš ï¸ Dependency array useEffect â€” Ð”ÐžÐ‘ÐÐ’Ð˜Ð¢Ð¬ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ ÑÑ‚Ð¸ 3:** `orders`, `openSessionByTableId`, `queryClient`. ÐÐ• Ð²ÐºÐ»ÑŽÑ‡Ð°Ñ‚ÑŒ `getLinkId` (origin Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»Ñ‘Ð½ Ð² Preparation Step 2; ÐµÑÐ»Ð¸ Ð¾Ð½ component-scoped â€” Ð¾Ð±ÐµÑ€Ð½ÑƒÑ‚ÑŒ Ð² useCallback Ð¸ Ð´Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ Ð² deps; ÐµÑÐ»Ð¸ imported â€” Ð¿Ñ€Ð¾Ð¿ÑƒÑÑ‚Ð¸Ñ‚ÑŒ, ÐºÐ°Ðº ÑÐµÐ¹Ñ‡Ð°Ñ).
+
+**âš ï¸ [V5-M3] Pre-check Ð”Ðž Ð²ÑÑ‚Ð°Ð²ÐºÐ¸:** ÑƒÐ±ÐµÐ´Ð¸Ñ‚ÑŒÑÑ Ñ‡Ñ‚Ð¾ `queryClient` Ð² scope (Ð¸Ð· Preparation Â§3). Ð•ÑÐ»Ð¸ Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½Ð°Ñ Ð½Ð°Ð·Ñ‹Ð²Ð°ÐµÑ‚ÑÑ Ð¸Ð½Ð°Ñ‡Ðµ â€” Ð·Ð°Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð² ÐºÐ¾Ð´Ðµ Fix C. Ð•ÑÐ»Ð¸ `useQueryClient()` Ð½Ðµ Ð²Ñ‹Ð·Ð²Ð°Ð½ â€” STOP.
+
+**âš ï¸ [V5-L5] Imports:** ÑƒÐ±ÐµÐ´Ð¸Ñ‚ÑŒÑÑ Ñ‡Ñ‚Ð¾ `useRef` ÑƒÐ¶Ðµ Ð¸Ð¼Ð¿Ð¾Ñ€Ñ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½ Ð¸Ð· 'react'. Pre-check (Ð¸Ð· Preparation Â§4) Ð´Ð°ÑÑ‚ hit-count. Ð•ÑÐ»Ð¸ Ð½ÑƒÐ¶Ð½Ð¾ Ð´Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ â€” Ð½Ð°Ð¹Ñ‚Ð¸ react import line (Preparation Â§4 grep `from 'react'`) Ð¸ Ñ€Ð°ÑÑˆÐ¸Ñ€Ð¸Ñ‚ÑŒ ÑÐ¿Ð¸ÑÐ¾Ðº:
+
+Single-line Ð²Ð°Ñ€Ð¸Ð°Ð½Ñ‚ (ÐµÑÐ»Ð¸ Ñ‚ÐµÐºÑƒÑ‰Ð°Ñ Ñ„Ð¾Ñ€Ð¼Ð° Ñ‚Ð°ÐºÐ°Ñ):
+- old_string: `import { useState, useEffect, useMemo, useCallback } from 'react';`
+- new_string: `import { useState, useEffect, useMemo, useCallback, useRef } from 'react';`
+
+Multi-line Ð²Ð°Ñ€Ð¸Ð°Ð½Ñ‚ (ÐµÑÐ»Ð¸ multi-line import) â€” Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ Ñ‚Ð¾Ñ‡Ð½Ñ‹Ð¹ snippet Ð¸Ð· `grep -n "from 'react'"` + `sed -n` ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚. ÐÐ• Ð¿ÐµÑ€ÐµÑ„Ð¾Ñ€Ð¼Ð°Ñ‚Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ multi-line Ð² single-line Ð¸ Ð½Ð°Ð¾Ð±Ð¾Ñ€Ð¾Ñ‚.
+
+### Why not activeOrders? (Why not Ð²ÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÑŒ status filter Ð² `activeOrders`?)
+
+CC findings (Issue #1 CRITICAL): `orders` Ð±ÐµÐ· status-Ñ„Ð¸Ð»ÑŒÑ‚Ñ€Ð° Ð»Ð¾Ð²Ð¸Ð» Ð²ÑÐµ hall orders Ð²ÐºÐ»ÑŽÑ‡Ð°Ñ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ðµ â†’ Ð±ÐµÑÐºÐ¾Ð½ÐµÑ‡Ð½Ñ‹Ð¹ invalidate-loop. ÐœÐ¾Ð¶Ð½Ð¾ Ð±Ñ‹Ð»Ð¾ Ð±Ñ‹ Ð¿ÐµÑ€ÐµÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÑŒÑÑ Ð½Ð° `activeOrders` (ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ðµ ÑƒÐ¶Ðµ Ñ„Ð¸Ð»ÑŒÑ‚Ñ€Ð¾Ð²Ð°Ð½Ñ‹), Ð½Ð¾ ÑÑ‚Ð¾ Ð±Ñ‹ Ð¿Ñ€Ð¾Ð¿ÑƒÑÑ‚Ð¸Ð»Ð¾ ÑÐ²ÐµÐ¶ÐµÑÐ¾Ð·Ð´Ð°Ð½Ð½Ñ‹Ðµ orders Ñ status='active' Ð½Ð¾ Ñ‡ÐµÑ€ÐµÐ· `shiftCutoff` Ð¾Ñ‚Ñ„Ð¸Ð»ÑŒÑ‚Ñ€Ð¾Ð²Ð°Ð½Ð½Ñ‹Ðµ. Ð ÐµÑˆÐµÐ½Ð¸Ðµ [v4-C1]: Ð¾ÑÑ‚Ð°Ð²Ð»ÑÐµÐ¼ `orders` (Ñ€Ð°Ð½Ð½ÐµÐµ Ð¾Ð±Ð½Ð°Ñ€ÑƒÐ¶ÐµÐ½Ð¸Ðµ) + ÑÐ²Ð½Ñ‹Ð¹ inline-Ñ„Ð¸Ð»ÑŒÑ‚Ñ€ Ð¿Ð¾ status (Ð¸ÑÐºÐ»ÑŽÑ‡Ð°ÐµÑ‚ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ðµ carryover).
+
+### Why not useMemo Ð²Ð¼ÐµÑÑ‚Ð¾ useEffect?
+Ð­Ñ‚Ð¾ side-effect (invalidateQueries) â€” Ð´Ð¾Ð»Ð¶ÐµÐ½ Ð±Ñ‹Ñ‚ÑŒ Ð² useEffect, Ð½Ðµ useMemo.
+
+### Safety (post-v4):
+- useEffect ÐÐ• ÑÐ¾Ð·Ð´Ð°Ñ‘Ñ‚ Ñ‚Ð°Ð¹Ð¼ÐµÑ€Ñ‹/Ð¿Ñ€Ð¾Ð¼Ð¸ÑÑ‹ â†’ cleanup Ð½Ðµ Ð½ÑƒÐ¶ÐµÐ½.
+- Re-run frequency: Ð¿Ñ€Ð¸ ÐºÐ°Ð¶Ð´Ð¾Ð¼ refetch orders (polling ~10-60Ñ) â€” ÐžÐš, signature-guard Ð±Ð»Ð¾ÐºÐ¸Ñ€ÑƒÐµÑ‚ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ invalidate Ð´Ð»Ñ Ñ‚Ð¾Ð¹ Ð¶Ðµ ÐºÐ¾Ð¼Ð±Ð¸Ð½Ð°Ñ†Ð¸Ð¸.
+- Ð‘ÐµÑÐºÐ¾Ð½ÐµÑ‡Ð½Ñ‹Ð¹ Ñ†Ð¸ÐºÐ» Ñ€Ð¸ÑÐº:
+  - **Closed-order carryover (CC Issue #1):** âœ… Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð¾ Ñ„Ð¸Ð»ÑŒÑ‚Ñ€Ð¾Ð¼ `o.status === 'closed' || 'cancelled' â†’ continue` (v4-C1).
+  - **New-session race (genuine orphan):** invalidate ÑÑ€Ð°Ð±Ð°Ñ‚Ñ‹Ð²Ð°ÐµÑ‚ 1 Ñ€Ð°Ð· â†’ openSessions refetch â†’ Ð½Ð¾Ð²Ð°Ñ ÑÐµÑÑÐ¸Ñ Ð¿Ð¾Ð¿Ð°Ð´Ð°ÐµÑ‚ Ð² `openSessionByTableId` â†’ orphanPairs ÑÑ‚Ð°Ð½Ð¾Ð²Ð¸Ñ‚ÑÑ Ð¿ÑƒÑÑ‚Ñ‹Ð¼ â†’ signature reset â†’ Ð³Ð¾Ñ‚Ð¾Ð² Ðº ÑÐ»ÐµÐ´ÑƒÑŽÑ‰ÐµÐ¼Ñƒ orphan'Ñƒ. âœ…
+  - **Stale openSessions response:** signature-guard (v4-M7) Ð·Ð°Ñ‰Ð¸Ñ‰Ð°ÐµÑ‚: ÐµÑÐ»Ð¸ openSessions Ð²ÐµÑ€Ð½ÑƒÐ» Ñ‚Ð¾Ñ‚ Ð¶Ðµ Ð½Ð°Ð±Ð¾Ñ€ Ð±ÐµÐ· Ð½Ð¾Ð²Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ â€” sig Ð½Ðµ Ð¸Ð·Ð¼ÐµÐ½Ð¸Ð»Ð°ÑÑŒ â†’ Ð²Ñ‚Ð¾Ñ€Ð¾Ð³Ð¾ invalidate Ð½Ðµ Ð±ÑƒÐ´ÐµÑ‚.
+
+### Verification Ð¿Ð¾ÑÐ»Ðµ Fix C â€” [V5-C4 Ð¿ÐµÑ€ÐµÐ¿Ð¸ÑÐ°Ð½: real identifiers]
+
+```bash
+# 1. [v5-C4] ÐŸÑ€Ð¾Ð²ÐµÑ€ÐºÐ° real identifiers Ð² ÐºÐ¾Ð´Ðµ â€” ÐÐ• hasOrphanedHallOrder (stale var Ð¸Ð· v3)
+grep -n "orphanInvalidateSigRef" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: Ñ€Ð¾Ð²Ð½Ð¾ 3 hits â€” (a) `const orphanInvalidateSigRef = useRef(null);` Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ðµ,
+#                            (b) `if (orphanInvalidateSigRef.current === signature)` Ñ‡Ñ‚ÐµÐ½Ð¸Ðµ,
+#                            (c) `orphanInvalidateSigRef.current = signature;` Ð·Ð°Ð¿Ð¸ÑÑŒ, Ð° Ñ‚Ð°ÐºÐ¶Ðµ
+#                            (d) `orphanInvalidateSigRef.current = null;` reset. Ð˜Ñ‚Ð¾Ð³ 3-4 hits.
+# Ð”Ð¾Ð¿ÑƒÑÑ‚Ð¸Ð¼Ð¾: 3-4 hits Ð² Ð·Ð°Ð²Ð¸ÑÐ¸Ð¼Ð¾ÑÑ‚Ð¸ Ð¾Ñ‚ Ñ‚Ð¾Ð³Ð¾ ÐºÐ°Ðº Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚Ñ‚ÐµÑ€ Ð¾Ð±ÑŠÐµÐ´Ð¸Ð½ÑÐµÑ‚ reset.
+
+grep -n "orphanPairs" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: â‰¥3 hits â€” Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ðµ, .push, .length check, .sort().join(',').
+
+grep -n "orphanPairs.push" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit (Ð²Ð½ÑƒÑ‚Ñ€Ð¸ Ñ†Ð¸ÐºÐ»Ð° for orders).
+
+# 2. invalidateQueries openSessions Ð¿Ñ€Ð¸ÑÑƒÑ‚ÑÑ‚Ð²ÑƒÐµÑ‚ Ð² Ð½ÑƒÐ¶Ð½Ð¾Ð¼ Ð¼ÐµÑÑ‚Ðµ
+grep -n 'invalidateQueries({ queryKey: \["openSessions"\] })' "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: â‰¥2 hits (ÑÑ‚Ð°Ñ€Ñ‹Ð¹ Ð² confirmCloseTable + Ð½Ð¾Ð²Ñ‹Ð¹ Ð² Fix C useEffect).
+
+# 3. [V5-C4] Stale references ÐžÐ¢Ð¡Ð£Ð¢Ð¡Ð¢Ð’Ð£Ð®Ð¢ (ÐµÑÐ»Ð¸ Codex/CC Ð¿Ð¾ Ð¾ÑˆÐ¸Ð±ÐºÐµ Ð½Ð°Ð¿Ð¸ÑÐ°Ð» Ð²Ð°Ñ€Ð¸Ð°Ð½Ñ‚ Ñ ÑÑ‚Ð¸Ð¼Ð¸ Ð¸Ð¼ÐµÐ½Ð°Ð¼Ð¸)
+grep -n "hasOrphanedHallOrder\|hasOrphanedOrder" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 0 hits (ÑÑ‚Ð¾ Ð¸Ð¼ÐµÐ½Ð° Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½Ñ‹Ñ… Ð¸Ð· v3 draft, Ð² Ñ„Ð¸Ð½Ð°Ð»ÑŒÐ½Ð¾Ð¼ ÐºÐ¾Ð´Ðµ v4/v5 Ð¸Ñ… Ð½ÐµÑ‚).
+
+# 4. [V5-M3] Pre-check Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½: queryClient Ð² scope
+grep -n "const queryClient = useQueryClient" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit â€” Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ðµ Ð²Ð½ÑƒÑ‚Ñ€Ð¸ ÐºÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚Ð° (pre-existed, Ð½Ðµ Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÐ¼).
+
+# 5. [V5-L5] useRef import Ð¿Ñ€Ð¸ÑÑƒÑ‚ÑÑ‚Ð²ÑƒÐµÑ‚ (Ð»Ð¸Ð±Ð¾ Ð±Ñ‹Ð», Ð»Ð¸Ð±Ð¾ Ð´Ð¾Ð±Ð°Ð²Ð¸Ð»Ð¸)
+grep -c "useRef" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: â‰¥2 (1 Ð² import, 1 Ð² const orphanInvalidateSigRef = useRef).
+
+# 6. Syntax check Ð½Ðµ Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÐµÐ½ (JSX â€” Ð½Ðµ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶Ð¸Ð²Ð°ÐµÑ‚ÑÑ node --check, PQ-072), Ð½Ð¾ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ° Ð»Ð¸Ð½Ñ‚Ð¾Ð¼:
+# Git push triggered CI lint / B44 deploy catch syntax â†’ Ð´Ð¾Ð²ÐµÑ€ÑÐµÐ¼ Ñ„Ð¸Ð½Ð°Ð»ÑŒÐ½Ð¾Ð¼Ñƒ git commit.
+```
+
+---
+
+## Regression Check (Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð¾ Ð¿Ð¾ÑÐ»Ðµ Ð’Ð¡Ð•Ð¥ Fix) â€” [V5-L1 typo fix]
+
+ÐŸÑ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ, Ñ‡Ñ‚Ð¾ ÐŸÐ ÐžÐ”ÐžÐ›Ð–ÐÐ•Ð¢ Ñ€Ð°Ð±Ð¾Ñ‚Ð°Ñ‚ÑŒ:
+
+- [ ] Ð Ð°ÑÐºÑ€Ñ‹Ñ‚Ð¸Ðµ/ÑÐ²Ð¾Ñ€Ð°Ñ‡Ð¸Ð²Ð°Ð½Ð¸Ðµ Ð¾Ð´Ð½Ð¾Ð¹ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ¸ (click Ð¿Ð¾ header) â†’ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚.
+- [ ] ÐÐµÐ»ÑŒÐ·Ñ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ÑŒ 2 ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ¸ Ð¾Ð´Ð½Ð¾Ð²Ñ€ÐµÐ¼ÐµÐ½Ð½Ð¾ (`expandedGroupId` single) â†’ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚.
+- [ ] Favorite star Ð½Ð° ÑÑ‚Ð¾Ð»Ðµ â†’ Ð¿ÐµÑ€ÐµÐºÐ»ÑŽÑ‡Ð°ÐµÑ‚ÑÑ, ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐµÑ‚ÑÑ Ð¼ÐµÐ¶Ð´Ñƒ Ñ€ÐµÐ½Ð´ÐµÑ€Ð°Ð¼Ð¸.
+- [ ] Favorite filter (star) â†’ Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¸Ð·Ð±Ñ€Ð°Ð½Ð½Ñ‹Ðµ.
+- [ ] Close Table Ð¸Ð· ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ¸ ÑÑ‚Ð¾Ð»Ð° â†’ Ð·Ð°ÐºÑ€Ñ‹Ð²Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ open-session; ÑÑ‚Ð°Ñ€Ð°Ñ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð°Ñ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° Ð¾ÑÑ‚Ð°Ñ‘Ñ‚ÑÑ Ð² Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹Ñ…Â» Ð½ÐµÑ‚Ñ€Ð¾Ð½ÑƒÑ‚Ð¾Ð¹.
+- [ ] Pickup / Delivery Ð·Ð°ÐºÐ°Ð·Ñ‹ â†’ Ð¾Ñ‚Ð¾Ð±Ñ€Ð°Ð¶Ð°ÑŽÑ‚ÑÑ Ð² ÑÐ¿Ð¸ÑÐºÐµ, Ñ‚Ð°Ð¿ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚.
+- [ ] Active/Completed Ñ‚Ð°Ð± ÑÑ‡Ñ‘Ñ‚Ñ‡Ð¸ÐºÐ¸ (tabCounts) â†’ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾ ÑÑ‡Ð¸Ñ‚Ð°ÑŽÑ‚ (Ð½Ð¾Ð²Ð°Ñ ÑÐµÑÑÐ¸Ñ Ð² Â«ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹ÐµÂ», ÑÑ‚Ð°Ñ€Ð°Ñ Ð² Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹ÐµÂ»).
+- [ ] Banner-navigate (ÐºÐ»Ð¸Ðº Ð¿Ð¾ alert Ð±Ð°Ð½Ð½ÐµÑ€Ñƒ Ð¾ Ð½Ð¾Ð²Ð¾Ð¼ Ð·Ð°ÐºÐ°Ð·Ðµ) â†’ ÑÐºÑ€Ð¾Ð»Ð»Ð¸Ñ‚ Ðº Ð¿Ñ€Ð°Ð²Ð¸Ð»ÑŒÐ½Ð¾Ð¹ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐµ (Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸), Ñ€Ð°ÑÐºÑ€Ñ‹Ð²Ð°ÐµÑ‚ ÐµÑ‘. [V5-C3: call chain buildBannerInfo â†’ banner.groupId (tableId) â†’ onNavigate @ 2825 â†’ prop @ 4610 â†’ handleBannerNavigate @ 4142 â†’ defensive Ñ€ÐµÐ·Ð¾Ð»Ð² tableId â†’ compositeKey]
+- [ ] servedOrders query (Ð½Ð°Ð¶Ð°Ñ‚ÑŒ expand Ð½Ð° ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐµ Ñ served orders) â†’ Ð¿Ð¾Ð´Ñ‚ÑÐ³Ð¸Ð²Ð°ÐµÑ‚ historical served orders Ð´Ð»Ñ tableId. [V5-L1: Ð±Ñ‹Ð»Ð¾ Â«ServedotÂ» typo]
+- [ ] Kitchen mode (`isKitchen === true`) â†’ Ð²Ð¸Ð´Ð¸Ñ‚ flat `visibleOrders`, Ð±ÐµÐ· ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐµÐº. `orderGroups` Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ `null` â†’ Ð½Ðµ Ð»Ð¾Ð¼Ð°ÐµÑ‚ÑÑ.
+- [ ] Highlight (Ð¾Ñ€Ð°Ð½Ð¶ÐµÐ²Ð°Ñ Ð¿Ð¾Ð´ÑÐ²ÐµÑ‚ÐºÐ° 1.5Ñ Ð¿Ð¾ÑÐ»Ðµ banner-navigate) â†’ Ð¿Ñ€Ð¸Ð¼ÐµÐ½ÑÐµÑ‚ÑÑ Ðº Ð¿Ñ€Ð°Ð²Ð¸Ð»ÑŒÐ½Ð¾Ð¹ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐµ.
+
+---
+
+## Mobile-first check (MANDATORY)
+
+SOM â€” mobile-first waiter interface (375px). Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Fix A/B/C â€” backend Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€Ð¾Ð²ÐºÐ°, UI Ð½Ðµ Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ÑÑ. ÐÐ¾ Ñ‚.Ðº. FROZEN UX Ð¿Ð¾ÐºÑ€Ñ‹Ð²Ð°ÐµÑ‚ Ñ€Ð°Ð·Ð¼ÐµÑ‚ÐºÑƒ OrderGroupCard â€” Ð²Ð¸Ð·ÑƒÐ°Ð»ÑŒÐ½Ð¾ Ð½Ð° 375px:
+- ÐšÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ¸ ÑÑ‚Ð¾Ð»Ð° Ð¾ÑÑ‚Ð°ÑŽÑ‚ÑÑ Ñ‚Ð¾Ð¹ Ð¶Ðµ ÑˆÐ¸Ñ€Ð¸Ð½Ñ‹, Ð¾Ð´Ð½Ð° Ð¿Ð¾Ð´ Ð´Ñ€ÑƒÐ³Ð¾Ð¹
+- ÐÐµÑ‚ Ð½Ð¾Ð²Ñ‹Ñ… touch-targets
+- ÐÐµÑ‚ Ð½Ð¾Ð²Ñ‹Ñ… overlay/sticky ÑÐ»ÐµÐ¼ÐµÐ½Ñ‚Ð¾Ð²
+
+**ÐÐµÑ‡ÐµÐ³Ð¾ Ð¼ÐµÐ½ÑÑ‚ÑŒ Ð² UI. Ð­Ñ‚Ð¾Ñ‚ Ð±Ð»Ð¾Ðº Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð´Ð»Ñ Ñ„Ð¸ÐºÑÐ°Ñ†Ð¸Ð¸ â€” CC/Codex Ð½Ðµ Ð´Ð¾Ð»Ð¶Ð½Ñ‹ Ð¼Ð¾Ð´Ð¸Ñ„Ð¸Ñ†Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ ÑÑ‚Ð¸Ð»Ð¸/Ð²ÐµÑ€ÑÑ‚ÐºÑƒ.**
+
+---
+
+---
+
+## Priority hierarchy (Ð¿Ñ€Ð¸ ÐºÐ¾Ð½Ñ„Ð»Ð¸ÐºÑ‚Ðµ Ñ FROZEN UX)
+
+1. **Fix A** (staleTime) â€” ÐºÑ€Ð¸Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸Ð¹, simple, safe. ÐžÐ±ÑÐ·Ð°Ñ‚ÐµÐ»ÐµÐ½.
+2. **Fix B.1-B.5** (orderGroups + filteredGroups + tabCounts + call-sites + data-group-id live @ 2292) â€” Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÐµÐ½, Ð¾ÑÐ½Ð¾Ð²Ð½Ð¾Ð¹ UX-Ñ„Ð¸ÐºÑ.
+3. **Fix B.6** (handleBannerNavigate) â€” Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÐµÐ½ ÐµÑÐ»Ð¸ baserunner Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ `data-group-id` Ð´Ð»Ñ ÑÐºÑ€Ð¾Ð»Ð»Ð¸Ð½Ð³Ð° (ÑÐµÐ³Ð¾Ð´Ð½Ñ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ Ñ‡ÐµÑ€ÐµÐ· call chain buildBannerInfo â†’ onNavigate â†’ handleBannerNavigate).
+4. **Fix C** (orphan detection) â€” Ð¶ÐµÐ»Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð¾. Ð•ÑÐ»Ð¸ ÑÐ¾Ð·Ð´Ð°Ñ‘Ñ‚ Ñ€Ð¸ÑÐºÐ¸ (Ð±ÐµÑÐºÐ¾Ð½ÐµÑ‡Ð½Ñ‹Ðµ re-renders / CPU spike Ð¿Ñ€Ð¸ Ð¼Ð½Ð¾Ð¶ÐµÑÑ‚Ð²Ðµ Orders) â€” Ð¸ÑÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÑŒ, Fix A+B Ð´Ð¾ÑÑ‚Ð°Ñ‚Ð¾Ñ‡Ð½Ð¾ Ð´Ð»Ñ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ð³Ð¾ UX.
+
+**ÐœÐ¸Ð½Ð¸Ð¼Ð°Ð»ÑŒÐ½Ð°Ñ Ñ€Ð°Ð±Ð¾Ñ‡Ð°Ñ ÐºÐ¾Ð¼Ð±Ð¸Ð½Ð°Ñ†Ð¸Ñ Ð´Ð»Ñ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð¸Ñ BUG-SM-015:** Fix A + Fix B.1-B.5 (Ð±ÐµÐ· B.6 Ð¸ C). UX Ð¿Ñ€Ð¸ ÑÑ‚Ð¾Ð¼ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚ÐµÐ½, Ð½Ð¾ banner-navigate Ð¼Ð¾Ð¶ÐµÑ‚ ÑÐºÑ€Ð¾Ð»Ð»Ð¸Ñ‚ÑŒ Ðº Ð½Ðµ-Ñ‚Ð¾Ð¹ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐµ (edge case, Ð½Ðµ Ð±Ð»Ð¾ÐºÐµÑ€).
+
+---
+
+## Codex-specific SCOPE RESTRICTION (Ð´Ð»Ñ codex-writer-v2 step)
+
+â›” **Ð—Ð°Ð¿Ñ€ÐµÑ‰ÐµÐ½Ð¾:**
+- ÐœÐµÐ½ÑÑ‚ÑŒ `components/sessionHelpers.js` (Ð»ÑŽÐ±Ñ‹Ðµ Ñ„ÑƒÐ½ÐºÑ†Ð¸Ð¸)
+- ÐœÐµÐ½ÑÑ‚ÑŒ `pages/PublicMenu/useTableSession.jsx`
+- ÐœÐµÐ½ÑÑ‚ÑŒ `pages/StaffOrdersMobile/BUGS.md`, README.md Ð¸Ð»Ð¸ Ð»ÑŽÐ±Ñ‹Ðµ Ð´Ð¾ÐºÑƒÐ¼ÐµÐ½Ñ‚Ñ‹
+- Ð¡Ð¾Ð·Ð´Ð°Ð²Ð°Ñ‚ÑŒ Ð½Ð¾Ð²Ñ‹Ðµ ÐºÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚Ñ‹/Ñ„Ð°Ð¹Ð»Ñ‹
+- ÐœÐµÐ½ÑÑ‚ÑŒ B44 entity schemas (Ð¾Ð½Ð¸ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ‡Ð¸Ñ‚Ð°ÑŽÑ‚ÑÑ Ñ‡ÐµÑ€ÐµÐ· api/base44Client)
+- ÐœÐµÐ½ÑÑ‚ÑŒ i18n dictionaries, theme, CSS classes
+- ÐœÐµÐ½ÑÑ‚ÑŒ `buildBannerInfo` Ð¸Ð»Ð¸ `onNavigate(banner.groupId)` call-site (upstream â€” FROZEN) [V5-L6]
+
+â›” **ÐÐ• ÐºÐ¾Ð¼Ð±Ð¸Ð½Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ** Fix B Ñ Ð»ÑŽÐ±Ñ‹Ð¼Ð¸ Ð´Ñ€ÑƒÐ³Ð¸Ð¼Ð¸ Ñ€ÐµÑ„Ð°ÐºÑ‚Ð¾Ñ€Ð¸Ð½Ð³Ð°Ð¼Ð¸. Ð”Ð°Ð¶Ðµ Â«Ð¾Ñ‡ÐµÐ²Ð¸Ð´Ð½Ñ‹ÐµÂ» cleanup'Ñ‹ (ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ðµ Ð½ÐµÐ¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÐ¼Ñ‹Ñ… Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½Ñ‹Ñ…, Ð¿ÐµÑ€ÐµÐ¸Ð¼ÐµÐ½Ð¾Ð²Ð°Ð½Ð¸Ðµ Ñ…ÑƒÐºÐ¾Ð²) â€” Ð·Ð°Ð¿Ñ€ÐµÑ‰ÐµÐ½Ñ‹ Ð² ÑÑ‚Ð¾Ð¼ Ð±Ð°Ñ‚Ñ‡Ðµ.
+
+---
+
+## Safety Guards (Ñ„Ð¸Ð½Ð°Ð»ÑŒÐ½Ñ‹Ð¹ Ñ‡ÐµÐº Ð¿ÐµÑ€ÐµÐ´ push)
+
+- [ ] `grep "tableGroups\[tableId\]"` â†’ 0 hits (Ð·Ð°Ð¼ÐµÐ½Ñ‹ Ð¿Ð¾Ð»Ð½Ñ‹Ðµ)
+- [ ] `grep "tableGroups\[compositeKey\]"` â†’ â‰¥4 hits
+- [ ] `wc -l` Ð² Ð´Ð¸Ð°Ð¿Ð°Ð·Ð¾Ð½Ðµ 4582-4687 [v5-M5]
+- [ ] `node -e "require('esprima').parseModule(require('fs').readFileSync('...', 'utf8'))"` â€” Ð¿Ñ€Ð¾Ð¿ÑƒÑÐºÐ°ÐµÐ¼ (JSX Ð½Ðµ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶Ð¸Ð²Ð°ÐµÑ‚ÑÑ, Ð½Ð¾ git push â†’ B44 deploy Ð¿Ð¾Ð¹Ð¼Ð°ÐµÑ‚ SyntaxError).
+- [ ] `git diff main -- pages/StaffOrdersMobile/staffordersmobile.jsx` ÑÐ¾Ð´ÐµÑ€Ð¶Ð¸Ñ‚ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¢ÐžÐ›Ð¬ÐšÐž Ð² **8 Ð»Ð¾ÐºÐ°Ñ†Ð¸ÑÑ…** [v4-L3, v5-M1 precision]: (1) openSessions staleTime (1 ÑÑ‚Ñ€Ð¾ÐºÐ°); (2) orderGroups useMemo (Ñ†ÐµÐ»Ð¸ÐºÐ¾Ð¼); (3) filteredGroups (Ñ‡Ð°ÑÑ‚Ð¸Ñ‡Ð½Ð¾ â€” Ñ‚Ð¾Ð»ÑŒÐºÐ¾ `if (group.type === 'table')` Ð±Ð»Ð¾Ðº); (4) tabCounts (Ñ‡Ð°ÑÑ‚Ð¸Ñ‡Ð½Ð¾ â€” Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ‚Ð¾Ñ‚ Ð¶Ðµ Ð±Ð»Ð¾Ðº); (5) OrderGroupCard map props (4 ÑÑ‚Ñ€Ð¾ÐºÐ¸ key/isExpanded/onToggleExpand/isHighlighted); (6) data-group-id live JSX @ ~2292 (1 Ð¼ÐµÑÑ‚Ð¾ Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð¾; ~565, ~1173 optional comment-only); (7) handleBannerNavigate useCallback (Ñ†ÐµÐ»Ð¸ÐºÐ¾Ð¼); (8) Ð½Ð¾Ð²Ñ‹Ð¹ useEffect + useRef Fix C.
+- [ ] `queryKey: ["openSessions", partnerId]` @ ~3542 ÐžÐ¡Ð¢ÐÐ›Ð¡Ð¯ Ð±ÐµÐ· Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹ (Ñ‚Ð¾Ð»ÑŒÐºÐ¾ `staleTime` Ð²Ð½ÑƒÑ‚Ñ€Ð¸ Ð±Ð»Ð¾ÐºÐ° Ð¸Ð·Ð¼ÐµÐ½Ñ‘Ð½) [V5-C1]
+- [ ] `buildBannerInfo` Ð¸ `onNavigate(banner.groupId)` call-site @ ~2825 ÐÐ• Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ñ‹ [V5-L6]
+- [ ] (ÐµÑÐ»Ð¸ Ñ‚Ñ€ÐµÐ±Ð¾Ð²Ð°Ð»Ð¾ÑÑŒ pre-check) `useRef` Ð¸Ð¼Ð¿Ð¾Ñ€Ñ‚ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½ Ð² ÑÑƒÑ‰ÐµÑÑ‚Ð²ÑƒÑŽÑ‰Ð¸Ð¹ import block.
+- [ ] `useQueryClient()` / `queryClient` Ð² scope (pre-existed, Ð½Ðµ Ð¼ÐµÐ½ÑÐµÐ¼) [V5-M3]
+- [ ] ÐÐ¸ÐºÐ°ÐºÐ¸Ñ… Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹ Ð² Ð´Ñ€ÑƒÐ³Ð¸Ñ… Ñ„Ð°Ð¹Ð»Ð°Ñ… (sessionHelpers.js, useTableSession.jsx, PublicMenu/*, docs).
+- [ ] Commit message: `fix(SOM): BUG-SM-015 session-aware orderGroups + staleTime 30sâ†’5s + orphan invalidate`
+
+---
+
+## Notes Ð´Ð»Ñ Ñ€ÐµÑ†ÐµÐ½Ð·ÐµÐ½Ñ‚Ð° ÐŸÐ¡Ð¡Ðš
+
+Fix Ñ‚Ð¸Ð¿Ñ‹: Fix A `[FIX]` safe/single; Fix B `[FIX]` ÑÐ¾ÑÑ‚Ð°Ð²Ð½Ð¾Ð¹ (7 ÑÑƒÐ±-Ð¿Ñ€Ð°Ð²Ð¾Ðº Ñ‡ÐµÑ€ÐµÐ· `group.sessionId`); Fix C `[NEW CODE]` performance. Ð’ÑÐµ anchors Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐµÐ½Ñ‹ Ð² Pre-flight â€” ÐµÑÐ»Ð¸ count Ð½Ðµ ÑÐ¾Ð²Ð¿Ð°Ð´Ð°ÐµÑ‚ â†’ STOP + Arman.
+
+
+codex
+I’m on the actual source now, verifying the draft’s anchors and assumptions against `pages/StaffOrdersMobile/staffordersmobile.jsx`. I’m keeping it narrow to the specific fixes and verification steps the draft mentions, rather than exploring unrelated code paths.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -e \"staleTime: 30_000\" -e 'queryKey: \\[\"openSessions\", partnerId\\]' -e \"const orderGroups = useMemo\" -e \"const filteredGroups = useMemo\" -e \"const tabCounts = useMemo\" -e \"handleCloseTableClick\" -e \"confirmCloseTable\" -e \"buildBannerInfo\" -e \"onNavigate\\(banner\\.groupId\\)\" -e \"handleBannerNavigate\" -e \"data-group-id\" -e \"getLinkId\" -e \"useQueryClient\" -e \"const queryClient\" -e \"useRef\" -e \"activeOrders\" -e \"servedOrders\" -- 'pages/StaffOrdersMobile/staffordersmobile.jsx'" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 18331ms:
+98:   - Stage ID сравнения теперь через getLinkId() везде (getStagesForOrder, getStatusConfig)
+103:   - isOrderFree() теперь использует getLinkId() (унификация)
+104:   - favorites нормализация: все ID приводятся к строке через getLinkId()
+105:   - MyTablesModal использует getLinkId() для сравнений
+108:   - getAssigneeId() теперь использует getLinkId() (унификация)
+112:   - getLinkId() финальный: null-check (== null), консистентный String() везде
+115:   - getLinkId() типобезопасный: string/number/object/value-object
+118:   - getLinkId() расширен: теперь обрабатывает _id и value (не только id)
+122:   - P0-1: Applied getLinkId() everywhere for order.table, order.stage_id, req.table
+133:   - D1: getLinkId helper for normalizing link fields
+159:import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+161:import { useMutation, useQuery, useQueryClient, useQueries } from "@tanstack/react-query";
+546:function getLinkId(field) {
+565:    <div data-group-id={group.id} className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-all duration-300 ${style.bgClass} ${style.borderClass} ${highlightRing}`}>
+733:              {servedOrders.length > 0 && (
+736:                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 opacity-60">{`${HALL_UI_TEXT.served} (${countRows(servedRows, servedOrders.length)})`}</span>
+767:                  <button type="button" onClick={handleCloseTableClick} disabled={!!closeDisabledReason} className={`w-full min-h-[44px] flex items-center justify-center gap-2 font-medium text-sm rounded-lg border transition-all active:scale-[0.99] ${closeDisabledReason ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}>
+806:const uniqueGuests = (orders) => new Set(orders.map(o => getLinkId(o.guest))).size;
+813:  return getLinkId(order.assignee);
+817:  return !getLinkId(order.assignee);
+1114:  const orderStageId = getLinkId(order.stage_id);
+1118:    const currentStage = stages.find(s => getLinkId(s.id) === orderStageId);
+1119:    if (currentStage && !filtered.find(s => getLinkId(s.id) === getLinkId(currentStage.id))) {
+1135:      r => getLinkId(r.table) === group.id
+1149:  const allFree = orders.every(o => !getLinkId(o.assignee));
+1173:      data-group-id={group.id}
+1348:              {servedOrders.length > 0 && (
+1351:                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 opacity-60">{`${HALL_UI_TEXT.served} (${servedRows.length || servedOrders.length})`}</span>
+1382:                  <button type="button" onClick={handleCloseTableClick} disabled={!!closeDisabledReason} className={`w-full min-h-[44px] flex items-center justify-center gap-2 font-medium text-sm rounded-lg border transition-all active:scale-[0.99] ${closeDisabledReason ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'}`}>
+1529:  const reqTableId = getLinkId(request.table);
+1581:  const queryClient = useQueryClient();
+1583:  const tableId = getLinkId(order.table);
+1584:  const tableSessionId = getLinkId(order.table_session);
+1585:  const guestId = getLinkId(order.guest);
+1749:  const queryClient = useQueryClient();
+1772:      const sid = getLinkId(order.stage_id) || "__null__";
+1779:      const index = orderStages.findIndex((stage) => getLinkId(stage.id) === sid);
+1798:  const { data: servedOrders = [] } = useQuery({
+1799:    queryKey: ["servedOrders", group.id],
+1810:  const ownerHintTimerRef = useRef(null);
+1811:  const requestsSectionRef = useRef(null);
+1812:  const newSectionRef = useRef(null);
+1813:  const inProgressSectionRef = useRef(null);
+1814:  const readySectionRef = useRef(null);
+1830:    queries: servedOrders.map((order) => ({
+1861:    servedOrders.forEach((order, index) => {
+1865:  }, [servedItemResults, servedOrders]);
+1877:    return (activeRequests || []).filter((request) => getLinkId(request.table) === group.id);
+1904:  const batchInFlightRef = useRef(false);
+1922:      queryClient.invalidateQueries({ queryKey: ["servedOrders", group.id] });
+1948:    const snapshots = orders.map((order) => ({ orderId: order.id, prevStatus: order.status, prevStageId: getLinkId(order.stage_id) }));
+1965:          queryClient.invalidateQueries({ queryKey: ["servedOrders", group.id] });
+1996:      queryClient.invalidateQueries({ queryKey: ["servedOrders", group.id] });
+2008:    const guestId = getLinkId(order.guest);
+2025:      const gid = getLinkId(order.guest) || "__default";
+2072:  const servedRows = useMemo(() => buildHallRows(servedOrders, { served: true }), [buildHallRows, servedOrders]);
+2164:  const handleCloseTableClick = useCallback(() => {
+2168:        (o) => o.status !== 'closed' && o.status !== 'cancelled' && getLinkId(o.table_session)
+2170:      sessionId = openOrder ? getLinkId(openOrder.table_session) : null;
+2292:    <div data-group-id={group.id} className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-all duration-300 ${style.bgClass} ${style.borderClass} ${highlightRing}`}>
+2386:              {servedOrders.length > 0 && <div><button type="button" onClick={() => setServedExpanded((prev) => !prev)} className="mb-2 flex w-full items-center justify-between text-left"><span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 opacity-60">{`${HALL_UI_TEXT.served} (${uniqueGuests(servedOrders)} ${pluralRu(uniqueGuests(servedOrders), "\u0433\u043E\u0441\u0442\u044C", "\u0433\u043E\u0441\u0442\u044F", "\u0433\u043E\u0441\u0442\u0435\u0439")} \u00B7 ${countRows(servedRows, servedOrders.length)} ${pluralRu(countRows(servedRows, servedOrders.length), "\u0431\u043B\u044E\u0434\u043E", "\u0431\u043B\u044E\u0434\u0430", "\u0431\u043B\u044E\u0434")})`}</span><span className="text-xs font-medium text-slate-400">{servedExpanded ? HALL_UI_TEXT.hide : HALL_UI_TEXT.show}</span></button>{servedExpanded && <div className="opacity-60">{renderHallRows(servedRows, "slate", true)}</div>}</div>}
+2390:              {onCloseTable && group.orders.length > 0 && <div className="pt-2 border-t border-slate-200"><button type="button" onClick={handleCloseTableClick} disabled={!!closeDisabledReason} className={`w-full min-h-[44px] flex items-center justify-center gap-2 font-medium text-sm rounded-lg border transition-all active:scale-[0.99] ${closeDisabledReason ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}><X className="w-4 h-4" />{HALL_UI_TEXT.closeTable}</button>{closeDisabledReasons.length > 0 && <p className="mt-1.5 text-[11px] text-slate-400 text-center leading-relaxed">{`${HALL_UI_TEXT.closeHint} `}{closeDisabledReasons.map((reason, i) => { const kind = reasonToKind[reason]; const countMap = { requests: `${tableRequests.length} \u0437\u0430\u043F\u0440.`, new: `${newOrders.length} \u043D\u043E\u0432.`, inProgress: `${inProgressOrders.length} \u0432 \u0440\u0430\u0431\u043E\u0442\u0435`, ready: `${readyOrders.length} \u0433\u043E\u0442.` }; const actionMap = { requests: HALL_UI_TEXT.closeActionRequests, new: HALL_UI_TEXT.closeActionNew, inProgress: HALL_UI_TEXT.closeActionInProgress, ready: HALL_UI_TEXT.closeActionReady }; const actionText = actionMap[kind] ? `${actionMap[kind]} ${countMap[kind] || ""}` : reason; return <React.Fragment key={kind || i}>{i > 0 && <span> · </span>}<button type="button" onClick={() => scrollToSection(kind)} className="text-red-500 font-medium active:text-red-700">{`\u2192 ${actionText}`}</button></React.Fragment>; })}</p>}</div>}
+2418:    const aId = getLinkId(a.id);
+2419:    const bId = getLinkId(b.id);
+2462:              const tId = getLinkId(table.id);
+2785:  const touchStartY = useRef(null);
+2786:  const autoHideTimer = useRef(null);
+2787:  const dismissAnimTimer = useRef(null);
+2825:      onNavigate(banner.groupId);
+2883:  const queryClient = useQueryClient();
+2891:  const didBindRef = useRef(false);
+2892:  const didUpdateLastActiveRef = useRef(false);
+2893:  const didAutoBindRef = useRef(false);
+2896:  const loadedGuestIdsRef = useRef(new Set());
+2901:  const toastTimerRef = useRef(null);
+2944:  const lastFilterChangeRef = useRef(0);
+2954:  const bannerIdCounter = useRef(0);
+2968:  const audioRef = useRef(null);
+2969:  const audioUnlockedRef = useRef(false);
+3004:  const ownMutationRef = useRef(null);
+3058:  const favoritesInitializedRef = useRef(false);
+3077:        const id = getLinkId(item);
+3118:    const normalizedId = getLinkId(id);
+3191:  const linkIdRef = useRef(null);
+3419:      const normalizedId = getLinkId(stage.id);
+3434:    const stageId = getLinkId(order.stage_id);
+3444:      const currentIndex = relevantStages.findIndex(s => getLinkId(s.id) === stageId);
+3548:    staleTime: 30_000,
+3557:      const tid = getLinkId(s.table);
+3593:  const activeOrders = useMemo(() => {
+3600:      if (o.order_type === 'hall' && !getLinkId(o.table_session)) return false;
+3607:      const stageId = getLinkId(o.stage_id);
+3622:    if (!isKitchen) return activeOrders;
+3623:    return activeOrders.filter((o) => {
+3625:      const stageId = getLinkId(o.stage_id);
+3635:  }, [activeOrders, isKitchen, stagesMap]);
+3655:          .map(o => getLinkId(o.guest))
+3729:    const stageId = getLinkId(order.stage_id);
+3768:  const orderGroups = useMemo(() => {
+3776:        const tableId = getLinkId(o.table);
+3803:      const tableId = getLinkId(req.table);
+3862:  const filteredGroups = useMemo(() => {
+3874:      const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+3886:  const tabCounts = useMemo(() => {
+3899:      const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+3918:        getLinkId(req.table) === group.id && favorites.includes(`request:${req.id}`)
+3927:    return base.filter(req => !getLinkId(req.table));
+3948:  const prevDigestRef = useRef(null);
+3949:  const prevStatusMapRef = useRef({});
+3992:        const stageId = getLinkId(o.stage_id); // P0-1
+3998:        const stageId = getLinkId(o.stage_id); // P0-1
+4007:      const stageId = getLinkId(o.stage_id); // P0-1
+4017:        const stageId = getLinkId(o.stage_id); // P0-1
+4028:      const stageId = getLinkId(o.stage_id); // P0-1
+4049:      const currStageId = getLinkId(o.stage_id);
+4056:    const buildBannerInfo = (orderIds, eventType) => {
+4065:          const tId = getLinkId(o.table);
+4094:      const banner = buildBannerInfo(readyOrderIds, 'ready');
+4099:      const banner = buildBannerInfo(newOrderIds, 'new');
+4139:  const highlightTimerRef = useRef(null);
+4142:  const handleBannerNavigate = useCallback((groupId) => {
+4147:        const el = document.querySelector(`[data-group-id="${CSS.escape(String(groupId))}"]`);
+4177:    const sessionId = getLinkId(tableSessionField);
+4183:  const confirmCloseTable = async () => {
+4395:              const reqTableId = getLinkId(req.table);
+4436:                const tableId = getLinkId(o.table);
+4590:                onClick={confirmCloseTable}
+4610:        onNavigate={handleBannerNavigate}
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -C 8 -e \"staleTime: 30_000\" -e \"const orderGroups = useMemo\" -e \"const filteredGroups = useMemo\" -e \"const tabCounts = useMemo\" -e \"const buildBannerInfo =\" -e \"const handleBannerNavigate = useCallback\" -- 'pages/StaffOrdersMobile/staffordersmobile.jsx'" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 20708ms:
+3540-
+3541-  const { data: openSessions = [] } = useQuery({
+3542-    queryKey: ["openSessions", partnerId],
+3543-    queryFn: () =>
+3544-      partnerId
+3545-        ? base44.entities.TableSession.filter({ partner: partnerId, status: 'open' })
+3546-        : base44.entities.TableSession.list(),
+3547-    enabled: canFetch && !!partnerId && !rateLimitHit,
+3548:    staleTime: 30_000,
+3549-    refetchInterval: effectivePollingInterval,
+3550-    refetchIntervalInBackground: false,
+3551-    retry: shouldRetry,
+3552-  });
+3553-
+3554-  const openSessionByTableId = useMemo(() => {
+3555-    const map = {};
+3556-    (openSessions || []).forEach((s) => {
+--
+3760-        return sortOrder === "newest" ? tb - ta : ta - tb;
+3761-      }
+3762-    });
+3763-    
+3764-    return r;
+3765-  }, [roleFilteredOrders, selectedTypes, assignFilters, sortMode, sortOrder, effectiveUserId, stagesMap]);
+3766-
+3767-  // v2.7.0: Order groups model (hall by table, pickup/delivery individual)
+3768:  const orderGroups = useMemo(() => {
+3769-    if (isKitchen) return null;
+3770-    
+3771-    const groups = [];
+3772-    const tableGroups = {};
+3773-    
+3774-    visibleOrders.forEach(o => {
+3775-      if (o.order_type === 'hall') {
+3776-        const tableId = getLinkId(o.table);
+--
+3854-      const next = new Set(prev);
+3855-      if (next.has(groupId)) next.delete(groupId);
+3856-      else next.add(groupId);
+3857-      return next;
+3858-    });
+3859-  }, []);
+3860-
+3861-  // v2.7.1: Tab filtering (active vs completed)
+3862:  const filteredGroups = useMemo(() => {
+3863-    if (!orderGroups) return [];
+3864-
+3865-    return orderGroups.filter(group => {
+3866-      if (group.type === 'table') {
+3867-        const hasOpenSession = !!openSessionByTableId[group.id];
+3868-        if (!hasOpenSession) return activeTab === 'completed';
+3869-      }
+3870-      const hasActiveOrder = group.orders.some(o => {
+--
+3878-      });
+3879-      return activeTab === 'active'
+3880-        ? (hasActiveOrder || hasActiveRequest || hasServedButNotClosed)
+3881-        : (!hasActiveOrder && !hasActiveRequest && !hasServedButNotClosed);
+3882-    });
+3883-  }, [orderGroups, activeTab, getStatusConfig, activeRequests, openSessionByTableId]);
+3884-
+3885-  // v2.7.1: Tab counts
+3886:  const tabCounts = useMemo(() => {
+3887-    if (!orderGroups) return { active: 0, completed: 0 };
+3888-
+3889-    let active = 0, completed = 0;
+3890-    orderGroups.forEach(group => {
+3891-      if (group.type === 'table' && !openSessionByTableId[group.id]) {
+3892-        completed++;
+3893-        return;
+3894-      }
+--
+4048-      const pstStageId = pst.stage_id; // already normalized in prevMap
+4049-      const currStageId = getLinkId(o.stage_id);
+4050-      const wasReady = pst.status === 'ready' || (pstStageId && stagesMap[pstStageId]?.internal_code === 'finish');
+4051-      const isReady = o.status === 'ready' || (currStageId && stagesMap[currStageId]?.internal_code === 'finish');
+4052-      if (!wasReady && isReady) { becameReady++; readyOrderIds.push(o.id); }
+4053-    });
+4054-
+4055-    // V2-09: Build banner info with table context
+4056:    const buildBannerInfo = (orderIds, eventType) => {
+4057-      if (!orderIds.length) return null;
+4058-      // Find which table(s) these orders belong to
+4059-      const orderMap = {};
+4060-      eligibleOrders.forEach(o => { orderMap[o.id] = o; });
+4061-      const tableIds = new Set();
+4062-      orderIds.forEach(id => {
+4063-        const o = orderMap[id];
+4064-        if (o) {
+--
+4134-    setExpandedGroupId(prev => prev === groupId ? null : groupId);
+4135-  }, []);
+4136-
+4137-  // V2-09: Sprint D — Highlight state for banner-navigate
+4138-  const [highlightGroupId, setHighlightGroupId] = useState(null);
+4139-  const highlightTimerRef = useRef(null);
+4140-
+4141-  // v4.0.0: Banner tap → expand card + scroll to it + highlight briefly
+4142:  const handleBannerNavigate = useCallback((groupId) => {
+4143-    if (!groupId) return;
+4144-    setExpandedGroupId(groupId);
+4145-    requestAnimationFrame(() => {
+4146-      requestAnimationFrame(() => {
+4147-        const el = document.querySelector(`[data-group-id="${CSS.escape(String(groupId))}"]`);
+4148-        if (el) {
+4149-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+4150-          setHighlightGroupId(groupId);
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -C 4 -e \"const queryClient = useQueryClient\\(\\);\" -e \"export default function StaffOrdersMobile|function StaffOrdersMobile|const StaffOrdersMobile\" -- 'pages/StaffOrdersMobile/staffordersmobile.jsx'" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 21063ms:
+1577-  isKitchen,
+1578-  guestsMap,
+1579-  onCloseTable,
+1580-}) {
+1581:  const queryClient = useQueryClient();
+1582-  const [itemsOpen, setItemsOpen] = useState(false);
+1583-  const tableId = getLinkId(order.table);
+1584-  const tableSessionId = getLinkId(order.table_session);
+1585-  const guestId = getLinkId(order.guest);
+--
+1745-  undoToast,
+1746-  staffName,
+1747-  isRequestPending,
+1748-}) {
+1749:  const queryClient = useQueryClient();
+1750-  const tableId = group.type === "table" ? group.id : null;
+1751-  const tableData = tableId ? tableMap[tableId] : null;
+1752-  const tableStatus = computeTableStatus(group, activeRequests, getStatusConfig);
+1753-  const style = TABLE_STATUS_STYLES[tableStatus] || TABLE_STATUS_STYLES.PREPARING;
+--
+2878-/* ═══════════════════════════════════════════════════════════════════════════
+2879-   MAIN COMPONENT
+2880-═══════════════════════════════════════════════════════════════════════════ */
+2881-
+2882:export default function StaffOrdersMobile() {
+2883:  const queryClient = useQueryClient();
+2884-  const { t } = useI18n(); // BUG-S76-01/02: translate stage names
+2885-
+2886-  const [urlParams] = useState(() => new URLSearchParams(window.location.search));
+2887-  const token = urlParams.get("token");
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -A 70 -B 6 \"const orderGroups = useMemo|const filteredGroups = useMemo|const tabCounts = useMemo\" -- 'pages/StaffOrdersMobile/staffordersmobile.jsx'" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 13809ms:
+3762-    });
+3763-    
+3764-    return r;
+3765-  }, [roleFilteredOrders, selectedTypes, assignFilters, sortMode, sortOrder, effectiveUserId, stagesMap]);
+3766-
+3767-  // v2.7.0: Order groups model (hall by table, pickup/delivery individual)
+3768:  const orderGroups = useMemo(() => {
+3769-    if (isKitchen) return null;
+3770-    
+3771-    const groups = [];
+3772-    const tableGroups = {};
+3773-    
+3774-    visibleOrders.forEach(o => {
+3775-      if (o.order_type === 'hall') {
+3776-        const tableId = getLinkId(o.table);
+3777-        if (!tableId) return;
+3778-        if (!tableGroups[tableId]) {
+3779-          const tableName = tableMap[tableId]?.name || '?';
+3780-          tableGroups[tableId] = {
+3781-            type: 'table',
+3782-            id: tableId,
+3783-            displayName: tableName,
+3784-            orders: [],
+3785-            openSessionId: openSessionByTableId[tableId]?.id || null,
+3786-          };
+3787-          groups.push(tableGroups[tableId]);
+3788-        }
+3789-        tableGroups[tableId].orders.push(o);
+3790-      } else {
+3791-        groups.push({
+3792-          type: o.order_type,
+3793-          id: o.id,
+3794-          displayName: o.order_type === 'pickup' 
+3795-            ? `СВ-${o.order_number || o.id.slice(-3)}` 
+3796-            : `ДОС-${o.order_number || o.id.slice(-3)}`,
+3797-          orders: [o],
+3798-        });
+3799-      }
+3800-    });
+3801-
+3802-    activeRequests.forEach((req) => {
+3803-      const tableId = getLinkId(req.table);
+3804-      if (!tableId) return;
+3805-      if (!tableGroups[tableId]) {
+3806-        const tableName = tableMap[tableId]?.name || '?';
+3807-        tableGroups[tableId] = {
+3808-          type: 'table',
+3809-          id: tableId,
+3810-          displayName: tableName,
+3811-          orders: [],
+3812-          openSessionId: openSessionByTableId[tableId]?.id || null,
+3813-        };
+3814-        groups.push(tableGroups[tableId]);
+3815-      }
+3816-    });
+3817-
+3818-    return groups;
+3819-  }, [visibleOrders, tableMap, isKitchen, activeRequests, openSessionByTableId]);
+3820-
+3821-  // v2.7.0: Sorted groups by oldest unaccepted order
+3822-  const sortedGroups = useMemo(() => {
+3823-    if (!orderGroups) return [];
+3824-    
+3825-    return [...orderGroups].sort((a, b) => {
+3826-      const getPriority = (group) => {
+3827-        const unaccepted = group.orders.filter(o => getStatusConfig(o).isFirstStage);
+3828-        if (unaccepted.length === 0) return Infinity;
+3829-        return Math.min(...unaccepted.map(o => safeParseDate(o.created_date).getTime()));
+3830-      };
+3831-      return getPriority(a) - getPriority(b);
+3832-    });
+3833-  }, [orderGroups, getStatusConfig]);
+3834-
+3835-  // v2.7.0: Auto-expand effect
+3836-  useEffect(() => {
+3837-    if (!sortedGroups?.length) return;
+3838-    
+--
+3856-      else next.add(groupId);
+3857-      return next;
+3858-    });
+3859-  }, []);
+3860-
+3861-  // v2.7.1: Tab filtering (active vs completed)
+3862:  const filteredGroups = useMemo(() => {
+3863-    if (!orderGroups) return [];
+3864-
+3865-    return orderGroups.filter(group => {
+3866-      if (group.type === 'table') {
+3867-        const hasOpenSession = !!openSessionByTableId[group.id];
+3868-        if (!hasOpenSession) return activeTab === 'completed';
+3869-      }
+3870-      const hasActiveOrder = group.orders.some(o => {
+3871-        const config = getStatusConfig(o);
+3872-        return !config.isFinishStage && o.status !== 'cancelled';
+3873-      });
+3874-      const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+3875-      const hasServedButNotClosed = group.orders.some(o => {
+3876-        const config = getStatusConfig(o);
+3877-        return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+3878-      });
+3879-      return activeTab === 'active'
+3880-        ? (hasActiveOrder || hasActiveRequest || hasServedButNotClosed)
+3881-        : (!hasActiveOrder && !hasActiveRequest && !hasServedButNotClosed);
+3882-    });
+3883-  }, [orderGroups, activeTab, getStatusConfig, activeRequests, openSessionByTableId]);
+3884-
+3885-  // v2.7.1: Tab counts
+3886:  const tabCounts = useMemo(() => {
+3887-    if (!orderGroups) return { active: 0, completed: 0 };
+3888-
+3889-    let active = 0, completed = 0;
+3890-    orderGroups.forEach(group => {
+3891-      if (group.type === 'table' && !openSessionByTableId[group.id]) {
+3892-        completed++;
+3893-        return;
+3894-      }
+3895-      const hasActiveOrder = group.orders.some(o => {
+3896-        const config = getStatusConfig(o);
+3897-        return !config.isFinishStage && o.status !== 'cancelled';
+3898-      });
+3899-      const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+3900-      const hasServedButNotClosed = group.orders.some(o => {
+3901-        const config = getStatusConfig(o);
+3902-        return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+3903-      });
+3904-      if (hasActiveOrder || hasActiveRequest || hasServedButNotClosed) active++; else completed++;
+3905-    });
+3906-
+3907-    return { active, completed };
+3908-  }, [orderGroups, getStatusConfig, activeRequests, openSessionByTableId]);
+3909-
+3910-  // v2.7.1: Favorites filter
+3911-  const finalGroups = useMemo(() => {
+3912-    if (!showOnlyFavorites) return filteredGroups;
+3913-    
+3914-    return filteredGroups.filter(group => {
+3915-      if (isFavorite(group.type === 'table' ? 'table' : 'order', group.id)) return true;
+3916-      if (group.type !== 'table') return false;
+3917-      return activeRequests.some(req =>
+3918-        getLinkId(req.table) === group.id && favorites.includes(`request:${req.id}`)
+3919-      );
+3920-    });
+3921-  }, [filteredGroups, showOnlyFavorites, isFavorite, activeRequests, favorites]);
+3922-
+3923-  const finalRequests = useMemo(() => {
+3924-    const base = showOnlyFavorites
+3925-      ? activeRequests.filter(req => favorites.includes(`request:${req.id}`))
+3926-      : activeRequests;
+3927-    return base.filter(req => !getLinkId(req.table));
+3928-  }, [activeRequests, showOnlyFavorites, favorites]);
+3929-
+3930-  // V2: Sort groups by table status priority (Mine tab sort order spec)
+3931-  const v2SortedGroups = useMemo(() => {
+3932-    if (!finalGroups.length) return finalGroups;
+3933-    return [...finalGroups].sort((a, b) => {
+3934-      const statusA = computeTableStatus(a, activeRequests, getStatusConfig);
+3935-      const statusB = computeTableStatus(b, activeRequests, getStatusConfig);
+3936-      const pa = TABLE_STATUS_SORT_PRIORITY[statusA] ?? 5;
+3937-      const pb = TABLE_STATUS_SORT_PRIORITY[statusB] ?? 5;
+3938-      if (pa !== pb) return pa - pb;
+3939-      // Within same status group: oldest order first
+3940-      const ta = Math.min(...a.orders.map(o => safeParseDate(o.created_date).getTime()));
+3941-      const tb = Math.min(...b.orders.map(o => safeParseDate(o.created_date).getTime()));
+3942-      return ta - tb;
+3943-    });
+3944-  }, [finalGroups, activeRequests, getStatusConfig]);
+3945-
+3946-  // v2.7.0: Removed favoriteOrders/otherOrders (replaced by orderGroups)
+3947-
+3948-  const prevDigestRef = useRef(null);
+3949-  const prevStatusMapRef = useRef({});
+3950-
+3951-  const pushNotify = (title, newOrderIds = [], bannerInfo = null) => {
+3952-    if (!notifPrefs?.enabled) return;
+3953-    setNotifDot(true);
+3954-
+3955-    if (newOrderIds.length > 0) {
+3956-      setNotifiedOrderIds((prev) => {
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -A 28 -B 8 -e \"const buildBannerInfo =\" -e \"const handleBannerNavigate = useCallback\" -- 'pages/StaffOrdersMobile/staffordersmobile.jsx'" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 15385ms:
+4048-      const pstStageId = pst.stage_id; // already normalized in prevMap
+4049-      const currStageId = getLinkId(o.stage_id);
+4050-      const wasReady = pst.status === 'ready' || (pstStageId && stagesMap[pstStageId]?.internal_code === 'finish');
+4051-      const isReady = o.status === 'ready' || (currStageId && stagesMap[currStageId]?.internal_code === 'finish');
+4052-      if (!wasReady && isReady) { becameReady++; readyOrderIds.push(o.id); }
+4053-    });
+4054-
+4055-    // V2-09: Build banner info with table context
+4056:    const buildBannerInfo = (orderIds, eventType) => {
+4057-      if (!orderIds.length) return null;
+4058-      // Find which table(s) these orders belong to
+4059-      const orderMap = {};
+4060-      eligibleOrders.forEach(o => { orderMap[o.id] = o; });
+4061-      const tableIds = new Set();
+4062-      orderIds.forEach(id => {
+4063-        const o = orderMap[id];
+4064-        if (o) {
+4065-          const tId = getLinkId(o.table);
+4066-          if (tId) tableIds.add(tId);
+4067-        }
+4068-      });
+4069-      const tableNames = [...tableIds].map(tId => {
+4070-        const t = tableMap[tId];
+4071-        return t?.name ? `${t.name}` : null;
+4072-      }).filter(Boolean);
+4073-
+4074-      // Single table: "Стол 5: Новый заказ"
+4075-      if (tableNames.length === 1 && orderIds.length === 1) {
+4076-        const label = eventType === 'ready' ? 'Заказ готов' : 'Новый заказ';
+4077-        return {
+4078-          text: `${tableNames[0]}: ${label}`,
+4079-          groupId: [...tableIds][0],
+4080-          count: 1,
+4081-        };
+4082-      }
+4083-      // Multiple: "3 новых заказа" or "2 заказа готовы"
+4084-      const count = orderIds.length;
+--
+4134-    setExpandedGroupId(prev => prev === groupId ? null : groupId);
+4135-  }, []);
+4136-
+4137-  // V2-09: Sprint D — Highlight state for banner-navigate
+4138-  const [highlightGroupId, setHighlightGroupId] = useState(null);
+4139-  const highlightTimerRef = useRef(null);
+4140-
+4141-  // v4.0.0: Banner tap → expand card + scroll to it + highlight briefly
+4142:  const handleBannerNavigate = useCallback((groupId) => {
+4143-    if (!groupId) return;
+4144-    setExpandedGroupId(groupId);
+4145-    requestAnimationFrame(() => {
+4146-      requestAnimationFrame(() => {
+4147-        const el = document.querySelector(`[data-group-id="${CSS.escape(String(groupId))}"]`);
+4148-        if (el) {
+4149-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+4150-          setHighlightGroupId(groupId);
+4151-          if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+4152-          highlightTimerRef.current = setTimeout(() => setHighlightGroupId(null), 1500);
+4153-        }
+4154-      });
+4155-    });
+4156-  }, []);
+4157-
+4158-  // Cleanup highlight timer
+4159-  useEffect(() => () => {
+4160-    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+4161-  }, []);
+4162-
+4163-  // V2-09: Banner dismiss handler
+4164-  const handleBannerDismiss = useCallback(() => {
+4165-    setBannerData(null);
+4166-  }, []);
+4167-
+4168-  const handleRefresh = () => {
+4169-    setManualRefreshTs(Date.now());
+4170-    refetchOrders();
+
+codex
+I’ve confirmed the live anchors in the source. Next I’m pulling just the draft’s Fix sections and the verification/safety parts so I can rate the prompt itself, not the underlying bug.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -A 40 -B 5 -e '"'^## Fix A'"' -e '"'^## Fix B'"' -e '"'^## Fix C'"' -e '"'^## Verification'"' -e '"'^## Safety Guards'"' -- 'C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/drafts/pssk-som-b2-1-260416-v7.md'" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 12136ms:
+271-
+272-5. **Время.** Целевое время Codex review: 8-15 минут. Если упёрся в технический blocker (sandbox, timeout) — фиксируй в findings и продолжай со следующим Fix. Не блокируйся.
+273-
+274----
+275-
+276:## Fix A: staleTime для openSessions 30s → 5s
+277-
+278-### Статус: [FIX]
+279-**Проблема (verified):** `staleTime: 30_000` в `openSessions` useQuery (строка ~3548) означает, что после создания новой TableSession на Base44 SOM не будет её видеть до 30 секунд. Всё это время новые Orders отображаются в карточке старой закрытой сессии.
+280-
+281-### Change
+282-
+283-**Grep-якорь:** `staleTime: 30_000` (ожидается 1 hit, в блоке `openSessions` useQuery, строки 3541-3552).
+284-
+285-**Текущий код (строка ~3548):**
+286-```js
+287-    enabled: canFetch && !!partnerId && !rateLimitHit,
+288-    staleTime: 30_000,
+289-    refetchInterval: effectivePollingInterval,
+290-```
+291-
+292-**Новый код (заменить ровно одну строку):**
+293-```js
+294-    enabled: canFetch && !!partnerId && !rateLimitHit,
+295-    staleTime: 5_000,
+296-    refetchInterval: effectivePollingInterval,
+297-```
+298-
+299-### Should NOT — [v4-M1, v5-C1]
+300-
+301-**Целевой queryKey:** `["openSessions", partnerId]` (1 hit @ ~3542). **НЕ МЕНЯТЬ** queryKey shape — это повлияет на кэш-партиционирование и сломает все места, которые читают cache для конкретного partner. [V5-C1]
+302-
+303-**Важно:** `queryClient.invalidateQueries({ queryKey: ["openSessions"] })` в Fix C ниже — это **prefix invalidate** (react-query по умолчанию матчит `["openSessions", partnerId]` через `exact: false`). НЕ нужно менять на `["openSessions", partnerId]` — prefix работает корректно для любого текущего partnerId.
+304-
+305-**Список staleTime значений в файле, которые ЗАПРЕЩЕНО трогать** (pre-check `grep -n "staleTime:" file`):
+306-- `staleTime: 60_000` для `["tables", partnerId]` / `["stages", partnerId]` / `["partner"]` queries — статичный конфиг, не менять.
+307-- `["orders", partnerId]` useQuery — НЕ имеет явного `staleTime` (использует `refetchInterval`); не добавлять staleTime туда.
+308-- Любой другой `staleTime: ...` который не находится в `useQuery({ queryKey: ["openSessions", partnerId], ... })` блоке — НЕ ТРОГАТЬ.
+309-
+310-**Также НЕ менять в `["openSessions", partnerId]` useQuery:**
+311-- `queryKey` (= `["openSessions", partnerId]`) — менять сломает partitioning и Fix C invalidate + tabCounts.
+312-- `queryFn` (`OpenSessions.list(...)` или аналог) — это backend контракт.
+313-- `refetchInterval: effectivePollingInterval` — polling управляется через переменную, не трогать.
+314-- `refetchIntervalInBackground` / `retry` / `enabled` (за исключением уже стоящих условий) — не трогать.
+315-
+316-### Verification после Fix A
+--
+335-# Ожидание: 4617 +70/-35 (заменили 1 строку, счётчик не должен вырасти).
+336-```
+337-
+338----
+339-
+340:## Fix B: Session-aware orderGroups (#347) + coordinated call-site updates
+341-
+342-### Статус: [FIX] (основной UX-фикс)
+343-**Проблема (verified):** `orderGroups` группирует hall-Orders по `tableId`. При последовательных сессиях (старая закрыта → новая открыта) ВСЕ Orders стола попадают в одну `tableGroups[tableId]` → одна карточка. Нужно группировать по `(tableId, sessionId)`, чтобы каждая TableSession имела отдельную карточку.
+344-
+345-### Wireframe (было → должно быть)
+346-
+347-```
+348-БЫЛО (BUG-SM-015):                      ДОЛЖНО БЫТЬ:
+349-╔══════════════════════════════════╗    ╔═══════════════════════════════╗
+350-║ таб «Завершённые»                ║    ║ таб «Активные»                ║
+351-║ ┌──────────────────────────────┐ ║    ║ ┌───────────────────────────┐ ║
+352-║ │ Стол 3                       │ ║    ║ │ Стол 3 (new session)      │ ║
+353-║ │  - заказ 1 (closed)          │ ║    ║ │  - заказ 2 (new)          │ ║
+354-║ │  - заказ 2 (new) ← WRONG!    │ ║    ║ └───────────────────────────┘ ║
+355-║ └──────────────────────────────┘ ║    ║                               ║
+356-╚══════════════════════════════════╝    ║ таб «Завершённые»             ║
+357-                                        ║ ┌───────────────────────────┐ ║
+358-                                        ║ │ Стол 3 (closed session)   │ ║
+359-                                        ║ │  - заказ 1 (closed)       │ ║
+360-                                        ║ └───────────────────────────┘ ║
+361-                                        ╚═══════════════════════════════╝
+362-```
+363-
+364-### Changes — 5 координированных правок
+365-
+366-**B.1 — `orderGroups` useMemo (~строки 3768-3819)**
+367-
+368-Grep-якорь: `const orderGroups = useMemo` (1 hit). Читается как:
+369-```js
+370-  // v2.7.0: Order groups model (hall by table, pickup/delivery individual)
+371-  const orderGroups = useMemo(() => {
+372-    if (isKitchen) return null;
+373-    
+374-    const groups = [];
+375-    const tableGroups = {};
+376-    
+377-    visibleOrders.forEach(o => {
+378-      if (o.order_type === 'hall') {
+379-        const tableId = getLinkId(o.table);
+380-        if (!tableId) return;
+--
+863-# Ожидание: 4582 ≤ wc-l ≤ 4687 (base 4617, +70 max от новых строк Fix B orderGroups + Fix C useEffect, -35 tolerance за cleanup). [v5-M5: unambiguous]
+864-```
+865-
+866----
+867-
+868:## Fix C: Invalidate openSessions при orphan-заказах
+869-
+870-### Статус: [NEW CODE — performance optimization]
+871-**Проблема:** Даже с Fix A (staleTime 5s) остаётся окно до 5 секунд, когда новый Order уже в БД, но SOM его группирует без открытой сессии. Если активно полинг `orders` раньше чем `openSessions` — карточка появится в «Завершённых», потом «прыгнет» в «Активные». Fix C детектирует такие orphan Orders и делает принудительный invalidate `openSessions` — карточка появится корректно сразу.
+872-
+873-### Change
+874-
+875-**[v5-C2] Pre-check перед вставкой — реальный `orders` alias:**
+876-
+877-```bash
+878-# Real anchor: `data: orders,` внутри useQuery destructure @ ~3497
+879-grep -n "data: orders," "pages/StaffOrdersMobile/staffordersmobile.jsx"
+880-# Ожидание: 1 hit, строка ~3497, внутри useQuery({ queryKey: ["orders", partnerId], ... }).
+881-# Это источник `orders` — массив Order entities используемый по всему компоненту.
+882-
+883-grep -n 'queryKey: \["orders"' "pages/StaffOrdersMobile/staffordersmobile.jsx"
+884-# Ожидание: 1 hit, строка ~3494, блок orders useQuery (диапазон ~3494-3512).
+885-
+886-# ⚠️ НЕ использовать pattern `^  const orders ` — он матчит inner helper variable @ ~1130 (не то).
+887-# Использовать `data: orders,` как единственный якорь для Fix C.
+888-```
+889-
+890-**Placement:** добавить НОВЫЙ useEffect СРАЗУ ПОСЛЕ закрывающей `}, [openSessions]);` useMemo `openSessionByTableId` (строка ~3561). Grep-якорь для точного места:
+891-
+892-```bash
+893-grep -n "openSessionByTableId = useMemo" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+894-# Ожидание: 1 hit, строка ~3554. Вставить useEffect сразу после `}, [openSessions]);` этого useMemo.
+895-```
+896-
+897-**Alternative anchor если closing `}, [openSessions]);` имеет нестандартное форматирование (trailing comment / extra whitespace / multi-line deps):**
+898-```bash
+899-# Прочитать ~30 строк начиная с openSessionByTableId useMemo
+900-sed -n '3554,3585p' "pages/StaffOrdersMobile/staffordersmobile.jsx"
+901-# Найти первую строку после закрывающей `});` или `}, [openSessions]);` и до `const activeRequests`.
+902-# Использовать последние 2 строки этого useMemo (с уникальной точностью) как Edit-anchor.
+903-```
+904-
+905-Причина (PQ-099): useEffect должен быть объявлен после всех useMemo/useCallback, от которых зависит, но до `const activeRequests` (~3565).
+906-
+907-**[v4-C1 + v4-M7] Новый код (вставить):**
+908-
+--
+1080-
+1081-⛔ **НЕ комбинировать** Fix B с любыми другими рефакторингами. Даже «очевидные» cleanup'ы (удаление неиспользуемых переменных, переименование хуков) — запрещены в этом батче.
+1082-
+1083----
+1084-
+1085:## Safety Guards (финальный чек перед push)
+1086-
+1087-- [ ] `grep "tableGroups\[tableId\]"` → 0 hits (замены полные)
+1088-- [ ] `grep "tableGroups\[compositeKey\]"` → ≥4 hits
+1089-- [ ] `wc -l` в диапазоне 4582-4687 [v5-M5]
+1090-- [ ] `node -e "require('esprima').parseModule(require('fs').readFileSync('...', 'utf8'))"` — пропускаем (JSX не поддерживается, но git push → B44 deploy поймает SyntaxError).
+1091-- [ ] `git diff main -- pages/StaffOrdersMobile/staffordersmobile.jsx` содержит изменения ТОЛЬКО в **8 локациях** [v4-L3, v5-M1 precision]: (1) openSessions staleTime (1 строка); (2) orderGroups useMemo (целиком); (3) filteredGroups (частично — только `if (group.type === 'table')` блок); (4) tabCounts (частично — только тот же блок); (5) OrderGroupCard map props (4 строки key/isExpanded/onToggleExpand/isHighlighted); (6) data-group-id live JSX @ ~2292 (1 место обязательно; ~565, ~1173 optional comment-only); (7) handleBannerNavigate useCallback (целиком); (8) новый useEffect + useRef Fix C.
+1092-- [ ] `queryKey: ["openSessions", partnerId]` @ ~3542 ОСТАЛСЯ без изменений (только `staleTime` внутри блока изменён) [V5-C1]
+1093-- [ ] `buildBannerInfo` и `onNavigate(banner.groupId)` call-site @ ~2825 НЕ изменены [V5-L6]
+1094-- [ ] (если требовалось pre-check) `useRef` импорт добавлен в существующий import block.
+1095-- [ ] `useQueryClient()` / `queryClient` в scope (pre-existed, не меняем) [V5-M3]
+1096-- [ ] Никаких изменений в других файлах (sessionHelpers.js, useTableSession.jsx, PublicMenu/*, docs).
+1097-- [ ] Commit message: `fix(SOM): BUG-SM-015 session-aware orderGroups + staleTime 30s→5s + orphan invalidate`
+1098-
+1099----
+1100-
+1101-## Notes для рецензента ПССК
+1102-
+1103-Fix типы: Fix A `[FIX]` safe/single; Fix B `[FIX]` составной (7 суб-правок через `group.sessionId`); Fix C `[NEW CODE]` performance. Все anchors проверены в Pre-flight — если count не совпадает → STOP + Arman.
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -B 12 -A 6 -e '"'^function .*'"' -e 'data-group-id=\\{group\\.id\\}' -- 'pages/StaffOrdersMobile/staffordersmobile.jsx'" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 3159ms:
+266-  "orderprocess.default.in_progress": "Готовится",
+267-  "orderprocess.default.ready": "Готов",
+268-  "orderprocess.default.served": "Выдан",
+269-  "orderprocess.default.cancelled": "Отменён",
+270-  "new": "Новый",
+271-  "accepted": "Принят",
+272-  "in_progress": "Готовится",
+273-  "ready": "Готов",
+274-  "served": "Выдан",
+275-  "cancelled": "Отменён",
+276-};
+277-
+278:function getStageName(stage, t) {
+279-  if (!stage?.name) return "—";
+280-  const name = stage.name;
+281-  // 1. Try t() if available (proper B44 i18n)
+282-  if (t) {
+283-    const translated = t(name);
+284-    if (translated && translated !== name) return translated;
+--
+347-  closeActionReady: "\u0432\u044B\u0434\u0430\u0442\u044C",
+348-  closeActionInProgress: "\u0434\u043E\u0436\u0434\u0430\u0442\u044C\u0441\u044F",
+349-};
+350-
+351-const HALL_CHIP_STYLES = {
+352-  red:   "bg-red-50 border-red-300 text-red-600",
+353-  blue:  "bg-blue-50 border-blue-300 text-blue-600",
+354-  green: "bg-green-50 border-green-300 text-green-600",
+355-  amber: "bg-amber-50 border-amber-300 text-amber-600",
+356-  gray:  "bg-slate-100 border-slate-300 text-slate-500",
+357-};
+358-
+359:function formatCompactMinutes(totalMinutes) {
+360-  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return "0\u043C";
+361-  if (totalMinutes < 60) return `${totalMinutes}\u043C`;
+362-  const hours = Math.floor(totalMinutes / 60);
+363-  const minutes = totalMinutes % 60;
+364-  return minutes > 0 ? `${hours}\u0447 ${minutes}\u043C` : `${hours}\u0447`;
+365-}
+366-
+367:function formatHallMoney(amount) {
+368-  const value = Number(amount || 0);
+369-  const hasFraction = Math.abs(value % 1) > 0;
+370-  return `${value.toLocaleString("ru-RU", {
+371-    minimumFractionDigits: hasFraction ? 2 : 0,
+372-    maximumFractionDigits: 2,
+373-  })} \u20B8`;
+374-}
+375-
+376:function formatClockTime(dateStr) {
+377-  return new Date(safeParseDate(dateStr)).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
+378-}
+379-
+380:function getAgeMinutes(dateStr) {
+381-  return Math.max(0, Math.floor((Date.now() - safeParseDate(dateStr).getTime()) / 60000));
+382-}
+383-
+384:function getUrgencyLevel(ageMin) {
+385-  if (!Number.isFinite(ageMin) || ageMin <= 0) return 'calm';
+386-  if (ageMin >= 6) return 'danger';
+387-  if (ageMin >= 3) return 'warning';
+388-  return 'calm';
+389-}
+390-const URGENCY_IDENTITY_STYLE = {
+--
+395-const SCS_CHIP_STYLES = {
+396-  green: { background: '#34c75920', color: '#30a14e' },
+397-  red:   { background: '#ff3b3020', color: '#ff3b30' },
+398-  blue:  { background: '#007aff20', color: '#007aff' },
+399-  gray:  { background: '#f2f2f7',   color: '#8e8e93' },
+400-};
+401-const SCS_SOLID_CHIP = {
+402-  green: { background: '#34c759', color: '#fff' },
+403-  red:   { background: '#ff3b30', color: '#fff' },
+404-  blue:  { background: '#007aff', color: '#fff' },
+405-};
+406-
+407:function stripTablePrefix(label) {
+408-  if (!label) return "";
+409-  return String(label).replace(/^\s*\u0421\u0442\u043E\u043B\s*/i, "").trim();
+410-}
+411-
+412:function extractGuestMarker(label) {
+413-  if (!label) return null;
+414-  const match = String(label).match(/(\d+)/);
+415-  return match ? match[1] : null;
+416-}
+417-
+418-const ROLE_LABELS = {
+--
+504-  { value: 60000, label: "60с" },
+505-  { value: 0, label: "Вручную" },
+506-];
+507-
+508-const DEFAULT_POLLING_INTERVAL = 5000;
+509-const DEFAULT_SORT_MODE = "priority";
+510-const DEFAULT_SORT_ORDER = "newest";
+511-
+512-/* ═══════════════════════════════════════════════════════════════════════════
+513-   HELPERS
+514-═══════════════════════════════════════════════════════════════════════════ */
+515-
+516:function isRateLimitError(error) {
+517-  if (!error) return false;
+518-  const msg = error.message || error.toString() || "";
+519-  return msg.toLowerCase().includes("rate limit") || msg.includes("429");
+520-}
+521-
+522:function shouldRetry(failureCount, error) {
+523-  if (isRateLimitError(error)) return false;
+524-  return failureCount < 2;
+525-}
+526-
+527-// SOM-BUG-S270-01: Sequential batch to prevent B44 429 on bulk operations.
+528-const BATCH_DELAY_MS = 120;
+--
+534-    } catch (err) {
+535-      results.push({ error: err });
+536-      if (isRateLimitError(err)) break;
+537-    }
+538-    if (i < items.length - 1 && delayMs > 0) {
+539-      await new Promise((r) => setTimeout(r, delayMs));
+540-    }
+541-  }
+542-  return results;
+543-}
+544-
+545-// D1-006: Normalize link fields (type-safe: string/number/object/value-object)
+546:function getLinkId(field) {
+547-  if (field == null) return null; // only null/undefined
+548-
+549-  if (typeof field === "string" || typeof field === "number") return String(field);
+550-
+551-  if (typeof field === "object") {
+552-    const v = field.id ?? field._id ?? field.value ?? null;
+553-
+554-    if (typeof v === "string" || typeof v === "number") return String(v);
+555-
+556-    if (v && typeof v === "object") {
+557-      const vv = v.id ?? v._id ?? null;
+558-      if (typeof vv === "string" || typeof vv === "number") return String(vv);
+559-    }
+560-  }
+561-
+562-  return null;
+563-}
+564-/*
+565:    <div data-group-id={group.id} className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-all duration-300 ${style.bgClass} ${style.borderClass} ${highlightRing}`}>
+566-      <div className="px-4 pt-3 pb-3 cursor-pointer active:opacity-80" onClick={onToggleExpand} role="button" aria-expanded={isExpanded} aria-label={group.type === "table" ? identifier : `${identifier}: ${statusLabel}`}>
+567-        {group.type === "table" ? (
+568-          <div className="space-y-2">
+569-            <div className="flex items-start justify-between gap-3">
+570-              <div className="flex items-center gap-2 min-w-0">
+571-                {ownershipState === "mine" ? (
+--
+796-          )}
+797-        </div>
+798-      </div>
+799-    </div>
+800-  );
+801-}
+802-
+803-*/
+804-// SOM-S256-02 (#293): Counts unique guests across orders.
+805-// null/undefined guest collapses into one bucket via Set semantics.
+806-const uniqueGuests = (orders) => new Set(orders.map(o => getLinkId(o.guest))).size;
+807-
+808:function getAssignee(order) {
+809-  return order.assignee || null;
+810-}
+811-
+812:function getAssigneeId(order) {
+813-  return getLinkId(order.assignee);
+814-}
+815-
+816:function isOrderFree(order) {
+817-  return !getLinkId(order.assignee);
+818-}
+819-
+820:function isOrderMine(order, effectiveUserId) {
+821-  if (!effectiveUserId) return false;
+822-  const assigneeId = getAssigneeId(order);
+823-  if (!assigneeId) return false;
+824-  return assigneeId === effectiveUserId;
+825-}
+826-
+827:function safeParseDate(dateStr) {
+828-  if (!dateStr) return new Date();
+829-  try {
+830-    const safe = !String(dateStr).endsWith("Z") ? `${dateStr}Z` : dateStr;
+831-    const d = new Date(safe);
+832-    if (isNaN(d.getTime())) return new Date();
+833-    return d;
+834-  } catch {
+835-    return new Date();
+836-  }
+837-}
+838-
+839-/**
+840- * Calculate when current shift started based on working_hours
+841- * @param {Object} workingHours - partner.working_hours object
+842- * @returns {Date} - shift start datetime
+843- */
+844:function getShiftStartTime(workingHours) {
+845-  const FALLBACK_HOURS = 12;
+846-  const now = new Date();
+847-  
+848-  // No working hours → fallback to start of today
+849-  if (!workingHours || typeof workingHours !== 'object') {
+850-    const startOfToday = new Date(now);
+--
+909-      shiftStart.setHours(Math.floor(yOpen / 60), yOpen % 60, 0, 0);
+910-      return shiftStart;
+911-    }
+912-  }
+913-  
+914-  // Fallback: start of today
+915-  const startOfToday = new Date(now);
+916-  startOfToday.setHours(0, 0, 0, 0);
+917-  return startOfToday;
+918-}
+919-
+920-
+921:function formatRelativeTime(dateStr) {
+922-  const date = safeParseDate(dateStr);
+923-  return formatDistanceToNow(date, { addSuffix: true, locale: ru });
+924-}
+925-
+926:function genDeviceId() {
+927-  try {
+928-    if (crypto?.randomUUID) return crypto.randomUUID();
+929-  } catch { /* ignore */ }
+930-  return `dev_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+931-}
+932-
+933:function getOrCreateDeviceId() {
+934-  try {
+935-    const existing = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+936-    if (existing) return existing;
+937-    const id = genDeviceId();
+938-    localStorage.setItem(DEVICE_ID_STORAGE_KEY, id);
+939-    return id;
+940-  } catch {
+941-    return genDeviceId();
+942-  }
+943-}
+944-
+945:function loadNotifPrefs() {
+946-  const defaults = { enabled: true, sound: false, vibrate: true, system: false };
+947-  try {
+948-    const raw = localStorage.getItem(NOTIF_PREFS_STORAGE_KEY);
+949-    if (!raw) return defaults;
+950-    return { ...defaults, ...JSON.parse(raw) };
+951-  } catch {
+952-    return defaults;
+953-  }
+954-}
+955-
+956:function saveNotifPrefs(prefs) {
+957-  try {
+958-    localStorage.setItem(NOTIF_PREFS_STORAGE_KEY, JSON.stringify(prefs));
+959-  } catch { /* ignore */ }
+960-}
+961-
+962:function loadPollingInterval() {
+963-  try {
+964-    const raw = sessionStorage.getItem(POLLING_INTERVAL_KEY);
+965-    if (!raw) return DEFAULT_POLLING_INTERVAL;
+966-    const val = parseInt(raw, 10);
+967-    if (POLLING_OPTIONS.some((o) => o.value === val)) return val;
+968-    return DEFAULT_POLLING_INTERVAL;
+969-  } catch {
+970-    return DEFAULT_POLLING_INTERVAL;
+971-  }
+972-}
+973-
+974:function savePollingInterval(val) {
+975-  try {
+976-    sessionStorage.setItem(POLLING_INTERVAL_KEY, String(val));
+977-  } catch { /* ignore */ }
+978-}
+979-
+980:function loadSortMode() {
+981-  try {
+982-    const raw = sessionStorage.getItem(SORT_MODE_KEY);
+983-    if (raw === "priority" || raw === "time") return raw;
+984-    return DEFAULT_SORT_MODE;
+985-  } catch {
+986-    return DEFAULT_SORT_MODE;
+987-  }
+988-}
+989-
+990:function saveSortMode(val) {
+991-  try {
+992-    sessionStorage.setItem(SORT_MODE_KEY, val);
+993-  } catch { /* ignore */ }
+994-}
+995-
+996:function loadSortOrder() {
+997-  try {
+998-    const raw = sessionStorage.getItem(SORT_ORDER_KEY);
+999-    if (raw === "newest" || raw === "oldest") return raw;
+1000-    return DEFAULT_SORT_ORDER;
+1001-  } catch {
+1002-    return DEFAULT_SORT_ORDER;
+1003-  }
+1004-}
+1005-
+1006:function saveSortOrder(val) {
+1007-  try {
+1008-    sessionStorage.setItem(SORT_ORDER_KEY, val);
+1009-  } catch { /* ignore */ }
+1010-}
+1011-
+1012:function getMyTablesKey(userIdOrToken) {
+1013-  return `staff_my_tables_${userIdOrToken || "anon"}`;
+1014-}
+1015-
+1016:function loadMyTables(userIdOrToken) {
+1017-  try {
+1018-    const raw = localStorage.getItem(getMyTablesKey(userIdOrToken));
+1019-    return raw ? JSON.parse(raw) : [];
+1020-  } catch {
+1021-    return [];
+1022-  }
+1023-}
+1024-
+1025:function saveMyTables(userIdOrToken, tables) {
+1026-  try {
+1027-    localStorage.setItem(getMyTablesKey(userIdOrToken), JSON.stringify(tables));
+1028-  } catch { /* ignore */ }
+1029-}
+1030-
+1031:function tryVibrate(enabled) {
+1032-  if (!enabled) return;
+1033-  try {
+1034-    if (navigator?.vibrate) navigator.vibrate(60);
+1035-  } catch { /* ignore */ }
+1036-}
+1037-
+1038:function createBeep() {
+1039-  try {
+1040-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+1041-    if (!AudioCtx) return null;
+1042-    const ctx = new AudioCtx();
+1043-    return {
+1044-      ctx,
+--
+1055-      },
+1056-      resume: async () => {
+1057-        try {
+1058-          if (ctx.state === "suspended") await ctx.resume();
+1059-        } catch { /* ignore */ }
+1060-      },
+1061-    };
+1062-  } catch {
+1063-    return null;
+1064-  }
+1065-}
+1066-
+1067:function canUseNotifications() {
+1068-  try {
+1069-    return typeof Notification !== "undefined";
+1070-  } catch {
+1071-    return false;
+1072-  }
+1073-}
+1074-
+1075:function clearAllStaffData() {
+1076-  try {
+1077-    localStorage.removeItem(DEVICE_ID_STORAGE_KEY);
+1078-    localStorage.removeItem(NOTIF_PREFS_STORAGE_KEY);
+1079-    sessionStorage.removeItem(POLLING_INTERVAL_KEY);
+1080-    sessionStorage.removeItem(SORT_MODE_KEY);
+1081-    sessionStorage.removeItem(SORT_ORDER_KEY);
+--
+1085-        localStorage.removeItem(key);
+1086-      }
+1087-    });
+1088-  } catch { /* ignore */ }
+1089-}
+1090-
+1091-/**
+1092- * Фильтрует этапы по каналу заказа (ORD-001, ORD-003)
+1093- * @param {Object} order - заказ с order_type
+1094- * @param {Array} stages - все этапы партнёра (sorted)
+1095- * @returns {Array} - отфильтрованные этапы
+1096- */
+1097:function getStagesForOrder(order, stages) {
+1098-  if (!order?.order_type || !stages?.length) return stages || [];
+1099-  
+1100-  const filtered = stages.filter(stage => {
+1101-    switch (order.order_type) {
+1102-      case 'hall': 
+1103-        return stage.enabled_hall !== false; // default true
+--
+1117-  if (orderStageId) {
+1118-    const currentStage = stages.find(s => getLinkId(s.id) === orderStageId);
+1119-    if (currentStage && !filtered.find(s => getLinkId(s.id) === getLinkId(currentStage.id))) {
+1120-      filtered.push(currentStage);
+1121-      filtered.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+1122-    }
+1123-  }
+1124-  
+1125-  return filtered;
+1126-}
+1127-
+1128-// V2-05: Compute table-level status from group orders + service requests
+1129:function computeTableStatus(group, activeRequests, getStatusConfig) {
+1130-  const orders = group.orders.filter(o => o.status !== 'cancelled');
+1131-
+1132-  // 1. Bill request check (table groups only, highest priority)
+1133-  if (group.type === 'table') {
+1134-    const tableRequests = (activeRequests || []).filter(
+1135-      r => getLinkId(r.table) === group.id
+--
+1161-  // 6. All in middle stages (kitchen working)
+1162-  return 'PREPARING';
+1163-}
+1164-
+1165-
+1166-/* ═══════════════════════════════════════════════════════════════════════════
+1167-   SUB-COMPONENTS
+1168-═══════════════════════════════════════════════════════════════════════════ */
+1169-
+1170-/* function RateLimitScreen({ onRetry }) {
+1171-  return (
+1172-    <div
+1173:      data-group-id={group.id}
+1174-      className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-all duration-300 ${style.bgClass} ${style.borderClass} ${highlightRing}`}
+1175-    >
+1176-      <div
+1177-        className="px-4 pt-3 pb-3 cursor-pointer active:opacity-80"
+1178-        onClick={onToggleExpand}
+1179-        role="button"
+--
+1426-                  {contactInfo.address && <div className="flex items-center gap-2 text-sm"><MapPin className="w-4 h-4 text-slate-400" /><span className="text-slate-600">{contactInfo.address}</span></div>}
+1427-                </div>
+1428-              )}
+1429-            </React.Fragment>
+1430-          )}
+1431-        </div>
+1432-      </div>
+1433-    </div>
+1434-  );
+1435-}
+1436-*/
+1437-
+1438:function RateLimitScreen({ onRetry }) {
+1439-  return (
+1440-    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
+1441-      <Card className="max-w-md w-full border-amber-200 bg-amber-50">
+1442-        <CardContent className="p-6 text-center space-y-4">
+1443-          <div className="w-12 h-12 mx-auto rounded-full bg-amber-100 flex items-center justify-center">
+1444-            <AlertTriangle className="w-6 h-6 text-amber-600" />
+--
+1446-          <div className="text-xl font-bold text-slate-900">{'\u0421\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u043D\u043E\u0433\u043E \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432'}</div>
+1447-          <div className="text-sm text-slate-600">{'\u0421\u0435\u0440\u0432\u0435\u0440 \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0438\u043B \u0434\u043E\u0441\u0442\u0443\u043F. \u041F\u043E\u0434\u043E\u0436\u0434\u0438\u0442\u0435 \u043C\u0438\u043D\u0443\u0442\u0443 \u0438 \u043F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0441\u043D\u043E\u0432\u0430.'}</div>
+1448-          <Button onClick={onRetry} className="w-full bg-amber-600 hover:bg-amber-700 text-white">
+1449-            <RefreshCcw className="w-4 h-4 mr-2" />
+1450-            {'\u041F\u043E\u043F\u0440\u043E\u0431\u043E\u0432\u0430\u0442\u044C \u0441\u043D\u043E\u0432\u0430'}
+1451-          </Button>
+1452-        </CardContent>
+1453-      </Card>
+1454-    </div>
+1455-  );
+1456-}
+1457-
+1458:function LockedScreen() {
+1459-  return (
+1460-    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
+1461-      <Card className="max-w-md w-full border-slate-200">
+1462-        <CardContent className="p-6 text-center space-y-3">
+1463-          <div className="text-xl font-bold text-slate-900">{'\u0421\u0441\u044B\u043B\u043A\u0430 \u0437\u0430\u043D\u044F\u0442\u0430'}</div>
+1464-          <div className="text-sm text-slate-600">{'\u042D\u0442\u0430 \u0441\u0441\u044B\u043B\u043A\u0430 \u043E\u0444\u0438\u0446\u0438\u0430\u043D\u0442\u0430 \u0443\u0436\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u043D\u0430 \u0434\u0440\u0443\u0433\u043E\u043C \u0443\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432\u0435.'}</div>
+1465-          <div className="text-xs text-slate-500">{'\u041F\u043E\u043F\u0440\u043E\u0441\u0438\u0442\u0435 \u043C\u0435\u043D\u0435\u0434\u0436\u0435\u0440\u0430 \u043F\u0435\u0440\u0435\u0432\u044B\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443 \u0432 \u043A\u0430\u0431\u0438\u043D\u0435\u0442\u0435.'}</div>
+1466-        </CardContent>
+1467-      </Card>
+1468-    </div>
+1469-  );
+1470-}
+1471-
+1472:function BindingScreen() {
+1473-  return (
+1474-    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
+1475-      <Card className="max-w-md w-full border-slate-200">
+1476-        <CardContent className="p-6 text-center space-y-3">
+1477-          <div className="text-xl font-bold text-slate-900">{'\u0410\u043A\u0442\u0438\u0432\u0430\u0446\u0438\u044F...'}</div>
+1478-          <div className="text-sm text-slate-600">{'\u041F\u0440\u0438\u0432\u044F\u0437\u044B\u0432\u0430\u0435\u043C \u0441\u0441\u044B\u043B\u043A\u0443 \u043A \u044D\u0442\u043E\u043C\u0443 \u0443\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432\u0443.'}</div>
+1479-          <div className="flex justify-center pt-2">
+1480-            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+1481-          </div>
+1482-        </CardContent>
+1483-      </Card>
+1484-    </div>
+1485-  );
+1486-}
+1487-
+1488:function IconToggle({ icon: Icon, label, count, selected, onClick, tone = "neutral", countAsIcon = false }) {
+1489-  const base = "flex flex-col items-center justify-center rounded-xl border transition-all select-none active:scale-[0.97]";
+1490-  const size = "flex-1 min-w-[52px] max-w-[120px] h-14";
+1491-  const isEmpty = count === 0;
+1492-
+1493-  let cls = "";
+1494-  if (tone === "neutral") {
+--
+1515-        <span className={`text-xl font-bold leading-none ${isEmpty && selected ? "opacity-60" : ""}`}>{count}</span>
+1516-      ) : (
+1517-        <React.Fragment>
+1518-          <Icon className="w-5 h-5" />
+1519-          <span className="text-[10px] leading-tight opacity-70 mt-0.5">{count}</span>
+1520-        </React.Fragment>
+1521-      )}
+1522-      <span className="text-[10px] leading-tight mt-1 font-medium">{label}</span>
+1523-    </button>
+1524-  );
+1525-}
+1526-
+1527:function RequestCard({ request, tableData, onAction, isPending, isFavorite, onToggleFavorite }) {
+1528-  const typeLabel = REQUEST_TYPE_LABELS[request.request_type] || request.request_type;
+1529-  const reqTableId = getLinkId(request.table);
+1530-  const tableLabel = reqTableId && tableData ? `\u0421\u0442\u043E\u043B ${tableData.name}` : request.table ? '\u0421\u0442\u043E\u043B ...' : '\u2014';
+1531-  const statusLabel = request.status === "new" ? '\u041D\u043E\u0432\u044B\u0439' : '\u0412 \u0440\u0430\u0431\u043E\u0442\u0435';
+1532-  const statusBadgeClass = request.status === "new" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-yellow-50 text-yellow-700 border-yellow-200";
+1533-  const actionLabel = request.status === "new" ? '\u0412 \u0440\u0430\u0431\u043E\u0442\u0443' : '\u0413\u043E\u0442\u043E\u0432\u043E';
+--
+1554-      <div className="text-xs text-slate-500 mb-2">{tableLabel}</div>
+1555-      {request.comment && <div className="text-xs bg-slate-50 text-slate-600 p-2 rounded mb-2 border border-slate-100">{request.comment}</div>}
+1556-      <div className="flex items-center justify-between">
+1557-        <Badge variant="outline" className={`text-[10px] ${statusBadgeClass}`}>{statusLabel}</Badge>
+1558-        <Button size="sm" onClick={onAction} disabled={isPending} className="h-7 px-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white">
+1559-          {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : actionLabel}
+1560-        </Button>
+1561-      </div>
+1562-    </div>
+1563-  );
+1564-}
+1565-
+1566:function OrderCard({
+1567-  order,
+1568-  tableData,
+1569-  isFavorite,
+1570-  onToggleFavorite,
+1571-  disableServe,
+1572-  onMutate,
+--
+1702-            {showActionButton && statusConfig.actionLabel && (
+1703-              <Button onClick={handleAction} disabled={actionDisabled} className={`text-white font-medium px-4 h-9 min-w-[100px] ${ctaClass}`}>
+1704-                {updateStatusMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : statusConfig.actionLabel}
+1705-              </Button>
+1706-            )}
+1707-          </div>
+1708-        </div>
+1709-      </CardContent>
+1710-    </Card>
+1711-  );
+1712-}
+1713-
+1714:function pluralRu(n, one, few, many) {
+1715-  const abs = Math.abs(n) % 100;
+1716-  const last = abs % 10;
+1717-  if (abs > 10 && abs < 20) return many;
+1718-  if (last > 1 && last < 5) return few;
+1719-  if (last === 1) return one;
+1720-  return many;
+1721-}
+1722-
+1723:function OrderGroupCard({
+1724-  group,
+1725-  isExpanded,
+1726-  onToggleExpand,
+1727-  isHighlighted,
+1728-  isFavorite,
+1729-  onToggleFavorite,
+--
+2280-        </div>
+2281-        <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+2282-          {order.order_number ? <span className="text-[10px] text-slate-400">{order.order_number}</span> : <span />}
+2283-          {buildAdvancePayload(order) && <button type="button" onClick={() => handleSingleAction(order)} disabled={advanceMutation.isPending || batchInFlight} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 min-h-[36px] active:scale-[0.98] disabled:opacity-60">{advanceMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : actionLabel}</button>}
+2284-        </div>
+2285-      </div>
+2286-    );
+2287-  }, [advanceMutation.isPending, buildAdvancePayload, getOrderActionMeta, getStatusConfig, guestName, handleSingleAction, itemsByOrder]);
+2288-
+2289-  const highlightRing = isHighlighted ? "ring-2 ring-indigo-400 ring-offset-1" : "";
+2290-
+2291-  return (
+2292:    <div data-group-id={group.id} className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-all duration-300 ${style.bgClass} ${style.borderClass} ${highlightRing}`}>
+2293-      <div className="px-4 pt-3 pb-3 cursor-pointer active:opacity-80" onClick={onToggleExpand} role="button" aria-expanded={isExpanded} aria-label={group.type === "table" ? identifier : `${identifier}: ${statusLabel}`}>
+2294-        {group.type === "table" ? (
+2295-          <div>
+2296-            <div style={{display:'flex', alignItems:'center', gap:'10px', minHeight:'72px'}}>
+2297-              <div style={{position:'relative', flexShrink:0, width:'84px', display:'flex', alignItems:'center', justifyContent:'flex-end'}}>
+2298-                {ownershipState === "mine" && (
+--
+2394-              {newOrders.length > 0 && <div><div className="flex items-center justify-between mb-2"><p className="text-[11px] font-bold text-blue-600 uppercase tracking-wider"><span className="bg-blue-50 rounded-md px-2 py-0.5">{`\u041D\u043E\u0432\u044B\u0435 (${newOrders.length})`}</span></p><button type="button" onClick={() => handleOrdersAction(newOrders)} disabled={advanceMutation.isPending || batchInFlight} className="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1 rounded min-h-[44px] active:scale-95 disabled:opacity-60">{'\u041F\u0440\u0438\u043D\u044F\u0442\u044C \u0432\u0441\u0435'}</button></div><div className="space-y-2">{newOrders.map(renderLegacyOrderCard)}</div></div>}
+2395-              {inProgressOrders.length > 0 && <div><div className="flex items-center justify-between mb-2 cursor-pointer min-h-[44px]" onClick={() => setInProgressExpanded((prev) => !prev)}><p className="text-[11px] font-bold text-amber-400 uppercase tracking-wider opacity-60">{`\u0412 \u0440\u0430\u0431\u043E\u0442\u0435 (${inProgressOrders.length})`}</p><ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${inProgressExpanded ? "rotate-180" : ""}`} /></div>{inProgressExpanded && <div className="space-y-3">{subGroups.map(({ sid, orders, cfg }) => { const isSubExpanded = !!expandedSubGroups[sid]; const actionMeta = getOrderActionMeta(orders[0]); const subGroupLabel = sid === "__null__" ? '\u0412 \u0420\u0410\u0411\u041E\u0422\u0415' : cfg.label; if (subGroups.length === 1) return <div key={sid} className="space-y-2">{orders.map(renderLegacyOrderCard)}</div>; return <div key={sid}><div className="flex items-center justify-between mb-1.5 cursor-pointer min-h-[44px]" onClick={() => setExpandedSubGroups((prev) => ({ ...prev, [sid]: !prev[sid] }))}><div className="flex items-center gap-2"><ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isSubExpanded ? "rotate-180" : ""}`} /><span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">{`${subGroupLabel} (${orders.length})`}</span></div><button type="button" onClick={(event) => { event.stopPropagation(); handleOrdersAction(orders); }} disabled={advanceMutation.isPending || batchInFlight} className="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded min-h-[36px] active:scale-95 disabled:opacity-60">{actionMeta.bulkLabel}</button></div>{isSubExpanded && <div className="space-y-2">{orders.map(renderLegacyOrderCard)}</div>}</div>; })}</div>}</div>}
+2396-              {readyOrders.length > 0 && <div><div className="flex items-center justify-between mb-2"><p className="text-[11px] font-bold text-green-600 uppercase tracking-wider"><span className="bg-green-50 rounded-md px-2 py-0.5">{`\u0413\u043E\u0442\u043E\u0432\u043E \u043A \u0432\u044B\u0434\u0430\u0447\u0435 (${readyOrders.length})`}</span></p><button type="button" onClick={() => handleOrdersAction(readyOrders)} disabled={advanceMutation.isPending || batchInFlight} className="text-xs font-semibold text-green-600 bg-green-50 border border-green-200 px-3 py-1 rounded min-h-[44px] active:scale-95 disabled:opacity-60">{'\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0435'}</button></div><div className="space-y-2">{readyOrders.map(renderLegacyOrderCard)}</div></div>}
+2397-              {contactInfo && <div className="space-y-2 pt-2 border-t border-slate-200">{contactInfo.name && <div className="flex items-center gap-2 text-sm"><User className="w-4 h-4 text-slate-400" /><span className="text-slate-700">{contactInfo.name}</span></div>}{contactInfo.phone && <div className="flex items-center gap-2 text-sm"><Phone className="w-4 h-4 text-slate-400" /><a href={`tel:${contactInfo.phone}`} className="text-blue-600 underline">{contactInfo.phone}</a></div>}{contactInfo.address && <div className="flex items-center gap-2 text-sm"><MapPin className="w-4 h-4 text-slate-400" /><span className="text-slate-600">{contactInfo.address}</span></div>}</div>}
+2398-            </React.Fragment>
+2399-          )}
+2400-        </div>
+2401-      </div>
+2402-    </div>
+2403-  );
+2404-}
+2405-
+2406:function MyTablesModal({ open, onClose, tables, favorites, onToggleFavorite, onClearAll }) {
+2407-  const [search, setSearch] = useState("");
+2408-
+2409-  if (!open) return null;
+2410-
+2411-  const filteredTables = tables.filter((t) => {
+2412-    if (!search.trim()) return true;
+--
+2493-              className="w-full text-red-600 border-red-200 hover:bg-red-50"
+2494-            >
+2495-              <Trash2 className="w-4 h-4 mr-2" />
+2496-              Очистить мои столы ({favorites.length})
+2497-            </Button>
+2498-          </div>
+2499-        )}
+2500-      </div>
+2501-    </div>
+2502-  );
+2503-}
+2504-
+2505:function ProfileSheet({ 
+2506-  open, 
+2507-  onClose, 
+2508-  staffName, 
+2509-  staffRole, 
+2510-  partnerName, 
+2511-  isKitchen,
+--
+2621-            onClick={onLogout}
+2622-            className="w-full text-red-600 border-red-200 hover:bg-red-50"
+2623-          >
+2624-            <LogOut className="w-4 h-4 mr-2" />
+2625-            Выйти
+2626-          </Button>
+2627-        </div>
+2628-      </div>
+2629-    </div>
+2630-  );
+2631-}
+2632-
+2633:function SettingsPanel({ 
+2634-  open, 
+2635-  onClose, 
+2636-  pollingInterval, 
+2637-  onChangePollingInterval, 
+2638-  sortMode, 
+2639-  onChangeSortMode,
+--
+2770-
+2771-/**
+2772- * BannerNotification — in-app overlay banner for new order events.
+2773- * Fixed at top of viewport, z-60 (above sticky header z-20, detail view z-30, modals z-40).
+2774- * Auto-hides after 5s. Swipe-up or tap X to dismiss. Tap body → navigate to relevant group.
+2775- * Non-blocking: pointer-events only on the banner itself, not full-screen overlay.
+2776- *
+2777- * Props:
+2778- *   banner: { id, text, groupId, count } | null
+2779- *   onDismiss: () => void
+2780- *   onNavigate: (groupId) => void
+2781- */
+2782:function BannerNotification({ banner, onDismiss, onNavigate }) {
+2783-  const [visible, setVisible] = useState(false);
+2784-  const [dismissing, setDismissing] = useState(false);
+2785-  const touchStartY = useRef(null);
+2786-  const autoHideTimer = useRef(null);
+2787-  const dismissAnimTimer = useRef(null);
+2788-
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n '"'^'"\\*\\*B\\.[1-9]' -- 'C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/drafts/pssk-som-b2-1-260416-v7.md'" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 1958ms:
+366:**B.1 — `orderGroups` useMemo (~строки 3768-3819)**
+513:**B.2 — `filteredGroups` useMemo (~строки 3862-3883)**
+575:**B.3 — `tabCounts` useMemo (~строки 3886-3908)**
+623:**B.4 — Call-site updates в OrderGroupCard map (~строки 4457-4486) — [v4-M3, v5-M2]**
+684:**B.5 — `data-group-id` (live JSX only) — [v4-M4, v5-M1 критично]**
+754:**B.6 — `handleBannerNavigate` обновить для compositeKey (~строка 4142) — [V5-L3]**
+810:**B.7 — `confirmCloseTable` очистка expanded (~строка 4190)**
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -C 6 \"OrderGroupCard|finalGroups\\.map|v2SortedGroups\\.map|onNavigate=\\{handleBannerNavigate\\}|confirmCloseTable\" -- 'pages/StaffOrdersMobile/staffordersmobile.jsx'" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 1847ms:
+85-   - Added overdue badge (red clock) on orders waiting too long
+86-   - Added "★ Мои" favorites filter toggle
+87-   - Added ★ button on ServiceRequests
+88-   - Added "Закрыть стол" button when all orders ready
+89-   
+90-   CHANGES in v2.7.0 (grouping):
+91:   - OrderGroupCard: hall grouped by table, pickup/delivery individual
+92-   - Favorites format: plain IDs → prefixed keys (table:id)
+93-   - Sorted by oldest unaccepted order
+94-   - Auto-expand first 5 + favorites
+95-   - Kitchen unchanged (flat list)
+96-   
+97-   CHANGES in v2.6.6 (hardening):
+--
+1717-  if (abs > 10 && abs < 20) return many;
+1718-  if (last > 1 && last < 5) return few;
+1719-  if (last === 1) return one;
+1720-  return many;
+1721-}
+1722-
+1723:function OrderGroupCard({
+1724-  group,
+1725-  isExpanded,
+1726-  onToggleExpand,
+1727-  isHighlighted,
+1728-  isFavorite,
+1729-  onToggleFavorite,
+--
+2952-  // V2-09: Sprint D — Banner notification state
+2953-  const [bannerData, setBannerData] = useState(null);
+2954-  const bannerIdCounter = useRef(0);
+2955-
+2956-  // v3.6.0: Close table confirmation dialog state
+2957-  const [closeTableConfirm, setCloseTableConfirm] = useState(null); // { sessionId, tableName } | null
+2958:  const [undoToast, setUndoToast] = useState(null); // lifted from OrderGroupCard — survives card unmount
+2959-
+2960-  const updateNotifPrefs = (patch) => {
+2961-    setNotifPrefs((prev) => {
+2962-      const next = { ...prev, ...patch };
+2963-      saveNotifPrefs(next);
+2964-      return next;
+--
+3210-    };
+3211-    
+3212-    const t = setInterval(tick, 60000);
+3213-    return () => clearInterval(t);
+3214-  }, [isTokenMode, tokenState, rateLimitHit, queryClient]);
+3215-
+3216:  // Global undo handler — works after OrderGroupCard unmounts
+3217-  const handleUndoGlobal = () => {
+3218-    if (!undoToast) return;
+3219-    clearTimeout(undoToast.timerId);
+3220-    undoToast.onUndo();
+3221-    setUndoToast(null);
+3222-  };
+--
+4177-    const sessionId = getLinkId(tableSessionField);
+4178-    if (!sessionId) return;
+4179-    setCloseTableConfirm({ sessionId, tableId, tableName: tableName || 'стол' });
+4180-  };
+4181-
+4182-  // v3.6.0: Confirmation dialog — executes close after user confirms
+4183:  const confirmCloseTable = async () => {
+4184-    if (!closeTableConfirm) return;
+4185-    const { sessionId, tableId } = closeTableConfirm;
+4186-    setCloseTableConfirm(null);
+4187-    try {
+4188-      await closeSession(sessionId, tableId);
+4189-      showToast("Стол закрыт");
+--
+4451-                    guestsMap={guestsMap}
+4452-                    onCloseTable={null}
+4453-                  />
+4454-                );
+4455-              })
+4456-            ) : (
+4457:              v2SortedGroups.map(group => (
+4458:                <OrderGroupCard
+4459-                  key={group.id}
+4460-                  group={group}
+4461-                  isExpanded={expandedGroupId === group.id}
+4462-                  onToggleExpand={() => handleToggleExpand(group.id)}
+4463-                  isHighlighted={highlightGroupId === group.id}
+4464-                  isFavorite={isFavorite(group.type === 'table' ? 'table' : 'order', group.id)}
+--
+4584-                className="flex-1 min-h-[44px] rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 active:scale-[0.98]"
+4585-              >
+4586-                Отмена
+4587-              </button>
+4588-              <button
+4589-                type="button"
+4590:                onClick={confirmCloseTable}
+4591-                className="flex-1 min-h-[44px] rounded-lg bg-red-600 text-white text-sm font-semibold active:scale-[0.98]"
+4592-              >
+4593-                Закрыть
+4594-              </button>
+4595-            </div>
+4596-          </div>
+--
+4604-      )}
+4605-
+4606-      {/* V2-09: Sprint D — Banner notification overlay */}
+4607-      <BannerNotification
+4608-        banner={bannerData}
+4609-        onDismiss={handleBannerDismiss}
+4610:        onNavigate={handleBannerNavigate}
+4611-      />
+4612-    </div>
+4613-  );
+4614-}
+4615-
+4616-
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -A 28 -B 6 '"'^'"\\*\\*B\\.7' -- 'C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/drafts/pssk-som-b2-1-260416-v7.md'" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 2218ms:
+804-⚠️ Добавить `openSessionByTableId` в dependency array useCallback (новая зависимость).
+805-
+806-**[V5-L3] Note про identity churn:** Новый dep `openSessionByTableId` пересчитывается каждый refetch `openSessions` query (каждые ~5s после Fix A). Это значит `handleBannerNavigate` получит **новую identity при каждом refetch** — если bannerComponent обёрнут в `memo` с shallow prop comparison, он будет ре-рендериться каждые 5 секунд.
+807-
+808-Impact: **косметический** — banner рендер лёгкий (alert + кнопка), CPU cost ничтожен. Не требует мемоизации `openSessionByTableId` или wrapper-hook. Принимаемо как trade-off за fresh session info в banner navigation.
+809-
+810:**B.7 — `confirmCloseTable` очистка expanded (~строка 4190)**
+811-
+812-Grep-якорь: `setExpandedGroupId(null); // Collapse expanded card` (1 hit). Строка ОК как есть — устанавливает `null`, никаких ссылок на ID. **Не менять.**
+813-
+814-### Should NOT (для Fix B целиком) — [v4-L4: `onCloseTable` = prop, `handleCloseTable` = handler — везде ниже используем `onCloseTable` как имя контракта]
+815-- НЕ менять OrderGroupCard компонент (только пропсы).
+816-- НЕ менять `favorites` массив / `toggleFavorite` / `isFavorite` сигнатуру. Favorites остаются привязаны к tableId.
+817-- НЕ менять `["servedOrders", group.id]` queryKey — tableId нужен для корректного filter по B44.
+818-- НЕ менять `onCloseTable(sessionId, identifier, tableId)` контракт (FROZEN UX: пропс OrderGroupCard'а; внутри маппится на handler `handleCloseTable` родителя через `group.openSessionId` + `group.displayName` + `group.id`).
+819-- НЕ трогать `handleCloseTableClick` useCallback внутри OrderGroupCard (~2164-2177).
+820-- НЕ трогать pickup/delivery ветку в `orderGroups` (их compositeKey уже уникален через `o.id`).
+821-- НЕ трогать `buildBannerInfo` @ ~4079-4090 или `onNavigate(banner.groupId)` @ ~2825 (upstream: Fix B.6 обрабатывает tableId через defensive резолв). [V5-L6]
+822-- НЕ добавлять новые state/hooks/queries.
+823-
+824-### Связи между Fix'ами
+825-⚠️ **Fix B.1 создаёт поле `group.sessionId`**, которое:
+826-- используется в Fix B.2 (`filteredGroups`) и Fix B.3 (`tabCounts`) для определения таба
+827-- используется в Fix C (ниже) для детектирования orphan orders
+828-Если Fix B.1 падает — Fix B.2, B.3 и Fix C тоже нельзя применять.
+829-
+830-### Verification после Fix B (ВСЕ команды должны пройти)
+831-
+832-```bash
+833-# 1. compositeKey появился везде где нужно (≥5 occurrences: 1 key + 1 isExpanded + 1 onToggleExpand + 1 isHighlighted + 1-3 data-group-id)
+834-grep -c "compositeKey" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+835-# Ожидание: ≥5 (4 call-sites B.4 + 1 обязательный data-group-id @ ~2292 + N в orderGroups тело).
+836-
+837-# 2. Старая одиночная группировка убрана
+838-grep -n "tableGroups\[tableId\]" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+
+codex
+I’ve confirmed one structural inconsistency already: Fix B is introduced as “5 coordinated changes” but the draft then defines B.1 through B.7, with B.7 being a no-op validation item. I’m checking the B.1/B.2/B.3 details now for more substantive gaps, especially around request-only tables and banner navigation.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/drafts/pssk-som-b2-1-260416-v7.md' | Select-Object -Skip 364 -First 220" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 2000ms:
+
+**B.1 â€” `orderGroups` useMemo (~ÑÑ‚Ñ€Ð¾ÐºÐ¸ 3768-3819)**
+
+Grep-ÑÐºÐ¾Ñ€ÑŒ: `const orderGroups = useMemo` (1 hit). Ð§Ð¸Ñ‚Ð°ÐµÑ‚ÑÑ ÐºÐ°Ðº:
+```js
+  // v2.7.0: Order groups model (hall by table, pickup/delivery individual)
+  const orderGroups = useMemo(() => {
+    if (isKitchen) return null;
+    
+    const groups = [];
+    const tableGroups = {};
+    
+    visibleOrders.forEach(o => {
+      if (o.order_type === 'hall') {
+        const tableId = getLinkId(o.table);
+        if (!tableId) return;
+        if (!tableGroups[tableId]) {
+          const tableName = tableMap[tableId]?.name || '?';
+          tableGroups[tableId] = {
+            type: 'table',
+            id: tableId,
+            displayName: tableName,
+            orders: [],
+            openSessionId: openSessionByTableId[tableId]?.id || null,
+          };
+          groups.push(tableGroups[tableId]);
+        }
+        tableGroups[tableId].orders.push(o);
+      } else {
+        groups.push({
+          type: o.order_type,
+          id: o.id,
+          displayName: o.order_type === 'pickup' 
+            ? `Ð¡Ð’-${o.order_number || o.id.slice(-3)}` 
+            : `Ð”ÐžÐ¡-${o.order_number || o.id.slice(-3)}`,
+          orders: [o],
+        });
+      }
+    });
+
+    activeRequests.forEach((req) => {
+      const tableId = getLinkId(req.table);
+      if (!tableId) return;
+      if (!tableGroups[tableId]) {
+        const tableName = tableMap[tableId]?.name || '?';
+        tableGroups[tableId] = {
+          type: 'table',
+          id: tableId,
+          displayName: tableName,
+          orders: [],
+          openSessionId: openSessionByTableId[tableId]?.id || null,
+        };
+        groups.push(tableGroups[tableId]);
+      }
+    });
+
+    return groups;
+  }, [visibleOrders, tableMap, isKitchen, activeRequests, openSessionByTableId]);
+```
+
+**Ð—Ð°Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð¦Ð•Ð›Ð˜ÐšÐžÐœ Ð±Ð»Ð¾Ðº `const orderGroups = useMemo(...)` ÑÐ»ÐµÐ´ÑƒÑŽÑ‰Ð¸Ð¼ (Ð‘Ð•Ð— Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ deps):**
+
+```js
+  // v2.7.0 + Ð‘2.1: Order groups model (hall by table+session, pickup/delivery individual)
+  // BUG-SM-015: Split table orders by session_id so closed session stays in
+  // Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹ÐµÂ» while new session appears as a fresh card in Â«ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹ÐµÂ».
+  const orderGroups = useMemo(() => {
+    if (isKitchen) return null;
+
+    const groups = [];
+    const tableGroups = {}; // key: `${tableId}__${sessionKey}` where sessionKey = sessionId || 'no-session'
+
+    visibleOrders.forEach(o => {
+      if (o.order_type === 'hall') {
+        const tableId = getLinkId(o.table);
+        if (!tableId) return;
+
+        const orderSessionId = getLinkId(o.table_session) || 'no-session';
+        const openSessionId = openSessionByTableId[tableId]?.id || null;
+        const compositeKey = `${tableId}__${orderSessionId}`;
+
+        if (!tableGroups[compositeKey]) {
+          const tableName = tableMap[tableId]?.name || '?';
+          tableGroups[compositeKey] = {
+            type: 'table',
+            id: tableId,                   // tableId â€” Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ÑÑ Ð´Ð»Ñ favorites, servedOrders query, onCloseTable callback
+            sessionId: orderSessionId === 'no-session' ? null : orderSessionId, // NEW: ÑÐµÑÑÐ¸Ñ ÑÑ‚Ð¾Ð¹ Ð³Ñ€ÑƒÐ¿Ð¿Ñ‹ (null Ð´Ð»Ñ legacy orders Ð±ÐµÐ· session)
+            compositeKey,                  // NEW: React key + data-group-id + expand/highlight tracking
+            displayName: tableName,
+            orders: [],
+            openSessionId,                 // ID Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ Ð´Ð»Ñ ÑÑ‚Ð¾Ð³Ð¾ ÑÑ‚Ð¾Ð»Ð° (Ð¼Ð¾Ð¶ÐµÑ‚ != sessionId ÐµÑÐ»Ð¸ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð°Ñ)
+          };
+          groups.push(tableGroups[compositeKey]);
+        }
+        tableGroups[compositeKey].orders.push(o);
+      } else {
+        // Pickup/Delivery â€” ÑƒÐ½Ð¸ÐºÐ°Ð»ÑŒÐ½Ñ‹ Ð¿Ð¾ orderId, Ð½Ðµ Ð¼ÐµÐ½ÑÐµÐ¼ Ð»Ð¾Ð³Ð¸ÐºÑƒ.
+        groups.push({
+          type: o.order_type,
+          id: o.id,
+          sessionId: null,
+          compositeKey: `${o.order_type}__${o.id}`,
+          displayName: o.order_type === 'pickup'
+            ? `Ð¡Ð’-${o.order_number || o.id.slice(-3)}`
+            : `Ð”ÐžÐ¡-${o.order_number || o.id.slice(-3)}`,
+          orders: [o],
+        });
+      }
+    });
+
+    // ServiceRequest â†’ Ð¿Ñ€Ð¸Ð²ÑÐ·Ð°Ñ‚ÑŒ Ðº Ð³Ñ€ÑƒÐ¿Ð¿Ðµ Ð¢Ð•ÐšÐ£Ð©Ð•Ð™ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ (ÐµÑÐ»Ð¸ ÐµÑÑ‚ÑŒ),
+    // Ð¸Ð½Ð°Ñ‡Ðµ Ðº `${tableId}__no-session`. Ð—Ð°Ð¿Ñ€Ð¾ÑÑ‹ Ð¾Ñ‚ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ñ… ÑÐµÑÑÐ¸Ð¹ ÑƒÐ¶Ðµ Ð² ÑÑ‚Ð°Ñ‚ÑƒÑÐµ 'done'
+    // (ÑÐ¼. closeSession Ð² sessionHelpers.js:175-188), Ð¿Ð¾ÑÑ‚Ð¾Ð¼Ñƒ Ð² activeRequests Ð½Ðµ Ð¿Ð¾Ð¿Ð°Ð´Ð°ÑŽÑ‚.
+    //
+    // âš ï¸ [v7-M1] INTENTIONAL: ÐµÑÐ»Ð¸ Ñƒ ÑÑ‚Ð¾Ð»Ð° Ð½ÐµÑ‚ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ (openSessionId = null),
+    // ÑÐ¾Ð·Ð´Ð°Ñ‘Ñ‚ÑÑ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° Ñ `orders: []`, `sessionId: null`, `compositeKey: ${tableId}__no-session`.
+    // Ð¢Ð°ÐºÐ°Ñ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° Ð¿Ð¾Ð¿Ð°Ð´Ñ‘Ñ‚ Ð² Ñ‚Ð°Ð± Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹ÐµÂ» (filteredGroups: isCurrentOpenSession = false).
+    // Ð­Ñ‚Ð¾ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ðµ Ð¿Ð¾Ð²ÐµÐ´ÐµÐ½Ð¸Ðµ: ServiceRequest Ð±ÐµÐ· Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ â€” Ð·Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹Ð¹ Ð·Ð°Ð¿Ñ€Ð¾Ñ.
+    // Ð•ÑÐ»Ð¸ Ð² Ð±ÑƒÐ´ÑƒÑ‰ÐµÐ¼ Ð¾Ñ‚ÐºÑ€Ð¾ÐµÑ‚ÑÑ ÑÐµÑÑÐ¸Ñ â†’ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° Ð´Ð»Ñ Ð½ÐµÑ‘ ÑÐ¾Ð·Ð´Ð°ÑÑ‚ÑÑ Ñ‡ÐµÑ€ÐµÐ· visibleOrders.
+    activeRequests.forEach((req) => {
+      const tableId = getLinkId(req.table);
+      if (!tableId) return;
+
+      const openSessionId = openSessionByTableId[tableId]?.id || null;
+      const targetSessionKey = openSessionId || 'no-session';
+      const compositeKey = `${tableId}__${targetSessionKey}`;
+
+      if (!tableGroups[compositeKey]) {
+        const tableName = tableMap[tableId]?.name || '?';
+        tableGroups[compositeKey] = {
+          type: 'table',
+          id: tableId,
+          sessionId: openSessionId,       // null ÐµÑÐ»Ð¸ no open session
+          compositeKey,
+          displayName: tableName,
+          orders: [],
+          openSessionId,
+        };
+        groups.push(tableGroups[compositeKey]);
+      }
+    });
+
+    return groups;
+  }, [visibleOrders, tableMap, isKitchen, activeRequests, openSessionByTableId]);
+```
+
+**NOTE:** Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÐµÑ‚ÑÑ Ñ‚Ð¾Ñ‚ Ð¶Ðµ dependency array (Ð´Ð¾Ð±Ð°Ð²Ð»ÑÑ‚ÑŒ Ð·Ð°Ð²Ð¸ÑÐ¸Ð¼Ð¾ÑÑ‚Ð¸ Ð½Ðµ Ñ‚Ñ€ÐµÐ±ÑƒÐµÑ‚ÑÑ â€” Ð²ÑÐµ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÐ¼Ñ‹Ðµ Ð² Ñ‚ÐµÐ»Ðµ Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½Ñ‹Ðµ ÑƒÐ¶Ðµ Ð±Ñ‹Ð»Ð¸ Ð² ÑÑ‚Ð°Ñ€Ð¾Ð¼ Ð¼Ð°ÑÑÐ¸Ð²Ðµ).
+
+**B.2 â€” `filteredGroups` useMemo (~ÑÑ‚Ñ€Ð¾ÐºÐ¸ 3862-3883)**
+
+Grep-ÑÐºÐ¾Ñ€ÑŒ: `const filteredGroups = useMemo` (1 hit).
+
+**Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ ÐºÐ¾Ð´:**
+```js
+  const filteredGroups = useMemo(() => {
+    if (!orderGroups) return [];
+
+    return orderGroups.filter(group => {
+      if (group.type === 'table') {
+        const hasOpenSession = !!openSessionByTableId[group.id];
+        if (!hasOpenSession) return activeTab === 'completed';
+      }
+      const hasActiveOrder = group.orders.some(o => {
+        const config = getStatusConfig(o);
+        return !config.isFinishStage && o.status !== 'cancelled';
+      });
+      const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+      const hasServedButNotClosed = group.orders.some(o => {
+        const config = getStatusConfig(o);
+        return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+      });
+      return activeTab === 'active'
+        ? (hasActiveOrder || hasActiveRequest || hasServedButNotClosed)
+        : (!hasActiveOrder && !hasActiveRequest && !hasServedButNotClosed);
+    });
+  }, [orderGroups, activeTab, getStatusConfig, activeRequests, openSessionByTableId]);
+```
+
+**[v4-M2] Ð—Ð°Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð’Ð•Ð¡Ð¬ Ð±Ð»Ð¾Ðº `const filteredGroups = useMemo(...)` ÑÐ»ÐµÐ´ÑƒÑŽÑ‰Ð¸Ð¼ (Ð¾Ñ‚Ð»Ð¸Ñ‡Ð¸Ñ Ð¾Ñ‚ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ³Ð¾: Ð¢ÐžÐ›Ð¬ÐšÐž Ð¿ÐµÑ€Ð²Ñ‹Ð¹ `if (group.type === 'table')` Ð±Ð»Ð¾Ðº â€” Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ðµ `isCurrentOpenSession` Ñ‡ÐµÑ€ÐµÐ· `openId` + `group.sessionId`, Ð²Ð¼ÐµÑÑ‚Ð¾ `hasOpenSession = !!openSessionByTableId[group.id]`). Ð’ÑÐµ Ð¾ÑÑ‚Ð°Ð»ÑŒÐ½Ñ‹Ðµ ÑÑ‚Ñ€Ð¾ÐºÐ¸ â€” `hasActiveOrder`, `hasActiveRequest`, `hasServedButNotClosed`, return â€” Ð˜Ð”Ð•ÐÐ¢Ð˜Ð§ÐÐ« Ð¾Ñ€Ð¸Ð³Ð¸Ð½Ð°Ð»Ñƒ. Deps array ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ.**
+
+```js
+  const filteredGroups = useMemo(() => {
+    if (!orderGroups) return [];
+
+    return orderGroups.filter(group => {
+      if (group.type === 'table') {
+        // Ð‘2.1: Ð³Ñ€ÑƒÐ¿Ð¿Ð° Ð¿Ñ€Ð¸Ð½Ð°Ð´Ð»ÐµÐ¶Ð¸Ñ‚ Â«ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹Ð¼Â» Ð¢ÐžÐ›Ð¬ÐšÐž ÐµÑÐ»Ð¸ ÐµÑ‘ sessionId ÑÐ¾Ð²Ð¿Ð°Ð´Ð°ÐµÑ‚ Ñ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹
+        // Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸ÐµÐ¹ Ð´Ð»Ñ ÑÑ‚Ð¾Ð»Ð°. Ð—Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ðµ ÑÐµÑÑÐ¸Ð¸ (group.sessionId !== openId Ð¸Ð»Ð¸ no-session) â†’ Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹ÐµÂ».
+        const openId = openSessionByTableId[group.id]?.id || null;
+        const isCurrentOpenSession = !!openId && group.sessionId === openId;
+        if (!isCurrentOpenSession) return activeTab === 'completed';
+      }
+      const hasActiveOrder = group.orders.some(o => {
+        const config = getStatusConfig(o);
+        return !config.isFinishStage && o.status !== 'cancelled';
+      });
+      const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+      const hasServedButNotClosed = group.orders.some(o => {
+        const config = getStatusConfig(o);
+        return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+      });
+      return activeTab === 'active'
+        ? (hasActiveOrder || hasActiveRequest || hasServedButNotClosed)
+        : (!hasActiveOrder && !hasActiveRequest && !hasServedButNotClosed);
+    });
+  }, [orderGroups, activeTab, getStatusConfig, activeRequests, openSessionByTableId]);
+```
+
+âš ï¸ **Ð’Ð°Ð¶Ð½Ð¾:** `hasActiveRequest` Ð¿Ñ€Ð¾Ð´Ð¾Ð»Ð¶Ð°ÐµÑ‚ Ñ„Ð¸Ð»ÑŒÑ‚Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ Ð¿Ð¾ `getLinkId(r.table) === group.id` (tableId). Ð­Ñ‚Ð¾ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾: ÐµÑÐ»Ð¸ Ñƒ ÑÑ‚Ð¾Ð»Ð° ÐµÑÑ‚ÑŒ request, Ð¾Ð½ Ð¿Ð¾ Fix B.1 ÑƒÐ¶Ðµ Ð¿Ñ€Ð¸ÐºÑ€ÐµÐ¿Ð»Ñ‘Ð½ Ðº compositeKey Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ â€” Ð·Ð½Ð°Ñ‡Ð¸Ñ‚ ÑÑ‚Ð° Ð³Ñ€ÑƒÐ¿Ð¿Ð° (Ñ `isCurrentOpenSession=true`) ÐµÐ³Ð¾ ÑƒÐ²Ð¸Ð´Ð¸Ñ‚; Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð°Ñ Ð³Ñ€ÑƒÐ¿Ð¿Ð° (Ñ `group.sessionId !== openId`) ÑƒÐ¶Ðµ Ð´Ñ€Ð¾Ð¿Ð½ÑƒÐ»Ð°ÑÑŒ Ð² `completed` Ð½Ð° Ñ€Ð°Ð½Ð½ÐµÐ¼ return.
+
+**B.3 â€” `tabCounts` useMemo (~ÑÑ‚Ñ€Ð¾ÐºÐ¸ 3886-3908)**
+
+Grep-ÑÐºÐ¾Ñ€ÑŒ: `const tabCounts = useMemo` (1 hit).
+
+**Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ ÐºÐ¾Ð´ (relevant Ñ‡Ð°ÑÑ‚ÑŒ):**
+```js
+    orderGroups.forEach(group => {
+      if (group.type === 'table' && !openSessionByTableId[group.id]) {
+        completed++;
+        return;
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/drafts/pssk-som-b2-1-260416-v7.md' | Select-Object -Skip 620 -First 210" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 12265ms:
+```
+
+**B.4 â€” Call-site updates Ð² OrderGroupCard map (~ÑÑ‚Ñ€Ð¾ÐºÐ¸ 4457-4486) â€” [v4-M3, v5-M2]**
+
+Grep-ÑÐºÐ¾Ñ€ÑŒ: `v2SortedGroups.map(group => (` (1 hit). ÐœÐµÐ½ÑÐµÐ¼ Ð ÐžÐ’ÐÐž 4 ÑÑ‚Ñ€Ð¾ÐºÐ¸ props Ñ‡ÐµÑ€ÐµÐ· 4 Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½Ñ‹Ñ… Edit.
+
+âš ï¸ **[V5-M2] Pre-pinned counts** (Ð¸Ð· Pre-flight ÑˆÐ°Ð³ 4, ÑƒÐ±ÐµÐ´Ð¸ÑÑŒ Ñ‡Ñ‚Ð¾ ÑÐ¾Ð¾Ñ‚Ð²ÐµÑ‚ÑÑ‚Ð²ÑƒÐµÑ‚):
+- `key={group.id}` â€” â‰¥1 hit (Ð¼Ð¾Ð¶ÐµÑ‚ Ð±Ñ‹Ñ‚ÑŒ Ð² Ð½ÐµÑÐºÐ¾Ð»ÑŒÐºÐ¸Ñ… map-Ð±Ð»Ð¾ÐºÐ°Ñ…; ÑÐ¼. context requirements Ð½Ð¸Ð¶Ðµ)
+- `expandedGroupId === group.id` â€” Ð ÐžÐ’ÐÐž 1 hit (~4461)
+- `onToggleExpand={() => handleToggleExpand(group.id)}` â€” Ð ÐžÐ’ÐÐž 1 hit (~4462)
+- `isHighlighted={highlightGroupId === group.id}` â€” Ð ÐžÐ’ÐÐž 1 hit
+
+Ð•ÑÐ»Ð¸ `key={group.id}` Ð´Ð°Ñ‘Ñ‚ >1 hit â€” ÑÑ‚Ð¾ Ð¾Ð¶Ð¸Ð´Ð°ÐµÐ¼Ð¾ (ÐµÑÑ‚ÑŒ Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½Ñ‹Ð¹ map Ð´Ð»Ñ pickup/delivery OrderCard â€” ÐÐ• Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ). Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÐ¼ surrounding context Ñ‡Ñ‚Ð¾Ð±Ñ‹ Edit Ð·Ð°Ñ‚Ñ€Ð¾Ð½ÑƒÐ» Ñ‚Ð¾Ð»ÑŒÐºÐ¾ `v2SortedGroups.map` Ð±Ð»Ð¾Ðº.
+
+âš ï¸ **Ð­Ñ‚Ð¸ 4 Edit'Ð° â€” ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½Ð¾Ðµ Ñ‡Ñ‚Ð¾ Ð¼ÐµÐ½ÑÐµÑ‚ÑÑ Ð² B.4. Ð’ÑÐµ Ð¾ÑÑ‚Ð°Ð»ÑŒÐ½Ñ‹Ðµ props Ð² ÑÑ‚Ð¾Ð¼ `<OrderGroupCard ... />` ÐÐ• Ð¢Ð ÐžÐ“ÐÐ¢Ð¬. ÐÐ¸ÐºÐ°ÐºÐ¸Ñ… `...` placeholder'Ð¾Ð² Ð² `new_string`.**
+
+**Edit 1 â€” `key` (Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÐ¼ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚ Ð´Ð»Ñ disambiguation):**
+- old_string:
+  ```
+              v2SortedGroups.map(group => (
+                <OrderGroupCard
+                  key={group.id}
+  ```
+- new_string:
+  ```
+              v2SortedGroups.map(group => (
+                <OrderGroupCard
+                  key={group.compositeKey}
+  ```
+
+**Edit 2 â€” `isExpanded` (ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½Ñ‹Ð¹ hit, ÑƒÐ½Ð¸ÐºÐ°Ð»ÐµÐ½):**
+- old_string: `                  isExpanded={expandedGroupId === group.id}`
+- new_string: `                  isExpanded={expandedGroupId === group.compositeKey}`
+
+**Edit 3 â€” `onToggleExpand` (ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½Ñ‹Ð¹ hit, ÑƒÐ½Ð¸ÐºÐ°Ð»ÐµÐ½):**
+- old_string: `                  onToggleExpand={() => handleToggleExpand(group.id)}`
+- new_string: `                  onToggleExpand={() => handleToggleExpand(group.compositeKey)}`
+
+**Edit 4 â€” `isHighlighted` (ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½Ñ‹Ð¹ hit, ÑƒÐ½Ð¸ÐºÐ°Ð»ÐµÐ½):**
+- old_string: `                  isHighlighted={highlightGroupId === group.id}`
+- new_string: `                  isHighlighted={highlightGroupId === group.compositeKey}`
+
+**Ð˜Ð»Ð»ÑŽÑÑ‚Ñ€Ð°Ñ†Ð¸Ñ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚Ð° (ÐÐ• ÐºÐ¾Ð¿Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ Ð² Edit â€” ÑÑ‚Ð¾ Ð´Ð»Ñ Ð¿Ð¾Ð½Ð¸Ð¼Ð°Ð½Ð¸Ñ, ÑÐ¼. Identifier Contract Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð²Ñ‹ÑˆÐµ):**
+```jsx
+              v2SortedGroups.map(group => (
+                <OrderGroupCard
+                  key={group.compositeKey}                                                /* CHANGED */
+                  group={group}
+                  isExpanded={expandedGroupId === group.compositeKey}                     /* CHANGED */
+                  onToggleExpand={() => handleToggleExpand(group.compositeKey)}           /* CHANGED */
+                  isHighlighted={highlightGroupId === group.compositeKey}                 /* CHANGED */
+                  isFavorite={isFavorite(group.type === 'table' ? 'table' : 'order', group.id)} /* group.id â€” ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ (tableId Ð´Ð»Ñ favorites) */
+                  onToggleFavorite={toggleFavorite}                                       /* ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ */
+                  /* Ð¾ÑÑ‚Ð°Ð»ÑŒÐ½Ñ‹Ðµ props â€” onCloseTable, activeRequests, onBatchCloseRequestAsync Ð¸ Ð´Ñ€. â€” ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ */
+                />
+              ))
+```
+
+âš ï¸ **ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ (Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€ Ð´Ð»Ñ Ð±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ð¾ÑÑ‚Ð¸):**
+- `isFavorite(...)` Ð²Ñ‹Ð·Ð¾Ð² â€” Ð¾ÑÑ‚Ð°Ñ‘Ñ‚ÑÑ Ð½Ð° `group.id` (tableId). Ð¤Ð°Ð²Ð¾Ñ€Ð¸Ñ‚Ñ‹ Ð´Ð¾Ð»Ð¶Ð½Ñ‹ Ð²Ñ‹Ð¶Ð¸Ð²Ð°Ñ‚ÑŒ ÑÐ¼ÐµÐ½Ñƒ ÑÐµÑÑÐ¸Ð¸.
+- `onToggleFavorite` â€” Ð¾ÑÑ‚Ð°Ñ‘Ñ‚ÑÑ `toggleFavorite` Ð±ÐµÐ· wrapper'Ð° (ÑÐ¸Ð³Ð½Ð°Ñ‚ÑƒÑ€Ð° `(type, id)` Ð½Ðµ Ð¼ÐµÐ½ÑÐµÑ‚ÑÑ).
+- ÐžÑÑ‚Ð°Ð»ÑŒÐ½Ñ‹Ðµ props (`onCloseTable`, `activeRequests`, `onBatchCloseRequestAsync`, etc.) â€” Ð½Ðµ Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ.
+
+**B.5 â€” `data-group-id` (live JSX only) â€” [v4-M4, v5-M1 ÐºÑ€Ð¸Ñ‚Ð¸Ñ‡Ð½Ð¾]**
+
+[V5-M1] **Ð¢Ð¾Ð»ÑŒÐºÐ¾ 1 live JSX replacement Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÐµÐ½. 2 Ð´Ñ€ÑƒÐ³Ð¸Ñ… â€” non-blocking commented snapshots.**
+
+Pre-check (Ð¸Ð· Pre-flight Â§5) Ð´Ð¾Ð»Ð¶ÐµÐ½ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ:
+- `~2292` â€” live JSX Ð²Ð½ÑƒÑ‚Ñ€Ð¸ Ñ€ÐµÐ°Ð»ÑŒÐ½Ð¾Ð³Ð¾ OrderGroupCard root element (Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð° Ð·Ð°Ð¼ÐµÐ½Ð°).
+- `~565` Ð¸ `~1173` â€” Ð²Ð½ÑƒÑ‚Ñ€Ð¸ block-comment (`/* ... */` Ð¸Ð»Ð¸ JSX comment `{/* ... */}`). Ð—Ð°Ð¼ÐµÐ½Ð° non-blocking: Ð¼Ð¾Ð¶Ð½Ð¾ Ð»Ð¸Ð±Ð¾ Ð¿Ñ€Ð¾Ð¿ÑƒÑÑ‚Ð¸Ñ‚ÑŒ (safer), Ð»Ð¸Ð±Ð¾ Ð·Ð°Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð´Ð»Ñ ÐºÐ¾Ð½ÑÐ¸ÑÑ‚ÐµÐ½Ñ‚Ð½Ð¾ÑÑ‚Ð¸ (optional).
+
+**Ð¡Ñ‚Ñ€Ð°Ñ‚ÐµÐ³Ð¸Ñ:**
+
+**Ð¨Ð°Ð³ 1 â€” ÐžÐ‘Ð¯Ð—ÐÐ¢Ð•Ð›Ð¬ÐÐÐ¯ Ð·Ð°Ð¼ÐµÐ½Ð° live JSX (~2292):**
+
+Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° Ð¿Ñ€Ð¾Ñ‡Ð¸Ñ‚Ð°Ñ‚ÑŒ Ñ‚Ð¾Ñ‡Ð½Ñ‹Ð¹ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚:
+```bash
+sed -n '2285,2298p' "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: JSX ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚ WITHOUT `/*` Ð¸Ð»Ð¸ `{/*` â€” ÑÑ‚Ð¾ live render.
+# ÐšÐ»ÑŽÑ‡ÐµÐ²Ñ‹Ðµ Ð¼Ð°Ñ€ÐºÐµÑ€Ñ‹ ÑƒÐ½Ð¸ÐºÐ°Ð»ÑŒÐ½Ð¾ÑÑ‚Ð¸ (ÐžÐ¢Ð¡Ð£Ð¢Ð¡Ð¢Ð’Ð£Ð®Ð¢ Ð² ~565 Ð¸ ~1173):
+#   - ÑÑ‚Ñ€Ð¾ÐºÐ° `highlightRing` Ð¸Ð»Ð¸ Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½Ð°Ñ Ñ ÑÑ‚Ð¸Ð¼ Ð¸Ð¼ÐµÐ½ÐµÐ¼ (~2285-2292)
+#   - ÐºÐ¾Ð½ÑÑ‚Ñ€ÑƒÐºÑ†Ð¸Ñ `return (` Ð² Ð¿Ñ€ÐµÐ´ÐµÐ»Ð°Ñ… 5 ÑÑ‚Ñ€Ð¾Ðº Ð´Ð¾ data-group-id
+```
+
+Edit pair (Ð—ÐÐŸÐžÐ›ÐÐ˜Ð¢Ð¬ Ñ‚Ð¾Ñ‡Ð½Ñ‹Ð¼Ð¸ ÑÑ‚Ñ€Ð¾ÐºÐ°Ð¼Ð¸ Ð¸Ð· sed-output Ð²Ñ‹ÑˆÐµ):
+
+1. ÐŸÑ€Ð¾Ñ‡Ð¸Ñ‚Ð°Ñ‚ÑŒ Ð²Ñ‹Ð²Ð¾Ð´ `sed -n '2285,2298p'` Ð¸ Ð½Ð°Ð¹Ñ‚Ð¸ ÑƒÐ½Ð¸ÐºÐ°Ð»ÑŒÐ½Ñ‹Ð¹ Ð±Ð»Ð¾Ðº: ÑÑ‚Ñ€Ð¾ÐºÐ¸ Ð¾Ñ‚ `highlightRing`
+   (Ð¸Ð»Ð¸ `return (`) Ð”Ðž Ð¸ Ð²ÐºÐ»ÑŽÑ‡Ð°Ñ `data-group-id={group.id}`.
+2. Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ ÑÑ‚Ð¸ 3-5 ÑÑ‚Ñ€Ð¾Ðº ÐºÐ°Ðº `old_string` â€” Ð²ÐºÐ»ÑŽÑ‡Ð°Ñ `highlightRing` Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½ÑƒÑŽ Ð¸Ð»Ð¸ `return (`
+   ÐºÐ°Ðº Ð¿ÐµÑ€Ð²ÑƒÑŽ ÑÑ‚Ñ€Ð¾ÐºÑƒ (ÑÑ‚Ð¾ Ð´ÐµÐ»Ð°ÐµÑ‚ anchor ÑƒÐ½Ð¸ÐºÐ°Ð»ÑŒÐ½Ñ‹Ð¼: Ñ‚Ð°ÐºÐ¸Ñ… ÑÑ‚Ñ€Ð¾Ðº Ð½ÐµÑ‚ Ð² ~565/~1173 comments).
+3. `new_string` â€” Ñ‚Ðµ Ð¶Ðµ ÑÑ‚Ñ€Ð¾ÐºÐ¸ Ñ ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½Ð¾Ð¹ Ð·Ð°Ð¼ÐµÐ½Ð¾Ð¹ `data-group-id={group.id}` â†’ `data-group-id={group.compositeKey}`.
+
+ÐžÐ¶Ð¸Ð´Ð°ÐµÐ¼Ñ‹Ð¹ Ð²Ð¸Ð´ (Ñ‚Ð¾Ñ‡Ð½Ñ‹Ðµ ÑÑ‚Ñ€Ð¾ÐºÐ¸ Ð·Ð°Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð¸Ð· sed-output):
+```jsx
+  // old_string Ð¿Ñ€Ð¸Ð¼ÐµÑ€ (Ð²Ð·ÑÑ‚ÑŒ Ñ‚Ð¾Ñ‡Ð½Ñ‹Ð¹ Ñ‚ÐµÐºÑÑ‚ Ð¸Ð· sed â€” ÐÐ• ÐºÐ¾Ð¿Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ ÑÑ‚Ð¾Ñ‚ ÑˆÐ°Ð±Ð»Ð¾Ð½):
+  const highlightRing = highlightGroupId === group.compositeKey;
+  return (
+    <div
+      data-group-id={group.id}
+```
+```jsx
+  // new_string (Ñ‚Ð° Ð¶Ðµ ÑÑ‚Ñ€ÑƒÐºÑ‚ÑƒÑ€Ð°, Ñ‚Ð¾Ð»ÑŒÐºÐ¾ data-group-id Ð·Ð°Ð¼ÐµÐ½Ñ‘Ð½):
+  const highlightRing = highlightGroupId === group.compositeKey;
+  return (
+    <div
+      data-group-id={group.compositeKey}
+```
+
+âš ï¸ **ÐÐ• Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ `data-group-id={group.id}` ÐºÐ°Ðº ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½ÑƒÑŽ ÑÑ‚Ñ€Ð¾ÐºÑƒ old_string** â€” ÑÑ‚Ð¾ Ð¼Ð¾Ð¶ÐµÑ‚ ÑÐ¾Ð²Ð¿Ð°ÑÑ‚ÑŒ Ñ block-comments @ ~565 / ~1173. Ð’ÑÐµÐ³Ð´Ð° Ð²ÐºÐ»ÑŽÑ‡Ð°Ñ‚ÑŒ `highlightRing` Ð¸Ð»Ð¸ `return (` ÑÑ‚Ñ€Ð¾ÐºÑƒ Ð”Ðž `data-group-id` Ð´Ð»Ñ Ð¾Ð´Ð½Ð¾Ð·Ð½Ð°Ñ‡Ð½Ð¾Ð¹ Ð¸Ð´ÐµÐ½Ñ‚Ð¸Ñ„Ð¸ÐºÐ°Ñ†Ð¸Ð¸.
+
+**Ð¨Ð°Ð³ 2 â€” OPTIONAL Ð·Ð°Ð¼ÐµÐ½Ð° comment-only snapshots (~565, ~1173):**
+
+Ð­Ñ‚Ð¸ hits Ð² block-comments (Ð¸ÑÑ‚Ð¾Ñ€Ð¸Ñ‡ÐµÑÐºÐ¸Ðµ snapshots/docstrings). Ð ÐµÐ½Ð´ÐµÑ€ DOM Ð½Ðµ Ð·Ð°Ñ‚Ñ€Ð°Ð³Ð¸Ð²Ð°ÑŽÑ‚. Ð—Ð°Ð¼ÐµÐ½Ñƒ Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÑÑ‚ÑŒ **Ñ‚Ð¾Ð»ÑŒÐºÐ¾ ÐµÑÐ»Ð¸ Ð¾ÑÑ‚Ð°Ð»ÑŒÐ½Ñ‹Ðµ Fix Ð¿Ñ€Ð¾ÑˆÐ»Ð¸ Ð±ÐµÐ· Ð¾ÑˆÐ¸Ð±Ð¾Ðº** Ð¸ ÐµÑÑ‚ÑŒ Ð±ÑŽÐ´Ð¶ÐµÑ‚ Ð²Ñ€ÐµÐ¼ÐµÐ½Ð¸. Non-blocking. Ð•ÑÐ»Ð¸ Ð¿Ñ€Ð¾Ð¿ÑƒÑÐºÐ°ÐµÐ¼ â€” Ð·Ð°Ð¿Ð¸ÑÐ°Ñ‚ÑŒ Ð² ÐºÐ¾Ð¼Ð¼Ð¸Ñ‚Ðµ `/* v5-M1: commented snapshots @ 565, 1173 preserved as legacy docs */`.
+
+**Verification B.5 (Ð¿Ð¾ÑÑ‚-Ñ„Ð¸ÐºÑ):**
+```bash
+# Live JSX Ð·Ð°Ð¼ÐµÐ½Ñ‘Ð½ (Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð¾)
+grep -c "data-group-id={group.compositeKey}" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: â‰¥1 (ÐµÑÐ»Ð¸ Ð¿Ñ€Ð¾Ð¿ÑƒÑÑ‚Ð¸Ð»Ð¸ comments) Ð¸Ð»Ð¸ =3 (ÐµÑÐ»Ð¸ Ð·Ð°Ð¼ÐµÐ½Ð¸Ð»Ð¸ Ð²ÑÑ‘).
+
+# Ð¡Ñ‚Ð°Ñ€Ñ‹Ð¹ Ð°Ñ‚Ñ€Ð¸Ð±ÑƒÑ‚ data-group-id={group.id} â€” 0 Ð’ÐÐ• comments:
+#   Ð•ÑÐ»Ð¸ Ñ€ÐµÑˆÐ¸Ð»Ð¸ Ð½Ðµ Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ comments â†’ ÑÑ‚Ð°Ñ€Ñ‹Ðµ 2 hits Ð¾ÑÑ‚Ð°Ð½ÑƒÑ‚ÑÑ Ð² comments (OK).
+#   [v5-L4] Loose regex â€” Ð´Ð¾Ð¿ÑƒÑÐºÐ°ÐµÑ‚ optional spaces Ð²Ð¾ÐºÑ€ÑƒÐ³ group.compositeKey (formatter-tolerant):
+grep -cE "data-group-id=\{ *group\.compositeKey *\}" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: â‰¥1 (Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ live JSX Ð¼Ð¾Ð¶ÐµÑ‚ Ð¼ÐµÐ½ÑÑ‚ÑŒÑÑ Ð¿Ð¾ÑÐ»Ðµ Ñ„Ð¾Ñ€Ð¼attÐµÑ€Ð°).
+
+# ÐšÐ Ð˜Ð¢Ð˜Ð§ÐÐž: live JSX @ ~2292 Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð¾ Ð½Ð° compositeKey:
+sed -n '2285,2298p' "pages/StaffOrdersMobile/staffordersmobile.jsx" | grep -c "compositeKey"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit.
+```
+
+âš ï¸ ÐšÐ Ð˜Ð¢Ð˜Ð§ÐÐž: `handleBannerNavigate` Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ ÑÐµÐ»ÐµÐºÑ‚Ð¾Ñ€ `[data-group-id="${CSS.escape(String(targetKey))}"]`. Ð•ÑÐ»Ð¸ LIVE `data-group-id` (@~2292) Ð¾ÑÑ‚Ð°Ð½ÐµÑ‚ÑÑ Ð½Ð° `group.id`, Ð±Ð°Ð½Ð½ÐµÑ€ Ð±ÑƒÐ´ÐµÑ‚ ÑÐºÑ€Ð¾Ð»Ð»Ð¸Ñ‚ÑŒ Ðº Ð¿ÐµÑ€Ð²Ð¾Ð¹ ÑÐ»ÑƒÑ‡Ð°Ð¹Ð½Ð¾Ð¹ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐµ (React key conflict + Ð½ÐµÐ¿Ñ€Ð°Ð²Ð¸Ð»ÑŒÐ½Ñ‹Ð¹ DOM selector). Commented hits Ð½Ð° Ñ€ÐµÐ½Ð´ÐµÑ€ ÐÐ• Ð²Ð»Ð¸ÑÑŽÑ‚.
+
+**B.6 â€” `handleBannerNavigate` Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ Ð´Ð»Ñ compositeKey (~ÑÑ‚Ñ€Ð¾ÐºÐ° 4142) â€” [V5-L3]**
+
+Grep-ÑÐºÐ¾Ñ€ÑŒ: `const handleBannerNavigate = useCallback` (1 hit, Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ðµ @ ~4142). Call-site: `onNavigate={handleBannerNavigate}` @ ~4610. Upstream: `onNavigate(banner.groupId)` @ ~2825, Ð³Ð´Ðµ `banner.groupId = tableId` Ð¸Ð· `buildBannerInfo @ ~4079-4090`.
+
+**Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ ÐºÐ¾Ð´:**
+```js
+  const handleBannerNavigate = useCallback((groupId) => {
+    if (!groupId) return;
+    setExpandedGroupId(groupId);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-group-id="${CSS.escape(String(groupId))}"]`);
+        ...
+```
+
+**[v3: M1] â€” Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÐ¼ defensive Ñ€ÐµÐ°Ð»Ð¸Ð·Ð°Ñ†Ð¸ÑŽ unconditionally** (CC review: "two alternatives with no decision rule â†’ pick defensive one").
+
+ÐÐµÐ·Ð°Ð²Ð¸ÑÐ¸Ð¼Ð¾ Ð¾Ñ‚ Ñ‚Ð¾Ð³Ð¾, Ñ‡Ñ‚Ð¾ Ð¿ÐµÑ€ÐµÐ´Ð°Ñ‘Ñ‚ call-site (upstream Ð¿ÐµÑ€ÐµÐ´Ð°Ñ‘Ñ‚ Ð§Ð˜Ð¡Ð¢Ð«Ð™ `tableId` Ð¸Ð· `banner.groupId`) â€” defensive Ð²ÐµÑ€ÑÐ¸Ñ Ñ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¾Ð¹ `__` Ð±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ð° Ð´Ð»Ñ Ð¾Ð±Ð¾Ð¸Ñ… ÑÐ»ÑƒÑ‡Ð°ÐµÐ².
+
+**Ð—Ð°Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð¦Ð•Ð›Ð˜ÐšÐžÐœ `handleBannerNavigate` useCallback:**
+```js
+  const handleBannerNavigate = useCallback((maybeTableIdOrCompositeKey) => {
+    if (!maybeTableIdOrCompositeKey) return;
+
+    // Ð‘2.1: ÐµÑÐ»Ð¸ Ð¿ÐµÑ€ÐµÐ´Ð°Ð½ tableId Ð±ÐµÐ· sessionId (current flow: banner.groupId = tableId) â€”
+    // Ñ€ÐµÐ·Ð¾Ð»Ð²Ð¸Ð¼ Ðº compositeKey Ð¢Ð•ÐšÐ£Ð©Ð•Ð™ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ ÑÑ‚Ð¾Ð³Ð¾ ÑÑ‚Ð¾Ð»Ð°.
+    // Defensive: Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð¸ ÐºÐ¾Ð³Ð´Ð° caller ÑƒÐ¶Ðµ Ð¿ÐµÑ€ÐµÐ´Ð°Ñ‘Ñ‚ compositeKey (ÑÐ¾Ð´ÐµÑ€Ð¶Ð¸Ñ‚ '__').
+    let targetKey = String(maybeTableIdOrCompositeKey);
+    if (!targetKey.includes('__')) {
+      const openId = openSessionByTableId[targetKey]?.id || null;
+      targetKey = openId
+        ? `${targetKey}__${openId}`
+        : `${targetKey}__no-session`;
+    }
+
+    setExpandedGroupId(targetKey);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-group-id="${CSS.escape(targetKey)}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setHighlightGroupId(targetKey);
+          if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+          highlightTimerRef.current = setTimeout(() => setHighlightGroupId(null), 1500);
+        }
+      });
+    });
+  }, [openSessionByTableId]);
+```
+
+âš ï¸ Ð”Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ `openSessionByTableId` Ð² dependency array useCallback (Ð½Ð¾Ð²Ð°Ñ Ð·Ð°Ð²Ð¸ÑÐ¸Ð¼Ð¾ÑÑ‚ÑŒ).
+
+**[V5-L3] Note Ð¿Ñ€Ð¾ identity churn:** ÐÐ¾Ð²Ñ‹Ð¹ dep `openSessionByTableId` Ð¿ÐµÑ€ÐµÑÑ‡Ð¸Ñ‚Ñ‹Ð²Ð°ÐµÑ‚ÑÑ ÐºÐ°Ð¶Ð´Ñ‹Ð¹ refetch `openSessions` query (ÐºÐ°Ð¶Ð´Ñ‹Ðµ ~5s Ð¿Ð¾ÑÐ»Ðµ Fix A). Ð­Ñ‚Ð¾ Ð·Ð½Ð°Ñ‡Ð¸Ñ‚ `handleBannerNavigate` Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ñ‚ **Ð½Ð¾Ð²ÑƒÑŽ identity Ð¿Ñ€Ð¸ ÐºÐ°Ð¶Ð´Ð¾Ð¼ refetch** â€” ÐµÑÐ»Ð¸ bannerComponent Ð¾Ð±Ñ‘Ñ€Ð½ÑƒÑ‚ Ð² `memo` Ñ shallow prop comparison, Ð¾Ð½ Ð±ÑƒÐ´ÐµÑ‚ Ñ€Ðµ-Ñ€ÐµÐ½Ð´ÐµÑ€Ð¸Ñ‚ÑŒÑÑ ÐºÐ°Ð¶Ð´Ñ‹Ðµ 5 ÑÐµÐºÑƒÐ½Ð´.
+
+Impact: **ÐºÐ¾ÑÐ¼ÐµÑ‚Ð¸Ñ‡ÐµÑÐºÐ¸Ð¹** â€” banner Ñ€ÐµÐ½Ð´ÐµÑ€ Ð»Ñ‘Ð³ÐºÐ¸Ð¹ (alert + ÐºÐ½Ð¾Ð¿ÐºÐ°), CPU cost Ð½Ð¸Ñ‡Ñ‚Ð¾Ð¶ÐµÐ½. ÐÐµ Ñ‚Ñ€ÐµÐ±ÑƒÐµÑ‚ Ð¼ÐµÐ¼Ð¾Ð¸Ð·Ð°Ñ†Ð¸Ð¸ `openSessionByTableId` Ð¸Ð»Ð¸ wrapper-hook. ÐŸÑ€Ð¸Ð½Ð¸Ð¼Ð°ÐµÐ¼Ð¾ ÐºÐ°Ðº trade-off Ð·Ð° fresh session info Ð² banner navigation.
+
+**B.7 â€” `confirmCloseTable` Ð¾Ñ‡Ð¸ÑÑ‚ÐºÐ° expanded (~ÑÑ‚Ñ€Ð¾ÐºÐ° 4190)**
+
+Grep-ÑÐºÐ¾Ñ€ÑŒ: `setExpandedGroupId(null); // Collapse expanded card` (1 hit). Ð¡Ñ‚Ñ€Ð¾ÐºÐ° ÐžÐš ÐºÐ°Ðº ÐµÑÑ‚ÑŒ â€” ÑƒÑÑ‚Ð°Ð½Ð°Ð²Ð»Ð¸Ð²Ð°ÐµÑ‚ `null`, Ð½Ð¸ÐºÐ°ÐºÐ¸Ñ… ÑÑÑ‹Ð»Ð¾Ðº Ð½Ð° ID. **ÐÐµ Ð¼ÐµÐ½ÑÑ‚ÑŒ.**
+
+### Should NOT (Ð´Ð»Ñ Fix B Ñ†ÐµÐ»Ð¸ÐºÐ¾Ð¼) â€” [v4-L4: `onCloseTable` = prop, `handleCloseTable` = handler â€” Ð²ÐµÐ·Ð´Ðµ Ð½Ð¸Ð¶Ðµ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÐ¼ `onCloseTable` ÐºÐ°Ðº Ð¸Ð¼Ñ ÐºÐ¾Ð½Ñ‚Ñ€Ð°ÐºÑ‚Ð°]
+- ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ OrderGroupCard ÐºÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚ (Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¿Ñ€Ð¾Ð¿ÑÑ‹).
+- ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ `favorites` Ð¼Ð°ÑÑÐ¸Ð² / `toggleFavorite` / `isFavorite` ÑÐ¸Ð³Ð½Ð°Ñ‚ÑƒÑ€Ñƒ. Favorites Ð¾ÑÑ‚Ð°ÑŽÑ‚ÑÑ Ð¿Ñ€Ð¸Ð²ÑÐ·Ð°Ð½Ñ‹ Ðº tableId.
+- ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ `["servedOrders", group.id]` queryKey â€” tableId Ð½ÑƒÐ¶ÐµÐ½ Ð´Ð»Ñ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ð³Ð¾ filter Ð¿Ð¾ B44.
+- ÐÐ• Ð¼ÐµÐ½ÑÑ‚ÑŒ `onCloseTable(sessionId, identifier, tableId)` ÐºÐ¾Ð½Ñ‚Ñ€Ð°ÐºÑ‚ (FROZEN UX: Ð¿Ñ€Ð¾Ð¿Ñ OrderGroupCard'Ð°; Ð²Ð½ÑƒÑ‚Ñ€Ð¸ Ð¼Ð°Ð¿Ð¿Ð¸Ñ‚ÑÑ Ð½Ð° handler `handleCloseTable` Ñ€Ð¾Ð´Ð¸Ñ‚ÐµÐ»Ñ Ñ‡ÐµÑ€ÐµÐ· `group.openSessionId` + `group.displayName` + `group.id`).
+- ÐÐ• Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ `handleCloseTableClick` useCallback Ð²Ð½ÑƒÑ‚Ñ€Ð¸ OrderGroupCard (~2164-2177).
+- ÐÐ• Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ pickup/delivery Ð²ÐµÑ‚ÐºÑƒ Ð² `orderGroups` (Ð¸Ñ… compositeKey ÑƒÐ¶Ðµ ÑƒÐ½Ð¸ÐºÐ°Ð»ÐµÐ½ Ñ‡ÐµÑ€ÐµÐ· `o.id`).
+- ÐÐ• Ñ‚Ñ€Ð¾Ð³Ð°Ñ‚ÑŒ `buildBannerInfo` @ ~4079-4090 Ð¸Ð»Ð¸ `onNavigate(banner.groupId)` @ ~2825 (upstream: Fix B.6 Ð¾Ð±Ñ€Ð°Ð±Ð°Ñ‚Ñ‹Ð²Ð°ÐµÑ‚ tableId Ñ‡ÐµÑ€ÐµÐ· defensive Ñ€ÐµÐ·Ð¾Ð»Ð²). [V5-L6]
+- ÐÐ• Ð´Ð¾Ð±Ð°Ð²Ð»ÑÑ‚ÑŒ Ð½Ð¾Ð²Ñ‹Ðµ state/hooks/queries.
+
+### Ð¡Ð²ÑÐ·Ð¸ Ð¼ÐµÐ¶Ð´Ñƒ Fix'Ð°Ð¼Ð¸
+âš ï¸ **Fix B.1 ÑÐ¾Ð·Ð´Ð°Ñ‘Ñ‚ Ð¿Ð¾Ð»Ðµ `group.sessionId`**, ÐºÐ¾Ñ‚Ð¾Ñ€Ð¾Ðµ:
+- Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ÑÑ Ð² Fix B.2 (`filteredGroups`) Ð¸ Fix B.3 (`tabCounts`) Ð´Ð»Ñ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ñ Ñ‚Ð°Ð±Ð°
+- Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ÑÑ Ð² Fix C (Ð½Ð¸Ð¶Ðµ) Ð´Ð»Ñ Ð´ÐµÑ‚ÐµÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ñ orphan orders
+Ð•ÑÐ»Ð¸ Fix B.1 Ð¿Ð°Ð´Ð°ÐµÑ‚ â€” Fix B.2, B.3 Ð¸ Fix C Ñ‚Ð¾Ð¶Ðµ Ð½ÐµÐ»ÑŒÐ·Ñ Ð¿Ñ€Ð¸Ð¼ÐµÐ½ÑÑ‚ÑŒ.
+
+### Verification Ð¿Ð¾ÑÐ»Ðµ Fix B (Ð’Ð¡Ð• ÐºÐ¾Ð¼Ð°Ð½Ð´Ñ‹ Ð´Ð¾Ð»Ð¶Ð½Ñ‹ Ð¿Ñ€Ð¾Ð¹Ñ‚Ð¸)
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/drafts/pssk-som-b2-1-260416-v7.md' | Select-Object -Skip 868 -First 190" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 5170ms:
+
+### Ð¡Ñ‚Ð°Ñ‚ÑƒÑ: [NEW CODE â€” performance optimization]
+**ÐŸÑ€Ð¾Ð±Ð»ÐµÐ¼Ð°:** Ð”Ð°Ð¶Ðµ Ñ Fix A (staleTime 5s) Ð¾ÑÑ‚Ð°Ñ‘Ñ‚ÑÑ Ð¾ÐºÐ½Ð¾ Ð´Ð¾ 5 ÑÐµÐºÑƒÐ½Ð´, ÐºÐ¾Ð³Ð´Ð° Ð½Ð¾Ð²Ñ‹Ð¹ Order ÑƒÐ¶Ðµ Ð² Ð‘Ð”, Ð½Ð¾ SOM ÐµÐ³Ð¾ Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€ÑƒÐµÑ‚ Ð±ÐµÐ· Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸. Ð•ÑÐ»Ð¸ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾ Ð¿Ð¾Ð»Ð¸Ð½Ð³ `orders` Ñ€Ð°Ð½ÑŒÑˆÐµ Ñ‡ÐµÐ¼ `openSessions` â€” ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° Ð¿Ð¾ÑÐ²Ð¸Ñ‚ÑÑ Ð² Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹Ñ…Â», Ð¿Ð¾Ñ‚Ð¾Ð¼ Â«Ð¿Ñ€Ñ‹Ð³Ð½ÐµÑ‚Â» Ð² Â«ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹ÐµÂ». Fix C Ð´ÐµÑ‚ÐµÐºÑ‚Ð¸Ñ€ÑƒÐµÑ‚ Ñ‚Ð°ÐºÐ¸Ðµ orphan Orders Ð¸ Ð´ÐµÐ»Ð°ÐµÑ‚ Ð¿Ñ€Ð¸Ð½ÑƒÐ´Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ñ‹Ð¹ invalidate `openSessions` â€” ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° Ð¿Ð¾ÑÐ²Ð¸Ñ‚ÑÑ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾ ÑÑ€Ð°Ð·Ñƒ.
+
+### Change
+
+**[v5-C2] Pre-check Ð¿ÐµÑ€ÐµÐ´ Ð²ÑÑ‚Ð°Ð²ÐºÐ¾Ð¹ â€” Ñ€ÐµÐ°Ð»ÑŒÐ½Ñ‹Ð¹ `orders` alias:**
+
+```bash
+# Real anchor: `data: orders,` Ð²Ð½ÑƒÑ‚Ñ€Ð¸ useQuery destructure @ ~3497
+grep -n "data: orders," "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~3497, Ð²Ð½ÑƒÑ‚Ñ€Ð¸ useQuery({ queryKey: ["orders", partnerId], ... }).
+# Ð­Ñ‚Ð¾ Ð¸ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº `orders` â€” Ð¼Ð°ÑÑÐ¸Ð² Order entities Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÐ¼Ñ‹Ð¹ Ð¿Ð¾ Ð²ÑÐµÐ¼Ñƒ ÐºÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚Ñƒ.
+
+grep -n 'queryKey: \["orders"' "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~3494, Ð±Ð»Ð¾Ðº orders useQuery (Ð´Ð¸Ð°Ð¿Ð°Ð·Ð¾Ð½ ~3494-3512).
+
+# âš ï¸ ÐÐ• Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ pattern `^  const orders ` â€” Ð¾Ð½ Ð¼Ð°Ñ‚Ñ‡Ð¸Ñ‚ inner helper variable @ ~1130 (Ð½Ðµ Ñ‚Ð¾).
+# Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ `data: orders,` ÐºÐ°Ðº ÐµÐ´Ð¸Ð½ÑÑ‚Ð²ÐµÐ½Ð½Ñ‹Ð¹ ÑÐºÐ¾Ñ€ÑŒ Ð´Ð»Ñ Fix C.
+```
+
+**Placement:** Ð´Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ ÐÐžÐ’Ð«Ð™ useEffect Ð¡Ð ÐÐ—Ð£ ÐŸÐžÐ¡Ð›Ð• Ð·Ð°ÐºÑ€Ñ‹Ð²Ð°ÑŽÑ‰ÐµÐ¹ `}, [openSessions]);` useMemo `openSessionByTableId` (ÑÑ‚Ñ€Ð¾ÐºÐ° ~3561). Grep-ÑÐºÐ¾Ñ€ÑŒ Ð´Ð»Ñ Ñ‚Ð¾Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÑÑ‚Ð°:
+
+```bash
+grep -n "openSessionByTableId = useMemo" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit, ÑÑ‚Ñ€Ð¾ÐºÐ° ~3554. Ð’ÑÑ‚Ð°Ð²Ð¸Ñ‚ÑŒ useEffect ÑÑ€Ð°Ð·Ñƒ Ð¿Ð¾ÑÐ»Ðµ `}, [openSessions]);` ÑÑ‚Ð¾Ð³Ð¾ useMemo.
+```
+
+**Alternative anchor ÐµÑÐ»Ð¸ closing `}, [openSessions]);` Ð¸Ð¼ÐµÐµÑ‚ Ð½ÐµÑÑ‚Ð°Ð½Ð´Ð°Ñ€Ñ‚Ð½Ð¾Ðµ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ðµ (trailing comment / extra whitespace / multi-line deps):**
+```bash
+# ÐŸÑ€Ð¾Ñ‡Ð¸Ñ‚Ð°Ñ‚ÑŒ ~30 ÑÑ‚Ñ€Ð¾Ðº Ð½Ð°Ñ‡Ð¸Ð½Ð°Ñ Ñ openSessionByTableId useMemo
+sed -n '3554,3585p' "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐÐ°Ð¹Ñ‚Ð¸ Ð¿ÐµÑ€Ð²ÑƒÑŽ ÑÑ‚Ñ€Ð¾ÐºÑƒ Ð¿Ð¾ÑÐ»Ðµ Ð·Ð°ÐºÑ€Ñ‹Ð²Ð°ÑŽÑ‰ÐµÐ¹ `});` Ð¸Ð»Ð¸ `}, [openSessions]);` Ð¸ Ð´Ð¾ `const activeRequests`.
+# Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ Ð¿Ð¾ÑÐ»ÐµÐ´Ð½Ð¸Ðµ 2 ÑÑ‚Ñ€Ð¾ÐºÐ¸ ÑÑ‚Ð¾Ð³Ð¾ useMemo (Ñ ÑƒÐ½Ð¸ÐºÐ°Ð»ÑŒÐ½Ð¾Ð¹ Ñ‚Ð¾Ñ‡Ð½Ð¾ÑÑ‚ÑŒÑŽ) ÐºÐ°Ðº Edit-anchor.
+```
+
+ÐŸÑ€Ð¸Ñ‡Ð¸Ð½Ð° (PQ-099): useEffect Ð´Ð¾Ð»Ð¶ÐµÐ½ Ð±Ñ‹Ñ‚ÑŒ Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½ Ð¿Ð¾ÑÐ»Ðµ Ð²ÑÐµÑ… useMemo/useCallback, Ð¾Ñ‚ ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ñ… Ð·Ð°Ð²Ð¸ÑÐ¸Ñ‚, Ð½Ð¾ Ð´Ð¾ `const activeRequests` (~3565).
+
+**[v4-C1 + v4-M7] ÐÐ¾Ð²Ñ‹Ð¹ ÐºÐ¾Ð´ (Ð²ÑÑ‚Ð°Ð²Ð¸Ñ‚ÑŒ):**
+
+```js
+  // Ð‘2.1 Fix C: ÐµÑÐ»Ð¸ Ð¿Ð¾ÑÐ²Ð¸Ð»ÑÑ hall-Order Ñ table_session, Ð½Ð¾ openSessionByTableId
+  // ÐµÑ‰Ñ‘ Ð½Ðµ Ð·Ð½Ð°ÐµÑ‚ Ð¾ Ð½ÐµÐ¹ (staleTime race) â€” Ð¿Ñ€Ð¸Ð½ÑƒÐ´Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ð¾ Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ openSessions.
+  // Ð­Ñ‚Ð¾ ÑƒÑÐºÐ¾Ñ€ÑÐµÑ‚ Ð¿Ð¾ÑÐ²Ð»ÐµÐ½Ð¸Ðµ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ð¹ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ¸ Ð² Â«ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹Ñ…Â» (Ð´Ð¾ 5Ñ â†’ <1Ñ).
+  //
+  // [v4-C1] FILTER: Ð¸ÑÐºÐ»ÑŽÑ‡Ð°ÐµÐ¼ orders ÑÐ¾ status 'closed'/'cancelled' â€” Ñƒ Ð½Ð¸Ñ… table_session
+  // Ð¾ÑÑ‚Ð°Ñ‘Ñ‚ÑÑ (sessionHelpers.js:158-173), Ð½Ð¾ Ð¾Ð½Ð¸ ÐÐ• Ð´Ð¾Ð»Ð¶Ð½Ñ‹ Ñ‚Ñ€Ð¸Ð³Ð³ÐµÑ€Ð¸Ñ‚ÑŒ invalidate
+  // (Ð¸Ð½Ð°Ñ‡Ðµ Ð´Ð»Ñ ÐºÐ°Ð¶Ð´Ð¾Ð³Ð¾ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð¾Ð³Ð¾ hall-Ð·Ð°ÐºÐ°Ð·Ð° Ð±ÐµÐ· Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ invalidate ÑƒÐ¹Ð´Ñ‘Ñ‚
+  // Ð² ÐºÐ°Ð¶Ð´Ð¾Ð¼ Ñ†Ð¸ÐºÐ»Ðµ polling â†’ Ð±ÐµÑÐºÐ¾Ð½ÐµÑ‡Ð½Ð°Ñ Ð½Ð°Ð³Ñ€ÑƒÐ·ÐºÐ° Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€).
+  //
+  // [v4-M7] ONE-SHOT GUARD: Ð·Ð°Ð¿Ð¾Ð¼Ð¸Ð½Ð°ÐµÐ¼ Â«ÑƒÐ¶Ðµ Ð¸Ð½Ð²Ð°Ð»Ð¸Ð´Ð¸Ñ€Ð¾Ð²Ð°Ð»Ð¸ Ð´Ð»Ñ ÑÑ‚Ð¾Ð¹ ÐºÐ¾Ð¼Ð±Ð¸Ð½Ð°Ñ†Ð¸Ð¸ orphan-ÑÐ¸Ð³Ð½Ð°Ñ‚ÑƒÑ€Â»
+  // Ñ‡ÐµÑ€ÐµÐ· useRef. Ð¡Ð¸Ð³Ð½Ð°Ñ‚ÑƒÑ€Ð° = Ð¾Ñ‚ÑÐ¾Ñ€Ñ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð½Ð°Ñ ÑÑ‚Ñ€Ð¾ÐºÐ° `tableId:sessionId,tableId:sessionId,...`.
+  // ÐšÐ¾Ð³Ð´Ð° ÑÐ¸Ð³Ð½Ð°Ñ‚ÑƒÑ€Ð° Ð½Ðµ Ð¸Ð·Ð¼ÐµÐ½Ð¸Ð»Ð°ÑÑŒ â€” ÐÐ• Ð²Ñ‹Ð·Ñ‹Ð²Ð°ÐµÐ¼ invalidate Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ð¾ (Ð´Ð¾Ð¿. Ð·Ð°Ñ‰Ð¸Ñ‚Ð° Ð¾Ñ‚ race
+  // ÐµÑÐ»Ð¸ openSessions Ð¾Ð±Ð½Ð¾Ð²Ð¸Ð»ÑÑ, Ð½Ð¾ Ð²ÑÑ‘ ÐµÑ‰Ñ‘ Ð½Ðµ ÑÐ¾Ð´ÐµÑ€Ð¶Ð¸Ñ‚ Ð½Ð¾Ð²ÑƒÑŽ ÑÐµÑÑÐ¸ÑŽ).
+  const orphanInvalidateSigRef = useRef(null);
+  useEffect(() => {
+    if (!Array.isArray(orders) || orders.length === 0) return;
+
+    const orphanPairs = [];
+    for (const o of orders) {
+      if (o.order_type !== 'hall') continue;
+      // [v4-C1] Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ðµ/Ð¾Ñ‚Ð¼ÐµÐ½Ñ‘Ð½Ð½Ñ‹Ðµ orders Ð½Ðµ ÑÑ‡Ð¸Ñ‚Ð°ÑŽÑ‚ÑÑ orphan â€” Ð¾Ð½Ð¸ Ð¿Ñ€Ð¸Ð½Ð°Ð´Ð»ÐµÐ¶Ð°Ñ‚ Ð·Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸
+      if (o.status === 'closed' || o.status === 'cancelled') continue;
+      const tableId = getLinkId(o.table);
+      if (!tableId) continue;
+      const sessionId = getLinkId(o.table_session);
+      if (!sessionId) continue;
+      // Order ÑÑÑ‹Ð»Ð°ÐµÑ‚ÑÑ Ð½Ð° table_session, Ð½Ð¾ SOM Ð½Ðµ Ð²Ð¸Ð´Ð¸Ñ‚ ÑÑ‚Ñƒ ÑÐµÑÑÐ¸ÑŽ Ð² openSessions
+      const open = openSessionByTableId[tableId];
+      if (!open || open.id !== sessionId) {
+        orphanPairs.push(`${tableId}:${sessionId}`);
+      }
+    }
+
+    if (orphanPairs.length === 0) {
+      // Reset signature ÐºÐ¾Ð³Ð´Ð° orphan'Ñ‹ Ð¸ÑÑ‡ÐµÐ·Ð»Ð¸ (Ð½Ð¾Ñ€Ð¼Ð°Ð»ÑŒÐ½Ð¾Ðµ ÑÐ¾ÑÑ‚Ð¾ÑÐ½Ð¸Ðµ) â€” Ð¿Ð¾Ð·Ð²Ð¾Ð»Ð¸Ñ‚
+      // ÑÑ€Ð°Ð±Ð¾Ñ‚Ð°Ñ‚ÑŒ invalidate ÐµÑ‰Ñ‘ Ñ€Ð°Ð· ÐµÑÐ»Ð¸ Ð² Ð±ÑƒÐ´ÑƒÑ‰ÐµÐ¼ Ð¿Ð¾ÑÐ²Ð¸Ñ‚ÑÑ Ð½Ð¾Ð²Ñ‹Ð¹ orphan.
+      orphanInvalidateSigRef.current = null;
+      return;
+    }
+
+    // [v4-M7] one-shot guard: ÑƒÐ½Ð¸ÐºÐ°Ð»ÑŒÐ½Ð°Ñ Ð¿Ð¾Ð´Ð¿Ð¸ÑÑŒ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ³Ð¾ Ð½Ð°Ð±Ð¾Ñ€Ð° orphan'Ð¾Ð²
+    const signature = orphanPairs.sort().join(',');
+    if (orphanInvalidateSigRef.current === signature) {
+      // Ð£Ð¶Ðµ Ð¸Ð½Ð²Ð°Ð»Ð¸Ð´Ð¸Ñ€Ð¾Ð²Ð°Ð»Ð¸ Ð´Ð»Ñ ÑÑ‚Ð¾Ð¹ Ð¶Ðµ ÐºÐ¾Ð¼Ð±Ð¸Ð½Ð°Ñ†Ð¸Ð¸ â€” Ð½Ðµ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€ÑÐµÐ¼.
+      return;
+    }
+    orphanInvalidateSigRef.current = signature;
+    // [v5-C1] Prefix invalidate â€” Ð¼Ð°Ñ‚Ñ‡Ð¸Ñ‚ ["openSessions", partnerId] Ð´Ð»Ñ Ð»ÑŽÐ±Ð¾Ð³Ð¾ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ³Ð¾ partnerId.
+    queryClient.invalidateQueries({ queryKey: ["openSessions"] });
+  }, [orders, openSessionByTableId, queryClient]);
+```
+
+**âš ï¸ Dependency array useEffect â€” Ð”ÐžÐ‘ÐÐ’Ð˜Ð¢Ð¬ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ ÑÑ‚Ð¸ 3:** `orders`, `openSessionByTableId`, `queryClient`. ÐÐ• Ð²ÐºÐ»ÑŽÑ‡Ð°Ñ‚ÑŒ `getLinkId` (origin Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»Ñ‘Ð½ Ð² Preparation Step 2; ÐµÑÐ»Ð¸ Ð¾Ð½ component-scoped â€” Ð¾Ð±ÐµÑ€Ð½ÑƒÑ‚ÑŒ Ð² useCallback Ð¸ Ð´Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ Ð² deps; ÐµÑÐ»Ð¸ imported â€” Ð¿Ñ€Ð¾Ð¿ÑƒÑÑ‚Ð¸Ñ‚ÑŒ, ÐºÐ°Ðº ÑÐµÐ¹Ñ‡Ð°Ñ).
+
+**âš ï¸ [V5-M3] Pre-check Ð”Ðž Ð²ÑÑ‚Ð°Ð²ÐºÐ¸:** ÑƒÐ±ÐµÐ´Ð¸Ñ‚ÑŒÑÑ Ñ‡Ñ‚Ð¾ `queryClient` Ð² scope (Ð¸Ð· Preparation Â§3). Ð•ÑÐ»Ð¸ Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½Ð°Ñ Ð½Ð°Ð·Ñ‹Ð²Ð°ÐµÑ‚ÑÑ Ð¸Ð½Ð°Ñ‡Ðµ â€” Ð·Ð°Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð² ÐºÐ¾Ð´Ðµ Fix C. Ð•ÑÐ»Ð¸ `useQueryClient()` Ð½Ðµ Ð²Ñ‹Ð·Ð²Ð°Ð½ â€” STOP.
+
+**âš ï¸ [V5-L5] Imports:** ÑƒÐ±ÐµÐ´Ð¸Ñ‚ÑŒÑÑ Ñ‡Ñ‚Ð¾ `useRef` ÑƒÐ¶Ðµ Ð¸Ð¼Ð¿Ð¾Ñ€Ñ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½ Ð¸Ð· 'react'. Pre-check (Ð¸Ð· Preparation Â§4) Ð´Ð°ÑÑ‚ hit-count. Ð•ÑÐ»Ð¸ Ð½ÑƒÐ¶Ð½Ð¾ Ð´Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ â€” Ð½Ð°Ð¹Ñ‚Ð¸ react import line (Preparation Â§4 grep `from 'react'`) Ð¸ Ñ€Ð°ÑÑˆÐ¸Ñ€Ð¸Ñ‚ÑŒ ÑÐ¿Ð¸ÑÐ¾Ðº:
+
+Single-line Ð²Ð°Ñ€Ð¸Ð°Ð½Ñ‚ (ÐµÑÐ»Ð¸ Ñ‚ÐµÐºÑƒÑ‰Ð°Ñ Ñ„Ð¾Ñ€Ð¼Ð° Ñ‚Ð°ÐºÐ°Ñ):
+- old_string: `import { useState, useEffect, useMemo, useCallback } from 'react';`
+- new_string: `import { useState, useEffect, useMemo, useCallback, useRef } from 'react';`
+
+Multi-line Ð²Ð°Ñ€Ð¸Ð°Ð½Ñ‚ (ÐµÑÐ»Ð¸ multi-line import) â€” Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ Ñ‚Ð¾Ñ‡Ð½Ñ‹Ð¹ snippet Ð¸Ð· `grep -n "from 'react'"` + `sed -n` ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚. ÐÐ• Ð¿ÐµÑ€ÐµÑ„Ð¾Ñ€Ð¼Ð°Ñ‚Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ multi-line Ð² single-line Ð¸ Ð½Ð°Ð¾Ð±Ð¾Ñ€Ð¾Ñ‚.
+
+### Why not activeOrders? (Why not Ð²ÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÑŒ status filter Ð² `activeOrders`?)
+
+CC findings (Issue #1 CRITICAL): `orders` Ð±ÐµÐ· status-Ñ„Ð¸Ð»ÑŒÑ‚Ñ€Ð° Ð»Ð¾Ð²Ð¸Ð» Ð²ÑÐµ hall orders Ð²ÐºÐ»ÑŽÑ‡Ð°Ñ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ðµ â†’ Ð±ÐµÑÐºÐ¾Ð½ÐµÑ‡Ð½Ñ‹Ð¹ invalidate-loop. ÐœÐ¾Ð¶Ð½Ð¾ Ð±Ñ‹Ð»Ð¾ Ð±Ñ‹ Ð¿ÐµÑ€ÐµÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÑŒÑÑ Ð½Ð° `activeOrders` (ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ðµ ÑƒÐ¶Ðµ Ñ„Ð¸Ð»ÑŒÑ‚Ñ€Ð¾Ð²Ð°Ð½Ñ‹), Ð½Ð¾ ÑÑ‚Ð¾ Ð±Ñ‹ Ð¿Ñ€Ð¾Ð¿ÑƒÑÑ‚Ð¸Ð»Ð¾ ÑÐ²ÐµÐ¶ÐµÑÐ¾Ð·Ð´Ð°Ð½Ð½Ñ‹Ðµ orders Ñ status='active' Ð½Ð¾ Ñ‡ÐµÑ€ÐµÐ· `shiftCutoff` Ð¾Ñ‚Ñ„Ð¸Ð»ÑŒÑ‚Ñ€Ð¾Ð²Ð°Ð½Ð½Ñ‹Ðµ. Ð ÐµÑˆÐµÐ½Ð¸Ðµ [v4-C1]: Ð¾ÑÑ‚Ð°Ð²Ð»ÑÐµÐ¼ `orders` (Ñ€Ð°Ð½Ð½ÐµÐµ Ð¾Ð±Ð½Ð°Ñ€ÑƒÐ¶ÐµÐ½Ð¸Ðµ) + ÑÐ²Ð½Ñ‹Ð¹ inline-Ñ„Ð¸Ð»ÑŒÑ‚Ñ€ Ð¿Ð¾ status (Ð¸ÑÐºÐ»ÑŽÑ‡Ð°ÐµÑ‚ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ðµ carryover).
+
+### Why not useMemo Ð²Ð¼ÐµÑÑ‚Ð¾ useEffect?
+Ð­Ñ‚Ð¾ side-effect (invalidateQueries) â€” Ð´Ð¾Ð»Ð¶ÐµÐ½ Ð±Ñ‹Ñ‚ÑŒ Ð² useEffect, Ð½Ðµ useMemo.
+
+### Safety (post-v4):
+- useEffect ÐÐ• ÑÐ¾Ð·Ð´Ð°Ñ‘Ñ‚ Ñ‚Ð°Ð¹Ð¼ÐµÑ€Ñ‹/Ð¿Ñ€Ð¾Ð¼Ð¸ÑÑ‹ â†’ cleanup Ð½Ðµ Ð½ÑƒÐ¶ÐµÐ½.
+- Re-run frequency: Ð¿Ñ€Ð¸ ÐºÐ°Ð¶Ð´Ð¾Ð¼ refetch orders (polling ~10-60Ñ) â€” ÐžÐš, signature-guard Ð±Ð»Ð¾ÐºÐ¸Ñ€ÑƒÐµÑ‚ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ invalidate Ð´Ð»Ñ Ñ‚Ð¾Ð¹ Ð¶Ðµ ÐºÐ¾Ð¼Ð±Ð¸Ð½Ð°Ñ†Ð¸Ð¸.
+- Ð‘ÐµÑÐºÐ¾Ð½ÐµÑ‡Ð½Ñ‹Ð¹ Ñ†Ð¸ÐºÐ» Ñ€Ð¸ÑÐº:
+  - **Closed-order carryover (CC Issue #1):** âœ… Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð¾ Ñ„Ð¸Ð»ÑŒÑ‚Ñ€Ð¾Ð¼ `o.status === 'closed' || 'cancelled' â†’ continue` (v4-C1).
+  - **New-session race (genuine orphan):** invalidate ÑÑ€Ð°Ð±Ð°Ñ‚Ñ‹Ð²Ð°ÐµÑ‚ 1 Ñ€Ð°Ð· â†’ openSessions refetch â†’ Ð½Ð¾Ð²Ð°Ñ ÑÐµÑÑÐ¸Ñ Ð¿Ð¾Ð¿Ð°Ð´Ð°ÐµÑ‚ Ð² `openSessionByTableId` â†’ orphanPairs ÑÑ‚Ð°Ð½Ð¾Ð²Ð¸Ñ‚ÑÑ Ð¿ÑƒÑÑ‚Ñ‹Ð¼ â†’ signature reset â†’ Ð³Ð¾Ñ‚Ð¾Ð² Ðº ÑÐ»ÐµÐ´ÑƒÑŽÑ‰ÐµÐ¼Ñƒ orphan'Ñƒ. âœ…
+  - **Stale openSessions response:** signature-guard (v4-M7) Ð·Ð°Ñ‰Ð¸Ñ‰Ð°ÐµÑ‚: ÐµÑÐ»Ð¸ openSessions Ð²ÐµÑ€Ð½ÑƒÐ» Ñ‚Ð¾Ñ‚ Ð¶Ðµ Ð½Ð°Ð±Ð¾Ñ€ Ð±ÐµÐ· Ð½Ð¾Ð²Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸ â€” sig Ð½Ðµ Ð¸Ð·Ð¼ÐµÐ½Ð¸Ð»Ð°ÑÑŒ â†’ Ð²Ñ‚Ð¾Ñ€Ð¾Ð³Ð¾ invalidate Ð½Ðµ Ð±ÑƒÐ´ÐµÑ‚.
+
+### Verification Ð¿Ð¾ÑÐ»Ðµ Fix C â€” [V5-C4 Ð¿ÐµÑ€ÐµÐ¿Ð¸ÑÐ°Ð½: real identifiers]
+
+```bash
+# 1. [v5-C4] ÐŸÑ€Ð¾Ð²ÐµÑ€ÐºÐ° real identifiers Ð² ÐºÐ¾Ð´Ðµ â€” ÐÐ• hasOrphanedHallOrder (stale var Ð¸Ð· v3)
+grep -n "orphanInvalidateSigRef" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: Ñ€Ð¾Ð²Ð½Ð¾ 3 hits â€” (a) `const orphanInvalidateSigRef = useRef(null);` Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ðµ,
+#                            (b) `if (orphanInvalidateSigRef.current === signature)` Ñ‡Ñ‚ÐµÐ½Ð¸Ðµ,
+#                            (c) `orphanInvalidateSigRef.current = signature;` Ð·Ð°Ð¿Ð¸ÑÑŒ, Ð° Ñ‚Ð°ÐºÐ¶Ðµ
+#                            (d) `orphanInvalidateSigRef.current = null;` reset. Ð˜Ñ‚Ð¾Ð³ 3-4 hits.
+# Ð”Ð¾Ð¿ÑƒÑÑ‚Ð¸Ð¼Ð¾: 3-4 hits Ð² Ð·Ð°Ð²Ð¸ÑÐ¸Ð¼Ð¾ÑÑ‚Ð¸ Ð¾Ñ‚ Ñ‚Ð¾Ð³Ð¾ ÐºÐ°Ðº Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚Ñ‚ÐµÑ€ Ð¾Ð±ÑŠÐµÐ´Ð¸Ð½ÑÐµÑ‚ reset.
+
+grep -n "orphanPairs" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: â‰¥3 hits â€” Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ðµ, .push, .length check, .sort().join(',').
+
+grep -n "orphanPairs.push" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit (Ð²Ð½ÑƒÑ‚Ñ€Ð¸ Ñ†Ð¸ÐºÐ»Ð° for orders).
+
+# 2. invalidateQueries openSessions Ð¿Ñ€Ð¸ÑÑƒÑ‚ÑÑ‚Ð²ÑƒÐµÑ‚ Ð² Ð½ÑƒÐ¶Ð½Ð¾Ð¼ Ð¼ÐµÑÑ‚Ðµ
+grep -n 'invalidateQueries({ queryKey: \["openSessions"\] })' "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: â‰¥2 hits (ÑÑ‚Ð°Ñ€Ñ‹Ð¹ Ð² confirmCloseTable + Ð½Ð¾Ð²Ñ‹Ð¹ Ð² Fix C useEffect).
+
+# 3. [V5-C4] Stale references ÐžÐ¢Ð¡Ð£Ð¢Ð¡Ð¢Ð’Ð£Ð®Ð¢ (ÐµÑÐ»Ð¸ Codex/CC Ð¿Ð¾ Ð¾ÑˆÐ¸Ð±ÐºÐµ Ð½Ð°Ð¿Ð¸ÑÐ°Ð» Ð²Ð°Ñ€Ð¸Ð°Ð½Ñ‚ Ñ ÑÑ‚Ð¸Ð¼Ð¸ Ð¸Ð¼ÐµÐ½Ð°Ð¼Ð¸)
+grep -n "hasOrphanedHallOrder\|hasOrphanedOrder" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 0 hits (ÑÑ‚Ð¾ Ð¸Ð¼ÐµÐ½Ð° Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½Ñ‹Ñ… Ð¸Ð· v3 draft, Ð² Ñ„Ð¸Ð½Ð°Ð»ÑŒÐ½Ð¾Ð¼ ÐºÐ¾Ð´Ðµ v4/v5 Ð¸Ñ… Ð½ÐµÑ‚).
+
+# 4. [V5-M3] Pre-check Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½: queryClient Ð² scope
+grep -n "const queryClient = useQueryClient" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: 1 hit â€” Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ðµ Ð²Ð½ÑƒÑ‚Ñ€Ð¸ ÐºÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚Ð° (pre-existed, Ð½Ðµ Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÐ¼).
+
+# 5. [V5-L5] useRef import Ð¿Ñ€Ð¸ÑÑƒÑ‚ÑÑ‚Ð²ÑƒÐµÑ‚ (Ð»Ð¸Ð±Ð¾ Ð±Ñ‹Ð», Ð»Ð¸Ð±Ð¾ Ð´Ð¾Ð±Ð°Ð²Ð¸Ð»Ð¸)
+grep -c "useRef" "pages/StaffOrdersMobile/staffordersmobile.jsx"
+# ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ: â‰¥2 (1 Ð² import, 1 Ð² const orphanInvalidateSigRef = useRef).
+
+# 6. Syntax check Ð½Ðµ Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÐµÐ½ (JSX â€” Ð½Ðµ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶Ð¸Ð²Ð°ÐµÑ‚ÑÑ node --check, PQ-072), Ð½Ð¾ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ° Ð»Ð¸Ð½Ñ‚Ð¾Ð¼:
+# Git push triggered CI lint / B44 deploy catch syntax â†’ Ð´Ð¾Ð²ÐµÑ€ÑÐµÐ¼ Ñ„Ð¸Ð½Ð°Ð»ÑŒÐ½Ð¾Ð¼Ñƒ git commit.
+```
+
+---
+
+## Regression Check (Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð¾ Ð¿Ð¾ÑÐ»Ðµ Ð’Ð¡Ð•Ð¥ Fix) â€” [V5-L1 typo fix]
+
+ÐŸÑ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ, Ñ‡Ñ‚Ð¾ ÐŸÐ ÐžÐ”ÐžÐ›Ð–ÐÐ•Ð¢ Ñ€Ð°Ð±Ð¾Ñ‚Ð°Ñ‚ÑŒ:
+
+- [ ] Ð Ð°ÑÐºÑ€Ñ‹Ñ‚Ð¸Ðµ/ÑÐ²Ð¾Ñ€Ð°Ñ‡Ð¸Ð²Ð°Ð½Ð¸Ðµ Ð¾Ð´Ð½Ð¾Ð¹ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ¸ (click Ð¿Ð¾ header) â†’ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚.
+- [ ] ÐÐµÐ»ÑŒÐ·Ñ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ÑŒ 2 ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ¸ Ð¾Ð´Ð½Ð¾Ð²Ñ€ÐµÐ¼ÐµÐ½Ð½Ð¾ (`expandedGroupId` single) â†’ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚.
+- [ ] Favorite star Ð½Ð° ÑÑ‚Ð¾Ð»Ðµ â†’ Ð¿ÐµÑ€ÐµÐºÐ»ÑŽÑ‡Ð°ÐµÑ‚ÑÑ, ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐµÑ‚ÑÑ Ð¼ÐµÐ¶Ð´Ñƒ Ñ€ÐµÐ½Ð´ÐµÑ€Ð°Ð¼Ð¸.
+- [ ] Favorite filter (star) â†’ Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¸Ð·Ð±Ñ€Ð°Ð½Ð½Ñ‹Ðµ.
+- [ ] Close Table Ð¸Ð· ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ¸ ÑÑ‚Ð¾Ð»Ð° â†’ Ð·Ð°ÐºÑ€Ñ‹Ð²Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ open-session; ÑÑ‚Ð°Ñ€Ð°Ñ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ð°Ñ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ° Ð¾ÑÑ‚Ð°Ñ‘Ñ‚ÑÑ Ð² Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹Ñ…Â» Ð½ÐµÑ‚Ñ€Ð¾Ð½ÑƒÑ‚Ð¾Ð¹.
+- [ ] Pickup / Delivery Ð·Ð°ÐºÐ°Ð·Ñ‹ â†’ Ð¾Ñ‚Ð¾Ð±Ñ€Ð°Ð¶Ð°ÑŽÑ‚ÑÑ Ð² ÑÐ¿Ð¸ÑÐºÐµ, Ñ‚Ð°Ð¿ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚.
+- [ ] Active/Completed Ñ‚Ð°Ð± ÑÑ‡Ñ‘Ñ‚Ñ‡Ð¸ÐºÐ¸ (tabCounts) â†’ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾ ÑÑ‡Ð¸Ñ‚Ð°ÑŽÑ‚ (Ð½Ð¾Ð²Ð°Ñ ÑÐµÑÑÐ¸Ñ Ð² Â«ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹ÐµÂ», ÑÑ‚Ð°Ñ€Ð°Ñ Ð² Â«Ð—Ð°Ð²ÐµÑ€ÑˆÑ‘Ð½Ð½Ñ‹ÐµÂ»).
+- [ ] Banner-navigate (ÐºÐ»Ð¸Ðº Ð¿Ð¾ alert Ð±Ð°Ð½Ð½ÐµÑ€Ñƒ Ð¾ Ð½Ð¾Ð²Ð¾Ð¼ Ð·Ð°ÐºÐ°Ð·Ðµ) â†’ ÑÐºÑ€Ð¾Ð»Ð»Ð¸Ñ‚ Ðº Ð¿Ñ€Ð°Ð²Ð¸Ð»ÑŒÐ½Ð¾Ð¹ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐµ (Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¾Ð¹ ÑÐµÑÑÐ¸Ð¸), Ñ€Ð°ÑÐºÑ€Ñ‹Ð²Ð°ÐµÑ‚ ÐµÑ‘. [V5-C3: call chain buildBannerInfo â†’ banner.groupId (tableId) â†’ onNavigate @ 2825 â†’ prop @ 4610 â†’ handleBannerNavigate @ 4142 â†’ defensive Ñ€ÐµÐ·Ð¾Ð»Ð² tableId â†’ compositeKey]
+- [ ] servedOrders query (Ð½Ð°Ð¶Ð°Ñ‚ÑŒ expand Ð½Ð° ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐµ Ñ served orders) â†’ Ð¿Ð¾Ð´Ñ‚ÑÐ³Ð¸Ð²Ð°ÐµÑ‚ historical served orders Ð´Ð»Ñ tableId. [V5-L1: Ð±Ñ‹Ð»Ð¾ Â«ServedotÂ» typo]
+- [ ] Kitchen mode (`isKitchen === true`) â†’ Ð²Ð¸Ð´Ð¸Ñ‚ flat `visibleOrders`, Ð±ÐµÐ· ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐµÐº. `orderGroups` Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ `null` â†’ Ð½Ðµ Ð»Ð¾Ð¼Ð°ÐµÑ‚ÑÑ.
+- [ ] Highlight (Ð¾Ñ€Ð°Ð½Ð¶ÐµÐ²Ð°Ñ Ð¿Ð¾Ð´ÑÐ²ÐµÑ‚ÐºÐ° 1.5Ñ Ð¿Ð¾ÑÐ»Ðµ banner-navigate) â†’ Ð¿Ñ€Ð¸Ð¼ÐµÐ½ÑÐµÑ‚ÑÑ Ðº Ð¿Ñ€Ð°Ð²Ð¸Ð»ÑŒÐ½Ð¾Ð¹ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐµ.
+
+---
+
+## Mobile-first check (MANDATORY)
+
+SOM â€” mobile-first waiter interface (375px). Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Fix A/B/C â€” backend Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€Ð¾Ð²ÐºÐ°, UI Ð½Ðµ Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ÑÑ. ÐÐ¾ Ñ‚.Ðº. FROZEN UX Ð¿Ð¾ÐºÑ€Ñ‹Ð²Ð°ÐµÑ‚ Ñ€Ð°Ð·Ð¼ÐµÑ‚ÐºÑƒ OrderGroupCard â€” Ð²Ð¸Ð·ÑƒÐ°Ð»ÑŒÐ½Ð¾ Ð½Ð° 375px:
+- ÐšÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ¸ ÑÑ‚Ð¾Ð»Ð° Ð¾ÑÑ‚Ð°ÑŽÑ‚ÑÑ Ñ‚Ð¾Ð¹ Ð¶Ðµ ÑˆÐ¸Ñ€Ð¸Ð½Ñ‹, Ð¾Ð´Ð½Ð° Ð¿Ð¾Ð´ Ð´Ñ€ÑƒÐ³Ð¾Ð¹
+- ÐÐµÑ‚ Ð½Ð¾Ð²Ñ‹Ñ… touch-targets
+- ÐÐµÑ‚ Ð½Ð¾Ð²Ñ‹Ñ… overlay/sticky ÑÐ»ÐµÐ¼ÐµÐ½Ñ‚Ð¾Ð²
+
+**ÐÐµÑ‡ÐµÐ³Ð¾ Ð¼ÐµÐ½ÑÑ‚ÑŒ Ð² UI. Ð­Ñ‚Ð¾Ñ‚ Ð±Ð»Ð¾Ðº Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð´Ð»Ñ Ñ„Ð¸ÐºÑÐ°Ñ†Ð¸Ð¸ â€” CC/Codex Ð½Ðµ Ð´Ð¾Ð»Ð¶Ð½Ñ‹ Ð¼Ð¾Ð´Ð¸Ñ„Ð¸Ñ†Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ ÑÑ‚Ð¸Ð»Ð¸/Ð²ÐµÑ€ÑÑ‚ÐºÑƒ.**
+
+---
+
+---
+
+
+codex
+I’ve got enough source context. One last draft pass is just to pin exact prompt lines for the inconsistencies before I draft the findings.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -e '5 координированных правок' -e 'НЕ менять OrderGroupCard компонент' -e 'Fix B\\.1 создаёт поле "'`group'"\\.sessionId"'`'"' -e 'git diff main -- pages/StaffOrdersMobile/staffordersmobile\\.jsx' -e 'Commit message:' -e 'Fix C \\(orphan detection\\) — желательно' -e 'если создаёт риски .* исключить' -e 'grep -rn \"getLinkId\" menuapp-code-review/' -e 'Ожидание: 1 hit — объявление внутри компонента' -- 'C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/drafts/pssk-som-b2-1-260416-v7.md'" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 2021ms:
+364:### Changes — 5 координированных правок
+815:- НЕ менять OrderGroupCard компонент (только пропсы).
+825:⚠️ **Fix B.1 создаёт поле `group.sessionId`**, которое:
+1016:# Ожидание: 1 hit — объявление внутри компонента (pre-existed, не добавляем).
+1091:- [ ] `git diff main -- pages/StaffOrdersMobile/staffordersmobile.jsx` содержит изменения ТОЛЬКО в **8 локациях** [v4-L3, v5-M1 precision]: (1) openSessions staleTime (1 строка); (2) orderGroups useMemo (целиком); (3) filteredGroups (частично — только `if (group.type === 'table')` блок); (4) tabCounts (частично — только тот же блок); (5) OrderGroupCard map props (4 строки key/isExpanded/onToggleExpand/isHighlighted); (6) data-group-id live JSX @ ~2292 (1 место обязательно; ~565, ~1173 optional comment-only); (7) handleBannerNavigate useCallback (целиком); (8) новый useEffect + useRef Fix C.
+1097:- [ ] Commit message: `fix(SOM): BUG-SM-015 session-aware orderGroups + staleTime 30s→5s + orphan invalidate`
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n -e '"'^4'"\\. \\*\\*Fix C\\*\\*' -e 'если создаёт риски' -e 'Минимальная рабочая комбинация' -e 'grep -rn \"getLinkId\" menuapp-code-review/' -- 'C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/drafts/pssk-som-b2-1-260416-v7.md'" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+ succeeded in 20104ms:
+1064:4. **Fix C** (orphan detection) — желательно. Если создаёт риски (бесконечные re-renders / CPU spike при множестве Orders) — исключить, Fix A+B достаточно для корректного UX.
+1066:**Минимальная рабочая комбинация для закрытия BUG-SM-015:** Fix A + Fix B.1-B.5 (без B.6 и C). UX при этом корректен, но banner-navigate может скроллить к не-той карточке (edge case, не блокер).
+
+codex
+The analysis is complete. The remaining blocker is purely output-side: this sandbox cannot write to the required `C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/...` paths, so I’m returning the exact findings content here instead of a pipeline file.
+codex
+I completed the prompt review, but I could not create the required pipeline files under `C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/...` because that path is outside the writable sandbox for this session. The review content is below in the exact report format.
+
+# Codex Reviewer Findings — ПССК Prompt Quality Review
+Chain: staffordersmobile-260416-212808-43bb
+
+## Issues Found
+1. [CRITICAL] Fix C is described as optional, but the safety gates assume it is mandatory — The prompt explicitly says `Fix C` may be excluded if it creates risk and that `Fix A + Fix B.1-B.5` is a sufficient minimum combination (`pssk-som-b2-1-260416-v7.md:1064-1066`). But the final safety checklist and required commit message always assume the new `useEffect + useRef Fix C` exists (`:1091`, `:1097`). That can force an unnecessary implementation or produce a false failure on a valid A+B-only execution. PROMPT FIX: Split the final verification into two branches: `with Fix C` and `without Fix C`, and provide separate acceptable commit messages / location counts for each path.
+
+2. [MEDIUM] `queryClient` verification has the wrong expected count and can trigger a false STOP — Fix C verification says `grep -n "const queryClient = useQueryClient"` should return exactly 1 hit (`:1016`). In the live source there are 3 hits: one in `OrderCard`, one in `OrderGroupCard`, and one in `StaffOrdersMobile` (lines 1581, 1749, 2883). Because the prompt treats anchor mismatches as escalation-worthy, a correct file can look “wrong” and halt execution. PROMPT FIX: Change the expectation to `>=1`, then state the real requirement: confirm one hit exists inside `export default function StaffOrdersMobile()` near line 2883.
+
+3. [MEDIUM] The prompt forbids changing `OrderGroupCard`, but Fix B.5 requires editing inside `OrderGroupCard` — The “Should NOT” section says `НЕ менять OrderGroupCard компонент (только пропсы)` (`:815`), but Fix B.5 tells the executor to change the live `data-group-id` attribute inside the `OrderGroupCard` JSX root. Those instructions conflict and create hesitation about scope. PROMPT FIX: Reword the restriction to `Do not change OrderGroupCard business logic/layout; only update the map props in B.4 and the root data-group-id attribute in B.5.`
+
+4. [MEDIUM] Fix B’s structure and dependency notes are internally inconsistent — The section header says `5 координированных правок` (`:364`), but the prompt then defines B.1 through B.7. Also the dependency note says `Fix B.1 creates group.sessionId`, which is used by `Fix C` (`:825`), but the Fix C code actually operates on `orders`, `openSessionByTableId`, and `queryClient`; it does not consume `group.sessionId`. This muddies sequencing and can make implementers over-couple Fix C to Fix B. PROMPT FIX: Rename the section to reflect the real structure, e.g. `7 coordinated items (5 code edits + 2 guardrails)`, and correct the dependency note so only B.2/B.3/B.4/B.5/B.6 depend on B.1.
+
+5. [LOW] The fallback repo path for locating `getLinkId` is not repo-root safe — In Preparation Step 2, the fallback is `grep -rn "getLinkId" menuapp-code-review/`. If the executor is already at the repo root, that subdirectory path will not exist. This is a small but avoidable dead end if the primary anchor ever fails. PROMPT FIX: Replace the fallback with `grep -rn "getLinkId" .` or an explicitly absolute repo path.
+
+6. [LOW] `git diff main` is a fragile validation baseline for this workflow — The safety checklist requires `git diff main -- pages/StaffOrdersMobile/staffordersmobile.jsx` to contain changes in only 8 locations (`:1091`). But the prompt’s own preparation flow resets the working file from RELEASE/HEAD, not from `main`. On a feature branch or a repo where `main` has unrelated divergence, this check can fail even when the prompt was followed perfectly. PROMPT FIX: Validate against the post-copy baseline (`git diff -- pages/...` after the RELEASE sync, or `git diff HEAD -- pages/...`) instead of `main`.
+
+## Summary
+Total: 6 issues (1 CRITICAL, 3 MEDIUM, 2 LOW)
+
+## Additional Risks
+The prompt is generally well-anchored to the live file, but it is highly count-driven. Several steps rely on exact hit counts and “STOP + Arman” behavior. That is brittle when the file already contains repeated helpers or component-local duplicates, as shown by the `queryClient` mismatch. The prompt would be more execution-safe if it preferred scope-qualified anchors over exact global counts.
+
+## Prompt Clarity (MANDATORY — do NOT skip)
+- Overall clarity: 3/5
+- What was most clear:
+  Fix A is precise and well-grounded. The core anchors for `openSessions`, `orderGroups`, `filteredGroups`, `tabCounts`, `handleBannerNavigate`, and the live `data-group-id` location all match the current source.
+- What was ambiguous or could cause hesitation:
+  The optional-vs-mandatory status of Fix C is contradictory. Fix B also mixes real edits, guardrails, and a no-op B.7 item under a header that says there are only 5 coordinated changes.
+- Missing context:
+  The prompt should specify which validations are still valid if Fix C is intentionally skipped, and it should scope repeated anchors like `queryClient` to the `StaffOrdersMobile` component rather than the whole file.
+
+## Fix Ratings (MANDATORY — ALWAYS include this section, even if no issues found)
+Rate each Fix mentioned in the prompt. Scale: 1=Rewrite needed, 2=Major issues, 3=Needs clarification, 4=Minor issues, 5=Clear.
+
+| Fix | Rating (1-5) | Verdict | Key issue (if any) |
+|-----|-------------|---------|-------------------|
+| Fix1 | 5/5 | Clear | Fix A is precise, the anchor matches the live file, and the do-not-change guidance is coherent. |
+| Fix2 | 3/5 | Needs clarification | Fix B has internal count/scope inconsistencies and conflicts with the “do not change OrderGroupCard” rule. |
+| Fix3 | 3/5 | Needs clarification | Fix C itself is understandable, but the prompt contradicts itself on whether Fix C is optional and uses a false `queryClient` verification count. |
+
+Overall prompt verdict: NEEDS REVISION (any <4/5)
+
+I also could not write the required marker, progress, findings, or summary files to the pipeline path because the sandbox denied writes outside the repo workspace.

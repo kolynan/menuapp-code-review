@@ -1,0 +1,520 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d2f6b-30b7-75b2-9e63-7109ef431d05
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260327-181015-2eb1-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260327-181015-2eb1 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # UX Batch 13: MenuView точечные фиксы + detail card star (#183) Reference: `BUGS_MASTER.md` (PM-119, PM-132, PM-147, PM-124), `DECISIONS_INDEX.md §3,§5`, `STYLE_GUIDE.md`. Production page: https://menu-app-mvp-49a4f5b2.base44.app **Context:** 4 targeted fixes across MenuView.jsx and x.jsx. Fix 1 (PM-119) touches both files. Fix 2 and Fix 3 are MenuView.jsx only. Fix 4 (PM-124) is x.jsx only. **TARGET FILES (modify):** - `pages/PublicMenu/MenuView.jsx` — Fix 1 (PM-119 list+tile cards), Fix 2 (PM-132 list stepper), Fix 3 (PM-147 list description) - `pages/PublicMenu/x.jsx` — Fix 1 (PM-119 detail card), Fix 4 (PM-124 detail card star icon) **CONTEXT FILES (read-only):** - `pages/PublicMenu/BUGS.md` - `pages/PublicMenu/README.md` --- ## Fix 1 — PM-119 (P2) [MUST-FIX]: Discounted price uses Math.round — wrong formatter ### Current behavior In list/tile cards (MenuView.jsx) and detail card (x.jsx), the discounted price is calculated as: ``` formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100) ``` This causes the discounted price to display as an integer (e.g., `30 ₸`) while the original price shows with decimals (e.g., `32.01 ₸`). The formats mismatch and the discounted price is visually incorrect. ### Expected behavior Discounted price MUST use the SAME formatter as original price — no Math.round wrapping. Replace with: `formatPrice(dish.price * (1 - partner.discount_percent / 100))` Let `formatPrice` handle all rounding/formatting (it uses toFixed(2) + thousands separator — Kaspi-style). Ref: DECISIONS_INDEX.md §3 "Форматирование — toFixed(2), НЕ Math.round". ### Must NOT - No `Math.round()` wrapping when calling `formatPrice` for discounted price. - Do NOT change how original price (`formatPrice(dish.price)`) is displayed. - Do NOT change the discount badge (–X%) logic or colors. ### File and location **pages/PublicMenu/MenuView.jsx:** - renderListCard ~line 103: `formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100)` → replace with: `formatPrice(dish.price * (1 - partner.discount_percent / 100))` - renderTileCard ~line 281: same pattern, same fix. **pages/PublicMenu/x.jsx:** - Detail card drawer ~line 3893: `formatPrice(Math.round(detailDish.price * (1 - partner.discount_percent / 100) * 100) / 100)` → replace with: `formatPrice(detailDish.price * (1 - partner.discount_percent / 100))` - Search for: `Math.round(dish.price` and `Math.round(detailDish.price` to locate all occurrences. ### Previously tried Chain 74b9 S178: used `Math.round` — confirmed WRONG. The fix is to REMOVE Math.round entirely. ### Verification 1. Enable discount in partner settings. View menu in list mode. Discounted price (e.g. `30.41 ₸`) must match format of original price (`32.01 ₸`). No integer display. 2. Open dish detail card drawer → discounted price must use the same format. --- ## Fix 2 — PM-132 (P2) [MUST-FIX]: List mode stepper buttons too small (36px, must be 44px) ### Current behavior In list mode (`renderListCard` in MenuView.jsx), the stepper container and buttons use `w-9 h-9` = 36px. This is below the required 44px minimum touch target. ### Expected behavior All stepper elements in `renderListCard` must use `w-11 h-11` = 44px — matching tile mode. Ref: STYLE_GUIDE.md "Min touch target: 44×44px (h-11 w-11)". DECISIONS_INDEX.md §10 "icon 44×44". ### Must NOT - Do NOT change tile mode stepper (`renderTileCard`, ~lines 234–256, uses `w-11 h-11`) — it is already correct (PM-096 ✅ Tested FROZEN). - Do NOT change the round "+" overlay button on the card image — that is a separate button (PM-108/PM-110 ✅ Tested FROZEN). - Do NOT reposition, restyle, or restructure the stepper pill — only update size classes. ### File and location **pages/PublicMenu/MenuView.jsx, renderListCard, ~lines 156–178:** - Search `renderListCard` for all `w-9 h-9` occurrences — there are 3 buttons + 1 container: - ~line 156: main "+" button container → `w-9 h-9` → `w-11 h-11` - ~line 164: stepper pill container → `h-9 px-1` → `h-11 px-1.5` - ~line 168: "−" button → `w-9 h-9` → `w-11 h-11` - ~line 178: "+" button → `w-9 h-9` → `w-11 h-11` ### Verification Open menu in list mode. Add item. Stepper buttons (–/+) must be clearly tappable ≥44px. Visually matches tile-mode stepper size. --- ## Fix 3 — PM-147 (P3) [MUST-FIX]: List mode dish description truncated to 1 line ### Current behavior In list mode (`renderListCard` in MenuView.jsx), dish description uses `line-clamp-1` — only 1 line shows. For longer RU/KK descriptions this is too little context. ### Expected behavior Change to `line-clamp-2` — show up to 2 lines. Standard: Wolt/Uber Eats. Ref: STYLE_GUIDE.md line-clamp rule. DECISIONS_INDEX.md §5 "Описание в list mode — PM-147". ### Must NOT - Do NOT change the description in `renderTileCard` (~line 272) — leave it as-is. - Do NOT change dish name truncation (~line 94, `line-clamp-2`) — leave as-is. ### File and location **pages/PublicMenu/MenuView.jsx, renderListCard, ~line 96:** ``` <p className="text-sm text-slate-500 mt-0.5 line-clamp-1"> ``` → change `line-clamp-1` to `line-clamp-2`. ONE character change on ONE line. ### Verification Open menu in list mode. A dish with long description must show 2 lines instead of being cut at 1. --- ## Fix 4 — PM-124 (P3) [MUST-FIX]: Detail card (БКБ) missing star icon next to rating ### Current behavior In the dish detail drawer (`pages/PublicMenu/x.jsx`, ~lines 3911–3915), the rating block renders: ```jsx <div className="flex items-center gap-1 text-sm text-slate-500"> <span>{dishRatings[detailDish.id]?.avg?.toFixed(1)}</span> <span>({dishRatings[detailDish.id]?.count})</span> </div> ``` Result: displays `4.8 (6)` — NO star icon. Inconsistent with list/tile mode. In MenuView.jsx (list/tile mode), ratings are shown via `<DishRating avgRating=... reviewCount=... />` which includes the star icon. ### Expected behavior Replace the raw span block with `<DishRating>` component — same as MenuView.jsx uses. Result: `⭐ 4.8 (6)` with star icon. Consistent with list/tile mode. ### Must NOT - Do NOT change the `Rating` import on line ~94 (`import Rating from "@/components/Rating"`) — that is a DIFFERENT component for a different feature. Leave it. - Do NOT change the position/order of sections in detail card. Section order is FROZEN (PM-123 ✅): Photo → Name → Description → Price+Discount → Rating → Add button. - Do NOT add an onClick handler to DishRating — reviews are read-only from the detail card (no drill-down needed here). ### File and location **pages/PublicMenu/x.jsx:** 1. Add import near top of file (around line 94, after existing imports): ```jsx import DishRating from "@/components/publicMenu/DishRating"; ``` NOTE: x.jsx currently does NOT have DishRating imported. Confirmed via grep. Add it. NOTE: `import Rating from "@/components/Rating"` (line ~94) is a DIFFERENT component — leave it. 2. Replace the rating block at ~lines 3911–3915: ```jsx {showReviews && dishRatings?.[detailDish.id] && ( <div className="flex items-center gap-1 text-sm text-slate-500"> <span>{dishRatings[detailDish.id]?.avg?.toFixed(1)}</span> <span>({dishRatings[detailDish.id]?.count})</span> </div> )} ``` Replace with: ```jsx {showReviews && dishRatings?.[detailDish.id] && ( <DishRating avgRating={dishRatings[detailDish.id]?.avg} reviewCount={dishRatings[detailDish.id]?.count} /> )} ``` NOTE on context: `detailDish` is the state for the dish detail bottom drawer (line ~1339, `const [detailDish, setDetailDish] = useState(null)`). This is NOT the same as `selectedDishId` (which controls `DishReviewsModal`). Do not confuse them. ### Verification Tap any dish card → dish detail drawer opens. Rating section must show star + number (e.g. ⭐ 4.8 (6)). Must match appearance of rating in list/tile mode cards. --- ## FROZEN UX (DO NOT CHANGE) These elements are approved and tested. Do NOT modify, remove, reposition, or restyle: - **PM-108 ✅**: List card — horizontal flex layout, photo 96px on the right, rounded-xl - **PM-110 ✅**: List card — "+" button as absolute overlay bottom-right OF THE PHOTO (not separate row) - **PM-111 ✅**: Tile card — "+" button overlay on image - **PM-096 ✅**: Tile mode stepper — `w-11 h-11` (44px) in renderTileCard — DO NOT change - **PM-122 ✅**: Detail card opens as bottom drawer (not inline), via `detailDish` state - **PM-123 ✅**: Detail card section order — Photo → Name → Description → Price+Discount → Rating → Add button - **PM-118 ✅**: Discount display in detail card uses partner-level fields (not item-level) Any change to a FROZEN element = task FAILURE. --- ## ⛔ SCOPE LOCK — change ONLY what is described above - Modify ONLY the code described in Fix 1–4 sections above. - Do NOT change ANY other styling, layout, colors, behavior, or UX patterns. - If you notice a bug outside this task — IGNORE it completely. - Locked UX elements listed in FROZEN UX — FORBIDDEN to modify. ## Implementation Notes - TARGET FILES: `pages/PublicMenu/MenuView.jsx`, `pages/PublicMenu/x.jsx` - Do NOT break: tile stepper (PM-096), card layout (PM-108/110/111), detail card layout (PM-122/123) - git add `pages/PublicMenu/MenuView.jsx` `pages/PublicMenu/x.jsx` && git commit -m "fix: PM-119 discount formatter, PM-132 list stepper 44px, PM-147 desc 2-line, PM-124 detail star" && git push ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Primary usage: customer phone at the table. Before committing, verify ALL changes at 375px viewport width: - [ ] List mode stepper: touch targets visibly ≥44×44px after w-9→w-11 change - [ ] List card with 2-line description doesn't break layout or create excessive card height on small screens - [ ] Detail card rating star renders correctly inline, doesn't overflow - [ ] No duplicate visual indicators anywhere - [ ] All touch targets ≥44×44px (h-11 w-11) ## Regression Check (MANDATORY after implementation) These must continue to work after all changes: - [ ] Tile mode stepper still `w-11 h-11` (PM-096 FROZEN — grep: `renderTileCard` → `w-11 h-11`) - [ ] Discount badge (–X%) still visible in list, tile, and detail card - [ ] Original price format unchanged (`formatPrice(dish.price)` — no Math.round added) - [ ] Detail card drawer still opens on card tap and closes correctly - [ ] `Rating` component import (line ~94) unchanged ## E3 FROZEN UX grep verification Before committing, run these greps to confirm FROZEN elements are untouched: ```bash # PM-096: tile stepper must still be w-11 h-11 in renderTileCard grep -A5 "renderTileCard" pages/PublicMenu/MenuView.jsx | grep "w-11" # PM-108/110: list card photo still has w-24 h-24 right-side grep -n "w-24 h-24" pages/PublicMenu/MenuView.jsx # PM-123: detail card section order (photo → name → desc → price → rating → button) grep -n "getDishName\|getDishDescription\|formatPrice.*detailDish\|showReviews.*dishRatings\|add_to_cart" pages/PublicMenu/x.jsx | head -10 ``` === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/PublicMenu/MenuView.jsx` and `pages/PublicMenu/x.jsx` with `README.md` and `BUGS.md` in the same folder only. I’m keeping scope locked to Fix 1–4 and will write the findings file plus the required review artifacts after analysis.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name' in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content README.md' in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content MenuView.jsx' in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content BUGS.md' in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu exited 124 in 22.35s:
+
+ exited 124 in 23.57s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content x.jsx' in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu exited 124 in 13.61s:
+
+ exited 124 in 14.64s:
+
+ exited 124 in 11.79s:
+
+codex
+The full-file reads timed out on the large page files. I’m switching to targeted reads inside `pages/PublicMenu` so I only pull the relevant sections for Fix 1–4 and the local docs.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content BUGS.md -Raw' in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content README.md -Raw' in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path MenuView.jsx -Pattern 'Math\\.round\\(dish\\.price|line-clamp-1|w-9 h-9|renderListCard|renderTileCard' -Context 4,6" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path x.jsx -Pattern 'Math\\.round\\(detailDish\\.price|DishRating|showReviews|dishRatings\\[detailDish\\.id\\]|import Rating' -Context 4,8" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem | Select-Object Name,Length' in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu exited 124 in 12.78s:
+
+ succeeded in 53.29s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 53.91s:
+---
+version: "37.0"
+updated: "2026-03-27"
+session: 184
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*9 active bugs remaining (0x P0, 4x P1, 4x P2, 0x P3, 1x suggestion).*
+
+### BUG-PM-132: List mode stepper buttons use w-9 h-9 (36px) instead of w-11 h-11 (44px) (P2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P2
+- **ÐšÐ¾Ð³Ð´Ð°:** S177 (found by Codex in chain 74b9, confirmed by CC)
+ exited 124 in 1m 02s:
+
+  MenuView.jsx:77:
+  MenuView.jsx:78:  const gridColsClass = `${MOBILE_GRID[mobileCols]} ${DESKTOP_GRID[desktopCols]}`;
+  MenuView.jsx:79:
+  MenuView.jsx:80:  // Render dish card for LIST mode (horizontal layout)
+> MenuView.jsx:81:  const renderListCard = (dish) => {
+  MenuView.jsx:82:    const inCart = cart.find((i) => i.dishId === dish.id);
+  MenuView.jsx:83:    
+  MenuView.jsx:84:    return (
+  MenuView.jsx:85:      <Card
+  MenuView.jsx:86:        key={dish.id}
+  MenuView.jsx:87:        className="overflow-hidden hover:shadow-md transition-shadow border-slate-200 cursor-pointer"
+  MenuView.jsx:92:          <div className="flex-1 min-w-0 flex flex-col justify-between min-h-[96px]">
+  MenuView.jsx:93:            <div>
+  MenuView.jsx:94:              <h3 className="font-semibold text-base text-slate-900 
+line-clamp-2">{getDishName(dish)}</h3>
+  MenuView.jsx:95:              {getDishDescription(dish) && (
+> MenuView.jsx:96:                <p className="text-sm text-slate-500 mt-0.5 line-clamp-1">
+  MenuView.jsx:97:                  {getDishDescription(dish)}
+  MenuView.jsx:98:                </p>
+ exited 124 in 1m 03s:
+
+  x.jsx:90:
+  x.jsx:91:// TASK-260203-01: Drawer for cart
+  x.jsx:92:import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+  x.jsx:93:
+> x.jsx:94:import Rating from "@/components/Rating";
+  x.jsx:95:import PublicMenuHeader from "@/components/publicMenu/PublicMenuHeader";
+  x.jsx:96:import HelpFab from "@/components/publicMenu/HelpFab";
+  x.jsx:97:import HelpModal from "@/components/publicMenu/HelpModal";
+  x.jsx:98:import ReviewDialog from "@/components/publicMenu/ReviewDialog";
+  x.jsx:99:import StickyCartBar from "@/components/publicMenu/StickyCartBar";
+  x.jsx:100:import MenuView from "@/components/publicMenu/MenuView";
+  x.jsx:101:import CartView from "@/components/publicMenu/CartView";
+  x.jsx:102:import RedirectBanner from "@/components/publicMenu/refactor/RedirectBanner";
+  x.jsx:1807:    initialData: []
+  x.jsx:1808:  });
+  x.jsx:1809:
+  x.jsx:1810:  // Dish ratings/reviews
+> x.jsx:1811:  const showReviews = partner?.show_dish_reviews === true;
+  x.jsx:1812:  const partnerId = partner?.id || partner?._id;
+codex
+I have the local README/BUGS context and the first hit locations. Pulling the exact snippets now so I can verify only the four requested fixes and avoid drifting into anything else.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content x.jsx; for ($i=3888; $i -le 3922; $i++) { if ($i -lt $lines.Length) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] } }' in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content MenuView.jsx; for ($i=268; $i -le 288; $i++) { if ($i -lt $lines.Length) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] } }' in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content MenuView.jsx; for ($i=90; $i -le 185; $i++) { if ($i -lt $lines.Length) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] } }' in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content x.jsx; for ($i=90; $i -le 102; $i++) { if ($i -lt $lines.Length) { '"'{0,5}: {1}' -f ("'$i+1), $lines[$i] } }' in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu succeeded in 44.66s:
+ 3889:                 <div className="flex items-baseline gap-2">
+ 3890:                   {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
+ 3891:                     <>
+ 3892:                       <span className="text-lg font-bold" style={{ color: partner?.primary_color || '#1A1A1A' }}>
+ 3893:                         {formatPrice(Math.round(detailDish.price * (1 - partner.discount_percent / 100) * 100) / 100)}
+ 3894:                       </span>
+ 3895:                       <span className="text-sm text-slate-400 line-through">
+ 3896:                         {formatPrice(detailDish.price)}
+ 3897:                       </span>
+ 3898:                       <span
+ 3899:                         className="text-xs font-bold text-white px-2 py-0.5 rounded-full"
+ 3900:                         style={{ backgroundColor: partner?.discount_color || '#C92A2A' }}
+ 3901:                       >
+ 3902:                         -{partner.discount_percent}%
+ 3903:                       </span>
+ 3904:                     </>
+ 3905:                   ) : (
+ 3906:                     <span className="text-lg font-bold" style={{ color: partner?.primary_color || '#1A1A1A' }}>
+ 3907:                       {formatPrice(detailDish.price)}
+ 3908:                     </span>
+ succeeded in 51.02s:
+  269:           </h3>
+  270: 
+  271:           {getDishDescription(dish) && (
+  272:             <p className="mt-1 text-sm text-slate-500 line-clamp-1">
+  273:               {getDishDescription(dish)}
+  274:             </p>
+  275:           )}
+  276: 
+  277:           <div className="mt-auto pt-2 space-y-1">
+  278:             {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
+  279:               <div className="flex items-baseline gap-1.5 flex-nowrap">
+  280:                 <span className="font-bold text-sm whitespace-nowrap" style={{ color: primaryColor }}>
+  281:                   {formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100)}
+  282:                 </span>
+  283:                 <span className="text-xs text-slate-400 line-through whitespace-nowrap">
+  284:                   {formatPrice(dish.price)}
+  285:                 </span>
+  286:               </div>
+  287:             ) : (
+  288:               <div className="font-bold" style={{color: primaryColor}}>
+ succeeded in 50.84s:
+   91: // TASK-260203-01: Drawer for cart
+   92: import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+   93: 
+   94: import Rating from "@/components/Rating";
+   95: import PublicMenuHeader from "@/components/publicMenu/PublicMenuHeader";
+   96: import HelpFab from "@/components/publicMenu/HelpFab";
+   97: import HelpModal from "@/components/publicMenu/HelpModal";
+   98: import ReviewDialog from "@/components/publicMenu/ReviewDialog";
+   99: import StickyCartBar from "@/components/publicMenu/StickyCartBar";
+  100: import MenuView from "@/components/publicMenu/MenuView";
+  101: import CartView from "@/components/publicMenu/CartView";
+  102: import RedirectBanner from "@/components/publicMenu/refactor/RedirectBanner";
+  103: import DishReviewsModal from "@/components/publicMenu/DishReviewsModal";
+ succeeded in 54.98s:
+   91:           {/* Text LEFT â€” name, description, price, stepper */}
+   92:           <div className="flex-1 min-w-0 flex flex-col justify-between min-h-[96px]">
+   93:             <div>
+   94:               <h3 className="font-semibold text-base text-slate-900 line-clamp-2">{getDishName(dish)}</h3>
+   95:               {getDishDescription(dish) && (
+   96:                 <p className="text-sm text-slate-500 mt-0.5 line-clamp-1">
+   97:                   {getDishDescription(dish)}
+   98:                 </p>
+   99:               )}
+  100:               {partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0 ? (
+  101:                 <div className="mt-0.5 flex items-baseline gap-1.5">
+  102:                   <span className="font-bold text-sm" style={{ color: primaryColor }}>
+  103:                     {formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100)}
+  104:                   </span>
+  105:                   <span className="text-xs text-slate-400 line-through">
+  106:                     {formatPrice(dish.price)}
+  107:                   </span>
+  108:                 </div>
+  109:               ) : (
+  110:                 <div className="mt-0.5 font-bold text-sm" style={{color: primaryColor}}>
+codex
+The exact sections confirm the current state still matches the broken patterns described in the task. I’m doing one last pass for duplicate occurrences inside those two files only, then I’ll write the report files.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path MenuView.jsx -Pattern 'Math\\.round\\(dish\\.price|line-clamp-1|w-9 h-9'" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenuexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path x.jsx -Pattern 'Math\\.round\\(detailDish\\.price|DishRating|showReviews && dishRatings\\?\\.\\[detailDish\\.id\\]'" in C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu succeeded in 20.55s:
+
+MenuView.jsx:96:                <p className="text-sm text-slate-500 mt-0.5 line-clamp-1">
+MenuView.jsx:103:                    {formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) 
+/ 100)}
+MenuView.jsx:156:                  className="w-9 h-9 flex items-center justify-center text-white rounded-full 
+shadow-md transition-colors border-2 border-white"
+MenuView.jsx:168:                    className="w-9 h-9 flex items-center justify-center rounded-full 
+hover:bg-slate-100 transition-colors"
+MenuView.jsx:178:                    className="w-9 h-9 flex items-center justify-center rounded-full 
+hover:bg-slate-100 transition-colors"
+MenuView.jsx:272:            <p className="mt-1 text-sm text-slate-500 line-clamp-1">
+MenuView.jsx:281:                  {formatPrice(Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 
+100)}
+
+
+ succeeded in 22.31s:
+
+x.jsx:1843:  const dishRatings = useMemo(() => {
+x.jsx:3409:          dishRatings={dishRatings}
+x.jsx:3893:                        {formatPrice(Math.round(detailDish.price * (1 - partner.discount_percent / 100) * 
+100) / 100)}
+x.jsx:3911:                {showReviews && dishRatings?.[detailDish.id] && (
+x.jsx:3913:                    <span>{dishRatings[detailDish.id]?.avg?.toFixed(1)}</span>
+x.jsx:3914:                    <span>({dishRatings[detailDish.id]?.count})</span>
+
+
+codex
+Writing the findings file now, along with the page-local review artifact and the command log required by this repo. I’m not touching any page code.
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-27.log
+# Commands executed during review
+
+[timeout] Get-ChildItem -Name
+[timeout] Get-Content README.md
+[timeout] Get-Content BUGS.md
+[timeout] Get-Content MenuView.jsx
+[timeout] Get-Content x.jsx
+[timeout] Get-ChildItem | Select-Object Name,Length
+Get-Content README.md -Raw
+Get-Content BUGS.md -Raw
+[timeout] Select-String -Path MenuView.jsx -Pattern 'Math\.round\(dish\.price|line-clamp-1|w-9 h-9|renderListCard|renderTileCard' -Context 4,6
+[timeout] Select-String -Path x.jsx -Pattern 'Math\.round\(detailDish\.price|DishRating|showReviews|dishRatings\[detailDish\.id\]|import Rating' -Context 4,8
+$lines = Get-Content MenuView.jsx; for ($i=90; $i -le 185; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
+$lines = Get-Content MenuView.jsx; for ($i=268; $i -le 288; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
+$lines = Get-Content x.jsx; for ($i=90; $i -le 102; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
+$lines = Get-Content x.jsx; for ($i=3888; $i -le 3922; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
+Select-String -Path MenuView.jsx -Pattern 'Math\.round\(dish\.price|line-clamp-1|w-9 h-9'
+Select-String -Path x.jsx -Pattern 'Math\.round\(detailDish\.price|DishRating|showReviews && dishRatings\?\.\[detailDish\.id\]'
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-27.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260327-181015-2eb1
+## Findings
+1. [P2] Discounted price is still pre-rounded before `formatPrice` — `pages/PublicMenu/MenuView.jsx` still wraps the discounted value with `Math.round(... * 100) / 100` in both `renderListCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L103)) and `renderTileCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L281)), and `pages/PublicMenu/x.jsx` does the same in the detail drawer ([x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3893)). This keeps the exact PM-119 bug active: the discounted price is formatted from a pre-rounded number instead of letting `formatPrice` handle precision consistently with the original price. FIX: replace those calls with `formatPrice(dish.price * (1 - partner.discount_percent / 100))` in `MenuView.jsx` and `formatPrice(detailDish.price * (1 - partner.discount_percent / 100))` in `x.jsx`, without changing the original price or discount badge logic.
+2. [P2] List-mode stepper is still below the 44px touch-target minimum — in `renderListCard`, the add button and both stepper buttons remain `w-9 h-9` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L156), [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L168), and [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L178), while the pill container is still `h-9 px-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L164). That leaves the list stepper at 36px instead of the required 44px and does not match the frozen tile-mode sizing. FIX: change only the list-mode classes to `w-11 h-11` for the three buttons and `h-11 px-1.5` for the pill container, with no layout or styling changes beyond those size classes.
+3. [P3] List-mode description is still clamped to one line — `renderListCard` keeps `line-clamp-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L96), so long dish descriptions still truncate after a single line. That means PM-147 is still unfixed in the list card. FIX: change that class to `line-clamp-2` on the list-card description only, leaving the tile-card description and dish-name clamp untouched.
+4. [P3] Detail drawer rating still renders as plain text without the star icon — `pages/PublicMenu/x.jsx` still shows the rating block as raw spans at [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3911) through [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3915), so the drawer displays `4.8 (6)` instead of the same `DishRating` UI used in list/tile mode. The import section also still lacks `DishRating` near [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L94). FIX: add `import DishRating from "@/components/publicMenu/DishRating";` near the other public-menu imports and replace the raw rating block with `<DishRating avgRating={dishRatings[detailDish.id]?.avg} reviewCount={dishRatings[detailDish.id]?.count} />`, keeping the existing `Rating` import and section order unchanged.
+
+## Summary
+Total: 4 findings (0 P0, 0 P1, 2 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260327-181015-2eb1-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260327-181015-2eb1
+## Findings
+1. [P2] Discounted price is still pre-rounded before `formatPrice` — `pages/PublicMenu/MenuView.jsx` still wraps the discounted value with `Math.round(... * 100) / 100` in both `renderListCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L103)) and `renderTileCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L281)), and `pages/PublicMenu/x.jsx` does the same in the detail drawer ([x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3893)). This keeps the exact PM-119 bug active: the discounted price is formatted from a pre-rounded number instead of letting `formatPrice` handle precision consistently with the original price. FIX: replace those calls with `formatPrice(dish.price * (1 - partner.discount_percent / 100))` in `MenuView.jsx` and `formatPrice(detailDish.price * (1 - partner.discount_percent / 100))` in `x.jsx`, without changing the original price or discount badge logic.
+2. [P2] List-mode stepper is still below the 44px touch-target minimum — in `renderListCard`, the add button and both stepper buttons remain `w-9 h-9` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L156), [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L168), and [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L178), while the pill container is still `h-9 px-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L164). That leaves the list stepper at 36px instead of the required 44px and does not match the frozen tile-mode sizing. FIX: change only the list-mode classes to `w-11 h-11` for the three buttons and `h-11 px-1.5` for the pill container, with no layout or styling changes beyond those size classes.
+3. [P3] List-mode description is still clamped to one line — `renderListCard` keeps `line-clamp-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L96), so long dish descriptions still truncate after a single line. That means PM-147 is still unfixed in the list card. FIX: change that class to `line-clamp-2` on the list-card description only, leaving the tile-card description and dish-name clamp untouched.
+4. [P3] Detail drawer rating still renders as plain text without the star icon — `pages/PublicMenu/x.jsx` still shows the rating block as raw spans at [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3911) through [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3915), so the drawer displays `4.8 (6)` instead of the same `DishRating` UI used in list/tile mode. The import section also still lacks `DishRating` near [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L94). FIX: add `import DishRating from "@/components/publicMenu/DishRating";` near the other public-menu imports and replace the raw rating block with `<DishRating avgRating={dishRatings[detailDish.id]?.avg} reviewCount={dishRatings[detailDish.id]?.count} />`, keeping the existing `Rating` import and section order unchanged.
+
+## Summary
+Total: 4 findings (0 P0, 0 P1, 2 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+apply_patch(auto_approved=true) exited 0 in 5.07s:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260327-181015-2eb1-codex-findings.md
+A pages/PublicMenu/review_2026-03-27.md
+A pages/PublicMenu/commands_2026-03-27.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-27.log b/pages/PublicMenu/commands_2026-03-27.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..03e73f79d76f80cedb243ba0a20131e954268602
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-27.log
+@@ -0,0 +1,18 @@
++# Commands executed during review
++
++[timeout] Get-ChildItem -Name
++[timeout] Get-Content README.md
++[timeout] Get-Content BUGS.md
++[timeout] Get-Content MenuView.jsx
++[timeout] Get-Content x.jsx
++[timeout] Get-ChildItem | Select-Object Name,Length
++Get-Content README.md -Raw
++Get-Content BUGS.md -Raw
++[timeout] Select-String -Path MenuView.jsx -Pattern 'Math\.round\(dish\.price|line-clamp-1|w-9 h-9|renderListCard|renderTileCard' -Context 4,6
++[timeout] Select-String -Path x.jsx -Pattern 'Math\.round\(detailDish\.price|DishRating|showReviews|dishRatings\[detailDish\.id\]|import Rating' -Context 4,8
++$lines = Get-Content MenuView.jsx; for ($i=90; $i -le 185; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
++$lines = Get-Content MenuView.jsx; for ($i=268; $i -le 288; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
++$lines = Get-Content x.jsx; for ($i=90; $i -le 102; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
++$lines = Get-Content x.jsx; for ($i=3888; $i -le 3922; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
++Select-String -Path MenuView.jsx -Pattern 'Math\.round\(dish\.price|line-clamp-1|w-9 h-9'
++Select-String -Path x.jsx -Pattern 'Math\.round\(detailDish\.price|DishRating|showReviews && dishRatings\?\.\[detailDish\.id\]'
+diff --git a/pages/PublicMenu/review_2026-03-27.md b/pages/PublicMenu/review_2026-03-27.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..e82510b0e1591040940f5d9e11ae5c489f93714a
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-27.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260327-181015-2eb1
++## Findings
++1. [P2] Discounted price is still pre-rounded before `formatPrice` — `pages/PublicMenu/MenuView.jsx` still wraps the discounted value with `Math.round(... * 100) / 100` in both `renderListCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L103)) and `renderTileCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L281)), and `pages/PublicMenu/x.jsx` does the same in the detail drawer ([x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3893)). This keeps the exact PM-119 bug active: the discounted price is formatted from a pre-rounded number instead of letting `formatPrice` handle precision consistently with the original price. FIX: replace those calls with `formatPrice(dish.price * (1 - partner.discount_percent / 100))` in `MenuView.jsx` and `formatPrice(detailDish.price * (1 - partner.discount_percent / 100))` in `x.jsx`, without changing the original price or discount badge logic.
++2. [P2] List-mode stepper is still below the 44px touch-target minimum — in `renderListCard`, the add button and both stepper buttons remain `w-9 h-9` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L156), [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L168), and [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L178), while the pill container is still `h-9 px-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L164). That leaves the list stepper at 36px instead of the required 44px and does not match the frozen tile-mode sizing. FIX: change only the list-mode classes to `w-11 h-11` for the three buttons and `h-11 px-1.5` for the pill container, with no layout or styling changes beyond those size classes.
++3. [P3] List-mode description is still clamped to one line — `renderListCard` keeps `line-clamp-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L96), so long dish descriptions still truncate after a single line. That means PM-147 is still unfixed in the list card. FIX: change that class to `line-clamp-2` on the list-card description only, leaving the tile-card description and dish-name clamp untouched.
++4. [P3] Detail drawer rating still renders as plain text without the star icon — `pages/PublicMenu/x.jsx` still shows the rating block as raw spans at [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3911) through [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3915), so the drawer displays `4.8 (6)` instead of the same `DishRating` UI used in list/tile mode. The import section also still lacks `DishRating` near [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L94). FIX: add `import DishRating from "@/components/publicMenu/DishRating";` near the other public-menu imports and replace the raw rating block with `<DishRating avgRating={dishRatings[detailDish.id]?.avg} reviewCount={dishRatings[detailDish.id]?.count} />`, keeping the existing `Rating` import and section order unchanged.
++
++## Summary
++Total: 4 findings (0 P0, 0 P1, 2 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260327-181015-2eb1-codex-findings.md b/pipeline/chain-state/publicmenu-260327-181015-2eb1-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..e82510b0e1591040940f5d9e11ae5c489f93714a
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260327-181015-2eb1-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260327-181015-2eb1
++## Findings
++1. [P2] Discounted price is still pre-rounded before `formatPrice` — `pages/PublicMenu/MenuView.jsx` still wraps the discounted value with `Math.round(... * 100) / 100` in both `renderListCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L103)) and `renderTileCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L281)), and `pages/PublicMenu/x.jsx` does the same in the detail drawer ([x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3893)). This keeps the exact PM-119 bug active: the discounted price is formatted from a pre-rounded number instead of letting `formatPrice` handle precision consistently with the original price. FIX: replace those calls with `formatPrice(dish.price * (1 - partner.discount_percent / 100))` in `MenuView.jsx` and `formatPrice(detailDish.price * (1 - partner.discount_percent / 100))` in `x.jsx`, without changing the original price or discount badge logic.
++2. [P2] List-mode stepper is still below the 44px touch-target minimum — in `renderListCard`, the add button and both stepper buttons remain `w-9 h-9` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L156), [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L168), and [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L178), while the pill container is still `h-9 px-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L164). That leaves the list stepper at 36px instead of the required 44px and does not match the frozen tile-mode sizing. FIX: change only the list-mode classes to `w-11 h-11` for the three buttons and `h-11 px-1.5` for the pill container, with no layout or styling changes beyond those size classes.
++3. [P3] List-mode description is still clamped to one line — `renderListCard` keeps `line-clamp-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L96), so long dish descriptions still truncate after a single line. That means PM-147 is still unfixed in the list card. FIX: change that class to `line-clamp-2` on the list-card description only, leaving the tile-card description and dish-name clamp untouched.
++4. [P3] Detail drawer rating still renders as plain text without the star icon — `pages/PublicMenu/x.jsx` still shows the rating block as raw spans at [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3911) through [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3915), so the drawer displays `4.8 (6)` instead of the same `DishRating` UI used in list/tile mode. The import section also still lacks `DishRating` near [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L94). FIX: add `import DishRating from "@/components/publicMenu/DishRating";` near the other public-menu imports and replace the raw rating block with `<DishRating avgRating={dishRatings[detailDish.id]?.avg} reviewCount={dishRatings[detailDish.id]?.count} />`, keeping the existing `Rating` import and section order unchanged.
++
++## Summary
++Total: 4 findings (0 P0, 0 P1, 2 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-27.log b/pages/PublicMenu/commands_2026-03-27.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..03e73f79d76f80cedb243ba0a20131e954268602
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-27.log
+@@ -0,0 +1,18 @@
++# Commands executed during review
++
++[timeout] Get-ChildItem -Name
++[timeout] Get-Content README.md
++[timeout] Get-Content BUGS.md
++[timeout] Get-Content MenuView.jsx
++[timeout] Get-Content x.jsx
++[timeout] Get-ChildItem | Select-Object Name,Length
++Get-Content README.md -Raw
++Get-Content BUGS.md -Raw
++[timeout] Select-String -Path MenuView.jsx -Pattern 'Math\.round\(dish\.price|line-clamp-1|w-9 h-9|renderListCard|renderTileCard' -Context 4,6
++[timeout] Select-String -Path x.jsx -Pattern 'Math\.round\(detailDish\.price|DishRating|showReviews|dishRatings\[detailDish\.id\]|import Rating' -Context 4,8
++$lines = Get-Content MenuView.jsx; for ($i=90; $i -le 185; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
++$lines = Get-Content MenuView.jsx; for ($i=268; $i -le 288; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
++$lines = Get-Content x.jsx; for ($i=90; $i -le 102; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
++$lines = Get-Content x.jsx; for ($i=3888; $i -le 3922; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
++Select-String -Path MenuView.jsx -Pattern 'Math\.round\(dish\.price|line-clamp-1|w-9 h-9'
++Select-String -Path x.jsx -Pattern 'Math\.round\(detailDish\.price|DishRating|showReviews && dishRatings\?\.\[detailDish\.id\]'
+diff --git a/pages/PublicMenu/review_2026-03-27.md b/pages/PublicMenu/review_2026-03-27.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..e82510b0e1591040940f5d9e11ae5c489f93714a
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-27.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260327-181015-2eb1
++## Findings
++1. [P2] Discounted price is still pre-rounded before `formatPrice` — `pages/PublicMenu/MenuView.jsx` still wraps the discounted value with `Math.round(... * 100) / 100` in both `renderListCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L103)) and `renderTileCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L281)), and `pages/PublicMenu/x.jsx` does the same in the detail drawer ([x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3893)). This keeps the exact PM-119 bug active: the discounted price is formatted from a pre-rounded number instead of letting `formatPrice` handle precision consistently with the original price. FIX: replace those calls with `formatPrice(dish.price * (1 - partner.discount_percent / 100))` in `MenuView.jsx` and `formatPrice(detailDish.price * (1 - partner.discount_percent / 100))` in `x.jsx`, without changing the original price or discount badge logic.
++2. [P2] List-mode stepper is still below the 44px touch-target minimum — in `renderListCard`, the add button and both stepper buttons remain `w-9 h-9` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L156), [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L168), and [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L178), while the pill container is still `h-9 px-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L164). That leaves the list stepper at 36px instead of the required 44px and does not match the frozen tile-mode sizing. FIX: change only the list-mode classes to `w-11 h-11` for the three buttons and `h-11 px-1.5` for the pill container, with no layout or styling changes beyond those size classes.
++3. [P3] List-mode description is still clamped to one line — `renderListCard` keeps `line-clamp-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L96), so long dish descriptions still truncate after a single line. That means PM-147 is still unfixed in the list card. FIX: change that class to `line-clamp-2` on the list-card description only, leaving the tile-card description and dish-name clamp untouched.
++4. [P3] Detail drawer rating still renders as plain text without the star icon — `pages/PublicMenu/x.jsx` still shows the rating block as raw spans at [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3911) through [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3915), so the drawer displays `4.8 (6)` instead of the same `DishRating` UI used in list/tile mode. The import section also still lacks `DishRating` near [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L94). FIX: add `import DishRating from "@/components/publicMenu/DishRating";` near the other public-menu imports and replace the raw rating block with `<DishRating avgRating={dishRatings[detailDish.id]?.avg} reviewCount={dishRatings[detailDish.id]?.count} />`, keeping the existing `Rating` import and section order unchanged.
++
++## Summary
++Total: 4 findings (0 P0, 0 P1, 2 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260327-181015-2eb1-codex-findings.md b/pipeline/chain-state/publicmenu-260327-181015-2eb1-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..e82510b0e1591040940f5d9e11ae5c489f93714a
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260327-181015-2eb1-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260327-181015-2eb1
++## Findings
++1. [P2] Discounted price is still pre-rounded before `formatPrice` — `pages/PublicMenu/MenuView.jsx` still wraps the discounted value with `Math.round(... * 100) / 100` in both `renderListCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L103)) and `renderTileCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L281)), and `pages/PublicMenu/x.jsx` does the same in the detail drawer ([x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3893)). This keeps the exact PM-119 bug active: the discounted price is formatted from a pre-rounded number instead of letting `formatPrice` handle precision consistently with the original price. FIX: replace those calls with `formatPrice(dish.price * (1 - partner.discount_percent / 100))` in `MenuView.jsx` and `formatPrice(detailDish.price * (1 - partner.discount_percent / 100))` in `x.jsx`, without changing the original price or discount badge logic.
++2. [P2] List-mode stepper is still below the 44px touch-target minimum — in `renderListCard`, the add button and both stepper buttons remain `w-9 h-9` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L156), [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L168), and [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L178), while the pill container is still `h-9 px-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L164). That leaves the list stepper at 36px instead of the required 44px and does not match the frozen tile-mode sizing. FIX: change only the list-mode classes to `w-11 h-11` for the three buttons and `h-11 px-1.5` for the pill container, with no layout or styling changes beyond those size classes.
++3. [P3] List-mode description is still clamped to one line — `renderListCard` keeps `line-clamp-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L96), so long dish descriptions still truncate after a single line. That means PM-147 is still unfixed in the list card. FIX: change that class to `line-clamp-2` on the list-card description only, leaving the tile-card description and dish-name clamp untouched.
++4. [P3] Detail drawer rating still renders as plain text without the star icon — `pages/PublicMenu/x.jsx` still shows the rating block as raw spans at [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3911) through [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3915), so the drawer displays `4.8 (6)` instead of the same `DishRating` UI used in list/tile mode. The import section also still lacks `DishRating` near [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L94). FIX: add `import DishRating from "@/components/publicMenu/DishRating";` near the other public-menu imports and replace the raw rating block with `<DishRating avgRating={dishRatings[detailDish.id]?.avg} reviewCount={dishRatings[detailDish.id]?.count} />`, keeping the existing `Rating` import and section order unchanged.
++
++## Summary
++Total: 4 findings (0 P0, 0 P1, 2 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+Found 4 in-scope findings, all within Fix 1–4 and nothing outside the locked scope:
+
+1. [P2] PM-119: discounted price still uses `Math.round(...)/100` before `formatPrice` in [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L103), [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L281), and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3893).
+2. [P2] PM-132: list-mode stepper is still `w-9 h-9` with `h-9 px-1` in [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L156), [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L164), [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L168), and [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L178).
+3. [P3] PM-147: list-mode description is still `line-clamp-1` in [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L96).
+4. [P3] PM-124: detail drawer rating still renders raw text instead of `DishRating`, and `DishRating` is not imported in [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L94) and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3911).
+
+The required findings file is saved at [publicmenu-260327-181015-2eb1-codex-findings.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260327-181015-2eb1-codex-findings.md). I also saved the page-local review copy at [review_2026-03-27.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-27.md) and the executed command log at [commands_2026-03-27.log](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-27.log).
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-27.log b/pages/PublicMenu/commands_2026-03-27.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..03e73f79d76f80cedb243ba0a20131e954268602
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-27.log
+@@ -0,0 +1,18 @@
++# Commands executed during review
++
++[timeout] Get-ChildItem -Name
++[timeout] Get-Content README.md
++[timeout] Get-Content BUGS.md
++[timeout] Get-Content MenuView.jsx
++[timeout] Get-Content x.jsx
++[timeout] Get-ChildItem | Select-Object Name,Length
++Get-Content README.md -Raw
++Get-Content BUGS.md -Raw
++[timeout] Select-String -Path MenuView.jsx -Pattern 'Math\.round\(dish\.price|line-clamp-1|w-9 h-9|renderListCard|renderTileCard' -Context 4,6
++[timeout] Select-String -Path x.jsx -Pattern 'Math\.round\(detailDish\.price|DishRating|showReviews|dishRatings\[detailDish\.id\]|import Rating' -Context 4,8
++$lines = Get-Content MenuView.jsx; for ($i=90; $i -le 185; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
++$lines = Get-Content MenuView.jsx; for ($i=268; $i -le 288; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
++$lines = Get-Content x.jsx; for ($i=90; $i -le 102; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
++$lines = Get-Content x.jsx; for ($i=3888; $i -le 3922; $i++) { if ($i -lt $lines.Length) { '{0,5}: {1}' -f ($i+1), $lines[$i] } }
++Select-String -Path MenuView.jsx -Pattern 'Math\.round\(dish\.price|line-clamp-1|w-9 h-9'
++Select-String -Path x.jsx -Pattern 'Math\.round\(detailDish\.price|DishRating|showReviews && dishRatings\?\.\[detailDish\.id\]'
+diff --git a/pages/PublicMenu/review_2026-03-27.md b/pages/PublicMenu/review_2026-03-27.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..e82510b0e1591040940f5d9e11ae5c489f93714a
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-27.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260327-181015-2eb1
++## Findings
++1. [P2] Discounted price is still pre-rounded before `formatPrice` — `pages/PublicMenu/MenuView.jsx` still wraps the discounted value with `Math.round(... * 100) / 100` in both `renderListCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L103)) and `renderTileCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L281)), and `pages/PublicMenu/x.jsx` does the same in the detail drawer ([x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3893)). This keeps the exact PM-119 bug active: the discounted price is formatted from a pre-rounded number instead of letting `formatPrice` handle precision consistently with the original price. FIX: replace those calls with `formatPrice(dish.price * (1 - partner.discount_percent / 100))` in `MenuView.jsx` and `formatPrice(detailDish.price * (1 - partner.discount_percent / 100))` in `x.jsx`, without changing the original price or discount badge logic.
++2. [P2] List-mode stepper is still below the 44px touch-target minimum — in `renderListCard`, the add button and both stepper buttons remain `w-9 h-9` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L156), [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L168), and [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L178), while the pill container is still `h-9 px-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L164). That leaves the list stepper at 36px instead of the required 44px and does not match the frozen tile-mode sizing. FIX: change only the list-mode classes to `w-11 h-11` for the three buttons and `h-11 px-1.5` for the pill container, with no layout or styling changes beyond those size classes.
++3. [P3] List-mode description is still clamped to one line — `renderListCard` keeps `line-clamp-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L96), so long dish descriptions still truncate after a single line. That means PM-147 is still unfixed in the list card. FIX: change that class to `line-clamp-2` on the list-card description only, leaving the tile-card description and dish-name clamp untouched.
++4. [P3] Detail drawer rating still renders as plain text without the star icon — `pages/PublicMenu/x.jsx` still shows the rating block as raw spans at [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3911) through [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3915), so the drawer displays `4.8 (6)` instead of the same `DishRating` UI used in list/tile mode. The import section also still lacks `DishRating` near [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L94). FIX: add `import DishRating from "@/components/publicMenu/DishRating";` near the other public-menu imports and replace the raw rating block with `<DishRating avgRating={dishRatings[detailDish.id]?.avg} reviewCount={dishRatings[detailDish.id]?.count} />`, keeping the existing `Rating` import and section order unchanged.
++
++## Summary
++Total: 4 findings (0 P0, 0 P1, 2 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260327-181015-2eb1-codex-findings.md b/pipeline/chain-state/publicmenu-260327-181015-2eb1-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..e82510b0e1591040940f5d9e11ae5c489f93714a
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260327-181015-2eb1-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260327-181015-2eb1
++## Findings
++1. [P2] Discounted price is still pre-rounded before `formatPrice` — `pages/PublicMenu/MenuView.jsx` still wraps the discounted value with `Math.round(... * 100) / 100` in both `renderListCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L103)) and `renderTileCard` ([MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L281)), and `pages/PublicMenu/x.jsx` does the same in the detail drawer ([x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3893)). This keeps the exact PM-119 bug active: the discounted price is formatted from a pre-rounded number instead of letting `formatPrice` handle precision consistently with the original price. FIX: replace those calls with `formatPrice(dish.price * (1 - partner.discount_percent / 100))` in `MenuView.jsx` and `formatPrice(detailDish.price * (1 - partner.discount_percent / 100))` in `x.jsx`, without changing the original price or discount badge logic.
++2. [P2] List-mode stepper is still below the 44px touch-target minimum — in `renderListCard`, the add button and both stepper buttons remain `w-9 h-9` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L156), [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L168), and [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L178), while the pill container is still `h-9 px-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L164). That leaves the list stepper at 36px instead of the required 44px and does not match the frozen tile-mode sizing. FIX: change only the list-mode classes to `w-11 h-11` for the three buttons and `h-11 px-1.5` for the pill container, with no layout or styling changes beyond those size classes.
++3. [P3] List-mode description is still clamped to one line — `renderListCard` keeps `line-clamp-1` at [MenuView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L96), so long dish descriptions still truncate after a single line. That means PM-147 is still unfixed in the list card. FIX: change that class to `line-clamp-2` on the list-card description only, leaving the tile-card description and dish-name clamp untouched.
++4. [P3] Detail drawer rating still renders as plain text without the star icon — `pages/PublicMenu/x.jsx` still shows the rating block as raw spans at [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3911) through [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3915), so the drawer displays `4.8 (6)` instead of the same `DishRating` UI used in list/tile mode. The import section also still lacks `DishRating` near [x.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L94). FIX: add `import DishRating from "@/components/publicMenu/DishRating";` near the other public-menu imports and replace the raw rating block with `<DishRating avgRating={dishRatings[detailDish.id]?.avg} reviewCount={dishRatings[detailDish.id]?.count} />`, keeping the existing `Rating` import and section order unchanged.
++
++## Summary
++Total: 4 findings (0 P0, 0 P1, 2 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+tokens used
+42 846
+Found 4 in-scope findings, all within Fix 1–4 and nothing outside the locked scope:
+
+1. [P2] PM-119: discounted price still uses `Math.round(...)/100` before `formatPrice` in [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L103), [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L281), and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3893).
+2. [P2] PM-132: list-mode stepper is still `w-9 h-9` with `h-9 px-1` in [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L156), [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L164), [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L168), and [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L178).
+3. [P3] PM-147: list-mode description is still `line-clamp-1` in [MenuView.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx#L96).
+4. [P3] PM-124: detail drawer rating still renders raw text instead of `DishRating`, and `DishRating` is not imported in [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L94) and [x.jsx](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3911).
+
+The required findings file is saved at [publicmenu-260327-181015-2eb1-codex-findings.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260327-181015-2eb1-codex-findings.md). I also saved the page-local review copy at [review_2026-03-27.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-27.md) and the executed command log at [commands_2026-03-27.log](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-27.log).

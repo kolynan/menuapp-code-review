@@ -1,0 +1,258 @@
+---
+task_id: design-order-flow-complete-s61
+type: discussion
+priority: high
+created: 2026-03-01
+session: S61
+budget: 12.00
+---
+
+# Complete UX/UI Design: Guest Ordering + Waiter Management
+
+Use @discussion-moderator agent to run this CC+Codex design session.
+
+**First:** Read `references/menuapp-prd.md` and `references/menuapp-architecture.md` for full project context.
+**Then:** Review screenshots in `outputs/screenshots-S61/` for current visual state.
+
+---
+
+## Mission
+
+Design the **complete UX/UI specification** for the two core operational pages of MenuApp:
+
+1. **Guest Menu Page** (`/x?partner=...&mode=hall`) — how the guest orders
+2. **Staff Orders Mobile** (`/staffordersmobile`) — how the waiter manages orders
+
+The design must cover the **full lifecycle**: from guest arriving at table → placing orders → waiter processing → table closure. This will be the blueprint for implementation.
+
+Context: MenuApp is a QR-menu and order management system for Kazakhstani restaurants. It runs on Base44 (no-code platform). Users include restaurant guests (any age, any tech level) and waiters (may not be tech-savvy). Interface language: RU (primary), KZ, EN.
+
+---
+
+## Part 1: Understand Current State
+
+Before designing, CC and Codex should both independently analyze what exists now:
+
+- Guest flow: QR scan → menu browse → cart → table code entry → order confirmation
+- Staff flow: Свободные counter → accept order (Принято) → cooking → Выдан гостю → Закрыть стол
+- Known issues from S61 testing:
+  - Table code entry is confusing (guest must know "753" + table number)
+  - Post-order dialog scrolls to wrong position (starts at bottom)
+  - No real-time order status visible to guest
+  - "Стол Стол 1" double prefix in order cards
+  - Мои/Чужие/Свободные model is unclear
+  - Table closure semantics undefined
+
+---
+
+## Part 2: Design — Guest Side (`/x` page)
+
+### 2A. Guest Identity & Table Association
+
+Design the complete flow for how a guest becomes associated with a table:
+
+**Question for CC and Codex:**
+- ЛМП: How do top QR-ordering systems (Flipdish, QR Tiger, Yumm, Square, Toast) handle guest-to-table linking?
+- Should the QR code URL already contain the table ID (e.g., `/x?partner=...&table=01`), eliminating manual code entry?
+- If table is already in URL — what is the manual code entry for? (fallback? walk-in guests?)
+- Recommend: Should we embed table ID in QR URL (yes/no) and why?
+- Guest identity: cookie/localStorage-based session (no login)? What data to persist?
+
+**Required output:** A clear decision on how table association should work, with exact UX flow steps.
+
+### 2B. Guest Ordering Flow — Full UX Spec
+
+Design each step with UI description:
+
+**Step 1: Landing (QR scan)**
+- What does guest see on first arrival?
+- If table is new: walk them through table association
+- If returning guest (cookie exists): show their session context
+- Wireframe: describe the top of the screen, navigation, first CTA
+
+**Step 2: Menu Browsing**
+- Categories tabs — horizontal scroll?
+- Product cards — what info to show (name, description, price, photo, rating)?
+- "Add to cart" interaction — quantity selector inline vs modal?
+- Cart indicator — bottom bar behavior?
+- ЛМП: How do best QR-menu apps present the menu?
+
+**Step 3: Cart Bottom Sheet**
+- What triggers it: clicking cart bar
+- Content: itemized list, guest name, "for whom" selector, bonuses, total
+- Actions: "Place order" button
+- What is shown AFTER tapping "Place order"? (current behavior has bugs)
+
+**Step 4: Post-Order Confirmation**
+- Immediately after order sent: what does guest see?
+- ЛМП: What do Shake Shack, McDonald's kiosk, or similar apps show?
+- Recommendation: simple "Order received, waiter is coming" screen vs full order details vs nothing?
+- When does the rating prompt appear? Immediately (bad) or after delivery (good)?
+
+**Step 5: Order Status Tracking (if applicable)**
+- Should guest be able to see their order status in real-time? (Принято / Готовится / Готово)
+- If yes: how? Polling? Push? A "track order" button?
+- ЛМП: Which approach is best for a casual restaurant setting?
+
+**Step 6: Returning Guest (same table session)**
+- Guest scans QR again or refreshes
+- Should they see their previous orders? ("Заказы стола" view)
+- Should table code entry be skipped?
+- How long does a "table session" last?
+
+**Required output for Part 2:** Step-by-step UX flow with ASCII wireframe for each key screen.
+
+---
+
+## Part 3: Design — Waiter Side (`/staffordersmobile`)
+
+### 3A. Order Management Mental Model
+
+**Question for CC and Codex:**
+- ЛМП: What is the standard mental model for waiter-facing POS/order management apps? (Toast POS, Revel, Aloha, Square for Restaurants)
+- Is the "claim" model (Свободные → Принято) correct? Or should orders auto-assign?
+- What are the main views a waiter needs?
+
+**Recommend one of:**
+1. Current model: Свободные / Мои / Чужие (claim-based)
+2. Zone model: each waiter owns tables, sees only their zone's orders
+3. Simple model: all waiters see all orders, first-come-first-served
+4. Manager-assign model: manager pushes orders to waiters
+
+Justify with ЛМП. Include trade-offs.
+
+### 3B. Waiter Home Screen — Full UX Spec
+
+Design the complete screen layout:
+
+**Header area:**
+- What goes here? (restaurant name, waiter name, notification bell, settings)
+- Counter pills: what metrics matter most to a waiter at a glance?
+
+**Order list:**
+- Tabs: Активные / Завершённые — is this the right split?
+- Within Активные: how to group? By table? By urgency? By time?
+- Order card design: what info on the card, in what order?
+  - Table number, zone, time ago, guest name, items, status badge, action button
+- Status badges: design the full status flow with readable labels (not raw i18n keys)
+  - Current: `orderprocess.default.new` → should be: "Новый" with orange badge
+  - Flow: Новый → Принято → Готовится → Готов → Выдан
+
+**Action buttons on cards:**
+- One primary CTA per card that advances the status
+- What are the exact labels and transitions?
+- Can waiter go back to previous status? (undo)
+
+**Filtering / Sorting:**
+- Does a waiter need to filter orders? By table? By status?
+- Sort: by time received? By urgency?
+
+**Wireframe:** Describe the complete screen layout for staffordersmobile home.
+
+### 3C. Table Lifecycle — Complete Definition
+
+This is the most critical architecture decision:
+
+**Define exactly what happens at each stage:**
+
+**Stage 1: Table is FREE**
+- State in system: no active orders, no guest session
+- What waiter sees: table in "Свободные" (if applicable)
+
+**Stage 2: Guest scans QR — Table ACTIVE**
+- What triggers "table active"? First order placed? Or QR scan?
+- Guest session created: what data? (guest ID, table ID, session start time)
+- What does waiter see change?
+
+**Stage 3: Order placed**
+- Order appears in staffordersmobile under "Свободные" counter
+- Multiple orders from same table: grouped or separate cards?
+- Multiple guests at same table: their orders linked to same table?
+
+**Stage 4: Table CLOSURE**
+- Who initiates: waiter only? Guest can request?
+- Trigger: "Закрыть стол" button after all orders delivered
+- What exactly happens:
+  a. Guest session ended (cookie cleared or server-side?)
+  b. Table marked "free" in partnertables
+  c. All order history preserved in DB (for analytics)
+  d. Next guest gets a fresh start
+- Is there a "request bill" flow? (Guest taps "Счёт" → waiter brings physical bill → waiter closes table)
+- ЛМП: How do restaurant POS systems handle table closure / bill payment?
+
+**Stage 5: After closure**
+- If the same physical person scans QR again: new session
+- Waiter sees table as "Свободные" again
+
+**Required output for Part 3:** Complete waiter screen spec + table lifecycle state diagram (text-based).
+
+---
+
+## Part 4: Interaction Between Guest and Waiter
+
+Design the **communication flow** between the two sides:
+
+**Scenario A: Normal order flow**
+Guest orders → waiter sees → processes → delivers → closes
+
+**Scenario B: Guest requests help**
+"Нужна помощь?" dialog → guest selects type (Позвать официанта / Счёт / Салфетки / Меню) → how does this reach the waiter? Is it a notification? A separate queue?
+
+**Scenario C: Guest wants to add more dishes**
+Table already has active order → guest scans again → places another order → how does waiter see this is an ADDITIONAL order for the same table session?
+
+**Scenario D: Multiple guests at one table**
+Guest 1 orders, Guest 2 orders → waiter needs to see it's the same table → should orders be grouped by table or by guest?
+
+**Scenario E: Waiter proactively closes table**
+Guests have left without requesting closure → waiter should be able to close table manually
+
+---
+
+## Part 5: Final Deliverables
+
+CC and Codex must produce:
+
+### Deliverable 1: `outputs/Design_GuestPage_S61.md`
+Complete UX spec for the guest-facing menu page:
+- User journey (step by step)
+- Screen-by-screen description with ASCII wireframes
+- Interaction patterns
+- Data that needs to persist
+- Decisions on each open question from Part 2
+
+### Deliverable 2: `outputs/Design_StaffPage_S61.md`
+Complete UX spec for the waiter-facing orders page:
+- Mental model decision (claim/zone/simple/assigned)
+- Screen-by-screen description with ASCII wireframes
+- Full status flow with readable labels
+- Table lifecycle state machine
+- Decisions on each open question from Part 3
+
+### Deliverable 3: `outputs/Design_Interactions_S61.md`
+Interaction design between guest and waiter:
+- Diagrams for each scenario from Part 4
+- Real-time update strategy (polling interval? websocket?)
+- Notification design (for waiter: new order appears? sound/badge?)
+
+### Deliverable 4: `outputs/Design_Implementation_Backlog_S61.md`
+Prioritized list of what to build, in order:
+- P0: Critical (breaks core flow if missing)
+- P1: High value (significantly improves UX)
+- P2: Nice to have
+For each item: description, which page, estimated complexity (S/M/L)
+
+---
+
+## Discussion Format
+
+Run 3 rounds per major topic:
+- Round 1: CC gives analysis + recommendation with ЛМП
+- Round 2: Codex responds — agree, disagree, or alternative approach
+- Round 3: Synthesis + final recommendation
+
+Total: aim for comprehensive coverage across all 5 parts.
+
+Focus on **decisions**, not just questions. Every section must end with a **clear recommendation**.
+
+**Git:** Start with `git add . && git commit -m "S61 pre-design snapshot" && git push`

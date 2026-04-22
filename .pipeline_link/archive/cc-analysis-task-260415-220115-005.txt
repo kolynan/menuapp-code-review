@@ -1,0 +1,32 @@
+## CC Analysis Summary — task-260415-220115-005
+
+**Task:** pssk-som-b2-codex-v1 (SOM Batch B2 — independent analysis of Fix A/B/C)
+**Output:** pipeline/codex-findings-pssk-som-b2-codex-v1.md (comprehensive, ~350 lines)
+**Date:** 2026-04-15
+**Agent:** Claude Code (acting as Codex peer reviewer)
+
+### Key Findings
+
+**Fix A (filteredGroups TableSession.status override):**
+- TableSession entity is NEVER queried in SOM (grep confirms 0 matches)
+- filteredGroups relies on order-level heuristics (hasActiveOrder/hasActiveRequest/hasServedButNotClosed)
+- Recommended: Option C (all-closed override) as defense-in-depth, but Fix B may resolve this entirely
+- Low complexity (2-3 lines)
+
+**Fix B (ServiceRequest.filter returns 0):**
+- Root cause likely: Base44 link field format mismatch in server-side filter
+- ServiceRequest.create uses `table: currentTableId` (string), filter uses `table: tableId` (string) — same format, but B44 may store link fields differently internally
+- Recommended: Filter by partner + client-side getLinkId match (10 lines + signature change)
+- This is the MOST CRITICAL fix — it likely causes Fix A's symptom
+
+**Fix C (orderGroups session-aware):**
+- Root cause identified: `activeOrders` finish-stage filter (line 3583) allows `closed` orders through
+- `o.status !== 'cancelled'` should also exclude `o.status !== 'closed'`
+- This 1-line fix prevents closed-session orders from entering visibleOrders → orderGroups
+- Risk: Completed tab loses closed-order visibility
+
+### Implementation Order
+B → C → A (verify if still needed after B+C)
+
+### Codex CLI Status
+Codex ran (gpt-5.4) but produced 4593 lines of raw grep output, not structured findings. CC analysis is self-contained.

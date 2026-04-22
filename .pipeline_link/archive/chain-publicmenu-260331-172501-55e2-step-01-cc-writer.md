@@ -1,0 +1,540 @@
+---
+chain: publicmenu-260331-172501-55e2
+chain_step: 1
+chain_total: 4
+chain_step_name: cc-writer
+chain_group: writers
+chain_group_size: 2
+page: PublicMenu
+budget: 23.00
+runner: cc
+type: chain-step
+---
+=== CHAIN STEP: CC Writer (1/4) ===
+Chain: publicmenu-260331-172501-55e2
+Page: PublicMenu
+
+You are the CC Writer in a modular consensus pipeline.
+Your job: independently analyze the code and produce findings.
+
+INSTRUCTIONS:
+1. Read the file(s) specified in TASK CONTEXT below for PublicMenu
+2. Also read README.md and BUGS.md in the same folder for context (read-only, do NOT modify)
+3. Do your OWN independent analysis
+4. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns
+5. For each finding: [P0/P1/P2/P3] Title - Description. FIX: description of code change needed.
+6. Write your findings to: pipeline/chain-state/publicmenu-260331-172501-55e2-cc-findings.md
+7. Do NOT apply any fixes yet — only document findings
+
+⛔ SCOPE RESTRICTION (MANDATORY):
+If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.):
+- Do NOT report ANY issues outside the numbered Fix list.
+- If you see other bugs — IGNORE them completely.
+- Your output must contain ONLY findings for Fix 1, Fix 2, etc.
+- Extra findings outside the Fix list = task FAILURE.
+- BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG.
+- GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else.
+
+If there is NO numbered Fix list → find ALL bugs.
+
+FORMAT for findings file:
+# CC Writer Findings — PublicMenu
+Chain: publicmenu-260331-172501-55e2
+
+## Findings
+1. [P0/P1/P2/P3] Title — Description. FIX: ...
+2. ...
+
+## Summary
+Total: N findings (X P0, Y P1, Z P2, W P3)
+
+⛔ Prompt Clarity (MANDATORY — findings without this section are INCOMPLETE and will be REJECTED):
+Rate the task description quality (1-5). For any score below 4, explain what was unclear:
+- Overall clarity: [1-5]
+- Ambiguous Fix descriptions (list Fix # and what was unclear): ...
+- Missing context (what info would have helped): ...
+- Scope questions (anything you weren't sure if it's in scope): ...
+YOU MUST FILL IN ALL FIELDS ABOVE. Do NOT skip this section.
+
+=== TASK CONTEXT ===
+# Help Drawer Phase 1 — Architecture Redesign (v5.1)
+
+**Production page:** PublicMenu (/x). File: `pages/PublicMenu/x.jsx` (4305 lines).
+
+**Reference docs:**
+- `ux-concepts/HelpDrawer/help-drawer.md` v5.1 — HD-01..HD-18, ASCII layouts, state model
+- `ux-concepts/HelpDrawer/GPT_HelpDrawer_UX_S209.md` — ticket board architecture (stack B+C+D+E)
+- `ux-concepts/HelpDrawer/GPT_HelpDrawer_Remind_S210.md` — remind flow, smart redirect, collapse thresholds
+
+**Context:**
+The Help Drawer currently uses a per-card state model where cards change color and label text when requests are pending/repeat. The redesign moves to a **ticket board architecture** with two clear sections:
+1. "Мои запросы" — ticket board (only when active requests exist)
+2. "Отправить ещё" — action cards, **always idle appearance**
+
+Cards never change color/state. All status tracking moves to the ticket board above.
+
+---
+
+## TARGET FILES (modify)
+- `pages/PublicMenu/x.jsx`
+
+## CONTEXT FILES (read-only)
+- `ux-concepts/HelpDrawer/help-drawer.md`
+- `ux-concepts/HelpDrawer/GPT_HelpDrawer_UX_S209.md`
+- `ux-concepts/HelpDrawer/GPT_HelpDrawer_Remind_S210.md`
+
+---
+
+## Fix 1 — ARCHITECTURE: Two-section ticket board layout [MUST-FIX]
+
+### Current behavior
+The drawer shows a grid of action cards. When a request is pending, its card changes color
+(bg-[#F5E6E0] for pending, amber border for repeat) and displays status text ("✓ 2 мин назад")
+directly on the card. A separate HD-08 summary block appears above cards when 2+ requests are
+active. Tapping a pending card opens a `cardActionModal` bottom sheet with "Напомнить персоналу"
+and "Больше не надо" buttons.
+
+### Expected behavior
+Two distinct sections inside the Drawer:
+
+**Section 1 — "Мои запросы"** (ticket board):
+- Appears ONLY when at least 1 request has status `pending` or `remind_available`
+- Header: "Мои запросы" (or "Мои запросы · N" when N >= 2)
+- Each request = one row:
+  ```
+  [emoji] [Label]                    [Уже помогли / Уже принесли]
+  Отправлено X мин назад  (or  Ждёте X мин  when >10 min)
+  [Напомнить]  (when remind_available and not on anti-spam cooldown)
+  ```
+- Emoji: call_waiter=🙋, bill=📋, napkins=🧻, menu=📄, other=✏️
+- Soft-close button: "Уже помогли" (call_waiter) / "Уже принесли" (bill, napkins, menu) / "Неактуально" (other)
+- Soft-close: local-only — remove from requestStates + localStorage, no server call
+
+**Section 2 — "Отправить ещё"** (action cards):
+- Label "Отправить ещё" ONLY when Section 1 is present; hidden when 0 active requests
+- Cards grid ALWAYS idle appearance: white bg, slate border — no color changes
+- Same 5 cards: call_waiter, bill, napkins, menu, Другое
+- Cards tappable at all times (brief sending spinner max 300-500ms, then undo window starts)
+
+### Must NOT
+- Cards changing bg-color/border/text when status is pending or repeat
+- Per-card "✓ 2 мин назад" text on action card buttons
+- Old HD-08 summary block (search `{/* HD-08: Active requests summary block */}` ~line 3916) — REMOVE
+- cardActionModal sheet (search `{/* HD-01v3: Card action modal */}` ~line 4080) — REMOVE entirely
+- Cards showing "Напомнить персоналу" text as label in repeat state
+- "Отправить ещё" label when 0 active requests
+
+### File and location
+File: `pages/PublicMenu/x.jsx`
+- Remove HD-08 block: search `{/* HD-08: Active requests summary block */}` (~line 3916)
+- Cards grid: search `{/* HD-01: Per-card state help cards */}` (~line 3927) — make always idle
+- Remove cardActionModal: search `{/* HD-01v3: Card action modal */}` (~line 4080)
+- State section: search `// HD-01..HD-08: Help drawer mini-ticket board state` (~line 1652)
+- Insert ticket board between drawer header and cards grid (replacing HD-08 block)
+- Add `ticketBoardRef = useRef(null)` near state declarations (~line 1663)
+
+### Verification
+1. Open with 0 requests → only cards visible, no "Мои запросы", no "Отправить ещё" label
+2. Send "Счёт" → ticket board appears with "📋 Счёт" row; "Отправить ещё" label appears above cards
+3. "📋 Счёт" card in "Отправить ещё" shows white idle appearance (no color change)
+4. Tap "Уже принесли" → row disappears, "Мои запросы" section hides
+
+---
+
+## Fix 2 — STATE MODEL: Two timestamps + reminder history [MUST-FIX]
+
+### Current behavior
+`requestStates[type]` shape: `{ status, sentAt, message }` — single timestamp, no reminder history.
+Status values include `'repeat'`.
+
+### Expected behavior
+Extended state shape per standard type:
+```js
+requestStates[type] = {
+  status: 'idle' | 'sending' | 'pending' | 'remind_available',
+  sentAt: timestamp_ms,                // original — NEVER changes after initial set
+  lastReminderAt: null | timestamp_ms, // updated on each remind tap
+  reminderCount: 0,                    // incremented on each remind tap
+  remindCooldownUntil: null | timestamp_ms,  // anti-spam expiry (Fix 4)
+}
+```
+Note: keep `'repeat'` as alias for `'remind_available'` if renaming is complex.
+
+For `other` type — array of entries:
+```js
+requestStates.other = [
+  { id: Date.now() + Math.random(), status, sentAt, lastReminderAt, reminderCount,
+    remindCooldownUntil, message },
+  // each "Другое" submission pushes a new item
+]
+```
+
+Timer display in ticket board rows (based on sentAt — NEVER changes):
+- < 60s → "Только что"
+- 1–9 min → "Отправлено N мин назад"
+- >= 10 min → "Ждёте N мин"
+Secondary line (if reminderCount > 0):
+- 1 reminder: "1 напоминание · последнее N мин назад" (based on lastReminderAt)
+- 2+ reminders: "N напоминаний · последнее N мин назад"
+
+Update getRelativeTime helper (~line 1699) to add "Ждёте" format for >= 10 min.
+Extend localStorage save/restore to handle new fields + other array.
+hasLoadedHelpStatesRef guard (~line 1664) — keep logic exactly as-is, only extend field restore.
+
+### Must NOT
+- sentAt reset to Date.now() on remind tap
+- lastReminderAt used as the primary waiting timer
+- reminderCount lost on drawer close/reopen (must persist localStorage)
+
+### File and location
+File: `pages/PublicMenu/x.jsx`
+- State shape: search `// Structure: { call_waiter: { status: 'idle'` (~line 1693)
+- localStorage restore: search `// HD-05: Load requestStates from localStorage on mount` (~line 1665)
+- getRelativeTime: search `// HD-03: Relative time helper` (~line 1699)
+- Timer interval: search `// HD-02 + HD-03: Timer interval` (~line 1817)
+- pendingRequests memo: search `.map(([type, s]) => ({ type, sentAt:` (~line 1713)
+
+### Verification
+1. Send "Счёт" → wait >10 min → ticket board shows "Ждёте 12 мин"
+2. Tap "Напомнить" → primary stays "Ждёте 12 мин"; secondary adds "1 напоминание · последнее только что"
+3. Close + reopen drawer → times still correct (localStorage persisted)
+4. Submit "Другое" twice → two separate rows in ticket board
+
+---
+
+## Fix 3 — REDIRECT: Smart redirect on card re-tap [MUST-FIX]
+
+### Current behavior
+Tapping a pending card opens cardActionModal (~lines 4080-4130) with "Напомнить" and "Больше не надо".
+
+### Expected behavior
+When tapping a card that already has active pending/remind_available request:
+1. Smooth scroll ticketBoardRef into view
+2. Highlight corresponding ticket board row for 1.5s (bg-amber-50 flash)
+3. Show brief toast: t('help.request_already_sent', 'Запрос уже отправлен. Нажмите Напомнить')
+4. Do NOT create duplicate. Do NOT open any modal.
+
+"Другое" exception: always creates new entry regardless.
+
+### Must NOT
+- cardActionModal for standard types (removed in Fix 1)
+- Duplicate row for same standard type
+- Auto-remind on re-tap
+
+### File and location
+File: `pages/PublicMenu/x.jsx`
+- handleCardTap: search `// HD-01 + HD-06: Card tap with 5s undo delay` (~line 1762)
+- ticketBoardRef: declared once in Fix 1 (~line 1663), referenced here
+- Add `[highlightedRow, setHighlightedRow] = useState(null)` for highlight animation
+- Remove `[cardActionModal, setCardActionModal]` state (declared near line 1663)
+
+⚠️ Fix 1 removes cardActionModal JSX and the modal state → Fix 3 replaces with scroll+highlight+toast.
+   Both fixes must be applied together. If only Fix 1 applied without Fix 3: cards have no re-tap feedback.
+
+### Verification
+1. Send "Счёт", tap "Счёт" again → no modal; scroll to "Мои запросы"; row flashes amber; toast appears
+2. "Другое" with existing pending → new row added, no redirect
+
+---
+
+## Fix 4 — ANTISPAM: Anti-spam guard on [Напомнить] [MUST-FIX]
+
+### Current behavior
+No rate limiting on remind action.
+
+### Expected behavior
+After tapping [Напомнить] in ticket board row:
+1. Set remindCooldownUntil = Date.now() + cooldownMs in requestStates
+2. Button disabled during cooldown, shows: "Повторить через MM:SS"
+3. After cooldown → button re-enables with "Напомнить"
+
+Cooldown: call_waiter=30s, bill/napkins/menu/other=45s
+
+On remind fire:
+- Set lastReminderAt = Date.now()
+- Increment reminderCount += 1
+- Re-trigger server call via handleCardTap(type) — same undo flow
+- sentAt does NOT change
+
+### Must NOT
+- Anti-spam countdown on action cards (only in ticket board rows)
+
+### File and location
+File: `pages/PublicMenu/x.jsx`
+- Add handleRemind(type, itemId?) function near handleCardTap (~line 1762)
+- remindCooldownUntil in requestStates item (from Fix 2 state shape)
+- Reuse existing timerTick state/interval (~line 1817) for countdown re-render
+
+### Verification
+1. Tap [Напомнить] → button shows "Повторить через 00:45" and disabled
+2. After ~45s → button re-enables
+
+---
+
+## Fix 5 — ANXIETY: Anxiety copy under "Мои запросы" [MUST-FIX]
+
+### Current behavior
+No helper text under active requests section.
+
+### Expected behavior
+Small text directly below ticket board rows (within Section 1):
+- t('help.status_auto_update', 'Статус обновляется автоматически')
+- Style: text-xs text-slate-400 text-center pt-1
+- Only when Section 1 is visible
+
+### Must NOT
+- Visible when 0 active requests
+
+### File and location
+File: `pages/PublicMenu/x.jsx` — insert after ticket board list, before "Отправить ещё" divider
+
+### Verification
+1. No requests → text not visible
+2. Send request → ticket board + "Статус обновляется автоматически" visible
+
+---
+
+## Fix 6 — COLLAPSE: Show all at 1-3, collapse at 4+ [MUST-FIX]
+
+### Current behavior
+Old HD-08 triggered at 2+. No collapse logic.
+
+### Expected behavior
+Ticket board (Section 1):
+- 1–3 requests: all rows fully expanded
+- 4+ requests: show first 3 + button "Ещё N запросов · самый старый ждёт X мин"
+  (text-sm text-slate-500)
+- Tapping → expand all (isTicketBoardExpanded = true)
+- Sort order: oldest sentAt first
+
+### Must NOT
+- Collapse at 2 or 3 (threshold is 4)
+
+### File and location
+File: `pages/PublicMenu/x.jsx`
+- Add [isTicketBoardExpanded, setIsTicketBoardExpanded] = useState(false)
+- Use/extend pendingRequests memo (~line 1713) to include other array items; sort by sentAt ascending
+
+### Verification
+1. 3 requests → all 3 visible
+2. 4th request → 3 visible + "Ещё 1 запрос · самый старый ждёт X мин"
+3. Tap → all 4 visible
+
+---
+
+## Fix 7 — PAID GATE: Block requests for Free plan [NICE-TO-HAVE]
+
+### Current behavior
+Help drawer works identically regardless of partner.plan.
+
+### Expected behavior
+When partner?.plan === 'Free':
+- Drawer still opens (feature discoverable)
+- Cards visible
+- Tapping any card → show toast: t('help.free_plan_blocked', 'Эта функция недоступна на текущем тарифе')
+- Do NOT create request, do NOT enter sending state
+
+When partner?.plan === 'Paid' or plan is absent/null → full functionality (no change).
+
+### Must NOT
+- Hide FAB or drawer when plan === 'Free'
+- Block when plan is null/undefined (treat as Paid = default)
+- Check plan after undo window starts — check at very start of handleCardTap
+
+### File and location
+File: `pages/PublicMenu/x.jsx`
+- partner object available in component scope (~line 1584)
+- Add at start of handleCardTap (~line 1763):
+  `if (partner?.plan === 'Free') { toast(t('help.free_plan_blocked', '...')); return; }`
+- Use existing toast() call pattern
+
+### Verification
+1. Set partner.plan = 'Free' → tap help card → toast, no request created
+2. Set partner.plan = 'Paid' or undefined → normal flow
+
+---
+
+## ⚠️ Fix Dependencies
+
+- **Fix 1 → Fix 3**: Fix 1 removes cardActionModal JSX + `[cardActionModal, setCardActionModal]` state.
+  Fix 3 replaces with scroll+highlight+toast. Apply together. Missing Fix 3 = cards have no re-tap feedback.
+- **Fix 2 → Fixes 4, 6**: Fix 2 adds remindCooldownUntil, lastReminderAt, reminderCount.
+  Fix 4 uses remindCooldownUntil. Fix 6 sorts by sentAt. Apply Fix 2 state extensions first.
+- **Fix 1 + Fix 3 → ticketBoardRef**: Declare once (~line 1663), use in both ticket board JSX (Fix 1)
+  and handleCardTap redirect (Fix 3).
+
+---
+
+## ⛔ SCOPE LOCK — change ONLY what is described in Fix sections above
+
+Do NOT change any of the following:
+
+**FROZEN — verified working, must remain intact:**
+- HD-06 undo toast: `handleUndo`, `undoToast` state, toast JSX (~lines 4033–4041)
+- HD-07 FAB badge: `activeRequestCount > 0` badge on HelpFab (~lines 3884–3889)
+- HD-10 `hasLoadedHelpStatesRef` guard (~line 1664) — extend fields only, keep guard logic
+- HD-05 localStorage key: `helpdrawer_${currentTableId}` — same key, extend shape only
+- HD-04 "Другое" chips + textarea form UI (~lines 4008–4031) — keep form, only submission pushes to array
+- PM-125 / PM-S81-15: openHelpDrawer / closeHelpDrawer / pushOverlay / popOverlay mechanics — intact
+- HelpFab component: props, import, rendering (~lines 3877–3883)
+- Drawer wrapper: `<Drawer open={isHelpModalOpen} ...>` + DrawerContent classes (`max-h-[85vh] rounded-t-2xl flex flex-col`)
+  **DO NOT add `relative` to DrawerContent** — breaks vaul (KB-096, PQ-D7)
+- Drawer header: title "Нужна помощь?", subtitle, ChevronDown close button (~lines 3896–3907)
+- `HELP_COOLDOWN_SECONDS`: call_waiter:90, bill:150, napkins:240, menu:240, other:120
+- `handlePresetSelect` + `submitHelpRequest` hook — keep same server call path
+- `HELP_CHIPS` array values
+- i18n pattern: t('help.key', 'Fallback text') — use for all new keys
+
+**New i18n keys (add with fallbacks, do not hardcode strings):**
+- help.my_requests → "Мои запросы"
+- help.send_more → "Отправить ещё"
+- help.status_auto_update → "Статус обновляется автоматически"
+- help.remind → "Напомнить"
+- help.remind_cooldown_timer → "Повторить через"
+- help.already_helped → "Уже помогли"
+- help.already_brought → "Уже принесли"
+- help.irrelevant → "Неактуально"
+- help.waiting_min → "Ждёте" (prefix: "Ждёте 25 мин")
+- help.request_already_sent → "Запрос уже отправлен. Нажмите Напомнить"
+- help.free_plan_blocked → "Эта функция недоступна на текущем тарифе"
+
+---
+
+## Implementation Notes
+
+**Architecture overview:**
+```
+BEFORE: Cards have status (pending/repeat/sending) → status shown ON card
+AFTER:  Cards always idle → status shown in "Мои запросы" ticket board ABOVE cards
+```
+
+**State shape (complete):**
+```js
+// Standard type (call_waiter, bill, napkins, menu):
+requestStates.bill = {
+  status: 'pending',
+  sentAt: 1711800000000,        // NEVER reset
+  lastReminderAt: null,
+  reminderCount: 0,
+  remindCooldownUntil: null,
+}
+// Other type — array:
+requestStates.other = [
+  { id: 1711800001, status: 'pending', sentAt: ..., lastReminderAt: null,
+    reminderCount: 0, remindCooldownUntil: null, message: 'Детский стул' },
+]
+```
+
+**handleCardTap update (merging Fixes 3 and 7):**
+```js
+const handleCardTap = useCallback((type) => {
+  // Fix 7: paid gate
+  if (partner?.plan === 'Free') {
+    toast(t('help.free_plan_blocked', 'Эта функция недоступна на текущем тарифе'));
+    return;
+  }
+  // Fix 3: smart redirect if already active
+  const existing = type === 'other' ? null : requestStates[type];
+  if (existing && (existing.status === 'pending' || existing.status === 'remind_available' || existing.status === 'repeat')) {
+    ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setHighlightedRow(type);
+    setTimeout(() => setHighlightedRow(null), 1500);
+    toast(t('help.request_already_sent', 'Запрос уже отправлен. Нажмите Напомнить'));
+    return;
+  }
+  // ... existing undo flow (unchanged)
+}, [requestStates, partner, ...]);
+```
+
+**handleSoftClose (local-only, new function):**
+```js
+const handleSoftClose = useCallback((type, itemId) => {
+  setRequestStates(prev => {
+    const next = { ...prev };
+    if (type === 'other') {
+      next.other = (next.other || []).filter(item => item.id !== itemId);
+    } else {
+      delete next[type];
+    }
+    return next;
+  });
+  // Clear from localStorage as well
+}, [currentTableId]);
+```
+
+**handleRemind (new function, near handleCardTap):**
+```js
+const handleRemind = useCallback((type, itemId) => {
+  const cooldownMs = type === 'call_waiter' ? 30000 : 45000;
+  const now = Date.now();
+  setRequestStates(prev => {
+    const next = { ...prev };
+    if (type === 'other') {
+      next.other = (next.other || []).map(item =>
+        item.id === itemId
+          ? { ...item, lastReminderAt: now, reminderCount: (item.reminderCount||0)+1,
+              remindCooldownUntil: now + cooldownMs }
+          : item
+      );
+    } else {
+      next[type] = { ...next[type], lastReminderAt: now,
+        reminderCount: (next[type]?.reminderCount||0)+1,
+        remindCooldownUntil: now + cooldownMs };
+    }
+    return next;
+  });
+  handleCardTap(type); // re-triggers server send via existing undo flow
+}, [handleCardTap, currentTableId]);
+```
+
+**⚠️ Card onClick update (Fix 1):**
+Current: `status === 'pending' ? setCardActionModal(card.id) : (status === 'idle' || status === 'repeat' ? handleCardTap(card.id) : null)`
+After: `handleCardTap(card.id)` for all statuses (smart redirect handles pending case internally)
+Card className: always `bg-white border-slate-200` — remove conditional pending/repeat classes.
+
+**pendingRequests memo update:**
+Extend to include `other` array items as individual entries.
+Sort result by `sentAt` ascending (oldest first).
+Include full shape: `{ type, id, sentAt, lastReminderAt, reminderCount, remindCooldownUntil, message, status }`.
+
+**git add:** `pages/PublicMenu/x.jsx` only.
+
+---
+
+## MOBILE-FIRST CHECK (MANDATORY before commit)
+This is a mobile-first restaurant app. Verify at 375px width:
+- [ ] Close/chevron: right-aligned, sticky top
+- [ ] Touch targets >= 44x44px on all ticket board buttons (Напомнить, Уже помогли, collapse toggle)
+- [ ] Ticket board rows readable at 320px — long labels don't overflow
+- [ ] "Отправить ещё" section label not truncated
+- [ ] Anxiety copy fits on one line
+- [ ] No duplicate visual indicators (no status on cards + in ticket board)
+- [ ] Bottom sheet scrollable without losing close button
+- [ ] Countdown microcopy (MM:SS) readable at small size
+
+---
+
+## Regression Check (MANDATORY after implementation)
+After completing all fixes, verify these still work:
+- [ ] Tapping any card → undo toast (5s), "Отменить" button cancels send
+- [ ] FAB bell badge shows count of active requests
+- [ ] Close + reopen drawer → active requests still in ticket board (localStorage)
+- [ ] Android back button closes drawer (overlay stack intact)
+- [ ] "Другое" chips insert text into textarea
+- [ ] "Другое" submit → new row in ticket board
+- [ ] DrawerContent has NO `relative` class (vaul compatibility)
+- [ ] plan = 'Paid' or undefined → help requests work normally (Fix 7 guard)
+
+---
+
+## E3: FROZEN UX grep verification (run before commit)
+```bash
+grep -n "hasLoadedHelpStatesRef" pages/PublicMenu/x.jsx  # must exist (~line 1664)
+grep -n "HELP_COOLDOWN_SECONDS" pages/PublicMenu/x.jsx   # must exist unchanged
+grep -n "undoToast" pages/PublicMenu/x.jsx               # undo toast intact
+grep -n "pushOverlay\|popOverlay" pages/PublicMenu/x.jsx # overlay stack intact
+grep -n "activeRequestCount" pages/PublicMenu/x.jsx      # badge counter intact
+# DrawerContent must NOT contain 'relative':
+grep -n "DrawerContent" pages/PublicMenu/x.jsx | head -5  # verify no 'relative' in DrawerContent
+```
+=== END ===

@@ -1,0 +1,1192 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d2423-a6b5-7650-a577-afd1312431c6
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260325-133629-74b9 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Feature + Fix: Batch 10 — Menu Cards (#146, PM-119, #141) Reference: `BUGS_MASTER.md`. Production page: https://menu-app-mvp-49a4f5b2.base44.app (PublicMenu / MenuView.jsx). **Context:** Two card improvements in MenuView.jsx: (1) discount price shown in tile/list cards is taken from DB integer instead of calculated — causing format mismatch with the discount badge; (2) the "+" button sits 8px inside the photo instead of on the edge (Glovo/Bolt Food style). Note: PM-096 (stepper 44px) is ALREADY FIXED (confirmed w-11 h-11 in code) — do NOT touch stepper sizes. TARGET FILES (modify): `pages/PublicMenu/MenuView.jsx` CONTEXT FILES (read-only): `pages/PublicMenu/README.md`, `pages/PublicMenu/BUGS.md` --- ## Fix 1 — PM-119 (P2) [MUST-FIX]: Tile/list price — calculate discount, don't use DB integer Search for `renderListCard` and `renderTileCard` in `pages/PublicMenu/MenuView.jsx`. ### Current behavior Tile and list cards display `item.price` directly from database (integer, e.g. `30`). When discount is active, the page shows `30 ₸` crossed-out with `32.01 ₸` as "original" — formats don't match and the discounted price is wrong. ### Expected behavior Price display logic (apply to BOTH `renderTileCard` and `renderListCard`): 1. If `partner?.discount_enabled === true` AND `partner?.discount_percent > 0`: - Original price = `item.price` (from DB, display crossed-out) - Discounted price = `Math.round(item.price * (1 - partner.discount_percent / 100) * 100) / 100` - Display: **`discounted ₸`** ~~`original ₸`~~ with `-X%` badge - Both prices use the same number format (consistent decimals) 2. If no discount active: show `item.price ₸` normally (no change) Check how `partner.discount_percent` is accessed in the existing badge rendering code — use the SAME source (props or context). ### НЕ должно быть - `item.price` shown as the DISCOUNTED price (it is the original price) - Mismatched number formats: e.g. `30 ₸` vs `32.01 ₸` - Discount shown when `discount_enabled !== true` (the guard from PM-109 КС must stay intact) - Any change to the `-X%` badge itself — badge already works correctly ### Файл и локация - `MenuView.jsx` → `renderTileCard` — price section - `MenuView.jsx` → `renderListCard` — price section - Guard: `partner?.discount_enabled === true && partner?.discount_percent > 0` (search this string) ### Проверка 1. Enable 10% discount in PartnerSettings → open menu 2. Tile mode: card shows `discounted ₸` bold + `~~original ₸~~` + `-10%` badge, formats consistent 3. List mode: same pattern 4. Disable discount → prices show normally, no badge, no strikethrough --- ## Fix 2 — #141 (P3) [MUST-FIX]: "+" button on photo EDGE — list + tile mode (Glovo style) Search for `PM-108+PM-110` (list mode) and `PM-111` (tile mode) comments in `pages/PublicMenu/MenuView.jsx`. ### Current behavior Both list and tile mode: "+" button is `absolute bottom-2 right-2` (8px from photo edge, fully INSIDE the photo boundary). Photo container has `overflow-hidden` which clips the button edge. ### Expected behavior "+" button (and stepper when count > 0) positioned at the EDGE of the photo, partially overlapping photo and partially outside — Glovo / Bolt Food style: ``` Photo container: position: relative overflow: visible ← change from overflow-hidden "+" button wrapper div: absolute bottom-[-10px] right-[-10px] (or: style={{bottom: '-10px', right: '-10px'}}) "+" button: white border ring: border-2 border-white (or: ring-2 ring-white) Keep: rounded-full, w-11 h-11, shadow-md, primaryColor background ``` Apply the SAME style to both list mode and tile mode. When count > 0, the stepper pill replaces the "+" in the same edge position. ### НЕ должно быть - Button fully inside photo (bottom-2 right-2 with overflow-hidden) - Button fully outside/below photo (bottom offset too large) - Different positioning between list and tile mode - Loss of white border ring - `overflow-hidden` remaining on photo container div (it clips the button) - Stepper moving to a different position than where "+" was ### Файл и локация - List mode: `pages/PublicMenu/MenuView.jsx` → `renderListCard` → photo wrapper div (currently `overflow-hidden`, ~line 127) + button div (~line 151: `absolute bottom-2 right-2`) - Tile mode: `pages/PublicMenu/MenuView.jsx` → `renderTileCard` → photo wrapper div + button div (~line 229: `absolute bottom-2 right-2`) ### Проверка 1. Tile mode: "+" sits on bottom-right EDGE of photo, half inside / half outside, with white border ring 2. List mode: same edge positioning with white border ring 3. Add item in tile → stepper pill in same edge position (not shifted inside the photo) 4. Add item in list → stepper pill in same edge position 5. Photo still displays correctly (no clipping of the photo itself) --- ## FROZEN UX (DO NOT CHANGE) These elements are confirmed working and tested in MenuView.jsx — do NOT modify: - `discount_enabled === true && discount_percent > 0` guard present in 5 places (PM-109 ✅) — Fix 1 must keep this guard, never use `discount_enabled` without `=== true` - Stepper button sizes: `w-11 h-11` on all −/+ buttons, tile and list mode (PM-092, PM-096 ✅) — DO NOT change - Tapping a dish card opens the detail drawer (PM-102 ✅) — Fix 2 must not break card tap - Toast on add-to-cart: visible, top-center, correct timing (AC-09, PM-103 ✅) — do not touch toast logic - Category chips use `primaryColor` (PM-062 ✅) — do not touch - "+" button position = bottom-right of photo (PM-077 ✅) — Fix 2 keeps this direction, only changes offset/overflow ## ⛔ SCOPE LOCK — modify ONLY what is described in Fix 1 and Fix 2 above - Do NOT touch CartView.jsx, x.jsx, or any file other than `pages/PublicMenu/MenuView.jsx` - Do NOT change stepper sizes (already w-11 h-11, correct) - Do NOT change category chips, tabs, or header - Do NOT modify detail card logic (that is in x.jsx) - Do NOT alter discount badge rendering (only price calculation) - If you see another issue outside Fix 1-2 scope — SKIP it, do not fix ## Regression Check (MANDATORY after implementation) Confirm these STILL work correctly after your changes: - [ ] Tapping a dish card opens the detail drawer (not broken by Fix 2 photo container change) - [ ] Discount badge `-X%` still displays correctly (not broken by Fix 1 price logic) - [ ] Cart still receives correct item.price (Fix 1 must only affect DISPLAY, not cart payload) - [ ] Stepper buttons still 44px touch targets (w-11 h-11 unchanged) - [ ] Toast appears when adding a dish to cart ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Verify at 375px width: - [ ] Tile mode: "+" button visible on photo edge, not clipped - [ ] List mode: "+" button visible on photo edge, not clipped - [ ] Discount price display fits in card without text overflow - [ ] Touch targets >= 44x44px for all +/− buttons - [ ] No layout shift in card when discount is active vs inactive ## Implementation Notes - For Fix 1: check how discount_percent is already used in the badge rendering code — it must be accessible from the same scope as `renderTileCard` / `renderListCard`. Use that exact same variable. - For Fix 2: `overflow: visible` on photo container should not affect photo display (the image itself is bounded by width/height). But if photo has `rounded-xl` that clips via overflow — consider moving `rounded-xl` to the img tag instead of the container. - FROZEN UX grep — run before commit to confirm unchanged: - `grep -n "w-11 h-11" pages/PublicMenu/MenuView.jsx` → must return multiple results (stepper buttons) - `grep -n "discount_enabled === true" pages/PublicMenu/MenuView.jsx` → must return ≥1 result - `grep -n "bottom-2 right-2" pages/PublicMenu/MenuView.jsx` → must return 0 results after Fix 2 - `git add pages/PublicMenu/MenuView.jsx && git commit -m "feat: batch10 — discount price calc + photo-edge plus button" && git push` === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/PublicMenu/MenuView.jsx` against the two scoped fixes only. I’m reading that file plus `README.md` and `BUGS.md` in the same folder, then I’ll write a concise findings report to the pipeline path and save the required review artifacts in `pages/PublicMenu/`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/BUGS.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 10.93s:
+
+ exited 124 in 10.94s:
+
+ exited 124 in 10.92s:
+
+codex
+The first file reads hit the timeout, likely because `MenuView.jsx` is large. I’m retrying with a longer window and then narrowing to the exact fix sections so I stay inside the requested scope.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/BUGS.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 10.36s:
+import React from "react";
+import { Loader2, ImageIcon, Minus, Plus, LayoutGrid, List } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import DishRating from "@/components/publicMenu/DishRating";
+
+// Grid mappings for Tailwind (explicit full class names)
+const DESKTOP_GRID = {
+  1: "md:grid-cols-1",
+  2: "md:grid-cols-2",
+  3: "md:grid-cols-3",
+  4: "md:grid-cols-4",
+  5: "md:grid-cols-5",
+};
+
+const MOBILE_GRID = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+  3: "grid-cols-3",
+};
+
+ succeeded in 10.40s:
+---
+version: "35.0"
+updated: "2026-03-23"
+session: 168
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*8 active bugs remaining (0x P0, 4x P1, 3x P2, 0x P3, 1x suggestion).*
+
+### BUG-PM-056: Drawer layout not visit-state-driven (P1 â€” Batch 2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P1
+- **ÐšÐ¾Ð³Ð´Ð°:** S153 (consensus chain publicmenu-260321-093745)
+ succeeded in 10.52s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+codex
+I have the target file loaded. Next I’m pulling the exact price and photo-button sections with line numbers so the report is tied to the two requested fixes and nothing else.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content '"'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 70 -First 120' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content '"'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 180 -First 110' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.98s:
+ 181:                   </button>
+ 182:                 </div>
+ 183:               )}
+ 184:             </div>
+ 185:           </div>
+ 186:         </CardContent>
+ 187:       </Card>
+ 188:     );
+ 189:   };
+ 190: 
+ 191:   // Render dish card for TILE mode (grid layout)
+ 192:   // S72: Redesigned â€” flex-col alignment, round "+" on photo, pill stepper, no placeholder text
+ 193:   const renderTileCard = (dish) => {
+ 194:     const inCart = cart.find((i) => i.dishId === dish.id);
+ 195: 
+ 196:     return (
+ 197:       <Card
+ 198:         key={dish.id}
+ 199:         className="relative overflow-hidden hover:shadow-md transition-shadow border-slate-200 flex flex-col cursor-pointer"
+ 200:         onClick={() => onDishClick?.(dish)}
+ succeeded in 9.16s:
+  71:   // Read grid settings from partner with safe fallback
+  72:   const rawDesktop = partner?.menu_grid_desktop;
+  73:   const rawMobile = partner?.menu_grid_mobile;
+  74: 
+  75:   const desktopCols = DESKTOP_GRID[rawDesktop] ? rawDesktop : 3;
+  76:   const mobileCols = MOBILE_GRID[rawMobile] ? rawMobile : 2;
+  77: 
+  78:   const gridColsClass = `${MOBILE_GRID[mobileCols]} ${DESKTOP_GRID[desktopCols]}`;
+  79: 
+  80:   // Render dish card for LIST mode (horizontal layout)
+  81:   const renderListCard = (dish) => {
+  82:     const inCart = cart.find((i) => i.dishId === dish.id);
+  83:     
+  84:     return (
+  85:       <Card
+  86:         key={dish.id}
+  87:         className="overflow-hidden hover:shadow-md transition-shadow border-slate-200 cursor-pointer"
+  88:         onClick={() => onDishClick?.(dish)}
+  89:       >
+  90:         <CardContent className="p-3 flex gap-3">
+codex
+I’ve isolated the two target sections in `MenuView.jsx`. I’m checking the page-local docs for the same bug IDs now so the findings stay aligned with the requested batch and I don’t drift into unrelated issues.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content '"'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f "'$i, $_; $i++ } | Select-Object -Skip 288 -First 20' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/BUGS.md' -Pattern 'PM-119','#141','MenuView','discount','PM-111','PM-108','PM-110' | ForEach-Object { '{0}:{1}: {2}' -f "'$_.Path, $_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.11s:
+ 289:                 {formatPrice(dish.price)}
+ 290:               </div>
+ 291:             )}
+ 292: 
+ 293:             {showReviews && dishRatings?.[dish.id] && (
+ 294:               <DishRating
+ 295:                 avgRating={dishRatings[dish.id]?.avg}
+ 296:                 reviewCount={dishRatings[dish.id]?.count}
+ 297:                 onClick={onOpenReviews ? () => onOpenReviews(dish.id) : undefined}
+ 298:               />
+ 299:             )}
+ 300:           </div>
+ 301:         </CardContent>
+ 302:       </Card>
+ 303:     );
+ 304:   };
+ 305: 
+ 306:   return (
+ 307:     <div className="max-w-2xl mx-auto px-4 mt-4 space-y-8" ref={listTopRef}>
+ 308:       {/* Mobile layout toggle - only visible on mobile */}
+ succeeded in 2.13s:
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\README.md:18: | MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 мар 2026 | S79 |
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\README.md:33: - Full CC code review всех 6 base файлов (CartView, CheckoutView, MenuView, ModeTabs, useTableSession, x.jsx)
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:115: ### BUG-PM-072: Mobile grid partner setting ignored in MenuView (P2) — FIXED S159
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:118: - **Файл:** MenuView.jsx
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:145: ### FIX-CHAIN-d45d: PM-122+PM-123+PM-118 — Detail card drawer + layout + discount — FIXED S173
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:150: - PM-123 (P2): Content reorder: Photo → Title → Description → Price+Discount → Rating → Sticky bar (was: Title → Price → Rating → Description)
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:151: - PM-118 (P2): Discount display aligned to partner-level fields (partner.discount_enabled, partner.discount_percent), matching MenuView.jsx pattern
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:154: ### FIX-CHAIN-f92b: PM-108+PM-110+PM-111 — Card layout redesign — FIXED S168
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:156: - **Файл:** MenuView.jsx
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:158: - PM-108+PM-110 (P2): List-mode card redesign — image moved to RIGHT side (Glovo/Wolt pattern), "+" button as overlay on image bottom-right (`absolute bottom-2 right-2 z-10 rounded-full`), stepper stays in text column when inCart.
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:159: - PM-111 (P2): Tile-mode "+" button moved from card-level absolute to image container overlay (`absolute bottom-2 right-2 z-10`). Removed `pb-14` from CardContent and `pr-14` from price area.
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:163: - **Файл:** MenuView.jsx, x.jsx
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:165: - PM-109 (P1): Discount badge/strikethrough showed when `discount_enabled=false`. Fix: changed all 5 discount guards from truthy check to `=== true && (discount_percent ?? 0) > 0` (4 in MenuView.jsx, 1 in x.jsx dish detail).
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:168: ### FIX-BATCH6-CHAIN-c460: PM-107, PM-102, PM-108, PM-104 refinements — FIXED S166
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:170: - **Файл:** x.jsx, MenuView.jsx
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:174: - PM-108 (P2): "+" button in list-mode — added `pr-1` to button container for breathing room inside `overflow-hidden` Card.
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:176: - **No-ops:** PM-103 (already fully fixed by d0a4), PM-096/PM-discount-check/#84b (already fixed in prior КС).
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:180: - **Файл:** MenuView.jsx, x.jsx
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:184: - **No-ops:** PM-107 (already fixed by fd04), PM-096/PM-discount-check/#84b (already fixed), PM-108 (already fixed by fd04).
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\BUGS.md:187: ### FIX-BATCH6-CHAIN-fd04: PM-107, PM-103, PM-102, PM-108 — FIXED S166
+codex
+I’ve finished the static analysis. I’m writing the scoped findings to the required pipeline file and duplicating the review artifacts into `pages/PublicMenu/` to satisfy the repo’s review-output rules.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Item 'pipeline/chain-state' | Select-Object FullName" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Item 'pages/PublicMenu' | Select-Object FullName" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.80s:
+
+FullName                                                             
+--------                                                             
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu
+
+
+ succeeded in 1.87s:
+
+FullName                                                                 
+--------                                                                 
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pipeline\chain-state
+
+
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-25.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-133629-74b9
+
+## Findings
+1. [P2] Discount math diverges between list and tile cards — `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
+2. [P3] The photo-edge overlay position is still not implemented in either mode — the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
+3. [P3] The shared Glovo-style control chrome is incomplete — list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2’s “same style in list and tile” requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+
+## Summary
+Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-25.log
+Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
+Get-Content -Raw 'pages/PublicMenu/README.md'
+Get-Content -Raw 'pages/PublicMenu/BUGS.md'
+Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
+Get-Content -Raw 'pages/PublicMenu/README.md'
+Get-Content -Raw 'pages/PublicMenu/BUGS.md'
+$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 70 -First 120
+$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 180 -First 110
+Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/BUGS.md' -Pattern 'PM-119','#141','MenuView','discount','PM-111','PM-108','PM-110' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
+$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 288 -First 20
+Get-Item 'pipeline/chain-state' | Select-Object FullName
+Get-Item 'pages/PublicMenu' | Select-Object FullName
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-133629-74b9
+
+## Findings
+1. [P2] Discount math diverges between list and tile cards — `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
+2. [P3] The photo-edge overlay position is still not implemented in either mode — the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
+3. [P3] The shared Glovo-style control chrome is incomplete — list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2’s “same style in list and tile” requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+
+## Summary
+Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+apply_patch(auto_approved=true) exited 0 in 281ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+A pages/PublicMenu/review_2026-03-25.md
+A pages/PublicMenu/commands_2026-03-25.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-25.log b/pages/PublicMenu/commands_2026-03-25.log
+index 4c9eac9e2b3707290fa69c1979f72f039edfd8b7..4664ac6453ac77846526ea4e073f0111a1c5ed32
+--- a/pages/PublicMenu/commands_2026-03-25.log
++++ b/pages/PublicMenu/commands_2026-03-25.log
+@@ -1,18 +1,12 @@
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu' | Select-Object Name,Length,LastWriteTime | Format-Table -AutoSize
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=3635; $i -le 3775; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; $lines=Get-Content $p; for($i=1; $i -le [Math]::Min(220,$lines.Length); $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; Select-String -Path $p -Pattern 'PM-131|#150|Help Drawer|Нужна помощь|submit' -Context 3,8 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'submitHelpRequest|handlePresetSelect|closeHelpDrawer|openHelpDrawer|isHelpModalOpen|selectedHelpType|helpComment|helpSubmitError|hasActiveRequest|isSendingHelp' -Context 3,6 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; $lines=Get-Content $p; $matches=Select-String -Path $p -Pattern 'PM-131|#150'; foreach($m in $matches){ $start=[Math]::Max(1,$m.LineNumber-8); $end=[Math]::Min($lines.Length,$m.LineNumber+18); '--- BLOCK ' + $m.LineNumber + ' ---'; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'helpQuickSent|quick_sent|closeHelpDrawer\(|handlePresetSelect\(|submitHelpRequest\(' -Context 2,4 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'pointer-events-none|z-\[|z-' -Context 0,1 | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state' | Select-Object Name | Format-Table -AutoSize
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'const openHelpDrawer|const closeHelpDrawer|useHelpRequests\(' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1540; $i -le 1605; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1638; $i -le 1662; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-25.md'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-25.log'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 70 -First 120
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 180 -First 110
++Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/BUGS.md' -Pattern 'PM-119','#141','MenuView','discount','PM-111','PM-108','PM-110' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 288 -First 20
++Get-Item 'pipeline/chain-state' | Select-Object FullName
++Get-Item 'pages/PublicMenu' | Select-Object FullName
+diff --git a/pages/PublicMenu/review_2026-03-25.md b/pages/PublicMenu/review_2026-03-25.md
+index a8ffc2e98de16c12f2a147bf0dae9f4c9b0b8a23..379454104c8ead6d038a45e8c87fe778208c6de2
+--- a/pages/PublicMenu/review_2026-03-25.md
++++ b/pages/PublicMenu/review_2026-03-25.md
+@@ -1,15 +1,15 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-131945-c028
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-133629-74b9
+ 
+ ## Findings
+-1. [P2] Fix 1: Help drawer still ships the old multi-step selector flow — In `x.jsx` at lines 3687-3737, the four preset options only call `handlePresetSelect(opt.id)`, the textarea is always rendered, and the footer still uses separate `Отмена` + `Отправить` buttons. That is the pre-redesign flow the task explicitly removes, so preset requests are still not one-tap cards, `Другое` is not the only path that expands a form, and the standalone cancel CTA remains. `Другое` also keeps `sm:col-span-1` instead of the required persistent `col-span-2` card layout. FIX: Replace the selector flow with five cards, wire the four preset cards to `submitHelpRequest(typeOverride)` directly, keep `Другое` as the only expandable inline form, and remove the standalone cancel button/default-visible textarea.
+-2. [P2] Fix 1: Quick-send success state and auto-close/reset path are missing — In `x.jsx` at lines 1649-1657, `closeHelpDrawer()` only closes the drawer; there is no `helpQuickSent` state anywhere in `x.jsx`, no success-state render in the drawer body, and no 2-second auto-close flow after a successful preset tap. That means the required `✅ Запрос отправлен` confirmation and state reset behavior for the redesigned quick actions are not implemented. FIX: Add `const [helpQuickSent, setHelpQuickSent] = useState(false)`, render the required success state with `help.quick_sent_title` / `help.quick_sent_desc`, auto-close via `setTimeout(() => { closeHelpDrawer(); setHelpQuickSent(false); }, 2000)`, and reset `helpQuickSent`, `selectedHelpType`, and `helpComment` on drawer close.
+-3. [P2] Fix 2: `Другое` submit button is still blocked by `!currentTableId` instead of comment validation — In `x.jsx` at lines 3727-3735, the submit CTA still uses `disabled={isSendingHelp || !currentTableId}`. This preserves the exact PM-131 failure mode described in the task and does not implement the required behavior where the button is disabled only when sending or when `helpComment.trim()` is empty. I did not find `pointer-events-none` in this drawer slice, so the current concrete blocker is the disabled condition itself. FIX: Change the expanded `Другое` submit button to `disabled={isSendingHelp || !helpComment.trim()}` only, keeping the CTA enabled as soon as the textarea contains text.
++1. [P2] Discount math diverges between list and tile cards — `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode — the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete — list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2’s “same style in list and tile” requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+ 
+ ## Summary
+-Total: 3 findings (0 P0, 0 P1, 3 P2, 0 P3)
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
+ 
+ ## Prompt Clarity (MANDATORY — do NOT skip this section)
+ - Overall clarity: 5
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+-- Missing context (what info would have helped): None needed; the task named the target file, exact UI area, frozen UX constraints, and expected behaviors.
++- Missing context (what info would have helped): None.
+ - Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..379454104c8ead6d038a45e8c87fe778208c6de2
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-133629-74b9
++
++## Findings
++1. [P2] Discount math diverges between list and tile cards — `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode — the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete — list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2’s “same style in list and tile” requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
++
++## Summary
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-25.log b/pages/PublicMenu/commands_2026-03-25.log
+index 4c9eac9e2b3707290fa69c1979f72f039edfd8b7..4664ac6453ac77846526ea4e073f0111a1c5ed32
+--- a/pages/PublicMenu/commands_2026-03-25.log
++++ b/pages/PublicMenu/commands_2026-03-25.log
+@@ -1,18 +1,12 @@
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu' | Select-Object Name,Length,LastWriteTime | Format-Table -AutoSize
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=3635; $i -le 3775; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; $lines=Get-Content $p; for($i=1; $i -le [Math]::Min(220,$lines.Length); $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; Select-String -Path $p -Pattern 'PM-131|#150|Help Drawer|Нужна помощь|submit' -Context 3,8 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'submitHelpRequest|handlePresetSelect|closeHelpDrawer|openHelpDrawer|isHelpModalOpen|selectedHelpType|helpComment|helpSubmitError|hasActiveRequest|isSendingHelp' -Context 3,6 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; $lines=Get-Content $p; $matches=Select-String -Path $p -Pattern 'PM-131|#150'; foreach($m in $matches){ $start=[Math]::Max(1,$m.LineNumber-8); $end=[Math]::Min($lines.Length,$m.LineNumber+18); '--- BLOCK ' + $m.LineNumber + ' ---'; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'helpQuickSent|quick_sent|closeHelpDrawer\(|handlePresetSelect\(|submitHelpRequest\(' -Context 2,4 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'pointer-events-none|z-\[|z-' -Context 0,1 | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state' | Select-Object Name | Format-Table -AutoSize
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'const openHelpDrawer|const closeHelpDrawer|useHelpRequests\(' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1540; $i -le 1605; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1638; $i -le 1662; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-25.md'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-25.log'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 70 -First 120
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 180 -First 110
++Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/BUGS.md' -Pattern 'PM-119','#141','MenuView','discount','PM-111','PM-108','PM-110' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 288 -First 20
++Get-Item 'pipeline/chain-state' | Select-Object FullName
++Get-Item 'pages/PublicMenu' | Select-Object FullName
+diff --git a/pages/PublicMenu/review_2026-03-25.md b/pages/PublicMenu/review_2026-03-25.md
+index a8ffc2e98de16c12f2a147bf0dae9f4c9b0b8a23..379454104c8ead6d038a45e8c87fe778208c6de2
+--- a/pages/PublicMenu/review_2026-03-25.md
++++ b/pages/PublicMenu/review_2026-03-25.md
+@@ -1,15 +1,15 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-131945-c028
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-133629-74b9
+ 
+ ## Findings
+-1. [P2] Fix 1: Help drawer still ships the old multi-step selector flow — In `x.jsx` at lines 3687-3737, the four preset options only call `handlePresetSelect(opt.id)`, the textarea is always rendered, and the footer still uses separate `Отмена` + `Отправить` buttons. That is the pre-redesign flow the task explicitly removes, so preset requests are still not one-tap cards, `Другое` is not the only path that expands a form, and the standalone cancel CTA remains. `Другое` also keeps `sm:col-span-1` instead of the required persistent `col-span-2` card layout. FIX: Replace the selector flow with five cards, wire the four preset cards to `submitHelpRequest(typeOverride)` directly, keep `Другое` as the only expandable inline form, and remove the standalone cancel button/default-visible textarea.
+-2. [P2] Fix 1: Quick-send success state and auto-close/reset path are missing — In `x.jsx` at lines 1649-1657, `closeHelpDrawer()` only closes the drawer; there is no `helpQuickSent` state anywhere in `x.jsx`, no success-state render in the drawer body, and no 2-second auto-close flow after a successful preset tap. That means the required `✅ Запрос отправлен` confirmation and state reset behavior for the redesigned quick actions are not implemented. FIX: Add `const [helpQuickSent, setHelpQuickSent] = useState(false)`, render the required success state with `help.quick_sent_title` / `help.quick_sent_desc`, auto-close via `setTimeout(() => { closeHelpDrawer(); setHelpQuickSent(false); }, 2000)`, and reset `helpQuickSent`, `selectedHelpType`, and `helpComment` on drawer close.
+-3. [P2] Fix 2: `Другое` submit button is still blocked by `!currentTableId` instead of comment validation — In `x.jsx` at lines 3727-3735, the submit CTA still uses `disabled={isSendingHelp || !currentTableId}`. This preserves the exact PM-131 failure mode described in the task and does not implement the required behavior where the button is disabled only when sending or when `helpComment.trim()` is empty. I did not find `pointer-events-none` in this drawer slice, so the current concrete blocker is the disabled condition itself. FIX: Change the expanded `Другое` submit button to `disabled={isSendingHelp || !helpComment.trim()}` only, keeping the CTA enabled as soon as the textarea contains text.
++1. [P2] Discount math diverges between list and tile cards — `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode — the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete — list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2’s “same style in list and tile” requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+ 
+ ## Summary
+-Total: 3 findings (0 P0, 0 P1, 3 P2, 0 P3)
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
+ 
+ ## Prompt Clarity (MANDATORY — do NOT skip this section)
+ - Overall clarity: 5
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+-- Missing context (what info would have helped): None needed; the task named the target file, exact UI area, frozen UX constraints, and expected behaviors.
++- Missing context (what info would have helped): None.
+ - Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..379454104c8ead6d038a45e8c87fe778208c6de2
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-133629-74b9
++
++## Findings
++1. [P2] Discount math diverges between list and tile cards — `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode — the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete — list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2’s “same style in list and tile” requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
++
++## Summary
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+The report files are written. I’m doing a quick read-back of the generated markdown and command log to make sure the saved artifacts match the scoped review.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/review_2026-03-25.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/commands_2026-03-25.log'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.78s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260325-133629-74b9
+
+## Findings
+1. [P2] Discount math diverges between list and tile cards â€” `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
+2. [P3] The photo-edge overlay position is still not implemented in either mode â€” the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
+3. [P3] The shared Glovo-style control chrome is incomplete â€” list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2â€™s â€œsame style in list and tileâ€ requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+
+## Summary
+Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY â€” do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+
+ succeeded in 1.85s:
+Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
+Get-Content -Raw 'pages/PublicMenu/README.md'
+Get-Content -Raw 'pages/PublicMenu/BUGS.md'
+Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
+Get-Content -Raw 'pages/PublicMenu/README.md'
+Get-Content -Raw 'pages/PublicMenu/BUGS.md'
+$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 70 -First 120
+$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 180 -First 110
+Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/BUGS.md' -Pattern 'PM-119','#141','MenuView','discount','PM-111','PM-108','PM-110' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
+$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 288 -First 20
+Get-Item 'pipeline/chain-state' | Select-Object FullName
+Get-Item 'pages/PublicMenu' | Select-Object FullName
+
+ succeeded in 1.86s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260325-133629-74b9
+
+## Findings
+1. [P2] Discount math diverges between list and tile cards â€” `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
+2. [P3] The photo-edge overlay position is still not implemented in either mode â€” the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
+3. [P3] The shared Glovo-style control chrome is incomplete â€” list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2â€™s â€œsame style in list and tileâ€ requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+
+## Summary
+Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY â€” do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-25.log b/pages/PublicMenu/commands_2026-03-25.log
+index 4c9eac9e2b3707290fa69c1979f72f039edfd8b7..4664ac6453ac77846526ea4e073f0111a1c5ed32
+--- a/pages/PublicMenu/commands_2026-03-25.log
++++ b/pages/PublicMenu/commands_2026-03-25.log
+@@ -1,18 +1,12 @@
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu' | Select-Object Name,Length,LastWriteTime | Format-Table -AutoSize
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=3635; $i -le 3775; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; $lines=Get-Content $p; for($i=1; $i -le [Math]::Min(220,$lines.Length); $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; Select-String -Path $p -Pattern 'PM-131|#150|Help Drawer|Нужна помощь|submit' -Context 3,8 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'submitHelpRequest|handlePresetSelect|closeHelpDrawer|openHelpDrawer|isHelpModalOpen|selectedHelpType|helpComment|helpSubmitError|hasActiveRequest|isSendingHelp' -Context 3,6 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; $lines=Get-Content $p; $matches=Select-String -Path $p -Pattern 'PM-131|#150'; foreach($m in $matches){ $start=[Math]::Max(1,$m.LineNumber-8); $end=[Math]::Min($lines.Length,$m.LineNumber+18); '--- BLOCK ' + $m.LineNumber + ' ---'; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'helpQuickSent|quick_sent|closeHelpDrawer\(|handlePresetSelect\(|submitHelpRequest\(' -Context 2,4 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'pointer-events-none|z-\[|z-' -Context 0,1 | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state' | Select-Object Name | Format-Table -AutoSize
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'const openHelpDrawer|const closeHelpDrawer|useHelpRequests\(' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1540; $i -le 1605; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1638; $i -le 1662; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-25.md'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-25.log'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 70 -First 120
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 180 -First 110
++Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/BUGS.md' -Pattern 'PM-119','#141','MenuView','discount','PM-111','PM-108','PM-110' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 288 -First 20
++Get-Item 'pipeline/chain-state' | Select-Object FullName
++Get-Item 'pages/PublicMenu' | Select-Object FullName
+diff --git a/pages/PublicMenu/review_2026-03-25.md b/pages/PublicMenu/review_2026-03-25.md
+index a8ffc2e98de16c12f2a147bf0dae9f4c9b0b8a23..379454104c8ead6d038a45e8c87fe778208c6de2
+--- a/pages/PublicMenu/review_2026-03-25.md
++++ b/pages/PublicMenu/review_2026-03-25.md
+@@ -1,15 +1,15 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-131945-c028
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-133629-74b9
+ 
+ ## Findings
+-1. [P2] Fix 1: Help drawer still ships the old multi-step selector flow — In `x.jsx` at lines 3687-3737, the four preset options only call `handlePresetSelect(opt.id)`, the textarea is always rendered, and the footer still uses separate `Отмена` + `Отправить` buttons. That is the pre-redesign flow the task explicitly removes, so preset requests are still not one-tap cards, `Другое` is not the only path that expands a form, and the standalone cancel CTA remains. `Другое` also keeps `sm:col-span-1` instead of the required persistent `col-span-2` card layout. FIX: Replace the selector flow with five cards, wire the four preset cards to `submitHelpRequest(typeOverride)` directly, keep `Другое` as the only expandable inline form, and remove the standalone cancel button/default-visible textarea.
+-2. [P2] Fix 1: Quick-send success state and auto-close/reset path are missing — In `x.jsx` at lines 1649-1657, `closeHelpDrawer()` only closes the drawer; there is no `helpQuickSent` state anywhere in `x.jsx`, no success-state render in the drawer body, and no 2-second auto-close flow after a successful preset tap. That means the required `✅ Запрос отправлен` confirmation and state reset behavior for the redesigned quick actions are not implemented. FIX: Add `const [helpQuickSent, setHelpQuickSent] = useState(false)`, render the required success state with `help.quick_sent_title` / `help.quick_sent_desc`, auto-close via `setTimeout(() => { closeHelpDrawer(); setHelpQuickSent(false); }, 2000)`, and reset `helpQuickSent`, `selectedHelpType`, and `helpComment` on drawer close.
+-3. [P2] Fix 2: `Другое` submit button is still blocked by `!currentTableId` instead of comment validation — In `x.jsx` at lines 3727-3735, the submit CTA still uses `disabled={isSendingHelp || !currentTableId}`. This preserves the exact PM-131 failure mode described in the task and does not implement the required behavior where the button is disabled only when sending or when `helpComment.trim()` is empty. I did not find `pointer-events-none` in this drawer slice, so the current concrete blocker is the disabled condition itself. FIX: Change the expanded `Другое` submit button to `disabled={isSendingHelp || !helpComment.trim()}` only, keeping the CTA enabled as soon as the textarea contains text.
++1. [P2] Discount math diverges between list and tile cards — `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode — the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete — list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2’s “same style in list and tile” requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+ 
+ ## Summary
+-Total: 3 findings (0 P0, 0 P1, 3 P2, 0 P3)
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
+ 
+ ## Prompt Clarity (MANDATORY — do NOT skip this section)
+ - Overall clarity: 5
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+-- Missing context (what info would have helped): None needed; the task named the target file, exact UI area, frozen UX constraints, and expected behaviors.
++- Missing context (what info would have helped): None.
+ - Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..379454104c8ead6d038a45e8c87fe778208c6de2
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-133629-74b9
++
++## Findings
++1. [P2] Discount math diverges between list and tile cards — `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode — the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete — list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2’s “same style in list and tile” requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
++
++## Summary
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+The saved markdown is correct structurally, but the console read-back exposed non-ASCII punctuation. I’m normalizing the report files to plain ASCII so the artifacts are clean in downstream tooling.
+file update
+M C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-25.md
+@@ -1,7 +1,7 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-133629-74b9
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
+ 
+ ## Findings
+-1. [P2] Discount math diverges between list and tile cards — `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
+-2. [P3] The photo-edge overlay position is still not implemented in either mode — the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
+-3. [P3] The shared Glovo-style control chrome is incomplete — list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2’s “same style in list and tile” requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
++1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+ 
+@@ -10,3 +10,3 @@
+ 
+-## Prompt Clarity (MANDATORY — do NOT skip this section)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
+ - Overall clarity: 5
+M C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+@@ -1,7 +1,7 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-133629-74b9
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
+ 
+ ## Findings
+-1. [P2] Discount math diverges between list and tile cards — `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
+-2. [P3] The photo-edge overlay position is still not implemented in either mode — the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
+-3. [P3] The shared Glovo-style control chrome is incomplete — list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2’s “same style in list and tile” requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
++1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+ 
+@@ -10,3 +10,3 @@
+ 
+-## Prompt Clarity (MANDATORY — do NOT skip this section)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
+ - Overall clarity: 5
+apply_patch(auto_approved=true) exited 0 in 271ms:
+Success. Updated the following files:
+M pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+M pages/PublicMenu/review_2026-03-25.md
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-25.log b/pages/PublicMenu/commands_2026-03-25.log
+index 4c9eac9e2b3707290fa69c1979f72f039edfd8b7..4664ac6453ac77846526ea4e073f0111a1c5ed32
+--- a/pages/PublicMenu/commands_2026-03-25.log
++++ b/pages/PublicMenu/commands_2026-03-25.log
+@@ -1,18 +1,12 @@
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu' | Select-Object Name,Length,LastWriteTime | Format-Table -AutoSize
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=3635; $i -le 3775; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; $lines=Get-Content $p; for($i=1; $i -le [Math]::Min(220,$lines.Length); $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; Select-String -Path $p -Pattern 'PM-131|#150|Help Drawer|Нужна помощь|submit' -Context 3,8 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'submitHelpRequest|handlePresetSelect|closeHelpDrawer|openHelpDrawer|isHelpModalOpen|selectedHelpType|helpComment|helpSubmitError|hasActiveRequest|isSendingHelp' -Context 3,6 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; $lines=Get-Content $p; $matches=Select-String -Path $p -Pattern 'PM-131|#150'; foreach($m in $matches){ $start=[Math]::Max(1,$m.LineNumber-8); $end=[Math]::Min($lines.Length,$m.LineNumber+18); '--- BLOCK ' + $m.LineNumber + ' ---'; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'helpQuickSent|quick_sent|closeHelpDrawer\(|handlePresetSelect\(|submitHelpRequest\(' -Context 2,4 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'pointer-events-none|z-\[|z-' -Context 0,1 | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state' | Select-Object Name | Format-Table -AutoSize
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'const openHelpDrawer|const closeHelpDrawer|useHelpRequests\(' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1540; $i -le 1605; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1638; $i -le 1662; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-25.md'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-25.log'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 70 -First 120
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 180 -First 110
++Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/BUGS.md' -Pattern 'PM-119','#141','MenuView','discount','PM-111','PM-108','PM-110' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 288 -First 20
++Get-Item 'pipeline/chain-state' | Select-Object FullName
++Get-Item 'pages/PublicMenu' | Select-Object FullName
+diff --git a/pages/PublicMenu/review_2026-03-25.md b/pages/PublicMenu/review_2026-03-25.md
+index a8ffc2e98de16c12f2a147bf0dae9f4c9b0b8a23..beea765a2427d83c04b93bb301b091e8f5e1126b
+--- a/pages/PublicMenu/review_2026-03-25.md
++++ b/pages/PublicMenu/review_2026-03-25.md
+@@ -1,15 +1,15 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-131945-c028
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
+ 
+ ## Findings
+-1. [P2] Fix 1: Help drawer still ships the old multi-step selector flow — In `x.jsx` at lines 3687-3737, the four preset options only call `handlePresetSelect(opt.id)`, the textarea is always rendered, and the footer still uses separate `Отмена` + `Отправить` buttons. That is the pre-redesign flow the task explicitly removes, so preset requests are still not one-tap cards, `Другое` is not the only path that expands a form, and the standalone cancel CTA remains. `Другое` also keeps `sm:col-span-1` instead of the required persistent `col-span-2` card layout. FIX: Replace the selector flow with five cards, wire the four preset cards to `submitHelpRequest(typeOverride)` directly, keep `Другое` as the only expandable inline form, and remove the standalone cancel button/default-visible textarea.
+-2. [P2] Fix 1: Quick-send success state and auto-close/reset path are missing — In `x.jsx` at lines 1649-1657, `closeHelpDrawer()` only closes the drawer; there is no `helpQuickSent` state anywhere in `x.jsx`, no success-state render in the drawer body, and no 2-second auto-close flow after a successful preset tap. That means the required `✅ Запрос отправлен` confirmation and state reset behavior for the redesigned quick actions are not implemented. FIX: Add `const [helpQuickSent, setHelpQuickSent] = useState(false)`, render the required success state with `help.quick_sent_title` / `help.quick_sent_desc`, auto-close via `setTimeout(() => { closeHelpDrawer(); setHelpQuickSent(false); }, 2000)`, and reset `helpQuickSent`, `selectedHelpType`, and `helpComment` on drawer close.
+-3. [P2] Fix 2: `Другое` submit button is still blocked by `!currentTableId` instead of comment validation — In `x.jsx` at lines 3727-3735, the submit CTA still uses `disabled={isSendingHelp || !currentTableId}`. This preserves the exact PM-131 failure mode described in the task and does not implement the required behavior where the button is disabled only when sending or when `helpComment.trim()` is empty. I did not find `pointer-events-none` in this drawer slice, so the current concrete blocker is the disabled condition itself. FIX: Change the expanded `Другое` submit button to `disabled={isSendingHelp || !helpComment.trim()}` only, keeping the CTA enabled as soon as the textarea contains text.
++1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+ 
+ ## Summary
+-Total: 3 findings (0 P0, 0 P1, 3 P2, 0 P3)
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
+ 
+-## Prompt Clarity (MANDATORY — do NOT skip this section)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
+ - Overall clarity: 5
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+-- Missing context (what info would have helped): None needed; the task named the target file, exact UI area, frozen UX constraints, and expected behaviors.
++- Missing context (what info would have helped): None.
+ - Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..beea765a2427d83c04b93bb301b091e8f5e1126b
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
++
++## Findings
++1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
++
++## Summary
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-25.log b/pages/PublicMenu/commands_2026-03-25.log
+index 4c9eac9e2b3707290fa69c1979f72f039edfd8b7..4664ac6453ac77846526ea4e073f0111a1c5ed32
+--- a/pages/PublicMenu/commands_2026-03-25.log
++++ b/pages/PublicMenu/commands_2026-03-25.log
+@@ -1,18 +1,12 @@
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu' | Select-Object Name,Length,LastWriteTime | Format-Table -AutoSize
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=3635; $i -le 3775; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; $lines=Get-Content $p; for($i=1; $i -le [Math]::Min(220,$lines.Length); $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; Select-String -Path $p -Pattern 'PM-131|#150|Help Drawer|Нужна помощь|submit' -Context 3,8 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'submitHelpRequest|handlePresetSelect|closeHelpDrawer|openHelpDrawer|isHelpModalOpen|selectedHelpType|helpComment|helpSubmitError|hasActiveRequest|isSendingHelp' -Context 3,6 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; $lines=Get-Content $p; $matches=Select-String -Path $p -Pattern 'PM-131|#150'; foreach($m in $matches){ $start=[Math]::Max(1,$m.LineNumber-8); $end=[Math]::Min($lines.Length,$m.LineNumber+18); '--- BLOCK ' + $m.LineNumber + ' ---'; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'helpQuickSent|quick_sent|closeHelpDrawer\(|handlePresetSelect\(|submitHelpRequest\(' -Context 2,4 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'pointer-events-none|z-\[|z-' -Context 0,1 | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state' | Select-Object Name | Format-Table -AutoSize
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'const openHelpDrawer|const closeHelpDrawer|useHelpRequests\(' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1540; $i -le 1605; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1638; $i -le 1662; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-25.md'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-25.log'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 70 -First 120
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 180 -First 110
++Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/BUGS.md' -Pattern 'PM-119','#141','MenuView','discount','PM-111','PM-108','PM-110' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 288 -First 20
++Get-Item 'pipeline/chain-state' | Select-Object FullName
++Get-Item 'pages/PublicMenu' | Select-Object FullName
+diff --git a/pages/PublicMenu/review_2026-03-25.md b/pages/PublicMenu/review_2026-03-25.md
+index a8ffc2e98de16c12f2a147bf0dae9f4c9b0b8a23..beea765a2427d83c04b93bb301b091e8f5e1126b
+--- a/pages/PublicMenu/review_2026-03-25.md
++++ b/pages/PublicMenu/review_2026-03-25.md
+@@ -1,15 +1,15 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-131945-c028
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
+ 
+ ## Findings
+-1. [P2] Fix 1: Help drawer still ships the old multi-step selector flow — In `x.jsx` at lines 3687-3737, the four preset options only call `handlePresetSelect(opt.id)`, the textarea is always rendered, and the footer still uses separate `Отмена` + `Отправить` buttons. That is the pre-redesign flow the task explicitly removes, so preset requests are still not one-tap cards, `Другое` is not the only path that expands a form, and the standalone cancel CTA remains. `Другое` also keeps `sm:col-span-1` instead of the required persistent `col-span-2` card layout. FIX: Replace the selector flow with five cards, wire the four preset cards to `submitHelpRequest(typeOverride)` directly, keep `Другое` as the only expandable inline form, and remove the standalone cancel button/default-visible textarea.
+-2. [P2] Fix 1: Quick-send success state and auto-close/reset path are missing — In `x.jsx` at lines 1649-1657, `closeHelpDrawer()` only closes the drawer; there is no `helpQuickSent` state anywhere in `x.jsx`, no success-state render in the drawer body, and no 2-second auto-close flow after a successful preset tap. That means the required `✅ Запрос отправлен` confirmation and state reset behavior for the redesigned quick actions are not implemented. FIX: Add `const [helpQuickSent, setHelpQuickSent] = useState(false)`, render the required success state with `help.quick_sent_title` / `help.quick_sent_desc`, auto-close via `setTimeout(() => { closeHelpDrawer(); setHelpQuickSent(false); }, 2000)`, and reset `helpQuickSent`, `selectedHelpType`, and `helpComment` on drawer close.
+-3. [P2] Fix 2: `Другое` submit button is still blocked by `!currentTableId` instead of comment validation — In `x.jsx` at lines 3727-3735, the submit CTA still uses `disabled={isSendingHelp || !currentTableId}`. This preserves the exact PM-131 failure mode described in the task and does not implement the required behavior where the button is disabled only when sending or when `helpComment.trim()` is empty. I did not find `pointer-events-none` in this drawer slice, so the current concrete blocker is the disabled condition itself. FIX: Change the expanded `Другое` submit button to `disabled={isSendingHelp || !helpComment.trim()}` only, keeping the CTA enabled as soon as the textarea contains text.
++1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+ 
+ ## Summary
+-Total: 3 findings (0 P0, 0 P1, 3 P2, 0 P3)
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
+ 
+-## Prompt Clarity (MANDATORY — do NOT skip this section)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
+ - Overall clarity: 5
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+-- Missing context (what info would have helped): None needed; the task named the target file, exact UI area, frozen UX constraints, and expected behaviors.
++- Missing context (what info would have helped): None.
+ - Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..beea765a2427d83c04b93bb301b091e8f5e1126b
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
++
++## Findings
++1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
++
++## Summary
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/PublicMenu/review_2026-03-25.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.72s:
+# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
+
+## Findings
+1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
+2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
+3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+
+## Summary
+Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY - do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+
+ succeeded in 1.78s:
+# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
+
+## Findings
+1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
+2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
+3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+
+## Summary
+Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY - do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None.
+- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-25.log b/pages/PublicMenu/commands_2026-03-25.log
+index 4c9eac9e2b3707290fa69c1979f72f039edfd8b7..4664ac6453ac77846526ea4e073f0111a1c5ed32
+--- a/pages/PublicMenu/commands_2026-03-25.log
++++ b/pages/PublicMenu/commands_2026-03-25.log
+@@ -1,18 +1,12 @@
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu' | Select-Object Name,Length,LastWriteTime | Format-Table -AutoSize
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=3635; $i -le 3775; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; $lines=Get-Content $p; for($i=1; $i -le [Math]::Min(220,$lines.Length); $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; Select-String -Path $p -Pattern 'PM-131|#150|Help Drawer|Нужна помощь|submit' -Context 3,8 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'submitHelpRequest|handlePresetSelect|closeHelpDrawer|openHelpDrawer|isHelpModalOpen|selectedHelpType|helpComment|helpSubmitError|hasActiveRequest|isSendingHelp' -Context 3,6 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; $lines=Get-Content $p; $matches=Select-String -Path $p -Pattern 'PM-131|#150'; foreach($m in $matches){ $start=[Math]::Max(1,$m.LineNumber-8); $end=[Math]::Min($lines.Length,$m.LineNumber+18); '--- BLOCK ' + $m.LineNumber + ' ---'; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'helpQuickSent|quick_sent|closeHelpDrawer\(|handlePresetSelect\(|submitHelpRequest\(' -Context 2,4 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'pointer-events-none|z-\[|z-' -Context 0,1 | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state' | Select-Object Name | Format-Table -AutoSize
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'const openHelpDrawer|const closeHelpDrawer|useHelpRequests\(' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1540; $i -le 1605; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1638; $i -le 1662; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-25.md'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-25.log'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 70 -First 120
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 180 -First 110
++Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/BUGS.md' -Pattern 'PM-119','#141','MenuView','discount','PM-111','PM-108','PM-110' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 288 -First 20
++Get-Item 'pipeline/chain-state' | Select-Object FullName
++Get-Item 'pages/PublicMenu' | Select-Object FullName
+diff --git a/pages/PublicMenu/review_2026-03-25.md b/pages/PublicMenu/review_2026-03-25.md
+index a8ffc2e98de16c12f2a147bf0dae9f4c9b0b8a23..beea765a2427d83c04b93bb301b091e8f5e1126b
+--- a/pages/PublicMenu/review_2026-03-25.md
++++ b/pages/PublicMenu/review_2026-03-25.md
+@@ -1,15 +1,15 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-131945-c028
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
+ 
+ ## Findings
+-1. [P2] Fix 1: Help drawer still ships the old multi-step selector flow — In `x.jsx` at lines 3687-3737, the four preset options only call `handlePresetSelect(opt.id)`, the textarea is always rendered, and the footer still uses separate `Отмена` + `Отправить` buttons. That is the pre-redesign flow the task explicitly removes, so preset requests are still not one-tap cards, `Другое` is not the only path that expands a form, and the standalone cancel CTA remains. `Другое` also keeps `sm:col-span-1` instead of the required persistent `col-span-2` card layout. FIX: Replace the selector flow with five cards, wire the four preset cards to `submitHelpRequest(typeOverride)` directly, keep `Другое` as the only expandable inline form, and remove the standalone cancel button/default-visible textarea.
+-2. [P2] Fix 1: Quick-send success state and auto-close/reset path are missing — In `x.jsx` at lines 1649-1657, `closeHelpDrawer()` only closes the drawer; there is no `helpQuickSent` state anywhere in `x.jsx`, no success-state render in the drawer body, and no 2-second auto-close flow after a successful preset tap. That means the required `✅ Запрос отправлен` confirmation and state reset behavior for the redesigned quick actions are not implemented. FIX: Add `const [helpQuickSent, setHelpQuickSent] = useState(false)`, render the required success state with `help.quick_sent_title` / `help.quick_sent_desc`, auto-close via `setTimeout(() => { closeHelpDrawer(); setHelpQuickSent(false); }, 2000)`, and reset `helpQuickSent`, `selectedHelpType`, and `helpComment` on drawer close.
+-3. [P2] Fix 2: `Другое` submit button is still blocked by `!currentTableId` instead of comment validation — In `x.jsx` at lines 3727-3735, the submit CTA still uses `disabled={isSendingHelp || !currentTableId}`. This preserves the exact PM-131 failure mode described in the task and does not implement the required behavior where the button is disabled only when sending or when `helpComment.trim()` is empty. I did not find `pointer-events-none` in this drawer slice, so the current concrete blocker is the disabled condition itself. FIX: Change the expanded `Другое` submit button to `disabled={isSendingHelp || !helpComment.trim()}` only, keeping the CTA enabled as soon as the textarea contains text.
++1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+ 
+ ## Summary
+-Total: 3 findings (0 P0, 0 P1, 3 P2, 0 P3)
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
+ 
+-## Prompt Clarity (MANDATORY — do NOT skip this section)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
+ - Overall clarity: 5
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+-- Missing context (what info would have helped): None needed; the task named the target file, exact UI area, frozen UX constraints, and expected behaviors.
++- Missing context (what info would have helped): None.
+ - Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..beea765a2427d83c04b93bb301b091e8f5e1126b
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
++
++## Findings
++1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
++
++## Summary
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+The findings are finalized. I’m appending the final verification reads to the command log so the saved audit trail matches every shell command I actually ran.
+file update
+M C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-25.log
+@@ -12 +12,6 @@
+ Get-Item 'pages/PublicMenu' | Select-Object FullName
++Get-Content -Raw 'pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/review_2026-03-25.md'
++Get-Content -Raw 'pages/PublicMenu/commands_2026-03-25.log'
++Get-Content -Raw 'pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/review_2026-03-25.md'
+apply_patch(auto_approved=true) exited 0 in 289ms:
+Success. Updated the following files:
+M pages/PublicMenu/commands_2026-03-25.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-25.log b/pages/PublicMenu/commands_2026-03-25.log
+index 4c9eac9e2b3707290fa69c1979f72f039edfd8b7..68bd8ba23c5580173f729bf491e5ececb872c2be
+--- a/pages/PublicMenu/commands_2026-03-25.log
++++ b/pages/PublicMenu/commands_2026-03-25.log
+@@ -1,18 +1,17 @@
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu' | Select-Object Name,Length,LastWriteTime | Format-Table -AutoSize
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=3635; $i -le 3775; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; $lines=Get-Content $p; for($i=1; $i -le [Math]::Min(220,$lines.Length); $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; Select-String -Path $p -Pattern 'PM-131|#150|Help Drawer|Нужна помощь|submit' -Context 3,8 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'submitHelpRequest|handlePresetSelect|closeHelpDrawer|openHelpDrawer|isHelpModalOpen|selectedHelpType|helpComment|helpSubmitError|hasActiveRequest|isSendingHelp' -Context 3,6 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; $lines=Get-Content $p; $matches=Select-String -Path $p -Pattern 'PM-131|#150'; foreach($m in $matches){ $start=[Math]::Max(1,$m.LineNumber-8); $end=[Math]::Min($lines.Length,$m.LineNumber+18); '--- BLOCK ' + $m.LineNumber + ' ---'; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'helpQuickSent|quick_sent|closeHelpDrawer\(|handlePresetSelect\(|submitHelpRequest\(' -Context 2,4 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'pointer-events-none|z-\[|z-' -Context 0,1 | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state' | Select-Object Name | Format-Table -AutoSize
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'const openHelpDrawer|const closeHelpDrawer|useHelpRequests\(' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1540; $i -le 1605; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1638; $i -le 1662; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-25.md'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-25.log'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 70 -First 120
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 180 -First 110
++Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/BUGS.md' -Pattern 'PM-119','#141','MenuView','discount','PM-111','PM-108','PM-110' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 288 -First 20
++Get-Item 'pipeline/chain-state' | Select-Object FullName
++Get-Item 'pages/PublicMenu' | Select-Object FullName
++Get-Content -Raw 'pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/review_2026-03-25.md'
++Get-Content -Raw 'pages/PublicMenu/commands_2026-03-25.log'
++Get-Content -Raw 'pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/review_2026-03-25.md'
+diff --git a/pages/PublicMenu/review_2026-03-25.md b/pages/PublicMenu/review_2026-03-25.md
+index a8ffc2e98de16c12f2a147bf0dae9f4c9b0b8a23..beea765a2427d83c04b93bb301b091e8f5e1126b
+--- a/pages/PublicMenu/review_2026-03-25.md
++++ b/pages/PublicMenu/review_2026-03-25.md
+@@ -1,15 +1,15 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-131945-c028
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
+ 
+ ## Findings
+-1. [P2] Fix 1: Help drawer still ships the old multi-step selector flow — In `x.jsx` at lines 3687-3737, the four preset options only call `handlePresetSelect(opt.id)`, the textarea is always rendered, and the footer still uses separate `Отмена` + `Отправить` buttons. That is the pre-redesign flow the task explicitly removes, so preset requests are still not one-tap cards, `Другое` is not the only path that expands a form, and the standalone cancel CTA remains. `Другое` also keeps `sm:col-span-1` instead of the required persistent `col-span-2` card layout. FIX: Replace the selector flow with five cards, wire the four preset cards to `submitHelpRequest(typeOverride)` directly, keep `Другое` as the only expandable inline form, and remove the standalone cancel button/default-visible textarea.
+-2. [P2] Fix 1: Quick-send success state and auto-close/reset path are missing — In `x.jsx` at lines 1649-1657, `closeHelpDrawer()` only closes the drawer; there is no `helpQuickSent` state anywhere in `x.jsx`, no success-state render in the drawer body, and no 2-second auto-close flow after a successful preset tap. That means the required `✅ Запрос отправлен` confirmation and state reset behavior for the redesigned quick actions are not implemented. FIX: Add `const [helpQuickSent, setHelpQuickSent] = useState(false)`, render the required success state with `help.quick_sent_title` / `help.quick_sent_desc`, auto-close via `setTimeout(() => { closeHelpDrawer(); setHelpQuickSent(false); }, 2000)`, and reset `helpQuickSent`, `selectedHelpType`, and `helpComment` on drawer close.
+-3. [P2] Fix 2: `Другое` submit button is still blocked by `!currentTableId` instead of comment validation — In `x.jsx` at lines 3727-3735, the submit CTA still uses `disabled={isSendingHelp || !currentTableId}`. This preserves the exact PM-131 failure mode described in the task and does not implement the required behavior where the button is disabled only when sending or when `helpComment.trim()` is empty. I did not find `pointer-events-none` in this drawer slice, so the current concrete blocker is the disabled condition itself. FIX: Change the expanded `Другое` submit button to `disabled={isSendingHelp || !helpComment.trim()}` only, keeping the CTA enabled as soon as the textarea contains text.
++1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+ 
+ ## Summary
+-Total: 3 findings (0 P0, 0 P1, 3 P2, 0 P3)
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
+ 
+-## Prompt Clarity (MANDATORY — do NOT skip this section)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
+ - Overall clarity: 5
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+-- Missing context (what info would have helped): None needed; the task named the target file, exact UI area, frozen UX constraints, and expected behaviors.
++- Missing context (what info would have helped): None.
+ - Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..beea765a2427d83c04b93bb301b091e8f5e1126b
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
++
++## Findings
++1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
++
++## Summary
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-25.log b/pages/PublicMenu/commands_2026-03-25.log
+index 4c9eac9e2b3707290fa69c1979f72f039edfd8b7..68bd8ba23c5580173f729bf491e5ececb872c2be
+--- a/pages/PublicMenu/commands_2026-03-25.log
++++ b/pages/PublicMenu/commands_2026-03-25.log
+@@ -1,18 +1,17 @@
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu' | Select-Object Name,Length,LastWriteTime | Format-Table -AutoSize
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=3635; $i -le 3775; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; $lines=Get-Content $p; for($i=1; $i -le [Math]::Min(220,$lines.Length); $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; Select-String -Path $p -Pattern 'PM-131|#150|Help Drawer|Нужна помощь|submit' -Context 3,8 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'submitHelpRequest|handlePresetSelect|closeHelpDrawer|openHelpDrawer|isHelpModalOpen|selectedHelpType|helpComment|helpSubmitError|hasActiveRequest|isSendingHelp' -Context 3,6 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; $lines=Get-Content $p; $matches=Select-String -Path $p -Pattern 'PM-131|#150'; foreach($m in $matches){ $start=[Math]::Max(1,$m.LineNumber-8); $end=[Math]::Min($lines.Length,$m.LineNumber+18); '--- BLOCK ' + $m.LineNumber + ' ---'; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'helpQuickSent|quick_sent|closeHelpDrawer\(|handlePresetSelect\(|submitHelpRequest\(' -Context 2,4 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'pointer-events-none|z-\[|z-' -Context 0,1 | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state' | Select-Object Name | Format-Table -AutoSize
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'const openHelpDrawer|const closeHelpDrawer|useHelpRequests\(' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1540; $i -le 1605; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1638; $i -le 1662; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-25.md'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-25.log'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 70 -First 120
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 180 -First 110
++Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/BUGS.md' -Pattern 'PM-119','#141','MenuView','discount','PM-111','PM-108','PM-110' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 288 -First 20
++Get-Item 'pipeline/chain-state' | Select-Object FullName
++Get-Item 'pages/PublicMenu' | Select-Object FullName
++Get-Content -Raw 'pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/review_2026-03-25.md'
++Get-Content -Raw 'pages/PublicMenu/commands_2026-03-25.log'
++Get-Content -Raw 'pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/review_2026-03-25.md'
+diff --git a/pages/PublicMenu/review_2026-03-25.md b/pages/PublicMenu/review_2026-03-25.md
+index a8ffc2e98de16c12f2a147bf0dae9f4c9b0b8a23..beea765a2427d83c04b93bb301b091e8f5e1126b
+--- a/pages/PublicMenu/review_2026-03-25.md
++++ b/pages/PublicMenu/review_2026-03-25.md
+@@ -1,15 +1,15 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-131945-c028
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
+ 
+ ## Findings
+-1. [P2] Fix 1: Help drawer still ships the old multi-step selector flow — In `x.jsx` at lines 3687-3737, the four preset options only call `handlePresetSelect(opt.id)`, the textarea is always rendered, and the footer still uses separate `Отмена` + `Отправить` buttons. That is the pre-redesign flow the task explicitly removes, so preset requests are still not one-tap cards, `Другое` is not the only path that expands a form, and the standalone cancel CTA remains. `Другое` also keeps `sm:col-span-1` instead of the required persistent `col-span-2` card layout. FIX: Replace the selector flow with five cards, wire the four preset cards to `submitHelpRequest(typeOverride)` directly, keep `Другое` as the only expandable inline form, and remove the standalone cancel button/default-visible textarea.
+-2. [P2] Fix 1: Quick-send success state and auto-close/reset path are missing — In `x.jsx` at lines 1649-1657, `closeHelpDrawer()` only closes the drawer; there is no `helpQuickSent` state anywhere in `x.jsx`, no success-state render in the drawer body, and no 2-second auto-close flow after a successful preset tap. That means the required `✅ Запрос отправлен` confirmation and state reset behavior for the redesigned quick actions are not implemented. FIX: Add `const [helpQuickSent, setHelpQuickSent] = useState(false)`, render the required success state with `help.quick_sent_title` / `help.quick_sent_desc`, auto-close via `setTimeout(() => { closeHelpDrawer(); setHelpQuickSent(false); }, 2000)`, and reset `helpQuickSent`, `selectedHelpType`, and `helpComment` on drawer close.
+-3. [P2] Fix 2: `Другое` submit button is still blocked by `!currentTableId` instead of comment validation — In `x.jsx` at lines 3727-3735, the submit CTA still uses `disabled={isSendingHelp || !currentTableId}`. This preserves the exact PM-131 failure mode described in the task and does not implement the required behavior where the button is disabled only when sending or when `helpComment.trim()` is empty. I did not find `pointer-events-none` in this drawer slice, so the current concrete blocker is the disabled condition itself. FIX: Change the expanded `Другое` submit button to `disabled={isSendingHelp || !helpComment.trim()}` only, keeping the CTA enabled as soon as the textarea contains text.
++1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+ 
+ ## Summary
+-Total: 3 findings (0 P0, 0 P1, 3 P2, 0 P3)
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
+ 
+-## Prompt Clarity (MANDATORY — do NOT skip this section)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
+ - Overall clarity: 5
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+-- Missing context (what info would have helped): None needed; the task named the target file, exact UI area, frozen UX constraints, and expected behaviors.
++- Missing context (what info would have helped): None.
+ - Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..beea765a2427d83c04b93bb301b091e8f5e1126b
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
++
++## Findings
++1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
++
++## Summary
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+Findings:
+- [P2] Discount math diverges between list and tile in [MenuView.jsx:100](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx:100) and [MenuView.jsx:278](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx:278). `renderListCard` rounds to 2 decimals, but `renderTileCard` still rounds to a whole unit with `Math.round(...)`, so Fix 1 is only partially implemented.
+- [P3] The photo-edge placement is still not implemented in [MenuView.jsx:127](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx:127), [MenuView.jsx:151](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx:151), and [MenuView.jsx:229](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx:229). The list photo wrapper still clips overflow, and both controls remain `bottom-2 right-2`, fully inside the photo.
+- [P3] The shared Glovo-style control chrome is incomplete in [MenuView.jsx:156](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx:156) and [MenuView.jsx:234](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx:234). List mode is still `w-9 h-9`/`h-9`, and the floating `+` buttons do not have the required white ring.
+
+I saved the full report to [publicmenu-260325-133629-74b9-codex-findings.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md), plus the page-local copies in [review_2026-03-25.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-25.md) and [commands_2026-03-25.log](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-25.log). Static review only; I did not run the UI.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-25.log b/pages/PublicMenu/commands_2026-03-25.log
+index 4c9eac9e2b3707290fa69c1979f72f039edfd8b7..68bd8ba23c5580173f729bf491e5ececb872c2be
+--- a/pages/PublicMenu/commands_2026-03-25.log
++++ b/pages/PublicMenu/commands_2026-03-25.log
+@@ -1,18 +1,17 @@
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu' | Select-Object Name,Length,LastWriteTime | Format-Table -AutoSize
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=3635; $i -le 3775; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/README.md'; $lines=Get-Content $p; for($i=1; $i -le [Math]::Min(220,$lines.Length); $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; Select-String -Path $p -Pattern 'PM-131|#150|Help Drawer|Нужна помощь|submit' -Context 3,8 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'submitHelpRequest|handlePresetSelect|closeHelpDrawer|openHelpDrawer|isHelpModalOpen|selectedHelpType|helpComment|helpSubmitError|hasActiveRequest|isSendingHelp' -Context 3,6 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md'; $lines=Get-Content $p; $matches=Select-String -Path $p -Pattern 'PM-131|#150'; foreach($m in $matches){ $start=[Math]::Max(1,$m.LineNumber-8); $end=[Math]::Min($lines.Length,$m.LineNumber+18); '--- BLOCK ' + $m.LineNumber + ' ---'; for($i=$start; $i -le $end; $i++){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'helpQuickSent|quick_sent|closeHelpDrawer\(|handlePresetSelect\(|submitHelpRequest\(' -Context 2,4 | ForEach-Object { '--- MATCH ---'; $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'pointer-events-none|z-\[|z-' -Context 0,1 | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-Get-ChildItem -Force 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state' | Select-Object Name | Format-Table -AutoSize
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline'
+-Test-Path 'C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; Select-String -Path $p -Pattern 'const openHelpDrawer|const closeHelpDrawer|useHelpRequests\(' | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1540; $i -le 1605; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx'; $lines=Get-Content $p; for($i=1638; $i -le 1662; $i++){ if($i -le $lines.Length){ '{0,5}: {1}' -f $i, $lines[$i-1] } }
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-25.md'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-25.log'
+-$p='C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-131945-c028-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++Get-Content -Raw 'pages/PublicMenu/MenuView.jsx'
++Get-Content -Raw 'pages/PublicMenu/README.md'
++Get-Content -Raw 'pages/PublicMenu/BUGS.md'
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 70 -First 120
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 180 -First 110
++Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/BUGS.md' -Pattern 'PM-119','#141','MenuView','discount','PM-111','PM-108','PM-110' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
++$i=1; Get-Content 'pages/PublicMenu/MenuView.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ } | Select-Object -Skip 288 -First 20
++Get-Item 'pipeline/chain-state' | Select-Object FullName
++Get-Item 'pages/PublicMenu' | Select-Object FullName
++Get-Content -Raw 'pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/review_2026-03-25.md'
++Get-Content -Raw 'pages/PublicMenu/commands_2026-03-25.log'
++Get-Content -Raw 'pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md'
++Get-Content -Raw 'pages/PublicMenu/review_2026-03-25.md'
+diff --git a/pages/PublicMenu/review_2026-03-25.md b/pages/PublicMenu/review_2026-03-25.md
+index a8ffc2e98de16c12f2a147bf0dae9f4c9b0b8a23..beea765a2427d83c04b93bb301b091e8f5e1126b
+--- a/pages/PublicMenu/review_2026-03-25.md
++++ b/pages/PublicMenu/review_2026-03-25.md
+@@ -1,15 +1,15 @@
+-# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-131945-c028
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
+ 
+ ## Findings
+-1. [P2] Fix 1: Help drawer still ships the old multi-step selector flow — In `x.jsx` at lines 3687-3737, the four preset options only call `handlePresetSelect(opt.id)`, the textarea is always rendered, and the footer still uses separate `Отмена` + `Отправить` buttons. That is the pre-redesign flow the task explicitly removes, so preset requests are still not one-tap cards, `Другое` is not the only path that expands a form, and the standalone cancel CTA remains. `Другое` also keeps `sm:col-span-1` instead of the required persistent `col-span-2` card layout. FIX: Replace the selector flow with five cards, wire the four preset cards to `submitHelpRequest(typeOverride)` directly, keep `Другое` as the only expandable inline form, and remove the standalone cancel button/default-visible textarea.
+-2. [P2] Fix 1: Quick-send success state and auto-close/reset path are missing — In `x.jsx` at lines 1649-1657, `closeHelpDrawer()` only closes the drawer; there is no `helpQuickSent` state anywhere in `x.jsx`, no success-state render in the drawer body, and no 2-second auto-close flow after a successful preset tap. That means the required `✅ Запрос отправлен` confirmation and state reset behavior for the redesigned quick actions are not implemented. FIX: Add `const [helpQuickSent, setHelpQuickSent] = useState(false)`, render the required success state with `help.quick_sent_title` / `help.quick_sent_desc`, auto-close via `setTimeout(() => { closeHelpDrawer(); setHelpQuickSent(false); }, 2000)`, and reset `helpQuickSent`, `selectedHelpType`, and `helpComment` on drawer close.
+-3. [P2] Fix 2: `Другое` submit button is still blocked by `!currentTableId` instead of comment validation — In `x.jsx` at lines 3727-3735, the submit CTA still uses `disabled={isSendingHelp || !currentTableId}`. This preserves the exact PM-131 failure mode described in the task and does not implement the required behavior where the button is disabled only when sending or when `helpComment.trim()` is empty. I did not find `pointer-events-none` in this drawer slice, so the current concrete blocker is the disabled condition itself. FIX: Change the expanded `Другое` submit button to `disabled={isSendingHelp || !helpComment.trim()}` only, keeping the CTA enabled as soon as the textarea contains text.
++1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
+ 
+ ## Summary
+-Total: 3 findings (0 P0, 0 P1, 3 P2, 0 P3)
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
+ 
+-## Prompt Clarity (MANDATORY — do NOT skip this section)
++## Prompt Clarity (MANDATORY - do NOT skip this section)
+ - Overall clarity: 5
+ - Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+-- Missing context (what info would have helped): None needed; the task named the target file, exact UI area, frozen UX constraints, and expected behaviors.
++- Missing context (what info would have helped): None.
+ - Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..beea765a2427d83c04b93bb301b091e8f5e1126b
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings - PublicMenu Chain: publicmenu-260325-133629-74b9
++
++## Findings
++1. [P2] Discount math diverges between list and tile cards - `renderListCard` rounds the discounted value to 2 decimals at `pages/PublicMenu/MenuView.jsx:100-103`, but `renderTileCard` still uses `Math.round(dish.price * (1 - partner.discount_percent / 100))` at `pages/PublicMenu/MenuView.jsx:278-281`, which rounds to a whole unit. That means the same dish can show a different discounted price after switching layouts and does not match the required `Math.round(... * 100) / 100` formula from Fix 1. FIX: compute one shared discounted value with `Math.round(dish.price * (1 - partner.discount_percent / 100) * 100) / 100` and use it in both `renderListCard` and `renderTileCard`, keeping the existing `partner?.discount_enabled === true && (partner?.discount_percent ?? 0) > 0` guard.
++2. [P3] The photo-edge overlay position is still not implemented in either mode - the list photo wrapper still has `overflow-hidden` at `pages/PublicMenu/MenuView.jsx:127`, and both control wrappers are still `absolute bottom-2 right-2` at `pages/PublicMenu/MenuView.jsx:151` and `pages/PublicMenu/MenuView.jsx:229`. That leaves the `+` button and stepper fully inside the photo instead of half-overlapping the edge as required by Fix 2. FIX: make the photo wrapper overflow visible and move the control wrapper in both list and tile cards to the same negative edge offset so `+` and the stepper sit on the photo edge.
++3. [P3] The shared Glovo-style control chrome is incomplete - list mode still uses 36px controls (`w-9 h-9`, `h-9`) at `pages/PublicMenu/MenuView.jsx:156-178`, and neither floating `+` button adds the required white border/ring styling (`pages/PublicMenu/MenuView.jsx:156-160`, `pages/PublicMenu/MenuView.jsx:234-239`). This misses Fix 2's "same style in list and tile" requirement and leaves the list control below the stated 44px spec. FIX: standardize both modes on the same edge control styling: `w-11 h-11` tap targets, matching stepper wrapper sizing, and a white border/ring on the floating `+` button.
++
++## Summary
++Total: 3 findings (0 P0, 0 P1, 1 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY - do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+tokens used
+111 802
+Findings:
+- [P2] Discount math diverges between list and tile in [MenuView.jsx:100](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx:100) and [MenuView.jsx:278](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx:278). `renderListCard` rounds to 2 decimals, but `renderTileCard` still rounds to a whole unit with `Math.round(...)`, so Fix 1 is only partially implemented.
+- [P3] The photo-edge placement is still not implemented in [MenuView.jsx:127](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx:127), [MenuView.jsx:151](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx:151), and [MenuView.jsx:229](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx:229). The list photo wrapper still clips overflow, and both controls remain `bottom-2 right-2`, fully inside the photo.
+- [P3] The shared Glovo-style control chrome is incomplete in [MenuView.jsx:156](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx:156) and [MenuView.jsx:234](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/MenuView.jsx:234). List mode is still `w-9 h-9`/`h-9`, and the floating `+` buttons do not have the required white ring.
+
+I saved the full report to [publicmenu-260325-133629-74b9-codex-findings.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-133629-74b9-codex-findings.md), plus the page-local copies in [review_2026-03-25.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-25.md) and [commands_2026-03-25.log](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-25.log). Static review only; I did not run the UI.

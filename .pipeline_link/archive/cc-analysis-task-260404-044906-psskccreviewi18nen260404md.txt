@@ -1,0 +1,144 @@
+## CC Review: ССП Draft #235 i18n EN mode fix
+## Reviewer: Claude Code (CC)
+## Date: 2026-04-04
+## Verdict: NEEDS REVISION (3 issues to fix before execution)
+
+---
+
+### 1. ISSUES FOUND
+
+#### Issue A — CRITICAL: `form.phone_placeholder` changed from "+7..." to "+1..."
+- **Current (line 418):** `"form.phone_placeholder": "+7..."`
+- **New dictionary:** `"form.phone_placeholder": "+1..."`
+- **Problem:** MenuApp serves Kazakhstan restaurants. Even English-speaking tourists in KZ should see +7 as the country code hint. Changing to +1 (US) is incorrect.
+- **Fix:** Keep `"+7..."` in the new dictionary, or use a neutral `"+..."`.
+
+#### Issue B — MEDIUM: 7 new dictionary entries added without explanation
+The new dictionary adds 10 keys not in the current file. 3 are required by Fix 2b/2c (`help.ago`, `help.reminder`, `help.reminders`). But 7 others are additions:
+- `"error.network_error"` — USED in code (lines 1083, 4207) via `t()` — currently shows raw key to EN users. **Justified addition.**
+- `"error.check_connection"` — USED (lines 1084, 4208). **Justified.**
+- `"common.retry"` — USED (lines 1086, 4210). **Justified.**
+- `"common.cancel"` — USED (line 4954). **Justified.**
+- `"cart.confirm_table.dismissed"` — USED (line 4578) via `tr()` with mojibake Russian fallback. **Justified.**
+- `"cart.verify.helper_text"` — USED (line 4599) via `tr()` with mojibake Russian fallback. **Justified.**
+- `"cart.motivation_bonus_short"` — USED (line 4655) via `tr()` with mojibake Russian fallback. **Justified.**
+
+**Verdict:** All 7 additions are actually justified — they are used in code but were missing from I18N_FALLBACKS. However, the prompt should EXPLAIN this explicitly so CC understands these are intentional gap-fills, not accidental additions. Without explanation, CC might hesitate or flag them.
+
+**Recommended prompt addition:**
+```
+Note: The new dictionary adds 10 keys not in the current version:
+- 3 required by Fix 2b/2c: help.ago, help.reminder, help.reminders
+- 7 gap-fill: keys already used in code via t()/tr() but missing from fallbacks
+  (error.network_error, error.check_connection, common.retry, common.cancel,
+   cart.confirm_table.dismissed, cart.verify.helper_text, cart.motivation_bonus_short)
+All additions are intentional.
+```
+
+#### Issue C — LOW: Entry ordering significantly changed
+The current dictionary has help.* entries starting at line 508 (middle of dict), with `form.table` and other entries after them. The new dictionary reorganizes everything into logical sections with help.* at the end. This is fine functionally but makes the git diff harder to review (shows as ~240 lines deleted + ~250 added rather than targeted changes).
+
+**Not a blocker** — the full replacement approach is the right call for this many changes. Just noting for awareness.
+
+#### Issue D — LOW: Validation step 3 (node syntax check) is weak
+`node --input-type=module < file.jsx` won't parse JSX. The prompt acknowledges this. Consider replacing with a more useful check:
+```bash
+# Check for common syntax issues
+grep -c "const\|function\|return\|export" pages/PublicMenu/x.jsx
+# Should return ~200+ matches — if dramatically lower, something was truncated
+```
+
+#### Issue E — INFO: Line count will change
+Current: 221 keys in 243 lines (327-569). New: 231 keys in ~254 lines. Net change: +~11 lines. Final file: ~5195 lines. The prompt says "close to 5184 +/- 20" which covers this. OK.
+
+---
+
+### 2. LINE NUMBER VERIFICATION
+
+All line numbers verified against current x.jsx (5184 lines, commit f6626e9):
+
+| Reference | Prompt says | Actual | Status |
+|-----------|------------|--------|--------|
+| I18N_FALLBACKS start | line 327 | line 327 | ✅ |
+| I18N_FALLBACKS end | line 569 | line 569 | ✅ |
+| HELP_CHIPS | line 1715 | line 1715 | ✅ |
+| getHelpReminderWord | lines 2448-2454 | lines 2448-2454 | ✅ |
+| "назад" #1 | line 2472 | line 2472 | ✅ |
+| "назад" #2 | line 2475 | line 2475 | ✅ |
+| "назад" #3 | line 2515 | line 2515 | ✅ |
+
+All line numbers are accurate. No shift risk as long as CC processes Fix 1 before Fix 2 (Fix 1 changes only affect lines 327-569, all Fix 2 targets are above line 1700).
+
+---
+
+### 3. FIX-BY-FIX ANALYSIS
+
+**Fix 1 (dictionary replacement):** SAFE. Full block replacement between clear boundaries (line 327 `const I18N_FALLBACKS = {` through line 569 `};`). The Edit tool can handle this as one operation. No risk of partial replacement.
+
+**Fix 2a (HELP_CHIPS):** SAFE. Single-line replacement, unique string, no ambiguity.
+
+**Fix 2b (getHelpReminderWord):** SAFE with one note. Adding `tr` to useCallback deps is correct since the new code calls `tr()`. The `tr` function is memoized (from `makeSafeT`), so it won't cause unnecessary re-renders. The Russian plural logic (mod10/mod100) is correctly replaced with simple English singular/plural.
+
+**Fix 2c ("назад" x3):** SAFE. Each occurrence is unique enough for targeted string replacement. The `${tr('help.ago', 'ago')}` pattern is consistent with surrounding code.
+
+---
+
+### 4. RISK ASSESSMENT
+
+| Risk | Level | Mitigation in prompt |
+|------|-------|---------------------|
+| KB-095 file truncation | HIGH | ✅ Post-commit wc -l check included |
+| Wrong line numbers | LOW | ✅ All verified accurate |
+| Missing dictionary entries | NONE | ✅ 0 entries removed, 10 added |
+| Fix order dependency | NONE | Fix 1 (lines 327-569) doesn't shift Fix 2 targets (1715+) |
+| Mojibake in new content | LOW | All new values are ASCII English |
+| CC stalling on large edit | MEDIUM | Prompt says "Do NOT read full file" — good |
+
+---
+
+### 5. SPECIFIC IMPROVEMENTS
+
+#### 5a. Fix Issue A — phone placeholder
+In the new dictionary content, change:
+```
+"form.phone_placeholder": "+1...",
+```
+to:
+```
+"form.phone_placeholder": "+7...",
+```
+
+#### 5b. Add explanation for new entries (Issue B)
+After the new dictionary block, add a note:
+```
+Note: This dictionary adds 10 new keys vs current version:
+- 3 for Fix 2b/2c: help.ago, help.reminder, help.reminders
+- 7 gap-fill for keys used in code but missing from fallbacks
+All intentional. Total: 231 keys (was 221).
+```
+
+#### 5c. Specify execution order explicitly
+Add after Fix 2c:
+```
+## Execution order
+1. Fix 1 first (dictionary replacement, lines 327-569)
+2. Fix 2a, 2b, 2c in any order (all above line 1700, no overlap)
+3. Validation steps
+4. Git commit
+```
+
+---
+
+### 6. FINAL VERDICT
+
+**Status: NEEDS MINOR REVISION**
+
+The prompt is well-structured, line numbers are accurate, and the approach (full dictionary replacement + surgical string fixes) is correct. Three changes needed before execution:
+
+1. **MUST FIX:** `form.phone_placeholder` — change "+1..." back to "+7..." (Issue A)
+2. **SHOULD ADD:** Explanation for 10 new dictionary entries (Issue B) — prevents CC hesitation
+3. **NICE TO HAVE:** Explicit execution order (Issue 5c)
+
+After fixing Issue A, the prompt is ready to execute. Estimated CC execution: 3-5 minutes, well within budget.
+
+**Prompt clarity rating: 8/10** (would be 9/10 after fixes above)

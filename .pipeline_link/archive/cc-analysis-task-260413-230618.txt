@@ -1,0 +1,67 @@
+# CC Analysis: task-260413-230618
+# WS-INFRA: Port chain_template support to v3-legacy.py
+
+## Summary
+Added chain_template expansion support to `task-watcher-v3-legacy.py` (v3.0 -> v5.0).
+This closes KB-136: the v3-legacy runner can now expand `chain_template` frontmatter
+into parallel/sequential chain steps, supporting both CC and Codex runners.
+
+## File Mapping (task -> actual)
+The task referenced `task-watcher-multi.py` (doesn't exist) and `task-watcher-v3.py`.
+Actual files:
+- `scripts/task-watcher.py` (v7.1, 323 lines) -- thin dispatcher, unchanged
+- `scripts/task-watcher-v3-legacy.py` (v3.0 -> v5.0, 1202 -> 1695 lines) -- chain support added here
+
+The chain YAML templates and step MD templates exist in `C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/chains/`
+and `pipeline/steps/` respectively (not in the repo).
+
+## Changes Made
+
+### INFRA-001 (P0): Chain expansion functions [DONE]
+Added 11 functions to `task-watcher-v3-legacy.py`:
+- `parse_chain_yaml()` -- simple YAML parser (no PyYAML dependency)
+- `load_chain_template()` -- reads from pipeline/chains/{name}.yaml
+- `load_step_template()` -- reads from pipeline/steps/{name}.md
+- `resolve_inline_source()` -- finds latest RELEASE/BASE JSX, cleans null bytes
+- `build_chain_step_prompt()` -- replaces {{TASK_BODY}}, {{INLINE_SOURCE}}, {{CHAIN_ID}}, {{PAGE}}
+- `group_chain_steps()` -- groups steps by group name (parallel within, sequential between)
+- `_run_chain_step()` -- orchestrates single step (CC or Codex)
+- `_run_cc_step()` -- launches Claude Code with stdin piping
+- `_run_codex_step()` -- launches Codex via PowerShell Get-Content
+- `run_chain_task()` -- main chain orchestrator (groups, threads, TG)
+
+Integration point: `run_task()` checks `meta.get('chain_template')` after parsing frontmatter.
+If present, delegates to `run_chain_task()` and returns.
+
+### INFRA-002 (P1): TG notifications [DONE]
+Chain step TG format: `[chain_name] Step N/M step_name (CC/Codex) -- PageName`
+Chain start/end summary messages also sent.
+Simple task TG format unchanged (backward compatible).
+
+### INFRA-003 (P1): WinError 206 fix [DONE]
+- CC steps: prompts > 7KB piped via stdin (subprocess.PIPE) instead of `-p` arg
+- Codex steps: prompt written to tmpfile, read via PowerShell `Get-Content -Raw`
+- `resolve_inline_source()` cleans null bytes from source files (KB-137)
+
+### INFRA-004 (P2): Documentation [DONE]
+- KB-136 in KNOWLEDGE_BASE_VSC.md: status updated to RESOLVED
+- v3-legacy.py header: updated to v5.0 with chain_template changelog
+- Version constant: WATCHER_VERSION = '5.0'
+
+## Files Changed
+- `scripts/task-watcher-v3-legacy.py` -- +493 lines (1202 -> 1695)
+- `C:/Users/ASUS/Dev/Menu AI Cowork/KNOWLEDGE_BASE_VSC.md` -- KB-136 status update
+
+## What Was NOT Done (per scope lock)
+- task-watcher.py (v7 dispatcher) NOT modified -- it already delegates v3 tasks correctly
+- task-watcher-v3-legacy.py NOT marked DEPRECATED -- it IS the enhanced file (task assumed different file structure)
+- CLAUDE.md commands block -- no watcher references exist to update
+- No new pip dependencies added
+- No changes to chain YAML or step MD formats
+- pipeline/chains/ and pipeline/steps/ NOT in repo (they live in OneDrive pipeline dir)
+
+## Test Plan
+1. Smoke: simple task without chain_template -> existing flow (run_task line 1417)
+2. Chain: task with `chain_template: pssk-review` -> expands to 2 parallel steps (CC + Codex)
+3. TG: chain steps show `[pssk-review] Step 1/2 pssk-cc-reviewer (CC)`
+4. Large prompt: inline source > 7KB -> stdin piping, no WinError 206

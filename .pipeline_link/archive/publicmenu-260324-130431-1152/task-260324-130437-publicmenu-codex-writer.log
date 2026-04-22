@@ -1,0 +1,743 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d1edf-f94b-73a0-9dee-fb4c729b3cb2
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260324-130431-1152 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # KS-1 (#133): CartView header + floating point fixes **Production page.** Target files: CartView.jsx + x.jsx. Reference: `BUGS_MASTER.md`, `ux-concepts/ACCEPTANCE_CRITERIA_PublicMenu.md`. --- ## FROZEN UX (DO NOT CHANGE) These elements are approved and tested — DO NOT modify under any circumstances: - Chevron ˅ must stay on the RIGHT side, sticky during scroll (PM-083, PM-085) - No custom drag handle (native B44 only) (PM-099) - Single border-t above ИТОГО (PM-098) - Chevron size w-7 h-7 (PM-100) - Email field must remain REMOVED from cart (PM-086) - ИТОГО layout: compact, no extra padding (PM-087) --- ## Fix 1 — PM-121 (P3) [MUST-FIX]: Double drag handle strip in CartView ### Сейчас CartView (Bottom Sheet) shows TWO gray horizontal strips at the top: one is the native B44 Bottom Sheet drag handle, the second is our custom `div` drag handle added in a previous fix. Visually looks broken — duplicate bars. ### Должно быть Only ONE gray drag handle strip at the top of the CartView Bottom Sheet. The native B44 handle is sufficient. ### НЕ должно быть - Do NOT add any new custom drag handle `div` - Do NOT remove the native B44 drag handle (it is part of B44 Bottom Sheet, cannot be removed) - Do NOT touch the chevron position or style ### Файл и локация File: `pages/PublicMenu/CartView.jsx` Search for: custom drag handle div — likely `<div className="... drag ... handle ...">` or similar near the top of the Bottom Sheet JSX. Remove ONLY the custom one, keep everything else. ### Уже пробовали PM-099 (S165): custom drag handle was removed before. Chain 36d5 (S172) may have accidentally re-added it. Check git diff. ### Проверка Open CartView (tap cart icon) → top of bottom sheet shows exactly ONE gray strip. --- ## Fix 2 — PM-104 (P3) [MUST-FIX]: Chevron alignment in CartView header ### Сейчас Chevron ˅ (close button) in CartView is NOT aligned on the same visual line as the gray drag handle. They appear at different vertical levels. Deployed in RELEASE 260324-00, but needs Android confirmation. ### Должно быть Chevron ˅ and drag handle are visually on the same line (same row). Layout: `flex justify-between` or `flex items-center`, drag handle centered, chevron on the right. The exact fix applied in chain 505b (S171): `justify-between` layout, spacer, centered drag handle, ChevronDown `w-9 h-9` on the right. ### НЕ должно быть - Chevron must NOT be centered (must stay RIGHT) - Do NOT change chevron size from w-9 h-9 (36px) - Do NOT add email field (PM-086 — permanently removed) ### Файл и локация File: `pages/PublicMenu/CartView.jsx` Search for: `ChevronDown` — the header row with drag handle + chevron. Apply `flex justify-between items-center` if not already applied. Note: if Fix 1 removed the custom drag handle, verify the chevron row layout still looks correct. ### Уже пробовали Chain 505b (S171) quick-fix: exact B44 diff applied. RELEASE 260324-00. Test pending on Android. Previous attempts (S167, S168): partial — chevron was center or wrong size. ### Проверка Open CartView → header shows: [gray handle centered] [˅ right]. Both on same line. --- ## Fix 3 — PM-120 (P2) [MUST-FIX]: Floating point prices in cart ### Сейчас Cart item prices and total show floating point artifacts: `167.57999999999998 ₸` instead of `167.58 ₸`. Happens when price × quantity in JavaScript produces floating point errors. ### Должно быть All prices in cart are rounded to 2 decimal places. Use: `Math.round(price * qty * 100) / 100` or `parseFloat((price * qty).toFixed(2))`. ### НЕ должно быть - Do NOT use `.toFixed(2)` on display string alone — must fix the underlying number before display - Do NOT change the currency symbol or formatting (₸ stays, thousands separator stays) - Do NOT touch `useCurrency` hook — that hook is for formatting only (PM-116 already fixed) ### Файл и локация Files: `pages/PublicMenu/CartView.jsx` AND `pages/PublicMenu/x.jsx` In CartView.jsx: search for `price * qty` or `item.price * item.quantity` — the line item subtotal calculation. In x.jsx: search for cart total calculation — wherever `reduce` or sum of cart items is computed for display. ### Проверка Add item (e.g. price 55.93 ₸) × 3 → cart shows `167.79 ₸` (not `167.78999...`). Total also shows clean number. --- ## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано выше - Modify ONLY code described in Fix 1, Fix 2, Fix 3. - Everything else (stepper logic, loyalty section, toast notifications, i18n keys, order submission) — DO NOT TOUCH. - Locked UX decisions (FROZEN UX section above) — PROHIBITED to change. - If you notice another issue not listed here — SKIP IT, do not fix. ## Implementation Notes - TARGET FILES (modify): `pages/PublicMenu/CartView.jsx`, `pages/PublicMenu/x.jsx` - CONTEXT FILES (read-only): `BUGS_MASTER.md`, `README.md` - Fix order: Fix 1 first (remove extra handle) → Fix 2 (verify alignment) → Fix 3 (floating point, both files) - After all fixes: `git add` + `git commit -m "KS-1 #133: CartView handle + chevron + floating point (PM-121, PM-104, PM-120)"` - Mobile-first: all fixes must look correct at 390px width (iPhone 14 viewport) === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/PublicMenu/CartView.jsx` and `pages/PublicMenu/x.jsx`, plus `README.md` and `BUGS.md` in the same folder, and I’ll keep scope locked to Fix 1, Fix 2, and Fix 3 only.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Date -Format 'yyyy-MM-dd'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 14.05s:
+
+ exited 124 in 14.99s:
+
+codex
+I’m checking the `PublicMenu` folder contents first so I can read only the allowed files and avoid drifting outside the page scope.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Date -Format 'yyyy-MM-dd'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 23.32s:
+components
+versions
+260320-01 useTableSession RELEASE.jsx
+260323-03 CheckoutView RELEASE.jsx
+260324-00 CartView RELEASE.jsx
+260324-01 MenuView RELEASE.jsx
+260324-02 x RELEASE.jsx
+ACCEPTANCE_CRITERIA_PHASE1.md
+BUGS.md
+CartView.jsx
+CheckoutView.jsx
+COPY_SPEC.md
+i18n_DrawerUX_S79.csv
+i18n_WorkingHours_S79.csv
+MenuView.jsx
+ModeTabs.jsx
+PublicMenu README.md
+PublicMenu_BASE.txt
+README.md
+StickyCartBar.jsx
+ succeeded in 23.20s:
+2026-03-24
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=0; Get-Content '"'pages/PublicMenu/x.jsx' | ForEach-Object { "'$i++; '"'{0,4}: {1}' -f "'$i, $_ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=0; Get-Content '"'pages/PublicMenu/README.md' | ForEach-Object { "'$i++; '"'{0,4}: {1}' -f "'$i, $_ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=0; Get-Content '"'pages/PublicMenu/BUGS.md' | ForEach-Object { "'$i++; '"'{0,4}: {1}' -f "'$i, $_ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=0; Get-Content '"'pages/PublicMenu/CartView.jsx' | ForEach-Object { "'$i++; '"'{0,4}: {1}' -f "'$i, $_ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 14.67s:
+   1: ---
+   2: version: "7.0"
+   3: updated: "2026-03-13"
+   4: session: 119
+   5: ---
+   6: 
+   7: # PublicMenu â€” README
+   8: 
+   9: Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+  10: Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+  11: 
+  12: ## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+  13: 
+  14: | Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+  15: |---|---|---|---|
+  16: | x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+  17: | CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+  18: | MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+  19: | useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+  20: 
+ succeeded in 16.57s:
+   1: import React from "react";
+   2: import { Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, Minus, Plus } from "lucide-react";
+   3: import { Card, CardContent } from "@/components/ui/card";
+   4: import { Button } from "@/components/ui/button";
+   5: import { Input } from "@/components/ui/input";
+   6: import Rating from "@/components/Rating";
+   7: 
+   8: function lightenColor(hex, amount) {
+   9:   const num = parseInt(hex.replace('#', ''), 16);
+  10:   const r = Math.min(255, (num >> 16) + Math.round((255 - (num >> 16)) * amount));
+  11:   const g = Math.min(255, ((num >> 8) & 0x00FF) + Math.round((255 - ((num >> 8) & 0x00FF)) * amount));
+  12:   const b = Math.min(255, (num & 0x0000FF) + Math.round((255 - (num & 0x0000FF)) * amount));
+  13:   return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
+  14: }
+  15: 
+  16: export default function CartView({
+  17:   partner,
+  18:   currentTable,
+  19:   currentGuest,
+  20:   t,
+ succeeded in 16.82s:
+   1: ---
+   2: version: "35.0"
+   3: updated: "2026-03-23"
+   4: session: 168
+   5: ---
+   6: 
+   7: # PublicMenu â€” Bug Registry
+   8: 
+   9: Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+  10: Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+  11: 
+  12: ---
+  13: 
+  14: ## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+  15: 
+  16: *8 active bugs remaining (0x P0, 4x P1, 3x P2, 0x P3, 1x suggestion).*
+  17: 
+  18: ### BUG-PM-056: Drawer layout not visit-state-driven (P1 â€” Batch 2)
+  19: - **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P1
+  20: - **ÐšÐ¾Ð³Ð´Ð°:** S153 (consensus chain publicmenu-260321-093745)
+ succeeded in 20.34s:
+   1: // ======================================================
+   2: // pages/x.jsx â€” PUBLIC MENU with i18n + Channels Visibility + Gating
+   3: // UPDATED: Simplified Hall logic (TASK-260123-01b)
+   4: // FIXED: P0-1..P0-7 security and functionality fixes
+   5: // UPDATED: TASK-260127-01 - session restore, UI cleanup
+   6: // PATCHED: 2026-01-28 - P0-1, P0-2, P0-2b, P1-1..P1-4
+   7: // PATCHED: 2026-02-01 - FIX-260131-07 FINAL - guest safeguard in submit
+   8: // PATCHED: 2026-02-01 - TASK-260201-01 - Hall StickyBar always visible
+   9: // PATCHED: 2026-03-03 - GAP-01 - Order Confirmation Screen
+  10: // FIXED: 2026-03-03 - GAP-01 fix - Confirmation as full-screen overlay (z-60)
+  11: // FIXED: 2026-03-03 - GAP-02 fix - Embed OrderStatusScreen inside x.jsx (no /orderstatus route)
+  12: // FIXED: 2026-03-03 - GAP-02 fix - Remove auto-dismiss timer (race condition: ghost click on menu)
+  13: // ======================================================
+  14: 
+  15: import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+  16: import { useLocation } from "react-router-dom";
+  17: import { useQuery, useQueryClient } from "@tanstack/react-query";
+  18: import { base44 } from "@/api/base44Client";
+  19: import { useI18n } from "@/components/i18n";
+  20: import { toast } from "sonner"; // P0-6: sonner instead of custom toast
+codex
+I have the page files open now. Next I’m narrowing to the exact header and price calculation paths so I can judge only the three requested fixes and nothing outside them.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=792; $end=906; $i=0; Get-Content '"'pages/PublicMenu/CartView.jsx' | ForEach-Object { "'$i++; if($i -ge $start -and $i -le $end){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'cartTotalAmount|reduce\\(|item.price \\* item.quantity|price \\* qty|quantity' -Context 2,2 | ForEach-Object { "'$_.Context.PreContext + $_.Line + $_.Context.PostContext }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'ChevronDown|item.price \\* item.quantity|Drag handle|sticky top-0|cartTotalAmount' -Context 3,3 | ForEach-Object { "'$_.Context.PreContext + $_.Line + $_.Context.PostContext }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=420; $end=440; $i=0; Get-Content '"'pages/PublicMenu/CartView.jsx' | ForEach-Object { "'$i++; if($i -ge $start -and $i -le $end){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 29.57s:
+ 792:             <div className="space-y-2">
+ 793:               {cart.map((item) => (
+ 794:                 <div key={item.dishId} className="flex items-center justify-between py-2 border-b last:border-0">
+ 795:                   <div className="flex-1">
+ 796:                     <div className="font-medium text-slate-900">{item.name}</div>
+ 797:                     <div className="text-xs text-slate-500">{formatPrice(item.price)} Ã— {item.quantity}</div>
+ 798:                   </div>
+ 799:                   <div className="flex items-center gap-2">
+ 800:                     <span className="font-semibold text-slate-900">{formatPrice(item.price * item.quantity)}</span>
+ 801:                     {/* FIX P2: Stepper (-/count/+) instead of just remove-all */}
+ 802:                     <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
+ 803:                       <button
+ 804:                         onClick={() => updateQuantity(item.dishId, -1)}
+ 805:                         className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white transition-colors"
+ 806:                         aria-label={tr('menu.remove', 'Ð£Ð±Ñ€Ð°Ñ‚ÑŒ')}
+ 807:                       >
+ 808:                         <Minus className="w-3.5 h-3.5 text-slate-600" />
+ 809:                       </button>
+ 810:                       <span className="mx-1.5 text-sm font-semibold text-slate-900 min-w-[20px] text-center">{item.quantity}</span>
+ 811:                       <button
+ succeeded in 26.94s:
+import React from "react";
+import { Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, Minus, Plus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+  redeemedPoints,
+  setRedeemedPoints,
+  toast,
+  cartTotalAmount,
+  discountAmount,
+  pointsDiscountAmount,
+  isSubmitting,
+  // Cart grand total (after discounts)
+  const cartGrandTotal = Math.max(
+    0,
+    (Number(cartTotalAmount) || 0) - (Number(discountAmount) || 0) - (Number(pointsDiscountAmount) || 0)
+  );
+
+  // ===== Guest count (stable, from orders OR guests) =====
+
+ succeeded in 29.88s:
+                <span className="text-slate-700">
+                  {item.name}{" "}
+                  <span className="text-slate-400">x{item.quantity}</span>
+                </span>
+                <span className="text-slate-700 font-medium tabular-nums">
+                </span>
+                <span className="text-slate-700 font-medium tabular-nums">
+                  {formatPrice(item.price * item.quantity)}
+                </span>
+              </div>
+
+  const itemsTotal = useMemo(() => {
+    return orderItems.reduce((sum, item) => {
+      const lineTotal = Number(item.line_total) || (Number(item.dish_price) * Number(item.quantity)) || 0;
+      return sum + lineTotal;
+  const itemsTotal = useMemo(() => {
+    return orderItems.reduce((sum, item) => {
+      const lineTotal = Number(item.line_total) || (Number(item.dish_price) * Number(item.quantity)) || 0;
+      return sum + lineTotal;
+    }, 0);
+ succeeded in 28.42s:
+ 420: 
+ 421:   // loyaltySummary + reviewRewardLabel removed â€” loyalty section simplified (#87 KS-1)
+ 422: 
+ 423:   return (
+ 424:     <div className="max-w-2xl mx-auto px-4 mt-2 pb-4">
+ 425:       {/* Drag handle + chevron close â€” sticky top (#87 KS-2, PM-083/084/085) */}
+ 426:       <div className="sticky top-0 z-10 bg-white px-4 pt-3 pb-1 flex items-center justify-between">
+ 427:         <div className="w-9" /> {/* Spacer to balance the close button */}
+ 428:         <div className="w-12 h-1.5 bg-gray-300 rounded-full" /> {/* Drag handle */}
+ 429:         <button
+ 430:           className="w-11 h-11 flex items-center justify-center -mr-2"
+ 431:           onClick={() => { if (isSubmitting) return; onClose ? onClose() : setView("menu"); }}
+ 432:           aria-label="Close cart"
+ 433:         >
+ 434:           <ChevronDown
+ 435:             className={`w-9 h-9 ${isSubmitting ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500'}`}
+ 436:           />
+ 437:         </button>
+ 438:       </div>
+ 439:       {/* P0 Header: [ðŸ””] Ð¡Ñ‚Ð¾Ð» Â· Ð“Ð¾ÑÑ‚ÑŒ */}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=2215; $end=2255; $i=0; Get-Content '"'pages/PublicMenu/x.jsx' | ForEach-Object { "'$i++; if($i -ge $start -and $i -le $end){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=1450; $end=1485; $i=0; Get-Content '"'pages/PublicMenu/x.jsx' | ForEach-Object { "'$i++; if($i -ge $start -and $i -le $end){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=2465; $end=2515; $i=0; Get-Content '"'pages/PublicMenu/x.jsx' | ForEach-Object { "'$i++; if($i -ge $start -and $i -le $end){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'const cartTotalItems =|const cartTotalAmount =|line_total:' -Context 2,2 | ForEach-Object { "'$_.LineNumber.ToString().PadLeft(4)+'"': '+"'$_.Line; $_.Context.PreContext | ForEach-Object { }; $_.Context.PostContext | ForEach-Object { } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 27.89s:
+2215:       // P2-2: Should be tied to partner, but keeping simple for now
+2216:       let code = localStorage.getItem("menu_guest_code");
+2217:       if (!code) {
+2218:         code = String(Math.floor(1000 + Math.random() * 9000));
+2219:         localStorage.setItem("menu_guest_code", code);
+2220:       }
+2221:       setGuestCode(code);
+2222:     } catch (e) {
+2223:       // silent
+2224:     }
+2225:   }, [isHallMode, hallGuestCodeEnabled]);
+2226: 
+2227:   // P0-2: Removed legacy table_id/table_slug handling
+2228:   // Only explicit table code from URL triggers hall mode verification
+2229:   useEffect(() => {
+2230:     if (tableCodeParam && orderMode !== "hall") {
+2231:       setOrderMode("hall");
+2232:     }
+2233:   }, [tableCodeParam, orderMode]);
+2234: 
+ succeeded in 31.96s:
+2465:       }
+2466:     }
+2467: 
+2468:     setErrors(newErrors);
+2469:     // Change 2b: Scroll to first error field on validation failure
+2470:     if (Object.keys(newErrors).length > 0) {
+2471:       const firstKey = Object.keys(newErrors)[0];
+2472:       requestAnimationFrame(() => {
+2473:         const el = document.querySelector(`[data-field="${firstKey}"]`);
+2474:         if (el) {
+2475:           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+2476:         }
+2477:       });
+2478:     }
+2479:     return Object.keys(newErrors).length === 0;
+2480:   };
+2481: 
+2482:   // P1-4: Anti-spam with partner filter
+2483:   const checkRateLimit = async () => {
+2484:     if (!clientPhone) return true;
+ succeeded in 31.03s:
+1450: 
+1451:   // Save cart to localStorage on every change
+1452:   // BUG-PM-005: guard against saving empty cart before restore completes
+1453:   useEffect(() => {
+1454:     if (!partner?.id) return;
+1455:     if (!cartRestoredRef.current) return;
+1456:     saveCartToStorage(partner.id, cart);
+1457:   }, [cart, partner?.id]);
+1458: 
+1459:   // Restore cart from localStorage on page load (once)
+1460:   // BUG-PM-005: mark restored before setCart to prevent save effect from firing on stale empty cart
+1461:   useEffect(() => {
+1462:     if (cartRestoredRef.current) return;
+1463:     if (!partner?.id) return;
+1464:     cartRestoredRef.current = true;
+1465: 
+1466:     const savedCart = getCartFromStorage(partner.id);
+1467:     if (savedCart && savedCart.length > 0 && cart.length === 0) {
+1468:       setCart(savedCart);
+1469:     }
+ succeeded in 33.34s:
+2000:   const cartTotalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
+2001:   const cartTotalAmount = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+2588:         line_total: item.price * item.quantity,
+2967:           line_total: item.price * item.quantity,
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=1994; $end=2004; $i=0; Get-Content '"'pages/PublicMenu/x.jsx' | ForEach-Object { "'$i++; if($i -ge $start -and $i -le $end){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=2582; $end=2593; $i=0; Get-Content '"'pages/PublicMenu/x.jsx' | ForEach-Object { "'$i++; if($i -ge $start -and $i -le $end){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=2961; $end=2972; $i=0; Get-Content '"'pages/PublicMenu/x.jsx' | ForEach-Object { "'$i++; if($i -ge $start -and $i -le $end){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'formatPrice\\(item\\.price \\* item\\.quantity\\)|formatPrice\\(item\\.line_total "'!= null '"\\? item\\.line_total : item\\.dish_price \\* item\\.quantity\\)|Number\\(item\\.dish_price\\) \\* Number\\(item\\.quantity\\)' -Context 1,1 | ForEach-Object { "'$_.LineNumber.ToString().PadLeft(4)+'"': '+"'$_.Line; $_.Context.PreContext; $_.Context.PostContext }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 24.93s:
+1994:       }
+1995:     }
+1996: 
+1997:     return groups;
+1998:   }, [sortedCategoriesAll, visibleDishes, orderMode]);
+1999: 
+2000:   const cartTotalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
+2001:   const cartTotalAmount = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+2002: 
+2003:   // Loyalty hook
+2004:   const {
+ succeeded in 26.31s:
+2582:       const newItems = cart.map((item) => ({
+2583:         order: order.id,
+2584:         dish: item.dishId,
+2585:         dish_name: item.name,
+2586:         dish_price: item.price,
+2587:         quantity: item.quantity,
+2588:         line_total: item.price * item.quantity,
+2589:         split_type: splitType,
+2590:       }));
+2591: 
+2592:       await base44.entities.OrderItem.bulkCreate(newItems);
+2593: 
+ succeeded in 25.86s:
+ 716:                   {formatPrice(item.price * item.quantity)}
+                <span className="text-slate-700 font-medium tabular-nums">
+                </span>
+ 998:       const lineTotal = Number(item.line_total) || (Number(item.dish_price) * Number(item.quantity)) || 0;
+    return orderItems.reduce((sum, item) => {
+      return sum + lineTotal;
+1151:                       {formatPrice(item.line_total != null ? item.line_total : item.dish_price * item.quantity)}
+                    <span className="text-slate-700 font-medium tabular-nums">
+                    </span>
+ succeeded in 30.26s:
+2961:         const orderItemsData = cart.map((item) => ({
+2962:           order: order.id,
+2963:           dish: item.dishId,
+2964:           dish_name: item.name,
+2965:           dish_price: item.price,
+2966:           quantity: item.quantity,
+2967:           line_total: item.price * item.quantity,
+2968:         }));
+2969: 
+2970:         await base44.entities.OrderItem.bulkCreate(orderItemsData);
+2971: 
+2972:         // Post-create side effects â€” best-effort after items exist
+codex
+I’ve confirmed one obvious regression already in `CartView.jsx`. I’m checking the remaining price paths now to see whether the floating-point fix was applied consistently at the cart UI and total layers.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=706; $end=722; $i=0; Get-Content '"'pages/PublicMenu/x.jsx' | ForEach-Object { "'$i++; if($i -ge $start -and $i -le $end){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=1144; $end=1156; $i=0; Get-Content '"'pages/PublicMenu/x.jsx' | ForEach-Object { "'$i++; if($i -ge $start -and $i -le $end){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=990; $end=1005; $i=0; Get-Content '"'pages/PublicMenu/x.jsx' | ForEach-Object { "'$i++; if($i -ge $start -and $i -le $end){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/CartView.jsx','pages/PublicMenu/x.jsx' -Pattern '\\* item.quantity|\\* qty|line_total' | ForEach-Object { '{0}:{1}: {2}' -f "'$_.Path.Replace((Get-Location).Path + '"'\\\\',''), "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.73s:
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:722: <span className="text-slate-600">{formatPrice(item.line_total ?? (item.dish_price * item.quantity))}</span>
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:800: <span className="font-semibold text-slate-900">{formatPrice(item.price * item.quantity)}</span>
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:716: {formatPrice(item.price * item.quantity)}
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:998: const lineTotal = Number(item.line_total) || (Number(item.dish_price) * Number(item.quantity)) || 0;
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:1151: {formatPrice(item.line_total != null ? item.line_total : item.dish_price * item.quantity)}
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:2001: const cartTotalAmount = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:2588: line_total: item.price * item.quantity,
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\x.jsx:2967: line_total: item.price * item.quantity,
+ succeeded in 12.97s:
+ 990:     const num = Number(amount);
+ 991:     if (isNaN(num)) return String(amount);
+ 992:     const formatted = Number.isInteger(num) ? num.toLocaleString() : parseFloat(num.toFixed(2)).toString();
+ 993:     return symbol ? `${formatted} ${symbol}` : formatted;
+ 994:   };
+ 995: 
+ 996:   const itemsTotal = useMemo(() => {
+ 997:     return orderItems.reduce((sum, item) => {
+ 998:       const lineTotal = Number(item.line_total) || (Number(item.dish_price) * Number(item.quantity)) || 0;
+ 999:       return sum + lineTotal;
+1000:     }, 0);
+1001:   }, [orderItems]);
+1002: 
+1003:   const displayTotal = order?.total_amount != null ? order.total_amount : itemsTotal;
+1004: 
+1005:   // Invalid token
+ succeeded in 13.24s:
+ 706:             {items.map((item, idx) => (
+ 707:               <div
+ 708:                 key={item.dishId || idx}
+ 709:                 className="flex justify-between items-center text-sm"
+ 710:               >
+ 711:                 <span className="text-slate-700">
+ 712:                   {item.name}{" "}
+ 713:                   <span className="text-slate-400">x{item.quantity}</span>
+ 714:                 </span>
+ 715:                 <span className="text-slate-700 font-medium tabular-nums">
+ 716:                   {formatPrice(item.price * item.quantity)}
+ 717:                 </span>
+ 718:               </div>
+ 719:             ))}
+ 720:           </div>
+ 721: 
+ 722:           {/* Divider */}
+ succeeded in 13.36s:
+1144:               <div className="space-y-2">
+1145:                 {orderItems.map((item, idx) => (
+1146:                   <div key={item.id || idx} className="flex justify-between items-center text-sm">
+1147:                     <span className="text-slate-700">
+1148:                       {item.dish_name} <span className="text-slate-400">x{item.quantity}</span>
+1149:                     </span>
+1150:                     <span className="text-slate-700 font-medium tabular-nums">
+1151:                       {formatPrice(item.line_total != null ? item.line_total : item.dish_price * item.quantity)}
+1152:                     </span>
+1153:                   </div>
+1154:                 ))}
+1155:               </div>
+1156:               <div className="border-t border-slate-200 pt-3 mt-3">
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$start=3416; $end=3424; $i=0; Get-Content '"'pages/PublicMenu/x.jsx' | ForEach-Object { "'$i++; if($i -ge $start -and $i -le $end){ '"'{0,4}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'w-12 h-1.5 bg-gray-300 rounded-full|w-9 h-9|justify-between' | ForEach-Object { '{0}:{1}: {2}' -f "'$_.Path.Replace((Get-Location).Path + '"'\\\\',''), "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 9.42s:
+3416:       {/* TASK-260203-01: Cart as Bottom Drawer */}
+3417:       <Drawer
+3418:         open={drawerMode === 'cart'}
+3419:         dismissible={!isSubmitting}
+3420:         onOpenChange={(open) => { if (!open && !isSubmitting) { popOverlay('cart'); setDrawerMode(null); } }}
+3421:       >
+3422:         <DrawerContent className="max-h-[85vh] overflow-hidden">
+3423:           <DrawerHeader className="sr-only">
+3424:             <DrawerTitle>{t('cart.title')}</DrawerTitle>
+ succeeded in 9.55s:
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:426: <div className="sticky top-0 z-10 bg-white px-4 pt-3 pb-1 flex items-center justify-between">
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:428: <div className="w-12 h-1.5 bg-gray-300 rounded-full" /> {/* Drag handle */}
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:435: className={`w-9 h-9 ${isSubmitting ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500'}`}
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:441: <div className="flex items-center justify-between">
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:503: <div className="flex items-center justify-between">
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:565: className="w-full flex items-center justify-between text-left"
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:595: <div className="flex items-center justify-between mb-2">
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:612: <div key={order.id} className="flex justify-between items-center text-xs">
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:622: <div key={`${order.id}-${idx}`} className="flex justify-between items-center text-xs">
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:660: <div className="flex items-center justify-between">
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:674: className="w-full flex items-center justify-between text-left"
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:702: <div className="flex items-center justify-between mb-2">
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:720: <div className="flex justify-between items-center text-sm">
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:794: <div key={item.dishId} className="flex items-center justify-between py-2 border-b last:border-0">
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:829: className={`w-full flex items-center justify-between text-left ${
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\CartView.jsx:899: <div className="flex justify-between items-end pt-2 border-t">
+codex
+I’ve finished the code inspection. I’m writing the scoped findings now to the pipeline file the task requested, and I’m also saving the repo-mandated review artifacts in `pages/PublicMenu/`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@('pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md','pages/PublicMenu/review_2026-03-24.md','pages/PublicMenu/commands_2026-03-24.log') | ForEach-Object { \""'$_`t$(Test-Path $_)" }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.68s:
+pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md	False
+pages/PublicMenu/review_2026-03-24.md	False
+pages/PublicMenu/commands_2026-03-24.log	False
+codex
+I’m creating the report files now. The findings stay restricted to Fix 1 and Fix 3; I’m not adding any unrelated review comments.
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-130431-1152
+## Findings
+1. [P3] Custom CartView drag handle is still present — `pages/PublicMenu/CartView.jsx:428` still renders a custom gray handle (`<div className="w-12 h-1.5 bg-gray-300 rounded-full" />`) in the sticky header, while `pages/PublicMenu/x.jsx:3422` still uses the normal `DrawerContent`, so the native B44 handle remains too. That leaves PM-121 unfixed and the drawer can still show two gray strips. FIX: Remove only the custom handle div from `CartView.jsx` and keep the native B44 handle.
+2. [P2] Floating-point math is still raw in cart subtotal and total paths — `pages/PublicMenu/CartView.jsx:800` still renders `formatPrice(item.price * item.quantity)`, and `pages/PublicMenu/x.jsx:2001` still computes `cartTotalAmount` from unrounded `item.price * item.quantity`. `pages/PublicMenu/x.jsx:2588` and `pages/PublicMenu/x.jsx:2967` also persist raw `line_total` values, so binary float noise is still preserved in the underlying numbers. FIX: Introduce a shared rounded line-total helper, for example `Math.round(Number(price) * Number(quantity) * 100) / 100`, and use it for the CartView line subtotal, the `cartTotalAmount` reduce, and the `line_total` payloads before formatting/display.
+
+## Summary
+Total: 2 findings (0 P0, 0 P1, 1 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 2 is internally inconsistent with the frozen UX: the frozen block says chevron size must stay `w-7 h-7`, but Fix 2 says do not change it from `w-9 h-9`. Fix 2 also asks for native-handle-only after Fix 1, while still describing a same-row centered handle + right chevron layout that normally depends on a custom header handle.
+- Missing context (what info would have helped): The task references `BUGS_MASTER.md` and `ux-concepts/ACCEPTANCE_CRITERIA_PublicMenu.md`, but the speed rule also says not to read outside the page folder, so it was unclear whether those references were mandatory or informational only.
+- Scope questions (anything you weren't sure if it's in scope): For Fix 3, it was unclear whether review should cover only the cart display math or also the raw `line_total` writes in `x.jsx`; I treated the raw `line_total` writes as in scope because the task explicitly says to fix the underlying number, not only the rendered string.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-24.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-130431-1152
+## Findings
+1. [P3] Custom CartView drag handle is still present — `pages/PublicMenu/CartView.jsx:428` still renders a custom gray handle (`<div className="w-12 h-1.5 bg-gray-300 rounded-full" />`) in the sticky header, while `pages/PublicMenu/x.jsx:3422` still uses the normal `DrawerContent`, so the native B44 handle remains too. That leaves PM-121 unfixed and the drawer can still show two gray strips. FIX: Remove only the custom handle div from `CartView.jsx` and keep the native B44 handle.
+2. [P2] Floating-point math is still raw in cart subtotal and total paths — `pages/PublicMenu/CartView.jsx:800` still renders `formatPrice(item.price * item.quantity)`, and `pages/PublicMenu/x.jsx:2001` still computes `cartTotalAmount` from unrounded `item.price * item.quantity`. `pages/PublicMenu/x.jsx:2588` and `pages/PublicMenu/x.jsx:2967` also persist raw `line_total` values, so binary float noise is still preserved in the underlying numbers. FIX: Introduce a shared rounded line-total helper, for example `Math.round(Number(price) * Number(quantity) * 100) / 100`, and use it for the CartView line subtotal, the `cartTotalAmount` reduce, and the `line_total` payloads before formatting/display.
+
+## Summary
+Total: 2 findings (0 P0, 0 P1, 1 P2, 1 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 2 is internally inconsistent with the frozen UX: the frozen block says chevron size must stay `w-7 h-7`, but Fix 2 says do not change it from `w-9 h-9`. Fix 2 also asks for native-handle-only after Fix 1, while still describing a same-row centered handle + right chevron layout that normally depends on a custom header handle.
+- Missing context (what info would have helped): The task references `BUGS_MASTER.md` and `ux-concepts/ACCEPTANCE_CRITERIA_PublicMenu.md`, but the speed rule also says not to read outside the page folder, so it was unclear whether those references were mandatory or informational only.
+- Scope questions (anything you weren't sure if it's in scope): For Fix 3, it was unclear whether review should cover only the cart display math or also the raw `line_total` writes in `x.jsx`; I treated the raw `line_total` writes as in scope because the task explicitly says to fix the underlying number, not only the rendered string.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-24.log
+Get-ChildItem -Name pages/PublicMenu
+Get-Date -Format 'yyyy-MM-dd'
+Get-ChildItem -Name pages/PublicMenu
+Get-Date -Format 'yyyy-MM-dd'
+$i=0; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
+$i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
+$i=0; Get-Content 'pages/PublicMenu/README.md' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
+$i=0; Get-Content 'pages/PublicMenu/BUGS.md' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
+Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'ChevronDown|item.price \* item.quantity|Drag handle|sticky top-0|cartTotalAmount' -Context 3,3 | ForEach-Object { $_.Context.PreContext + $_.Line + $_.Context.PostContext }
+Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'cartTotalAmount|reduce\(|item.price \* item.quantity|price \* qty|quantity' -Context 2,2 | ForEach-Object { $_.Context.PreContext + $_.Line + $_.Context.PostContext }
+$start=420; $end=440; $i=0; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
+$start=792; $end=906; $i=0; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
+Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'const cartTotalItems =|const cartTotalAmount =|line_total:' -Context 2,2 | ForEach-Object { $_.LineNumber.ToString().PadLeft(4)+': '+$_.Line; $_.Context.PreContext | ForEach-Object { }; $_.Context.PostContext | ForEach-Object { } }
+$start=1450; $end=1485; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
+$start=2215; $end=2255; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
+$start=2465; $end=2515; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
+$start=1994; $end=2004; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
+$start=2582; $end=2593; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
+$start=2961; $end=2972; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
+Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'formatPrice\(item\.price \* item\.quantity\)|formatPrice\(item\.line_total != null \? item.line_total : item\.dish_price \* item.quantity\)|Number\(item\.dish_price\) \* Number\(item\.quantity\)' -Context 1,1 | ForEach-Object { $_.LineNumber.ToString().PadLeft(4)+': '+$_.Line; $_.Context.PreContext; $_.Context.PostContext }
+$start=706; $end=722; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
+$start=990; $end=1005; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
+$start=1144; $end=1156; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
+Select-String -Path 'pages/PublicMenu/CartView.jsx','pages/PublicMenu/x.jsx' -Pattern '\* item.quantity|\* qty|line_total' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path.Replace((Get-Location).Path + '\\',''), $_.LineNumber, $_.Line.Trim() }
+$start=3416; $end=3424; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
+Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'w-12 h-1.5 bg-gray-300 rounded-full|w-9 h-9|justify-between' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path.Replace((Get-Location).Path + '\\',''), $_.LineNumber, $_.Line.Trim() }
+@('pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md','pages/PublicMenu/review_2026-03-24.md','pages/PublicMenu/commands_2026-03-24.log') | ForEach-Object { "$_`t$(Test-Path $_)" }
+apply_patch(auto_approved=true) exited 0 in 989ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md
+A pages/PublicMenu/review_2026-03-24.md
+A pages/PublicMenu/commands_2026-03-24.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..03aac89fd3c893b0ad363104a72e56a28a31335b
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -0,0 +1,27 @@
++Get-ChildItem -Name pages/PublicMenu
++Get-Date -Format 'yyyy-MM-dd'
++Get-ChildItem -Name pages/PublicMenu
++Get-Date -Format 'yyyy-MM-dd'
++$i=0; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
++$i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
++$i=0; Get-Content 'pages/PublicMenu/README.md' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
++$i=0; Get-Content 'pages/PublicMenu/BUGS.md' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'ChevronDown|item.price \* item.quantity|Drag handle|sticky top-0|cartTotalAmount' -Context 3,3 | ForEach-Object { $_.Context.PreContext + $_.Line + $_.Context.PostContext }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'cartTotalAmount|reduce\(|item.price \* item.quantity|price \* qty|quantity' -Context 2,2 | ForEach-Object { $_.Context.PreContext + $_.Line + $_.Context.PostContext }
++$start=420; $end=440; $i=0; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=792; $end=906; $i=0; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'const cartTotalItems =|const cartTotalAmount =|line_total:' -Context 2,2 | ForEach-Object { $_.LineNumber.ToString().PadLeft(4)+': '+$_.Line; $_.Context.PreContext | ForEach-Object { }; $_.Context.PostContext | ForEach-Object { } }
++$start=1450; $end=1485; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=2215; $end=2255; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=2465; $end=2515; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=1994; $end=2004; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=2582; $end=2593; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=2961; $end=2972; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'formatPrice\(item\.price \* item\.quantity\)|formatPrice\(item\.line_total != null \? item.line_total : item\.dish_price \* item.quantity\)|Number\(item\.dish_price\) \* Number\(item\.quantity\)' -Context 1,1 | ForEach-Object { $_.LineNumber.ToString().PadLeft(4)+': '+$_.Line; $_.Context.PreContext; $_.Context.PostContext }
++$start=706; $end=722; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=990; $end=1005; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=1144; $end=1156; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PublicMenu/CartView.jsx','pages/PublicMenu/x.jsx' -Pattern '\* item.quantity|\* qty|line_total' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path.Replace((Get-Location).Path + '\\',''), $_.LineNumber, $_.Line.Trim() }
++$start=3416; $end=3424; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'w-12 h-1.5 bg-gray-300 rounded-full|w-9 h-9|justify-between' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path.Replace((Get-Location).Path + '\\',''), $_.LineNumber, $_.Line.Trim() }
++@('pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md','pages/PublicMenu/review_2026-03-24.md','pages/PublicMenu/commands_2026-03-24.log') | ForEach-Object { "$_`t$(Test-Path $_)" }
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4e1da80bc501a7c263446fdbb0f53ded359cb131
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-130431-1152
++## Findings
++1. [P3] Custom CartView drag handle is still present — `pages/PublicMenu/CartView.jsx:428` still renders a custom gray handle (`<div className="w-12 h-1.5 bg-gray-300 rounded-full" />`) in the sticky header, while `pages/PublicMenu/x.jsx:3422` still uses the normal `DrawerContent`, so the native B44 handle remains too. That leaves PM-121 unfixed and the drawer can still show two gray strips. FIX: Remove only the custom handle div from `CartView.jsx` and keep the native B44 handle.
++2. [P2] Floating-point math is still raw in cart subtotal and total paths — `pages/PublicMenu/CartView.jsx:800` still renders `formatPrice(item.price * item.quantity)`, and `pages/PublicMenu/x.jsx:2001` still computes `cartTotalAmount` from unrounded `item.price * item.quantity`. `pages/PublicMenu/x.jsx:2588` and `pages/PublicMenu/x.jsx:2967` also persist raw `line_total` values, so binary float noise is still preserved in the underlying numbers. FIX: Introduce a shared rounded line-total helper, for example `Math.round(Number(price) * Number(quantity) * 100) / 100`, and use it for the CartView line subtotal, the `cartTotalAmount` reduce, and the `line_total` payloads before formatting/display.
++
++## Summary
++Total: 2 findings (0 P0, 0 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 2 is internally inconsistent with the frozen UX: the frozen block says chevron size must stay `w-7 h-7`, but Fix 2 says do not change it from `w-9 h-9`. Fix 2 also asks for native-handle-only after Fix 1, while still describing a same-row centered handle + right chevron layout that normally depends on a custom header handle.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` and `ux-concepts/ACCEPTANCE_CRITERIA_PublicMenu.md`, but the speed rule also says not to read outside the page folder, so it was unclear whether those references were mandatory or informational only.
++- Scope questions (anything you weren't sure if it's in scope): For Fix 3, it was unclear whether review should cover only the cart display math or also the raw `line_total` writes in `x.jsx`; I treated the raw `line_total` writes as in scope because the task explicitly says to fix the underlying number, not only the rendered string.
+diff --git a/pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md b/pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4e1da80bc501a7c263446fdbb0f53ded359cb131
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-130431-1152
++## Findings
++1. [P3] Custom CartView drag handle is still present — `pages/PublicMenu/CartView.jsx:428` still renders a custom gray handle (`<div className="w-12 h-1.5 bg-gray-300 rounded-full" />`) in the sticky header, while `pages/PublicMenu/x.jsx:3422` still uses the normal `DrawerContent`, so the native B44 handle remains too. That leaves PM-121 unfixed and the drawer can still show two gray strips. FIX: Remove only the custom handle div from `CartView.jsx` and keep the native B44 handle.
++2. [P2] Floating-point math is still raw in cart subtotal and total paths — `pages/PublicMenu/CartView.jsx:800` still renders `formatPrice(item.price * item.quantity)`, and `pages/PublicMenu/x.jsx:2001` still computes `cartTotalAmount` from unrounded `item.price * item.quantity`. `pages/PublicMenu/x.jsx:2588` and `pages/PublicMenu/x.jsx:2967` also persist raw `line_total` values, so binary float noise is still preserved in the underlying numbers. FIX: Introduce a shared rounded line-total helper, for example `Math.round(Number(price) * Number(quantity) * 100) / 100`, and use it for the CartView line subtotal, the `cartTotalAmount` reduce, and the `line_total` payloads before formatting/display.
++
++## Summary
++Total: 2 findings (0 P0, 0 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 2 is internally inconsistent with the frozen UX: the frozen block says chevron size must stay `w-7 h-7`, but Fix 2 says do not change it from `w-9 h-9`. Fix 2 also asks for native-handle-only after Fix 1, while still describing a same-row centered handle + right chevron layout that normally depends on a custom header handle.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` and `ux-concepts/ACCEPTANCE_CRITERIA_PublicMenu.md`, but the speed rule also says not to read outside the page folder, so it was unclear whether those references were mandatory or informational only.
++- Scope questions (anything you weren't sure if it's in scope): For Fix 3, it was unclear whether review should cover only the cart display math or also the raw `line_total` writes in `x.jsx`; I treated the raw `line_total` writes as in scope because the task explicitly says to fix the underlying number, not only the rendered string.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..03aac89fd3c893b0ad363104a72e56a28a31335b
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -0,0 +1,27 @@
++Get-ChildItem -Name pages/PublicMenu
++Get-Date -Format 'yyyy-MM-dd'
++Get-ChildItem -Name pages/PublicMenu
++Get-Date -Format 'yyyy-MM-dd'
++$i=0; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
++$i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
++$i=0; Get-Content 'pages/PublicMenu/README.md' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
++$i=0; Get-Content 'pages/PublicMenu/BUGS.md' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'ChevronDown|item.price \* item.quantity|Drag handle|sticky top-0|cartTotalAmount' -Context 3,3 | ForEach-Object { $_.Context.PreContext + $_.Line + $_.Context.PostContext }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'cartTotalAmount|reduce\(|item.price \* item.quantity|price \* qty|quantity' -Context 2,2 | ForEach-Object { $_.Context.PreContext + $_.Line + $_.Context.PostContext }
++$start=420; $end=440; $i=0; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=792; $end=906; $i=0; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'const cartTotalItems =|const cartTotalAmount =|line_total:' -Context 2,2 | ForEach-Object { $_.LineNumber.ToString().PadLeft(4)+': '+$_.Line; $_.Context.PreContext | ForEach-Object { }; $_.Context.PostContext | ForEach-Object { } }
++$start=1450; $end=1485; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=2215; $end=2255; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=2465; $end=2515; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=1994; $end=2004; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=2582; $end=2593; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=2961; $end=2972; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'formatPrice\(item\.price \* item\.quantity\)|formatPrice\(item\.line_total != null \? item.line_total : item\.dish_price \* item.quantity\)|Number\(item\.dish_price\) \* Number\(item\.quantity\)' -Context 1,1 | ForEach-Object { $_.LineNumber.ToString().PadLeft(4)+': '+$_.Line; $_.Context.PreContext; $_.Context.PostContext }
++$start=706; $end=722; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=990; $end=1005; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=1144; $end=1156; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PublicMenu/CartView.jsx','pages/PublicMenu/x.jsx' -Pattern '\* item.quantity|\* qty|line_total' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path.Replace((Get-Location).Path + '\\',''), $_.LineNumber, $_.Line.Trim() }
++$start=3416; $end=3424; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'w-12 h-1.5 bg-gray-300 rounded-full|w-9 h-9|justify-between' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path.Replace((Get-Location).Path + '\\',''), $_.LineNumber, $_.Line.Trim() }
++@('pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md','pages/PublicMenu/review_2026-03-24.md','pages/PublicMenu/commands_2026-03-24.log') | ForEach-Object { "$_`t$(Test-Path $_)" }
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4e1da80bc501a7c263446fdbb0f53ded359cb131
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-130431-1152
++## Findings
++1. [P3] Custom CartView drag handle is still present — `pages/PublicMenu/CartView.jsx:428` still renders a custom gray handle (`<div className="w-12 h-1.5 bg-gray-300 rounded-full" />`) in the sticky header, while `pages/PublicMenu/x.jsx:3422` still uses the normal `DrawerContent`, so the native B44 handle remains too. That leaves PM-121 unfixed and the drawer can still show two gray strips. FIX: Remove only the custom handle div from `CartView.jsx` and keep the native B44 handle.
++2. [P2] Floating-point math is still raw in cart subtotal and total paths — `pages/PublicMenu/CartView.jsx:800` still renders `formatPrice(item.price * item.quantity)`, and `pages/PublicMenu/x.jsx:2001` still computes `cartTotalAmount` from unrounded `item.price * item.quantity`. `pages/PublicMenu/x.jsx:2588` and `pages/PublicMenu/x.jsx:2967` also persist raw `line_total` values, so binary float noise is still preserved in the underlying numbers. FIX: Introduce a shared rounded line-total helper, for example `Math.round(Number(price) * Number(quantity) * 100) / 100`, and use it for the CartView line subtotal, the `cartTotalAmount` reduce, and the `line_total` payloads before formatting/display.
++
++## Summary
++Total: 2 findings (0 P0, 0 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 2 is internally inconsistent with the frozen UX: the frozen block says chevron size must stay `w-7 h-7`, but Fix 2 says do not change it from `w-9 h-9`. Fix 2 also asks for native-handle-only after Fix 1, while still describing a same-row centered handle + right chevron layout that normally depends on a custom header handle.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` and `ux-concepts/ACCEPTANCE_CRITERIA_PublicMenu.md`, but the speed rule also says not to read outside the page folder, so it was unclear whether those references were mandatory or informational only.
++- Scope questions (anything you weren't sure if it's in scope): For Fix 3, it was unclear whether review should cover only the cart display math or also the raw `line_total` writes in `x.jsx`; I treated the raw `line_total` writes as in scope because the task explicitly says to fix the underlying number, not only the rendered string.
+diff --git a/pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md b/pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4e1da80bc501a7c263446fdbb0f53ded359cb131
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-130431-1152
++## Findings
++1. [P3] Custom CartView drag handle is still present — `pages/PublicMenu/CartView.jsx:428` still renders a custom gray handle (`<div className="w-12 h-1.5 bg-gray-300 rounded-full" />`) in the sticky header, while `pages/PublicMenu/x.jsx:3422` still uses the normal `DrawerContent`, so the native B44 handle remains too. That leaves PM-121 unfixed and the drawer can still show two gray strips. FIX: Remove only the custom handle div from `CartView.jsx` and keep the native B44 handle.
++2. [P2] Floating-point math is still raw in cart subtotal and total paths — `pages/PublicMenu/CartView.jsx:800` still renders `formatPrice(item.price * item.quantity)`, and `pages/PublicMenu/x.jsx:2001` still computes `cartTotalAmount` from unrounded `item.price * item.quantity`. `pages/PublicMenu/x.jsx:2588` and `pages/PublicMenu/x.jsx:2967` also persist raw `line_total` values, so binary float noise is still preserved in the underlying numbers. FIX: Introduce a shared rounded line-total helper, for example `Math.round(Number(price) * Number(quantity) * 100) / 100`, and use it for the CartView line subtotal, the `cartTotalAmount` reduce, and the `line_total` payloads before formatting/display.
++
++## Summary
++Total: 2 findings (0 P0, 0 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 2 is internally inconsistent with the frozen UX: the frozen block says chevron size must stay `w-7 h-7`, but Fix 2 says do not change it from `w-9 h-9`. Fix 2 also asks for native-handle-only after Fix 1, while still describing a same-row centered handle + right chevron layout that normally depends on a custom header handle.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` and `ux-concepts/ACCEPTANCE_CRITERIA_PublicMenu.md`, but the speed rule also says not to read outside the page folder, so it was unclear whether those references were mandatory or informational only.
++- Scope questions (anything you weren't sure if it's in scope): For Fix 3, it was unclear whether review should cover only the cart display math or also the raw `line_total` writes in `x.jsx`; I treated the raw `line_total` writes as in scope because the task explicitly says to fix the underlying number, not only the rendered string.
+
+codex
+Saved the scoped review to [publicmenu-260324-130431-1152-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md). I logged 2 in-scope findings: the custom CartView drag handle is still present, and the floating-point fix is still missing in the CartView/x.jsx subtotal-total math paths. No code fixes were applied.
+
+Repo copies are in [review_2026-03-24.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-24.md) and [commands_2026-03-24.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-24.log). I did not log a separate Fix 2 defect because the current chevron row already has the requested `justify-between` / `w-9 h-9` structure; the remaining header regression is the duplicate-handle issue from Fix 1.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-24.log b/pages/PublicMenu/commands_2026-03-24.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..03aac89fd3c893b0ad363104a72e56a28a31335b
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-24.log
+@@ -0,0 +1,27 @@
++Get-ChildItem -Name pages/PublicMenu
++Get-Date -Format 'yyyy-MM-dd'
++Get-ChildItem -Name pages/PublicMenu
++Get-Date -Format 'yyyy-MM-dd'
++$i=0; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
++$i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
++$i=0; Get-Content 'pages/PublicMenu/README.md' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
++$i=0; Get-Content 'pages/PublicMenu/BUGS.md' | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'ChevronDown|item.price \* item.quantity|Drag handle|sticky top-0|cartTotalAmount' -Context 3,3 | ForEach-Object { $_.Context.PreContext + $_.Line + $_.Context.PostContext }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'cartTotalAmount|reduce\(|item.price \* item.quantity|price \* qty|quantity' -Context 2,2 | ForEach-Object { $_.Context.PreContext + $_.Line + $_.Context.PostContext }
++$start=420; $end=440; $i=0; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=792; $end=906; $i=0; Get-Content 'pages/PublicMenu/CartView.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'const cartTotalItems =|const cartTotalAmount =|line_total:' -Context 2,2 | ForEach-Object { $_.LineNumber.ToString().PadLeft(4)+': '+$_.Line; $_.Context.PreContext | ForEach-Object { }; $_.Context.PostContext | ForEach-Object { } }
++$start=1450; $end=1485; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=2215; $end=2255; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=2465; $end=2515; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=1994; $end=2004; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=2582; $end=2593; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=2961; $end=2972; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PublicMenu/x.jsx' -Pattern 'formatPrice\(item\.price \* item\.quantity\)|formatPrice\(item\.line_total != null \? item.line_total : item\.dish_price \* item.quantity\)|Number\(item\.dish_price\) \* Number\(item\.quantity\)' -Context 1,1 | ForEach-Object { $_.LineNumber.ToString().PadLeft(4)+': '+$_.Line; $_.Context.PreContext; $_.Context.PostContext }
++$start=706; $end=722; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=990; $end=1005; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++$start=1144; $end=1156; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PublicMenu/CartView.jsx','pages/PublicMenu/x.jsx' -Pattern '\* item.quantity|\* qty|line_total' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path.Replace((Get-Location).Path + '\\',''), $_.LineNumber, $_.Line.Trim() }
++$start=3416; $end=3424; $i=0; Get-Content 'pages/PublicMenu/x.jsx' | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,4}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/PublicMenu/CartView.jsx' -Pattern 'w-12 h-1.5 bg-gray-300 rounded-full|w-9 h-9|justify-between' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path.Replace((Get-Location).Path + '\\',''), $_.LineNumber, $_.Line.Trim() }
++@('pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md','pages/PublicMenu/review_2026-03-24.md','pages/PublicMenu/commands_2026-03-24.log') | ForEach-Object { "$_`t$(Test-Path $_)" }
+diff --git a/pages/PublicMenu/review_2026-03-24.md b/pages/PublicMenu/review_2026-03-24.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4e1da80bc501a7c263446fdbb0f53ded359cb131
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-24.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-130431-1152
++## Findings
++1. [P3] Custom CartView drag handle is still present — `pages/PublicMenu/CartView.jsx:428` still renders a custom gray handle (`<div className="w-12 h-1.5 bg-gray-300 rounded-full" />`) in the sticky header, while `pages/PublicMenu/x.jsx:3422` still uses the normal `DrawerContent`, so the native B44 handle remains too. That leaves PM-121 unfixed and the drawer can still show two gray strips. FIX: Remove only the custom handle div from `CartView.jsx` and keep the native B44 handle.
++2. [P2] Floating-point math is still raw in cart subtotal and total paths — `pages/PublicMenu/CartView.jsx:800` still renders `formatPrice(item.price * item.quantity)`, and `pages/PublicMenu/x.jsx:2001` still computes `cartTotalAmount` from unrounded `item.price * item.quantity`. `pages/PublicMenu/x.jsx:2588` and `pages/PublicMenu/x.jsx:2967` also persist raw `line_total` values, so binary float noise is still preserved in the underlying numbers. FIX: Introduce a shared rounded line-total helper, for example `Math.round(Number(price) * Number(quantity) * 100) / 100`, and use it for the CartView line subtotal, the `cartTotalAmount` reduce, and the `line_total` payloads before formatting/display.
++
++## Summary
++Total: 2 findings (0 P0, 0 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 2 is internally inconsistent with the frozen UX: the frozen block says chevron size must stay `w-7 h-7`, but Fix 2 says do not change it from `w-9 h-9`. Fix 2 also asks for native-handle-only after Fix 1, while still describing a same-row centered handle + right chevron layout that normally depends on a custom header handle.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` and `ux-concepts/ACCEPTANCE_CRITERIA_PublicMenu.md`, but the speed rule also says not to read outside the page folder, so it was unclear whether those references were mandatory or informational only.
++- Scope questions (anything you weren't sure if it's in scope): For Fix 3, it was unclear whether review should cover only the cart display math or also the raw `line_total` writes in `x.jsx`; I treated the raw `line_total` writes as in scope because the task explicitly says to fix the underlying number, not only the rendered string.
+diff --git a/pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md b/pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4e1da80bc501a7c263446fdbb0f53ded359cb131
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260324-130431-1152
++## Findings
++1. [P3] Custom CartView drag handle is still present — `pages/PublicMenu/CartView.jsx:428` still renders a custom gray handle (`<div className="w-12 h-1.5 bg-gray-300 rounded-full" />`) in the sticky header, while `pages/PublicMenu/x.jsx:3422` still uses the normal `DrawerContent`, so the native B44 handle remains too. That leaves PM-121 unfixed and the drawer can still show two gray strips. FIX: Remove only the custom handle div from `CartView.jsx` and keep the native B44 handle.
++2. [P2] Floating-point math is still raw in cart subtotal and total paths — `pages/PublicMenu/CartView.jsx:800` still renders `formatPrice(item.price * item.quantity)`, and `pages/PublicMenu/x.jsx:2001` still computes `cartTotalAmount` from unrounded `item.price * item.quantity`. `pages/PublicMenu/x.jsx:2588` and `pages/PublicMenu/x.jsx:2967` also persist raw `line_total` values, so binary float noise is still preserved in the underlying numbers. FIX: Introduce a shared rounded line-total helper, for example `Math.round(Number(price) * Number(quantity) * 100) / 100`, and use it for the CartView line subtotal, the `cartTotalAmount` reduce, and the `line_total` payloads before formatting/display.
++
++## Summary
++Total: 2 findings (0 P0, 0 P1, 1 P2, 1 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 2 is internally inconsistent with the frozen UX: the frozen block says chevron size must stay `w-7 h-7`, but Fix 2 says do not change it from `w-9 h-9`. Fix 2 also asks for native-handle-only after Fix 1, while still describing a same-row centered handle + right chevron layout that normally depends on a custom header handle.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` and `ux-concepts/ACCEPTANCE_CRITERIA_PublicMenu.md`, but the speed rule also says not to read outside the page folder, so it was unclear whether those references were mandatory or informational only.
++- Scope questions (anything you weren't sure if it's in scope): For Fix 3, it was unclear whether review should cover only the cart display math or also the raw `line_total` writes in `x.jsx`; I treated the raw `line_total` writes as in scope because the task explicitly says to fix the underlying number, not only the rendered string.
+
+tokens used
+75 999
+Saved the scoped review to [publicmenu-260324-130431-1152-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260324-130431-1152-codex-findings.md). I logged 2 in-scope findings: the custom CartView drag handle is still present, and the floating-point fix is still missing in the CartView/x.jsx subtotal-total math paths. No code fixes were applied.
+
+Repo copies are in [review_2026-03-24.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-24.md) and [commands_2026-03-24.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-24.log). I did not log a separate Fix 2 defect because the current chevron row already has the requested `justify-between` / `w-9 h-9` structure; the remaining header regression is the duplicate-handle issue from Fix 1.

@@ -1,0 +1,114 @@
+# CC Reviewer Findings — PSSK Prompt Quality Review (Round 4)
+Chain: task-260404-110558-psskpartnerorderprocess260404v4md
+Prompt: pssk-partnerorderprocess-redesign-260404-v4.md
+Page: PartnerOrderProcess (1653 lines)
+
+## Issues Found
+
+1. [CRITICAL] Missing i18n dictionary keys `orderprocess.status.active` and `orderprocess.status.inactive`
+   The new FixedStageRow component in Fix 2 uses `t('orderprocess.status.active')` (line 196 of snippet) and `t('orderprocess.status.inactive')` (line 198 of snippet), but these two keys are NOT listed in Fix 4's "New t() keys to add to i18n dictionary" section. The executor will create the component correctly but forget to add these dictionary entries, causing raw key strings like "orderprocess.status.active" to appear in the UI instead of "Активен"/"Выключен".
+   PROMPT FIX: Add to Fix 4 dictionary section:
+   - `'orderprocess.status.active'` -> `"Активен"`
+   - `'orderprocess.status.inactive'` -> `"Выключен"`
+
+2. [CRITICAL] Fix 4 execution order contradiction — LOCAL_UI_TEXT deletion timing
+   Fix 4 instructions say: "After all replacements (Groups A auto-deleted by Fix 2, Groups B+V manually replaced), DELETE the LOCAL_UI_TEXT constant entirely." This implies deletion should happen AFTER Fix 2 removes Group A references. But the EXECUTION ORDER says "Fix 4 -> Fix 1 -> Fix 3 -> Fix 2 -> Fix 5" — meaning Fix 4 runs first, three fixes before Fix 2. If the executor follows the execution order and deletes LOCAL_UI_TEXT in Fix 4, lines 698 and 712 (inside old FixedStageRow, which still exists until Fix 2) will reference an undefined constant — breaking the file.
+   PROMPT FIX: Either:
+   (a) Split Fix 4 into two steps: Fix 4a (replace Groups B+V, do NOT delete LOCAL_UI_TEXT) runs first, Fix 4b (delete LOCAL_UI_TEXT constant) runs AFTER Fix 2. Update execution order: Fix 4a -> Fix 1 -> Fix 3 -> Fix 2 -> Fix 4b -> Fix 5.
+   OR (b) Explicitly state in Fix 4: "Do NOT delete LOCAL_UI_TEXT constant yet — it is still referenced by the old FixedStageRow. Deletion happens automatically when Fix 2 replaces the entire component. After Fix 2 completes, then delete LOCAL_UI_TEXT."
+
+3. [MEDIUM] Fix 4 display point BEFORE/AFTER code snippet doesn't match actual code
+   The prompt shows:
+   ```
+   // BEFORE:
+   {stageAnalysis.blocker && <p>{stageAnalysis.blocker}</p>}
+   ```
+   The actual code at lines 1507-1509 is:
+   ```jsx
+   <p className="text-sm text-amber-700">
+     {stageAnalysis.blocker}
+   </p>
+   ```
+   The BEFORE pattern doesn't exist in the file. An executor searching for the exact BEFORE string will not find it and may hesitate. The actual change needed is clear (wrap `{stageAnalysis.blocker}` with `t()`) but the misleading BEFORE/AFTER pair could cause confusion.
+   PROMPT FIX: Show actual code:
+   ```
+   // BEFORE (line 1508):
+   {stageAnalysis.blocker}
+   // AFTER:
+   {t(stageAnalysis.blocker)}
+   ```
+
+4. [MEDIUM] `moveBusy` state becomes dead after Fix 5
+   Fix 5 removes `handleMoveUp` and `handleMoveDown` — the only consumers of `moveBusy` state (line 1077). After deletion, `const [moveBusy, setMoveBusy] = useState(false)` becomes dead code. Unlike `deleteDialog` (which must stay for hook order), `moveBusy` is a useState hook — removing it would ALSO change hook order. The prompt should either: (a) explicitly note to keep it for hook order safety, or (b) if the executor is already keeping deleteMutation for hook order, consistency requires keeping moveBusy too.
+   PROMPT FIX: Add `moveBusy` state to the "kept for hook order" list in Fix 5, alongside deleteMutation and deleteDialog. Add a note: "`moveBusy` state (line 1077) — keep for React hook order safety."
+
+5. [LOW] `middleStages` variable used in `handleAddStage` — verify it exists in scope
+   `handleAddStage` (line 1229) references `sortedStages` and `middleStages`. The prompt says to delete the function body but doesn't mention whether these variables are used elsewhere. This is not a problem since the whole function body is deleted, but worth verifying `middleStages` isn't only defined for these handlers.
+   PROMPT FIX: No change needed — cosmetic observation only.
+
+## Line Number Verification
+| Reference | Prompt says | Actual | Status |
+|-----------|------------|--------|--------|
+| CHANNEL_FILTERS | lines 35-40 | lines 35-40 | OK |
+| LOCAL_UI_TEXT | lines 125-135 | lines 125-135 | OK |
+| analyzeStageSet | line 229 | line 229 | OK |
+| blocker refs in analyzeStageSet | 249, 258, 267, 276 | 249, 258, 267, 276 | OK |
+| ChannelFilter function | lines 582-630 | lines 582-630 | OK |
+| FixedStageRow function | lines 636-769 | lines 636-769 | OK |
+| getRoleLabel useCallback | line 664 | line 664 | OK |
+| LOCAL_UI_TEXT.locked | line 698 | line 698 | OK |
+| LOCAL_UI_TEXT.enabled/disabled | line 712 | line 712 | OK |
+| useState group | lines 1076-1079 | lines 1076-1079 | OK |
+| const { t } = useI18n() | line 1067 | line 1067 | OK |
+| LOCAL_UI_TEXT.blockerGeneric | line 1505 | line 1505 | OK |
+| stageAnalysis.blocker display | line ~1508 | line 1508 | OK |
+| LOCAL_UI_TEXT.currentProcess | line 1589 | line 1589 | OK |
+| FixedStageRow call-site | lines 1609-1618 | lines 1609-1618 | OK |
+| "bg-white rounded-xl border overflow-hidden" | line 1608 | line 1608 | OK |
+| handleAddStage | line 1229 | line 1229 | OK |
+| handleDeleteStage | line 1326 | line 1326 | OK |
+| handleMoveUp | line 1365 | line 1365 | OK |
+| handleMoveDown | line 1390 | line 1390 | OK |
+| deleteMutation | line 1219 | line 1219 | OK |
+| createMutation | line 1209 | line 1209 | OK |
+| deleteDialog state | line 1079 | line 1079 | OK |
+
+All 22 line number references: VERIFIED CORRECT (22/22).
+
+## Fix-by-Fix Analysis
+
+### Fix 4 (LOCAL_UI_TEXT -> t()) — RISKY
+- Groups B+V replacements: SAFE — correct line numbers, straightforward substitutions.
+- Approach A (analyzeStageSet returns key strings): SAFE — clean pattern, display point wraps with t().
+- LOCAL_UI_TEXT deletion: RISKY — execution order contradiction (see issue #2). If deleted before Fix 2, code breaks.
+- Dictionary additions: INCOMPLETE — missing `orderprocess.status.active` and `orderprocess.status.inactive` (see issue #1).
+
+### Fix 1 (Remove ChannelFilter) — SAFE
+- Dead code removal. Confirmed: 0 JSX usages of `<ChannelFilter>`, no channelFilter state exists. Prompt correctly identifies both the function (582-630) and constant (35-40). Clean deletion.
+
+### Fix 3 (Mobile channel legend) — SAFE
+- Insertion before a unique class string anchor. Responsive classes correct (sm:hidden). Icons already imported. i18n keys for channel.* may already exist (prompt notes "grep first"). No risk.
+
+### Fix 2 (Redesign FixedStageRow) — SAFE (with issue #1 fixed)
+- Complete component replacement. All slot prop names verified against actual code. Preserves getRoleLabel with useCallback. New props (isExpanded, onToggleExpand, onEdit, t) are clear. Call-site update at lines 1609-1618 matches.
+- Correctly removes toggleBusyKey and onToggle props (toggle moved to EditStageDialog per UX v2.0).
+- Missing dictionary keys (issue #1) is the only gap.
+
+### Fix 5 (Remove dead handlers) — SAFE
+- Grep confirms 0 JSX usages for all 5 functions. Hook order safety correctly identified for deleteMutation and deleteDialog. createMutation correctly marked as NOT dead code. Only gap: moveBusy state not mentioned (issue #4).
+
+## Summary
+Total: 5 issues (2 CRITICAL, 2 MEDIUM, 1 LOW)
+
+## Prompt Clarity (MANDATORY)
+- Overall clarity: 4/5
+- What was most clear: Prop names, data facts, wireframes, behavior matrix, FROZEN UX list, DO NOT DELETE list, and the explicit Approach A for analyzeStageSet are excellent. All 22 line numbers are correct. The fix-by-fix grouping of LOCAL_UI_TEXT references (Groups A/B/V) is very helpful.
+- What was ambiguous or could cause hesitation:
+  1. LOCAL_UI_TEXT deletion timing vs execution order (CRITICAL — could break the file between fixes)
+  2. BEFORE/AFTER code for display point doesn't match actual file (executor will search and not find)
+- Missing context:
+  1. Dictionary entries for `orderprocess.status.active` / `orderprocess.status.inactive`
+  2. `moveBusy` state disposition after Fix 5
+
+## Verdict
+v4 is a major improvement over v3. The analyzeStageSet Approach A is clean and correct. All line numbers verified. The two CRITICAL issues are easy to fix — add 2 dictionary keys and clarify LOCAL_UI_TEXT deletion timing. After those fixes, prompt is ready for execution.

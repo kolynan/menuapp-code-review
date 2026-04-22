@@ -1,0 +1,491 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d66a0-a21f-7b03-9cbe-0dd96282963b
+--------
+user
+**MANDATORY FIRST STEP — run this before anything else:** ``` git fetch origin 2>/dev/null; git reset --hard origin/main ``` This ensures your working copy is in sync with the remote repository (prevents KB-095 stale-copy issue). --- Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md FORMAT: # Codex Writer Findings — Unknown Chain: split-order-per-dish-x-s230-260407-112801-978b ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Task: Split Cart Submission into N Separate Orders ## Business Goal Currently, submitting a cart with N dishes creates **1 Order + N OrderItems**. This causes a UX lie in StaffOrdersMobile: waiter presses [Принять] on one dish but the entire Order advances (all dishes change status together). **Fix**: Change cart submission to create **N Orders (1 per cart line)**, each with **1 OrderItem**. StaffOrdersMobile already handles multiple orders from the same guest correctly — no SOM changes needed. CartView already displays N orders with correct totals — no CartView changes needed. ## Scope Lock Changes are **ONLY** in `pages/PublicMenu/x.jsx`, within: - `processHallOrder` function (hall mode, ~line 3671) - The delivery/takeaway Order creation block inside `handleSubmitOrder` (~line 4039–4200) - Post-submit logic: `setSessionOrders`, `setSessionItems`, `showConfirmation` inside those two blocks **DO NOT change:** - CartView.jsx - StaffOrdersMobile.jsx - Any other file ## FROZEN UX (DO NOT CHANGE) These elements are tested and approved — **do not touch their rendering logic**: - CartView order grouping by guest/session (already works for N orders) - SOM per-order row display (already correct) - `submitLockRef` double-tap guard (line 3871-3872 in RELEASE) — keep as-is - Confirmation screen layout (`showConfirmation` call structure) - All loyalty UI (points display, redemption UI) - All discount UI (discount display in cart) --- ## Architecture Decisions (confirmed by Arman) **Split unit**: 1 Order per cart LINE. `quantity` is preserved as-is. - If cart has `2 × Стейк`, create 1 Order with `OrderItem.quantity = 2` (not 2 separate Orders). - This is by design: SOM shows quantity on the row. **Discount**: Proportional split by `itemGross / cartSubtotal`. Last item absorbs rounding remainder. - If `cartSubtotal <= 0` (free cart, edge case): skip split math, use original single-Order flow. **Loyalty**: Attach all loyalty side-effects (earn/redeem transactions, LoyaltyAccount update, Order.points_earned) to `createdOrders[0]` (first Order) only. Do NOT repeat for each Order. **Partner counters**: Call `getNextOrderNumber` N times (once per loop iteration), accumulating state. Call `Partner.update` once after the loop with final accumulated counters. **Error handling**: If Order.create or OrderItem.create fails mid-loop, do NOT delete already-created Orders. Let the error propagate to the existing `catch` block (which shows `setSubmitError`). Guest will see an error and can retry. **`public_token`**: Each Order gets a unique `public_token` (random). For `showConfirmation`, use `createdOrders[0].public_token`. --- ## Fix 1 — Hall Mode: `processHallOrder` (~line 3671 in RELEASE) ### What to find ``` grep -n "processHallOrder" x.jsx ``` Function signature: `const processHallOrder = async (guestToUse, validatedSession) => {` ### Current pattern to replace (approximate lines 3709–3747) ```js const { orderNumber, updatedCounters } = getNextOrderNumber(partner, 'hall'); const orderData = { ... order_number: orderNumber, total_amount: finalTotal, discount_amount: discountAmount + pointsDiscountAmount, public_token: Math.random().toString(36).substring(2, 10), ... }; const order = await base44.entities.Order.create(orderData); // ... (loyalty pre-checks in between) const newItems = cart.map((item) => ({ order: order.id, dish: item.dishId, dish_name: item.name, dish_price: item.price, quantity: item.quantity, line_total: Math.round(item.price * item.quantity * 100) / 100, split_type: splitType, })); await base44.entities.OrderItem.bulkCreate(newItems); ``` ### New pattern Replace the single `Order.create` + `OrderItem.bulkCreate` block with a loop. Keep ALL other fields in `orderData` unchanged (partner, order_type, status, stage_id, payment_status, comment, client_phone, client_email, table, table_session, guest, loyalty_account, points_redeemed). Only `total_amount`, `discount_amount`, `order_number`, and `public_token` change per iteration. ```js // Compute discount split inputs const cartSubtotal = cart.reduce((s, item) => s + item.price * item.quantity, 0); const totalDiscount = discountAmount + pointsDiscountAmount; // Base orderData — shared fields (no total_amount / discount_amount / order_number / public_token yet) const baseOrderData = { partner: partner.id, order_type: 'hall', status: "new", stage_id: startStage?.id || null, payment_status: "unpaid", comment: comment || undefined, client_phone: clientPhone || undefined, client_email: customerEmail && customerEmail.trim() ? customerEmail.trim().toLowerCase() : undefined, table: currentTableId, table_session: validatedSession?.id ?? null, guest: guestToUse?.id || null, loyalty_account: loyaltyAccountToUse?.id || null, points_redeemed: redeemedPoints || 0, }; // Loop: create N Orders, accumulate order numbers const createdOrders = []; let currentPartnerState = { ...partner }; let accumulatedDiscount = 0; for (let idx = 0; idx < cart.length; idx++) { const item = cart[idx]; const itemGross = Math.round(item.price * item.quantity * 100) / 100; // Proportional discount; last item absorbs rounding remainder let itemDiscount; if (cartSubtotal <= 0) { itemDiscount = 0; } else if (idx < cart.length - 1) { itemDiscount = parseFloat((totalDiscount * (itemGross / cartSubtotal)).toFixed(2)); } else { itemDiscount = parseFloat((totalDiscount - accumulatedDiscount).toFixed(2)); } // Clamp: itemTotal must not go below 0 const itemTotal = Math.max(0, parseFloat((itemGross - itemDiscount).toFixed(2))); accumulatedDiscount += itemDiscount; // Sequential order number (accumulate state across loop) const { orderNumber: itemOrderNumber, updatedCounters: itemCounters } = getNextOrderNumber(currentPartnerState, 'hall'); currentPartnerState = { ...currentPartnerState, ...itemCounters }; const itemOrderData = { ...baseOrderData, total_amount: itemTotal, discount_amount: itemDiscount, order_number: itemOrderNumber, public_token: Math.random().toString(36).substring(2, 10), }; const createdOrder = await base44.entities.Order.create(itemOrderData); createdOrders.push(createdOrder); await base44.entities.OrderItem.create({ order: createdOrder.id, dish: item.dishId, dish_name: item.name, dish_price: item.price, quantity: item.quantity, line_total: Math.round(item.price * item.quantity * 100) / 100, split_type: splitType, }); } // Final accumulated counters → Partner.update (once, not N times) const finalUpdatedCounters = { order_counter_hall: currentPartnerState.order_counter_hall, order_counter_pickup: currentPartnerState.order_counter_pickup, order_counter_delivery: currentPartnerState.order_counter_delivery, order_counter_date: currentPartnerState.order_counter_date, }; ``` After the loop: - **Loyalty side-effects**: use `createdOrders[0]` instead of `order` everywhere in the existing loyalty try/catch blocks. Specifically: - `LoyaltyTransaction.create({ ..., order: createdOrders[0].id })` - `LoyaltyAccount.update(...)` — keep as-is (not order-specific) - `Order.update(createdOrders[0].id, { points_earned: earnedPoints })` - **Partner.update**: replace `updatedCounters` with `finalUpdatedCounters` - **queryClient.setQueryData**: same, use `finalUpdatedCounters` - **Optimistic update `setSessionOrders`**: add ALL N orders: ```js const optimisticAt = Date.now(); setSessionOrders(prev => { const existingIds = new Set(prev.map(o => String(o.id))); const newOpts = createdOrders .filter(o => !existingIds.has(String(o.id))) .map(o => ({ ...o, guest: guestToUse?.id, _optimisticAt: optimisticAt })); return [...newOpts, ...prev]; }); ``` - **Optimistic update `setSessionItems`**: build temp items for ALL N orders: ```js const tempIdBase = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(16).slice(2)}`; const allOptimisticItems = cart.map((item, i) => ({ id: `temp_${tempIdBase}_${i}`, order: createdOrders[i].id, dish: item.dishId, dish_name: item.name, dish_price: item.price, quantity: item.quantity, line_total: Math.round(item.price * item.quantity * 100) / 100, split_type: splitType, _optimisticAt: optimisticAt, })); setSessionItems(prev => [...prev, ...allOptimisticItems]); ``` - **`showConfirmation`**: change `publicToken: order.public_token` → `publicToken: createdOrders[0].public_token`. Keep `totalAmount: confirmedTotal` (= `finalTotal`, the full cart total — NOT per-item). --- ## Fix 2 — Delivery/Takeaway Mode: inside `handleSubmitOrder` (~line 4039–4200) ### What to find ``` grep -n "orderMode.*delivery\|orderMode.*takeaway\|client_name" x.jsx ``` Look for the delivery `Order.create` block (has `client_name`, `delivery_address`, NO `order_number`, NO `splitType`). ### Current pattern to replace ```js const order = await base44.entities.Order.create(orderData); const orderItemsData = cart.map((item) => ({ order: order.id, dish: item.dishId, dish_name: item.name, dish_price: item.price, quantity: item.quantity, line_total: Math.round(item.price * item.quantity * 100) / 100, })); await base44.entities.OrderItem.bulkCreate(orderItemsData); ``` ### New pattern Same loop structure as Fix 1, but simpler (no `getNextOrderNumber`, no `splitType`): ```js // Compute discount split inputs const cartSubtotal = cart.reduce((s, item) => s + item.price * item.quantity, 0); const totalDiscount = discountAmount + pointsDiscountAmount; // Base orderData — shared fields const baseDeliveryOrderData = { // Preserve ALL existing fields from the current orderData block // Only total_amount / discount_amount / public_token are per-iteration partner: partner.id, order_type: orderMode, status: "new", payment_status: "unpaid", comment: comment || undefined, client_name: clientName || undefined, client_phone: clientPhone || undefined, client_email: customerEmail && customerEmail.trim() ? customerEmail.trim().toLowerCase() : undefined, delivery_address: orderMode === "delivery" ? deliveryAddress || undefined : undefined, loyalty_account: loyaltyAccountToUse?.id || null, points_redeemed: redeemedPoints || 0, discount_amount: discountAmount + pointsDiscountAmount, // will be overridden per-item }; const createdOrders = []; let accumulatedDiscount = 0; for (let idx = 0; idx < cart.length; idx++) { const item = cart[idx]; const itemGross = Math.round(item.price * item.quantity * 100) / 100; let itemDiscount; if (cartSubtotal <= 0) { itemDiscount = 0; } else if (idx < cart.length - 1) { itemDiscount = parseFloat((totalDiscount * (itemGross / cartSubtotal)).toFixed(2)); } else { itemDiscount = parseFloat((totalDiscount - accumulatedDiscount).toFixed(2)); } const itemTotal = Math.max(0, parseFloat((itemGross - itemDiscount).toFixed(2))); accumulatedDiscount += itemDiscount; const itemOrderData = { ...baseDeliveryOrderData, total_amount: itemTotal, discount_amount: itemDiscount, public_token: Math.random().toString(36).substring(2, 10), }; const createdOrder = await base44.entities.Order.create(itemOrderData); createdOrders.push(createdOrder); await base44.entities.OrderItem.create({ order: createdOrder.id, dish: item.dishId, dish_name: item.name, dish_price: item.price, quantity: item.quantity, line_total: Math.round(item.price * item.quantity * 100) / 100, // No split_type in delivery (not in original code) }); } ``` After the delivery loop: - **Loyalty side-effects**: use `createdOrders[0]` instead of `order` - **Optimistic update `setSessionOrders`**: same N-order pattern as Fix 1 (but without `guest` field — delivery has no guest) - **Optimistic update `setSessionItems`**: same N-order pattern as Fix 1 (no `split_type`) - **`showConfirmation`**: `publicToken: createdOrders[0].public_token`, `totalAmount: confirmedTotal` (= `finalTotal`) --- ## Verification Checklist After implementation, verify: 1. **Line count**: `x.jsx` must be within ±100 lines of current RELEASE (5279 lines). If outside range → something went wrong. 2. **Submit 3-dish cart (hall mode)**: - B44 DB → Order table shows 3 new Orders, same `guest`, same `table_session` - Each Order has 1 OrderItem - Order numbers: ЗАЛ-001, ЗАЛ-002, ЗАЛ-003 (sequential) - Discount split: proportional per item - Hard refresh after submit: CartView still shows "Ваши заказы (3)" 3. **SOM after 3-dish submit**: 3 separate [Принять] rows, same guest shown as "1 ГОСТЯ · 3 БЛЮДА" (NOT "3 ГОСТЯ") 4. **1-dish cart**: works exactly as before (loop of 1 = same as single create) 5. **Delivery mode**: 3-dish submit creates 3 Orders, no `order_number` field, no `split_type` on OrderItem 6. **Error mid-loop**: network error after 2nd Order create → error shown to user, first 2 Orders remain in DB (expected behavior, no rollback) --- ## Notes for Implementer - `getNextOrderNumber` is imported from `sessionHelpers.js` — it's a pure function, safe to call N times with accumulated state - `base44.entities.*` API pattern: keep the same pattern already used throughout the function (do NOT change API style) - `cartTotalAmount` is already computed at ~line 1916 as `cart.reduce(...)` — you can use it as `cartSubtotal` if it's in scope, otherwise recompute inline - The existing `submitLockRef.current = true` at the start of `handleSubmitOrder` already prevents double-taps — do not add additional guards - Loyalty is intentionally low-priority: `pointsDiscountAmount` and `loyaltyEnabled` etc. are in scope but their allocation to first Order only is a deliberate simplification === END ===
+mcp startup: no servers
+codex
+Reviewing the target page within the requested scope. I’ll sync the worktree first as requested, then read only `x.jsx` plus `README.md` and `BUGS.md` in the same page folder, and write the findings file in the pipeline path.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git fetch origin 2>$null; git reset --hard origin/main' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 44.15s:
+HEAD is now at bd3486f feat(StaffOrdersMobile): SOM Section Rework — lifecycle order, active/passive, dual metric, 2-step requests, staff pill, inline toast, close-blocker, bulk requests
+codex
+The reset completed. I’m checking only the `PublicMenu` page folder now so I can read `x.jsx`, `README.md`, and `BUGS.md` without pulling in unrelated files.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '(Get-Content "pages/PublicMenu/x.jsx").Length' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Select-String -Path "pages/PublicMenu/x.jsx" -Pattern "processHallOrder|handleSubmitOrder|client_name|orderMode.*delivery|orderMode.*takeaway" | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Force "pages/PublicMenu" | Select-Object Name,Length,LastWriteTime' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 40.01s:
+5279
+ succeeded in 38.15s:
+440:"confirmation.client_name": "Name",
+876:{tr("confirmation.client_name", "Name")}: {clientName}
+3285:autoSubmitTimerRef.current = setTimeout(() => handleSubmitOrder(), 100);
+3618:if (orderMode === "delivery" && !deliveryAddress.trim()) {
+3671:const processHallOrder = async (guestToUse, validatedSession) => {
+3870:const handleSubmitOrder = async () => {
+4039:const success = await processHallOrder(guest, session);
+4047:if (orderMode === "pickup" || orderMode === "delivery" || clientPhone) {
+4102:client_name: clientName || undefined,
+4105:delivery_address: orderMode === "delivery" ? deliveryAddress || undefined : undefined,
+4538:handleSubmitOrder={handleSubmitOrder}
+4622:handleSubmitOrder={handleSubmitOrder}
+ succeeded in 35.46s:
+
+Name                                             Length LastWriteTime        
+----                                             ------ -------------        
+components                                              4/5/2026 9:07:11 PM  
+versions                                                4/6/2026 10:59:51 AM 
+260320-01 useTableSession RELEASE.jsx            29623  4/5/2026 9:07:10 PM  
+260321-02 CartView RELEASE.jsx                   48348  4/5/2026 9:07:10 PM  
+260321-02 x RELEASE.jsx                          129988 4/5/2026 9:07:10 PM  
+260323-02 CartView RELEASE.jsx                   41742  4/5/2026 9:07:10 PM  
+260323-02 MenuView RELEASE.jsx                   15335  4/5/2026 9:07:10 PM  
+260323-02 x RELEASE.jsx                          130581 4/5/2026 9:07:10 PM  
+260323-03 CheckoutView RELEASE.jsx               7840   3/23/2026 11:26:26 AM
+260327-01 ModeTabs RELEASE.jsx                   3026   3/27/2026 7:24:37 AM 
+260328-01 CartView RELEASE.jsx                   44686  4/5/2026 9:07:10 PM  
+260328-01 x RELEASE.jsx                          149420 4/5/2026 9:07:10 PM  
+260329-01 MenuView RELEASE.jsx                   16120  3/29/2026 1:55:42 PM 
+260329-01 StickyCartBar RELEASE.jsx              2316   3/29/2026 1:55:42 PM 
+260330-02 CartView RELEASE.jsx                   52737  3/30/2026 4:49:19 PM 
+260330-09 PublicMenu x RELEASE.jsx               164417 3/31/2026 7:11:46 AM 
+260331-01 PublicMenu x RELEASE.jsx               164417 3/31/2026 11:50:58 AM
+codex
+I’ve confirmed the file is the expected 5,279 lines. Next I’m pulling the two targeted code regions and only the relevant README/BUGS context from the same folder so the review stays inside the requested boundary.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Select-String -Path "pages/PublicMenu/BUGS.md" -Pattern "split|order|cart|hall|delivery|takeaway|loyalty|public_token|StaffOrdersMobile" -CaseSensitive:$false | Select-Object -First 120 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content "pages/PublicMenu/README.md"' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$c = Get-Content "pages/PublicMenu/x.jsx"; $c[3660..3865]' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$c = Get-Content "pages/PublicMenu/x.jsx"; $c[4035..4205]' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 30.20s:
+    } catch (e) {
+      // silent
+      return true;
+    }
+  };
+
+
+
+  // Submit order
+  // Process hall order (P0-2: accepts validatedSession to avoid stale closure)
+  const processHallOrder = async (guestToUse, validatedSession) => {
+    try {
+      // Handle loyalty account (find or create if email provided)
+      let loyaltyAccountToUse = loyaltyAccount;
+      if (customerEmail && customerEmail.trim() && !loyaltyAccountToUse) {
+        const emailLower = customerEmail.trim().toLowerCase();
+        const existingAccounts = await base44.entities.LoyaltyAccount.filter({
+          partner: partner.id,
+          email: emailLower
+        });
+ succeeded in 31.51s:
+        // ============================================================
+
+        // Process the order (pass validated session to avoid stale closure)
+        const success = await processHallOrder(guest, session);
+        if (!success) {
+          submitLockRef.current = false;
+          setIsSubmitting(false);
+          return;
+        }
+      } else {
+        // Pickup/Delivery flow (unchanged)
+        if (orderMode === "pickup" || orderMode === "delivery" || clientPhone) {
+          const isAllowed = await checkRateLimit();
+          if (!isAllowed) {
+            setSubmitError(t('error.rate_limit'));
+            submitLockRef.current = false;
+            setIsSubmitting(false);
+            return;
+          }
+        }
+ succeeded in 31.15s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 31.69s:
+28:- **Файл:** CartView.jsx
+29:- **Симптом:** CartView renders same layout regardless of visit state. Missing 3 distinct drawer layouts per spec (before send / after send+draft / after send no draft).
+30:- **Фикс:** Introduce `drawerLayout` variable, conditionally reorder sections, add collapsible bill.
+35:- **Файл:** CartView.jsx
+39:### BUG-PM-058: StickyCartBar missing 7-state visibility (P1 — Batch 3)
+43:- **Симптом:** `hallStickyMode` only has 4 states. Missing: paid fade-out, closed hidden, closed+items confirm reset, two text modes.
+46:### BUG-PM-059: StickyCartBar text modes not implemented (P1 — Batch 3)
+50:- **Симптом:** No separate draft-mode vs visit-mode text formats for StickyCartBar.
+52:### BUG-PM-052: Pickup/delivery checkout drops loyalty UI (P1)
+55:- **Файл:** x.jsx / CartView.jsx
+56:- **Симптом:** Loyalty section not shown in pickup/delivery checkout flow.
+57:- **Фикс:** Enable loyalty UI for all order modes.
+59:### BUG-PM-060: Section rendering order wrong (P2 — Batch 2)
+62:- **Файл:** CartView.jsx
+63:- **Симптом:** Sections render out of spec order (sent before draft). Part of drawer restructure (BUG-PM-056).
+65:### BUG-PM-061: StickyCartBar missing animations (P2 — Batch 3)
+82:- **Файл:** x.jsx (OrderStatusBadge, osGetStatusConfig), CartView.jsx (getSafeStatus)
+89:- **Файл:** x.jsx (OrderStatusBadge, osGetStatusConfig), CartView.jsx (getSafeStatus)
+96:### BUG-PM-065: Hall StickyCartBar ignores visit lifecycle state (P1)
+100:- **Симптом:** StickyCartBar doesn't inspect visit/session/bill/closed/paid state.
+codex
+The target code still looks like the pre-split flow. I’m pulling exact numbered lines now so the findings file can point to the concrete hall and delivery/takeaway defects without drifting outside Fix 1 and Fix 2.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=4088; $i -le 4195; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=3700; $i -le 3855; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 24.08s:
+4088:          }
+4089:        }
+4090:
+4091:        // Get start stage for this order type
+4092:        const startStage = getStartStage(orderStages, orderMode);
+4093:
+4094:        const orderData = {
+4095:          partner: partner.id,
+4096:          order_type: orderMode,
+4097:          status: "new",
+4098:          stage_id: startStage?.id || null,
+4099:          payment_status: "unpaid",
+4100:          total_amount: finalTotal,
+4101:          comment: comment || undefined,
+4102:          client_name: clientName || undefined,
+4103:          client_phone: clientPhone || undefined,
+4104:          client_email: customerEmail && customerEmail.trim() ? customerEmail.trim().toLowerCase() : undefined,
+4105:          delivery_address: orderMode === "delivery" ? deliveryAddress || undefined : undefined,
+4106:          public_token: Math.random().toString(36).substring(2, 10),
+4107:          loyalty_account: loyaltyAccountToUse?.id || null,
+ succeeded in 23.63s:
+3700:          toast.error(t('loyalty.insufficient_points'), { id: 'mm1' });
+3701:          return false;
+3702:        }
+3703:      }
+3704:
+3705:      // Get start stage for this order type
+3706:      const startStage = getStartStage(orderStages, orderMode);
+3707:
+3708:      // Generate order number (for staff, not shown to guest)
+3709:      const { orderNumber, updatedCounters } = getNextOrderNumber(partner, 'hall');
+3710:
+3711:      const orderData = {
+3712:        partner: partner.id,
+3713:        order_type: 'hall',
+3714:        status: "new",
+3715:        stage_id: startStage?.id || null,
+3716:        payment_status: "unpaid",
+3717:        total_amount: finalTotal,
+3718:        comment: comment || undefined,
+3719:        client_phone: clientPhone || undefined,
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=4192; $i -le 4202; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 10.25s:
+4192:        // GAP-01: Show confirmation screen instead of toast + delayed transition
+4193:        showConfirmation({
+4194:          items: confirmedItems,
+4195:          totalAmount: confirmedTotal,
+4196:          guestLabel: null,
+4197:          orderMode,
+4198:          publicToken: order.public_token,
+4199:          clientName: savedClientName,
+4200:        });
+4201:
+4202:      }
+codex
+I have the concrete defects isolated. I’m writing the findings to the required pipeline file now, and I’ll also save the same review plus a command log in `pages/PublicMenu` to satisfy the repo’s review-output rules.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path "pages/PublicMenu/commands_2026-04-07.log"' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path "pages/PublicMenu/review_2026-04-07.md"' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path "pipeline/chain-state"' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 16.79s:
+False
+ succeeded in 16.53s:
+True
+ succeeded in 17.05s:
+False
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=3854; $i -le 3860; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 13.80s:
+3854:      showConfirmation({
+3855:        items: confirmedItems,
+3856:        totalAmount: confirmedTotal,
+3857:        guestLabel,
+3858:        orderMode: "hall",
+3859:        publicToken: order.public_token,
+3860:        clientName: null,
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-04-07.md
+# Codex Writer Findings — Unknown Chain: split-order-per-dish-x-s230-260407-112801-978b
+
+## Findings
+1. [P1] Fix 1 not implemented in `processHallOrder` — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3709-3747 still call `getNextOrderNumber(partner, 'hall')` once, create one `Order` with `total_amount: finalTotal`, then `bulkCreate` all cart lines under that single `order.id`. That preserves the old `1 Order + N OrderItems` model, so StaffOrdersMobile will still advance the whole order when a waiter accepts one dish. FIX: replace the single `Order.create` + `OrderItem.bulkCreate` block with the required per-cart-line loop, splitting `discount_amount` proportionally, preserving `quantity`, generating a unique `public_token` per order, calling `getNextOrderNumber` once per iteration, and updating `Partner` once with the final accumulated counters.
+2. [P1] Fix 1 hall post-submit flow still assumes one order — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3775-3805 and 3810-3859 still route loyalty earn/update to `order.id`, cache only one `updatedCounters`, insert one optimistic order, attach every optimistic item to the same `order.id`, and pass `order.public_token` to `showConfirmation`. Even if the create block were split later, the local session state and confirmation token would still collapse the cart back to one hall order. FIX: switch loyalty and confirmation to `createdOrders[0]`, use `finalUpdatedCounters`, push all `createdOrders` into `setSessionOrders`, and create one optimistic item per created order using `createdOrders[i].id`.
+3. [P1] Fix 2 not implemented in pickup/delivery submit path — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4094-4124 still build one `orderData`, call `Order.create` once, and `bulkCreate` all `OrderItem`s under that order. That leaves delivery/takeaway in the same forbidden `1 Order + N OrderItems` structure instead of `N` orders with one item each. FIX: replace this block with the specified per-cart-line loop, using shared base fields and per-item `total_amount`, `discount_amount`, and `public_token`, while keeping `order_number` and `split_type` absent.
+4. [P1] Fix 2 delivery/takeaway post-submit flow is still single-order-only — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4152-4170 and 4193-4199 still attach loyalty earn/update to `order.id` and use `order.public_token` for confirmation, and there is no N-order optimistic `setSessionOrders` / `setSessionItems` update after submit. That does not match the required first-order loyalty scoping and multi-order post-submit state for the split-order design. FIX: route loyalty side effects through `createdOrders[0]`, add the required N-order optimistic order/item updates without `guest` or `split_type`, and pass `createdOrders[0].public_token` to `showConfirmation`.
+
+## Summary
+Total: 4 findings (0 P0, 4 P1, 0 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None; the target file, functions, required behavior, and excluded areas were specified precisely.
+- Scope questions (anything you weren't sure if it's in scope): None.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md
+# Codex Writer Findings — Unknown Chain: split-order-per-dish-x-s230-260407-112801-978b
+
+## Findings
+1. [P1] Fix 1 not implemented in `processHallOrder` — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3709-3747 still call `getNextOrderNumber(partner, 'hall')` once, create one `Order` with `total_amount: finalTotal`, then `bulkCreate` all cart lines under that single `order.id`. That preserves the old `1 Order + N OrderItems` model, so StaffOrdersMobile will still advance the whole order when a waiter accepts one dish. FIX: replace the single `Order.create` + `OrderItem.bulkCreate` block with the required per-cart-line loop, splitting `discount_amount` proportionally, preserving `quantity`, generating a unique `public_token` per order, calling `getNextOrderNumber` once per iteration, and updating `Partner` once with the final accumulated counters.
+2. [P1] Fix 1 hall post-submit flow still assumes one order — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3775-3805 and 3810-3859 still route loyalty earn/update to `order.id`, cache only one `updatedCounters`, insert one optimistic order, attach every optimistic item to the same `order.id`, and pass `order.public_token` to `showConfirmation`. Even if the create block were split later, the local session state and confirmation token would still collapse the cart back to one hall order. FIX: switch loyalty and confirmation to `createdOrders[0]`, use `finalUpdatedCounters`, push all `createdOrders` into `setSessionOrders`, and create one optimistic item per created order using `createdOrders[i].id`.
+3. [P1] Fix 2 not implemented in pickup/delivery submit path — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4094-4124 still build one `orderData`, call `Order.create` once, and `bulkCreate` all `OrderItem`s under that order. That leaves delivery/takeaway in the same forbidden `1 Order + N OrderItems` structure instead of `N` orders with one item each. FIX: replace this block with the specified per-cart-line loop, using shared base fields and per-item `total_amount`, `discount_amount`, and `public_token`, while keeping `order_number` and `split_type` absent.
+4. [P1] Fix 2 delivery/takeaway post-submit flow is still single-order-only — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4152-4170 and 4193-4199 still attach loyalty earn/update to `order.id` and use `order.public_token` for confirmation, and there is no N-order optimistic `setSessionOrders` / `setSessionItems` update after submit. That does not match the required first-order loyalty scoping and multi-order post-submit state for the split-order design. FIX: route loyalty side effects through `createdOrders[0]`, add the required N-order optimistic order/item updates without `guest` or `split_type`, and pass `createdOrders[0].public_token` to `showConfirmation`.
+
+## Summary
+Total: 4 findings (0 P0, 4 P1, 0 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None; the target file, functions, required behavior, and excluded areas were specified precisely.
+- Scope questions (anything you weren't sure if it's in scope): None.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-04-07.log
+git fetch origin 2>$null; git reset --hard origin/main
+Get-ChildItem -Force "pages/PublicMenu" | Select-Object Name,Length,LastWriteTime
+(Get-Content "pages/PublicMenu/x.jsx").Length
+Select-String -Path "pages/PublicMenu/x.jsx" -Pattern "processHallOrder|handleSubmitOrder|client_name|orderMode.*delivery|orderMode.*takeaway" | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+$c = Get-Content "pages/PublicMenu/x.jsx"; $c[3660..3865]
+$c = Get-Content "pages/PublicMenu/x.jsx"; $c[4035..4205]
+Get-Content "pages/PublicMenu/README.md"
+Select-String -Path "pages/PublicMenu/BUGS.md" -Pattern "split|order|cart|hall|delivery|takeaway|loyalty|public_token|StaffOrdersMobile" -CaseSensitive:$false | Select-Object -First 120 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
+$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=3700; $i -le 3855; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }
+$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=4088; $i -le 4195; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }
+Test-Path "pipeline/chain-state"
+Test-Path "pages/PublicMenu/review_2026-04-07.md"
+Test-Path "pages/PublicMenu/commands_2026-04-07.log"
+$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=3854; $i -le 3860; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }
+apply_patch(auto_approved=true) exited 0 in 1.65s:
+Success. Updated the following files:
+A pipeline/chain-state/split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md
+A pages/PublicMenu/review_2026-04-07.md
+A pages/PublicMenu/commands_2026-04-07.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-04-07.log b/pages/PublicMenu/commands_2026-04-07.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..ae2be49282bcdd4f0721708b5481032ce1bfc70c
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-04-07.log
+@@ -0,0 +1,14 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Force "pages/PublicMenu" | Select-Object Name,Length,LastWriteTime
++(Get-Content "pages/PublicMenu/x.jsx").Length
++Select-String -Path "pages/PublicMenu/x.jsx" -Pattern "processHallOrder|handleSubmitOrder|client_name|orderMode.*delivery|orderMode.*takeaway" | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$c = Get-Content "pages/PublicMenu/x.jsx"; $c[3660..3865]
++$c = Get-Content "pages/PublicMenu/x.jsx"; $c[4035..4205]
++Get-Content "pages/PublicMenu/README.md"
++Select-String -Path "pages/PublicMenu/BUGS.md" -Pattern "split|order|cart|hall|delivery|takeaway|loyalty|public_token|StaffOrdersMobile" -CaseSensitive:$false | Select-Object -First 120 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=3700; $i -le 3855; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }
++$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=4088; $i -le 4195; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }
++Test-Path "pipeline/chain-state"
++Test-Path "pages/PublicMenu/review_2026-04-07.md"
++Test-Path "pages/PublicMenu/commands_2026-04-07.log"
++$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=3854; $i -le 3860; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }
+diff --git a/pages/PublicMenu/review_2026-04-07.md b/pages/PublicMenu/review_2026-04-07.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c5f8bb4751c77e43165da034886590c86520949f
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-04-07.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — Unknown Chain: split-order-per-dish-x-s230-260407-112801-978b
++
++## Findings
++1. [P1] Fix 1 not implemented in `processHallOrder` — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3709-3747 still call `getNextOrderNumber(partner, 'hall')` once, create one `Order` with `total_amount: finalTotal`, then `bulkCreate` all cart lines under that single `order.id`. That preserves the old `1 Order + N OrderItems` model, so StaffOrdersMobile will still advance the whole order when a waiter accepts one dish. FIX: replace the single `Order.create` + `OrderItem.bulkCreate` block with the required per-cart-line loop, splitting `discount_amount` proportionally, preserving `quantity`, generating a unique `public_token` per order, calling `getNextOrderNumber` once per iteration, and updating `Partner` once with the final accumulated counters.
++2. [P1] Fix 1 hall post-submit flow still assumes one order — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3775-3805 and 3810-3859 still route loyalty earn/update to `order.id`, cache only one `updatedCounters`, insert one optimistic order, attach every optimistic item to the same `order.id`, and pass `order.public_token` to `showConfirmation`. Even if the create block were split later, the local session state and confirmation token would still collapse the cart back to one hall order. FIX: switch loyalty and confirmation to `createdOrders[0]`, use `finalUpdatedCounters`, push all `createdOrders` into `setSessionOrders`, and create one optimistic item per created order using `createdOrders[i].id`.
++3. [P1] Fix 2 not implemented in pickup/delivery submit path — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4094-4124 still build one `orderData`, call `Order.create` once, and `bulkCreate` all `OrderItem`s under that order. That leaves delivery/takeaway in the same forbidden `1 Order + N OrderItems` structure instead of `N` orders with one item each. FIX: replace this block with the specified per-cart-line loop, using shared base fields and per-item `total_amount`, `discount_amount`, and `public_token`, while keeping `order_number` and `split_type` absent.
++4. [P1] Fix 2 delivery/takeaway post-submit flow is still single-order-only — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4152-4170 and 4193-4199 still attach loyalty earn/update to `order.id` and use `order.public_token` for confirmation, and there is no N-order optimistic `setSessionOrders` / `setSessionItems` update after submit. That does not match the required first-order loyalty scoping and multi-order post-submit state for the split-order design. FIX: route loyalty side effects through `createdOrders[0]`, add the required N-order optimistic order/item updates without `guest` or `split_type`, and pass `createdOrders[0].public_token` to `showConfirmation`.
++
++## Summary
++Total: 4 findings (0 P0, 4 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, functions, required behavior, and excluded areas were specified precisely.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md b/pipeline/chain-state/split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c5f8bb4751c77e43165da034886590c86520949f
+--- /dev/null
++++ b/pipeline/chain-state/split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — Unknown Chain: split-order-per-dish-x-s230-260407-112801-978b
++
++## Findings
++1. [P1] Fix 1 not implemented in `processHallOrder` — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3709-3747 still call `getNextOrderNumber(partner, 'hall')` once, create one `Order` with `total_amount: finalTotal`, then `bulkCreate` all cart lines under that single `order.id`. That preserves the old `1 Order + N OrderItems` model, so StaffOrdersMobile will still advance the whole order when a waiter accepts one dish. FIX: replace the single `Order.create` + `OrderItem.bulkCreate` block with the required per-cart-line loop, splitting `discount_amount` proportionally, preserving `quantity`, generating a unique `public_token` per order, calling `getNextOrderNumber` once per iteration, and updating `Partner` once with the final accumulated counters.
++2. [P1] Fix 1 hall post-submit flow still assumes one order — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3775-3805 and 3810-3859 still route loyalty earn/update to `order.id`, cache only one `updatedCounters`, insert one optimistic order, attach every optimistic item to the same `order.id`, and pass `order.public_token` to `showConfirmation`. Even if the create block were split later, the local session state and confirmation token would still collapse the cart back to one hall order. FIX: switch loyalty and confirmation to `createdOrders[0]`, use `finalUpdatedCounters`, push all `createdOrders` into `setSessionOrders`, and create one optimistic item per created order using `createdOrders[i].id`.
++3. [P1] Fix 2 not implemented in pickup/delivery submit path — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4094-4124 still build one `orderData`, call `Order.create` once, and `bulkCreate` all `OrderItem`s under that order. That leaves delivery/takeaway in the same forbidden `1 Order + N OrderItems` structure instead of `N` orders with one item each. FIX: replace this block with the specified per-cart-line loop, using shared base fields and per-item `total_amount`, `discount_amount`, and `public_token`, while keeping `order_number` and `split_type` absent.
++4. [P1] Fix 2 delivery/takeaway post-submit flow is still single-order-only — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4152-4170 and 4193-4199 still attach loyalty earn/update to `order.id` and use `order.public_token` for confirmation, and there is no N-order optimistic `setSessionOrders` / `setSessionItems` update after submit. That does not match the required first-order loyalty scoping and multi-order post-submit state for the split-order design. FIX: route loyalty side effects through `createdOrders[0]`, add the required N-order optimistic order/item updates without `guest` or `split_type`, and pass `createdOrders[0].public_token` to `showConfirmation`.
++
++## Summary
++Total: 4 findings (0 P0, 4 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, functions, required behavior, and excluded areas were specified precisely.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-04-07.log b/pages/PublicMenu/commands_2026-04-07.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..ae2be49282bcdd4f0721708b5481032ce1bfc70c
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-04-07.log
+@@ -0,0 +1,14 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Force "pages/PublicMenu" | Select-Object Name,Length,LastWriteTime
++(Get-Content "pages/PublicMenu/x.jsx").Length
++Select-String -Path "pages/PublicMenu/x.jsx" -Pattern "processHallOrder|handleSubmitOrder|client_name|orderMode.*delivery|orderMode.*takeaway" | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$c = Get-Content "pages/PublicMenu/x.jsx"; $c[3660..3865]
++$c = Get-Content "pages/PublicMenu/x.jsx"; $c[4035..4205]
++Get-Content "pages/PublicMenu/README.md"
++Select-String -Path "pages/PublicMenu/BUGS.md" -Pattern "split|order|cart|hall|delivery|takeaway|loyalty|public_token|StaffOrdersMobile" -CaseSensitive:$false | Select-Object -First 120 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=3700; $i -le 3855; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }
++$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=4088; $i -le 4195; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }
++Test-Path "pipeline/chain-state"
++Test-Path "pages/PublicMenu/review_2026-04-07.md"
++Test-Path "pages/PublicMenu/commands_2026-04-07.log"
++$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=3854; $i -le 3860; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }
+diff --git a/pages/PublicMenu/review_2026-04-07.md b/pages/PublicMenu/review_2026-04-07.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c5f8bb4751c77e43165da034886590c86520949f
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-04-07.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — Unknown Chain: split-order-per-dish-x-s230-260407-112801-978b
++
++## Findings
++1. [P1] Fix 1 not implemented in `processHallOrder` — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3709-3747 still call `getNextOrderNumber(partner, 'hall')` once, create one `Order` with `total_amount: finalTotal`, then `bulkCreate` all cart lines under that single `order.id`. That preserves the old `1 Order + N OrderItems` model, so StaffOrdersMobile will still advance the whole order when a waiter accepts one dish. FIX: replace the single `Order.create` + `OrderItem.bulkCreate` block with the required per-cart-line loop, splitting `discount_amount` proportionally, preserving `quantity`, generating a unique `public_token` per order, calling `getNextOrderNumber` once per iteration, and updating `Partner` once with the final accumulated counters.
++2. [P1] Fix 1 hall post-submit flow still assumes one order — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3775-3805 and 3810-3859 still route loyalty earn/update to `order.id`, cache only one `updatedCounters`, insert one optimistic order, attach every optimistic item to the same `order.id`, and pass `order.public_token` to `showConfirmation`. Even if the create block were split later, the local session state and confirmation token would still collapse the cart back to one hall order. FIX: switch loyalty and confirmation to `createdOrders[0]`, use `finalUpdatedCounters`, push all `createdOrders` into `setSessionOrders`, and create one optimistic item per created order using `createdOrders[i].id`.
++3. [P1] Fix 2 not implemented in pickup/delivery submit path — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4094-4124 still build one `orderData`, call `Order.create` once, and `bulkCreate` all `OrderItem`s under that order. That leaves delivery/takeaway in the same forbidden `1 Order + N OrderItems` structure instead of `N` orders with one item each. FIX: replace this block with the specified per-cart-line loop, using shared base fields and per-item `total_amount`, `discount_amount`, and `public_token`, while keeping `order_number` and `split_type` absent.
++4. [P1] Fix 2 delivery/takeaway post-submit flow is still single-order-only — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4152-4170 and 4193-4199 still attach loyalty earn/update to `order.id` and use `order.public_token` for confirmation, and there is no N-order optimistic `setSessionOrders` / `setSessionItems` update after submit. That does not match the required first-order loyalty scoping and multi-order post-submit state for the split-order design. FIX: route loyalty side effects through `createdOrders[0]`, add the required N-order optimistic order/item updates without `guest` or `split_type`, and pass `createdOrders[0].public_token` to `showConfirmation`.
++
++## Summary
++Total: 4 findings (0 P0, 4 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, functions, required behavior, and excluded areas were specified precisely.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md b/pipeline/chain-state/split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c5f8bb4751c77e43165da034886590c86520949f
+--- /dev/null
++++ b/pipeline/chain-state/split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — Unknown Chain: split-order-per-dish-x-s230-260407-112801-978b
++
++## Findings
++1. [P1] Fix 1 not implemented in `processHallOrder` — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3709-3747 still call `getNextOrderNumber(partner, 'hall')` once, create one `Order` with `total_amount: finalTotal`, then `bulkCreate` all cart lines under that single `order.id`. That preserves the old `1 Order + N OrderItems` model, so StaffOrdersMobile will still advance the whole order when a waiter accepts one dish. FIX: replace the single `Order.create` + `OrderItem.bulkCreate` block with the required per-cart-line loop, splitting `discount_amount` proportionally, preserving `quantity`, generating a unique `public_token` per order, calling `getNextOrderNumber` once per iteration, and updating `Partner` once with the final accumulated counters.
++2. [P1] Fix 1 hall post-submit flow still assumes one order — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3775-3805 and 3810-3859 still route loyalty earn/update to `order.id`, cache only one `updatedCounters`, insert one optimistic order, attach every optimistic item to the same `order.id`, and pass `order.public_token` to `showConfirmation`. Even if the create block were split later, the local session state and confirmation token would still collapse the cart back to one hall order. FIX: switch loyalty and confirmation to `createdOrders[0]`, use `finalUpdatedCounters`, push all `createdOrders` into `setSessionOrders`, and create one optimistic item per created order using `createdOrders[i].id`.
++3. [P1] Fix 2 not implemented in pickup/delivery submit path — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4094-4124 still build one `orderData`, call `Order.create` once, and `bulkCreate` all `OrderItem`s under that order. That leaves delivery/takeaway in the same forbidden `1 Order + N OrderItems` structure instead of `N` orders with one item each. FIX: replace this block with the specified per-cart-line loop, using shared base fields and per-item `total_amount`, `discount_amount`, and `public_token`, while keeping `order_number` and `split_type` absent.
++4. [P1] Fix 2 delivery/takeaway post-submit flow is still single-order-only — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4152-4170 and 4193-4199 still attach loyalty earn/update to `order.id` and use `order.public_token` for confirmation, and there is no N-order optimistic `setSessionOrders` / `setSessionItems` update after submit. That does not match the required first-order loyalty scoping and multi-order post-submit state for the split-order design. FIX: route loyalty side effects through `createdOrders[0]`, add the required N-order optimistic order/item updates without `guest` or `split_type`, and pass `createdOrders[0].public_token` to `showConfirmation`.
++
++## Summary
++Total: 4 findings (0 P0, 4 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, functions, required behavior, and excluded areas were specified precisely.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+codex
+Review saved to [split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md). I also mirrored it to [review_2026-04-07.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-04-07.md) and logged the executed commands in [commands_2026-04-07.log](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-04-07.log).
+
+Summary: 4 findings, all P1. Both Fix 1 and Fix 2 are still unimplemented in `x.jsx`: hall mode and delivery/takeaway mode still create a single order for the whole cart, and both post-submit flows still assume a single order for loyalty, optimistic state, and confirmation token handling.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-04-07.log b/pages/PublicMenu/commands_2026-04-07.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..ae2be49282bcdd4f0721708b5481032ce1bfc70c
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-04-07.log
+@@ -0,0 +1,14 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Force "pages/PublicMenu" | Select-Object Name,Length,LastWriteTime
++(Get-Content "pages/PublicMenu/x.jsx").Length
++Select-String -Path "pages/PublicMenu/x.jsx" -Pattern "processHallOrder|handleSubmitOrder|client_name|orderMode.*delivery|orderMode.*takeaway" | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$c = Get-Content "pages/PublicMenu/x.jsx"; $c[3660..3865]
++$c = Get-Content "pages/PublicMenu/x.jsx"; $c[4035..4205]
++Get-Content "pages/PublicMenu/README.md"
++Select-String -Path "pages/PublicMenu/BUGS.md" -Pattern "split|order|cart|hall|delivery|takeaway|loyalty|public_token|StaffOrdersMobile" -CaseSensitive:$false | Select-Object -First 120 | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line }
++$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=3700; $i -le 3855; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }
++$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=4088; $i -le 4195; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }
++Test-Path "pipeline/chain-state"
++Test-Path "pages/PublicMenu/review_2026-04-07.md"
++Test-Path "pages/PublicMenu/commands_2026-04-07.log"
++$c = Get-Content "pages/PublicMenu/x.jsx"; for($i=3854; $i -le 3860; $i++){ if($i -le $c.Length){ "{0}:{1}" -f $i, $c[$i-1] } }
+diff --git a/pages/PublicMenu/review_2026-04-07.md b/pages/PublicMenu/review_2026-04-07.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c5f8bb4751c77e43165da034886590c86520949f
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-04-07.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — Unknown Chain: split-order-per-dish-x-s230-260407-112801-978b
++
++## Findings
++1. [P1] Fix 1 not implemented in `processHallOrder` — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3709-3747 still call `getNextOrderNumber(partner, 'hall')` once, create one `Order` with `total_amount: finalTotal`, then `bulkCreate` all cart lines under that single `order.id`. That preserves the old `1 Order + N OrderItems` model, so StaffOrdersMobile will still advance the whole order when a waiter accepts one dish. FIX: replace the single `Order.create` + `OrderItem.bulkCreate` block with the required per-cart-line loop, splitting `discount_amount` proportionally, preserving `quantity`, generating a unique `public_token` per order, calling `getNextOrderNumber` once per iteration, and updating `Partner` once with the final accumulated counters.
++2. [P1] Fix 1 hall post-submit flow still assumes one order — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3775-3805 and 3810-3859 still route loyalty earn/update to `order.id`, cache only one `updatedCounters`, insert one optimistic order, attach every optimistic item to the same `order.id`, and pass `order.public_token` to `showConfirmation`. Even if the create block were split later, the local session state and confirmation token would still collapse the cart back to one hall order. FIX: switch loyalty and confirmation to `createdOrders[0]`, use `finalUpdatedCounters`, push all `createdOrders` into `setSessionOrders`, and create one optimistic item per created order using `createdOrders[i].id`.
++3. [P1] Fix 2 not implemented in pickup/delivery submit path — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4094-4124 still build one `orderData`, call `Order.create` once, and `bulkCreate` all `OrderItem`s under that order. That leaves delivery/takeaway in the same forbidden `1 Order + N OrderItems` structure instead of `N` orders with one item each. FIX: replace this block with the specified per-cart-line loop, using shared base fields and per-item `total_amount`, `discount_amount`, and `public_token`, while keeping `order_number` and `split_type` absent.
++4. [P1] Fix 2 delivery/takeaway post-submit flow is still single-order-only — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4152-4170 and 4193-4199 still attach loyalty earn/update to `order.id` and use `order.public_token` for confirmation, and there is no N-order optimistic `setSessionOrders` / `setSessionItems` update after submit. That does not match the required first-order loyalty scoping and multi-order post-submit state for the split-order design. FIX: route loyalty side effects through `createdOrders[0]`, add the required N-order optimistic order/item updates without `guest` or `split_type`, and pass `createdOrders[0].public_token` to `showConfirmation`.
++
++## Summary
++Total: 4 findings (0 P0, 4 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, functions, required behavior, and excluded areas were specified precisely.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md b/pipeline/chain-state/split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c5f8bb4751c77e43165da034886590c86520949f
+--- /dev/null
++++ b/pipeline/chain-state/split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — Unknown Chain: split-order-per-dish-x-s230-260407-112801-978b
++
++## Findings
++1. [P1] Fix 1 not implemented in `processHallOrder` — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3709-3747 still call `getNextOrderNumber(partner, 'hall')` once, create one `Order` with `total_amount: finalTotal`, then `bulkCreate` all cart lines under that single `order.id`. That preserves the old `1 Order + N OrderItems` model, so StaffOrdersMobile will still advance the whole order when a waiter accepts one dish. FIX: replace the single `Order.create` + `OrderItem.bulkCreate` block with the required per-cart-line loop, splitting `discount_amount` proportionally, preserving `quantity`, generating a unique `public_token` per order, calling `getNextOrderNumber` once per iteration, and updating `Partner` once with the final accumulated counters.
++2. [P1] Fix 1 hall post-submit flow still assumes one order — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 3775-3805 and 3810-3859 still route loyalty earn/update to `order.id`, cache only one `updatedCounters`, insert one optimistic order, attach every optimistic item to the same `order.id`, and pass `order.public_token` to `showConfirmation`. Even if the create block were split later, the local session state and confirmation token would still collapse the cart back to one hall order. FIX: switch loyalty and confirmation to `createdOrders[0]`, use `finalUpdatedCounters`, push all `createdOrders` into `setSessionOrders`, and create one optimistic item per created order using `createdOrders[i].id`.
++3. [P1] Fix 2 not implemented in pickup/delivery submit path — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4094-4124 still build one `orderData`, call `Order.create` once, and `bulkCreate` all `OrderItem`s under that order. That leaves delivery/takeaway in the same forbidden `1 Order + N OrderItems` structure instead of `N` orders with one item each. FIX: replace this block with the specified per-cart-line loop, using shared base fields and per-item `total_amount`, `discount_amount`, and `public_token`, while keeping `order_number` and `split_type` absent.
++4. [P1] Fix 2 delivery/takeaway post-submit flow is still single-order-only — [`pages/PublicMenu/x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) lines 4152-4170 and 4193-4199 still attach loyalty earn/update to `order.id` and use `order.public_token` for confirmation, and there is no N-order optimistic `setSessionOrders` / `setSessionItems` update after submit. That does not match the required first-order loyalty scoping and multi-order post-submit state for the split-order design. FIX: route loyalty side effects through `createdOrders[0]`, add the required N-order optimistic order/item updates without `guest` or `split_type`, and pass `createdOrders[0].public_token` to `showConfirmation`.
++
++## Summary
++Total: 4 findings (0 P0, 4 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None; the target file, functions, required behavior, and excluded areas were specified precisely.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+tokens used
+78 538
+Review saved to [split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/split-order-per-dish-x-s230-260407-112801-978b-codex-findings.md). I also mirrored it to [review_2026-04-07.md](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-04-07.md) and logged the executed commands in [commands_2026-04-07.log](/C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-04-07.log).
+
+Summary: 4 findings, all P1. Both Fix 1 and Fix 2 are still unimplemented in `x.jsx`: hall mode and delivery/takeaway mode still create a single order for the whole cart, and both post-submit flows still assume a single order for loyalty, optimistic state, and confirmation token handling.

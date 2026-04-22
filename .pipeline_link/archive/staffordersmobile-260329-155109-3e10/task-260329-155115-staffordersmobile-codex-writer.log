@@ -1,0 +1,747 @@
+2026-03-29T10:51:27.018036Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:51:27.034140Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-29T10:51:29.324340Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:51:29.324747Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d3938-5fd1-7040-94ec-91c9d321fe6a
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md FORMAT: # Codex Writer Findings — StaffOrdersMobile Chain: staffordersmobile-260329-155109-3e10 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Fix PM-158: Order statuses don't update in CartView after StaffOrdersMobile change Reference: `BUGS_MASTER.md #PM-158`, `pages/PublicMenu/CartView.jsx`, `pages/PublicMenu/useTableSession.jsx`. Production page. **Context:** MenuApp table ordering system. When staff changes order status in StaffOrdersMobile, the guest's CartView does NOT reflect the update. Root cause found in S193 (code analysis): - `useTableSession.jsx` polls every 10s and fetches orders via `getSessionOrders(sessionId)` → returns correct data including `order.status` and `order.stage_id` - CartView's `statusBuckets` uses `order.status` to sort orders into buckets (new_order / accepted / in_progress / ready / served) - StaffOrdersMobile's `handleAction` (line ~1030) AND `handleAdvance` (line ~1482) update **only `order.stage_id`** (never `order.status`) when OrderStages are configured - Result: after staff changes status → `order.status` stays as `"new"` → CartView shows the order in wrong bucket forever **Fix requires TWO changes:** 1. **Enrich `getStatusConfig` return object** — add `nextStageInternalCode` field (line ~2913) 2. **Update payload in `handleAction` AND `handleAdvance`** — use `nextStageInternalCode` to derive and set `status` TARGET FILES (modify): - `pages/StaffOrdersMobile/staffordersmobile.jsx` CONTEXT FILES (read-only, for understanding): - `pages/PublicMenu/useTableSession.jsx` (lines 577-591: polling merge logic, line 778-782: myOrders derivation) - `pages/PublicMenu/CartView.jsx` (search "statusBuckets": bucket logic using `o.status`) --- ## Fix 1 — PM-158 (P1) [MUST-FIX]: Sync `status` field when updating `stage_id` in StaffOrdersMobile ### Current behavior When staff taps the action button, two functions build a DB payload: 1. `handleAction` (~line 1030, in `OrderCard` component): ```javascript const payload = {}; if (statusConfig.nextStageId) { payload.stage_id = statusConfig.nextStageId; // updates stage_id ONLY } else if (statusConfig.nextStatus) { payload.status = statusConfig.nextStatus; // OR status ONLY — never both } ``` 2. `handleAdvance` (~line 1482, in `TableGroup` component): ```javascript const payload = {}; if (config.nextStageId) payload.stage_id = config.nextStageId; // same issue else if (config.nextStatus) payload.status = config.nextStatus; ``` When OrderStages are in use (`nextStageId` is set), `status` field is NOT written to DB. Guest's CartView polls correctly but sees `order.status = "new"` for all orders → all orders stay in the "Новый заказ" bucket regardless of actual stage. ### Expected behavior **Part A — Enrich `getStatusConfig` return value (~line 2913)** In the `getStatusConfig = useCallback((order) => {...}, ...)` function, in the branch that returns stage-mode config (when `stageId && stagesMap[stageId]`), add `nextStageInternalCode` to the returned object: ```javascript // Current return (line ~2934): return { label: getStageName(stage, t), color: stage.color, actionLabel: nextStage ? `→ ${getStageName(nextStage, t)}` : null, nextStageId: nextStage?.id || null, nextStatus: null, badgeClass: '', isStageMode: true, isFirstStage, isFinishStage, }; // After fix — add one field: return { label: getStageName(stage, t), color: stage.color, actionLabel: nextStage ? `→ ${getStageName(nextStage, t)}` : null, nextStageId: nextStage?.id || null, nextStageInternalCode: nextStage?.internal_code || null, // NEW nextStatus: null, badgeClass: '', isStageMode: true, isFirstStage, isFinishStage, }; ``` The fallback return (line ~2948, STATUS_FLOW path) does NOT need `nextStageInternalCode` — it sets `nextStatus` directly and `nextStageId` is null there. **Part B — Update `handleAction` payload (~line 1030)** After `payload.stage_id = statusConfig.nextStageId;`, derive and add `status`: ```javascript if (statusConfig.nextStageId) { payload.stage_id = statusConfig.nextStageId; // Derive status from next stage internal_code const CODE_TO_STATUS = { start: 'accepted', cook: 'in_progress', cooking: 'in_progress', finish: 'served', done: 'served', cancel: 'cancelled', }; const derivedStatus = CODE_TO_STATUS[statusConfig.nextStageInternalCode]; if (derivedStatus !== undefined) payload.status = derivedStatus; } ``` **Part C — Update `handleAdvance` payload (~line 1482)** Same mapping, using `config.nextStageInternalCode`: ```javascript if (config.nextStageId) { payload.stage_id = config.nextStageId; const CODE_TO_STATUS = { start: 'accepted', cook: 'in_progress', cooking: 'in_progress', finish: 'served', done: 'served', cancel: 'cancelled', }; const derivedStatus = CODE_TO_STATUS[config.nextStageInternalCode]; if (derivedStatus !== undefined) payload.status = derivedStatus; } ``` ### Must NOT be - Do NOT change visibility, layout, or any UI elements of StaffOrdersMobile. - Do NOT change polling or data fetching logic. - Do NOT change the fallback STATUS_FLOW branch (when `nextStageId` is null and only `nextStatus` is used — leave that branch unchanged). - Do NOT change CartView or useTableSession — the fix is ONLY in StaffOrdersMobile. - Do NOT set `status` if `internal_code` is not in the known list — skip if unknown (safe fallback, no `else` clause needed). - Do NOT extract CODE_TO_STATUS as a top-level const if it's only used in these two places — inline is fine. ### File and location File: `pages/StaffOrdersMobile/staffordersmobile.jsx` (4014 lines) - **Part A:** `getStatusConfig = useCallback` at ~line 2913. Search: `grep -n "nextStageId: nextStage" pages/StaffOrdersMobile/staffordersmobile.jsx` → find the return object → add `nextStageInternalCode: nextStage?.internal_code || null` - **Part B:** `handleAction` function at ~line 1030. Search: `grep -n "payload.stage_id = statusConfig.nextStageId" pages/StaffOrdersMobile/staffordersmobile.jsx` → add status derivation after that line - **Part C:** `handleAdvance` function at ~line 1482. Search: `grep -n "if (config.nextStageId) payload.stage_id" pages/StaffOrdersMobile/staffordersmobile.jsx` → add status derivation after that line ### Already tried No previous fix attempts. First fix for this bug. ### Verification 1. As a guest: open menu, add items, submit an order. 2. As staff: open StaffOrdersMobile, find the order, tap the action button to change status (e.g., "Принять"). 3. Wait ≤ 15 seconds (polling interval). 4. As guest: open CartView drawer — the order must appear in the correct bucket ("Принят" section), NOT in "Новый заказ". 5. Tap again in StaffOrdersMobile to advance to "Готов". Wait 15s. Guest CartView shows order in "Готов" bucket. --- ## ⛔ SCOPE LOCK — change ONLY what is described in Fix 1 above - Modify ONLY: - `getStatusConfig` return object in `staffordersmobile.jsx` (add `nextStageInternalCode`) - `handleAction` payload construction in `staffordersmobile.jsx` (add status derivation) - `handleAdvance` payload construction in `staffordersmobile.jsx` (add status derivation) - Do NOT change CartView, useTableSession, or any other file. - Do NOT change StaffOrdersMobile UI, layout, polling, rendering, or any logic except the three locations above. - Do NOT rename or restructure `handleAction`, `handleAdvance`, or `getStatusConfig`. ## FROZEN UX — DO NOT CHANGE (tested and confirmed working) These elements are confirmed working in production. Do NOT modify: - i18n badge translation (SO-S76-01, RELEASE 260305-00): order status badge shows translated text (e.g., «НОВЫЙ»), NOT raw key `orderprocess.default.new` - i18n action button (SO-S76-02, RELEASE 260305-00): action button label is translated - Guest name display (SO-S76-03, RELEASE 260305-00): guest name shows correctly, NOT «гость не определён» - "Стол 1" prefix (SO-S61-07, RELEASE 260306-01): table name shows once, NOT "Стол Стол 1" - i18n badge regression (SO-S89-01, RELEASE 260306-05): new orders get translated status badge, confirmed ✅ Android ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Primary usage: waiter's phone at the restaurant. Before committing, verify ALL changes at 375px viewport width: - [ ] No UI changes visible (this is a data-only fix) - [ ] Action button still works correctly (tapping changes order status) - [ ] No regression in status display in StaffOrdersMobile cards ## Regression Check (MANDATORY after implementation) - [ ] StaffOrdersMobile action buttons still function (tap → order status updates visually in staff view) - [ ] Cancelled orders still show as cancelled in StaffOrdersMobile - [ ] Fallback path (no stages, status-only update via STATUS_FLOW) still works: `nextStageId` is null, `nextStatus` is set, payload only gets `status` - [ ] `handleAdvance` (batch advance in TableGroup) still works correctly ## Implementation Notes - TARGET FILES: `pages/StaffOrdersMobile/staffordersmobile.jsx` - CONTEXT FILES (read-only): `pages/PublicMenu/useTableSession.jsx`, `pages/PublicMenu/CartView.jsx` - FROZEN UX grep verification before commit: ``` grep -n "payload.stage_id\|payload.status\|nextStageInternalCode" pages/StaffOrdersMobile/staffordersmobile.jsx ``` - git add pages/StaffOrdersMobile/staffordersmobile.jsx && git commit -m "fix(PM-158): sync order.status when updating stage_id in StaffOrdersMobile" && git push === END ===
+mcp startup: no servers
+2026-03-29T10:51:29.985213Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:51:29.985475Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-29T10:51:30.312923Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:51:30.313195Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-29T10:51:33.386046Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:51:33.386294Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-29T10:51:33.612829Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:51:33.613108Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+codex
+Reviewing `pages/StaffOrdersMobile/staffordersmobile.jsx` plus `README.md`/`BUGS.md` in that folder only. I’ll keep scope locked to Fix 1 and save the findings to the required pipeline file plus the page-folder artifacts mandated by the repo instructions.
+Plan update
+  → Read the StaffOrdersMobile page folder context files allowed by scope
+  • Inspect only the three Fix 1 code locations in staffordersmobile.jsx
+  • Write concise findings report and required artifact files
+2026-03-29T10:51:56.491080Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:51:56.491336Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-29T10:51:56.713242Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:51:56.713677Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Date -Format 'yyyy-MM-dd'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Name 'pages/StaffOrdersMobile'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 14.37s:
+
+ exited 124 in 15.07s:
+
+2026-03-29T10:53:22.975086Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:53:22.975290Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-29T10:53:23.359924Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:53:23.360128Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+codex
+I hit a shell startup timeout on the first read. Retrying with longer timeouts, still limited to the StaffOrdersMobile page folder and the specified file sections.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Date -Format 'yyyy-MM-dd'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Name 'pages/StaffOrdersMobile'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 19.27s:
+2026-03-29
+ succeeded in 18.63s:
+versions
+260306-05 StaffOrdersMobile RELEASE.jsx
+Audit_FunctionalMap_S70.md
+BUGS.md
+DeepAnalysis_S70.md
+StaffOrdersMobile README.md
+staffordersmobile.jsx
+staffordersmobile_v1.0_BASE.jsx
+TEST_PLAN.md
+2026-03-29T10:54:32.689898Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:54:32.690164Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-29T10:54:32.903638Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:54:32.903820Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/StaffOrdersMobile/BUGS.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'payload\\.stage_id = statusConfig\\.nextStageId|if \\(config\\.nextStageId\\) payload\\.stage_id|nextStageId: nextStage\\?\\.id \\|\\| null'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 9.24s:
+# StaffOrdersMobile Bug Tracker
+
+**Page:** `pages/StaffOrdersMobile/260306-04 StaffOrdersMobile RELEASE.jsx`
+**Last updated:** 2026-03-06 (Session 90 â€” restored from 260305-00 + re-applied SO-S89-01)
+
+---
+
+## Fixed Bugs
+
+### BUG-S66-01 (P1) -- Detail view doesn't open on card tap (Sprint B broken)
+- **Function:** TableDetailScreen render / CSS animation
+- **Root cause:** CSS `translate-x-full` â†’ `translate-x-0` transition with `requestAnimationFrame` timing was unreliable in Base44 platform container. Detail screen mounted but stayed off-screen.
+- **Fix:** Removed slide-in animation entirely. Detail view now shows instantly with `z-50` (above all other content). Swipe-right to close gesture retained.
+- **Commit:** `9b27dfd`
+- **RELEASE:** `260302-05 StaffOrdersMobile RELEASE.jsx`
+- **Status:** FIXED
+
+### BUG-S66-02 (P1) -- No CTA button on PREPARING card
+- **Function:** computeGroupCTA
+- **Root cause:** `computeGroupCTA` returned `null` for all PREPARING status cards (by Sprint A design V2-06). Orders in middle stages (kitchen working) had no action button, preventing waiter from advancing them.
+ succeeded in 9.26s:
+---
+version: "4.0.1"
+updated: "2026-03-06"
+session: 90
+deployed: "2026-03-02 S69"
+---
+
+# StaffOrdersMobile â€” ÐœÐ¾Ð±Ð¸Ð»ÑŒÐ½Ñ‹Ð¹ Ð¸Ð½Ñ‚ÐµÑ€Ñ„ÐµÐ¹Ñ Ð¿ÐµÑ€ÑÐ¾Ð½Ð°Ð»Ð°
+
+## ÐžÐ¿Ð¸ÑÐ°Ð½Ð¸Ðµ
+ÐœÐ¾Ð±Ð¸Ð»ÑŒÐ½Ñ‹Ð¹ Ð¸Ð½Ñ‚ÐµÑ€Ñ„ÐµÐ¹Ñ Ð´Ð»Ñ Ð¿ÐµÑ€ÑÐ¾Ð½Ð°Ð»Ð° Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð°. ÐŸÑ€Ð¸Ñ‘Ð¼ Ð·Ð°ÐºÐ°Ð·Ð¾Ð², ÑÐ¼ÐµÐ½Ð° ÑÑ‚Ð°Ñ‚ÑƒÑÐ¾Ð², Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹ Ð¿Ð¾Ð¼Ð¾Ñ‰Ð¸, Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€Ð¾Ð²ÐºÐ° Ð¿Ð¾ ÑÑ‚Ð¾Ð»Ð°Ð¼. Ð¡Ð°Ð¼Ñ‹Ð¹ ÑÐ»Ð¾Ð¶Ð½Ñ‹Ð¹ Ñ„Ð°Ð¹Ð» Ð¿Ñ€Ð¾ÐµÐºÑ‚Ð° (v3.6.0 â€” stale data + close table confirm S74).
+
+**Route:** `/staffordersmobile`
+**Roles:** partner_manager, partner_staff, kitchen
+**Ð Ð°Ð·Ð¼ÐµÑ€:** ~3940 ÑÑ‚Ñ€Ð¾Ðº (v3.2.0)
+
+## ÐÑ€Ñ…Ð¸Ñ‚ÐµÐºÑ‚ÑƒÑ€Ð°
+
+### ÐšÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚Ñ‹ (14)
+- `StaffOrdersMobile` â€” Ð³Ð»Ð°Ð²Ð½Ñ‹Ð¹
+ succeeded in 9.51s:
+
+pages\StaffOrdersMobile\staffordersmobile.jsx:1040:      payload.stage_id = statusConfig.nextStageId;
+pages\StaffOrdersMobile\staffordersmobile.jsx:1486:    if (config.nextStageId) payload.stage_id = config.nextStageId;
+pages\StaffOrdersMobile\staffordersmobile.jsx:2938:        nextStageId: nextStage?.id || null,
+
+
+2026-03-29T10:55:16.867865Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:55:16.868139Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-29T10:55:17.095061Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:55:17.095346Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+codex
+The allowed context is loaded. Next I’m checking only the three Fix 1 locations in `staffordersmobile.jsx` to verify whether the requested stage-to-status sync is actually implemented and whether both update paths are consistent.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$start=2928; $end=2952; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '"'{0,5}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$start=1028; $end=1055; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '"'{0,5}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/StaffOrdersMobile/staffordersmobile.jsx'; "'$start=1478; $end=1498; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '"'{0,5}: {1}' -f "'$i, $_ } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review2026-03-29T10:56:24.879703Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:56:24.880024Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+ exited 124 in 39.59s:
+
+ exited 124 in 38.88s:
+
+ exited 124 in 40.16s:
+
+2026-03-29T10:57:23.436267Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:57:23.436474Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-29T10:57:23.661716Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:57:23.661872Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+codex
+The file is large enough that full line enumeration is slow in this shell. I’m switching to targeted pattern reads with local context windows so I can stay inside the scope without scanning unrelated code.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'nextStageId: nextStage\\?\\.id \\|\\| null,' -Context 8,10" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'payload\\.stage_id = statusConfig\\.nextStageId' -Context 8,12" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'if \\(config\\.nextStageId\\) payload\\.stage_id = config\\.nextStageId;' -Context 6,10" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 21.23s:
+
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1032:    
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1033:    // Нет следующего статуса/этапа — ничего не делаем
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1034:    if (!statusConfig.nextStageId && !statusConfig.nextStatus) 
+return;
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1035:    
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1036:    const payload = {};
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1037:    
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1038:    // Режим OrderStage (приоритет)
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1039:    if (statusConfig.nextStageId) {
+> pages\StaffOrdersMobile\staffordersmobile.jsx:1040:      payload.stage_id = statusConfig.nextStageId;
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1041:    }
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1042:    // Fallback режим (старый status)
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1043:    else if (statusConfig.nextStatus) {
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1044:      payload.status = statusConfig.nextStatus;
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1045:    }
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1046:    
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1047:    // Assignee логика — для первого этапа (use getAssigneeId for 
+proper check)
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1048:    const isFirstAction = order.status === "new" || 
+ succeeded in 22.32s:
+
+  pages\StaffOrdersMobile\staffordersmobile.jsx:2930:      // Determine if this is first or finish stage
+  pages\StaffOrdersMobile\staffordersmobile.jsx:2931:      const isFirstStage = stage.internal_code === 'start' || 
+currentIndex === 0;
+  pages\StaffOrdersMobile\staffordersmobile.jsx:2932:      const isFinishStage = stage.internal_code === 'finish' || 
+currentIndex === relevantStages.length - 1;
+  pages\StaffOrdersMobile\staffordersmobile.jsx:2933:      
+  pages\StaffOrdersMobile\staffordersmobile.jsx:2934:      return {
+  pages\StaffOrdersMobile\staffordersmobile.jsx:2935:        label: getStageName(stage, t),
+  pages\StaffOrdersMobile\staffordersmobile.jsx:2936:        color: stage.color,
+  pages\StaffOrdersMobile\staffordersmobile.jsx:2937:        actionLabel: nextStage ? `→ ${getStageName(nextStage, 
+t)}` : null,
+> pages\StaffOrdersMobile\staffordersmobile.jsx:2938:        nextStageId: nextStage?.id || null,
+  pages\StaffOrdersMobile\staffordersmobile.jsx:2939:        nextStatus: null, // don't use old status
+  pages\StaffOrdersMobile\staffordersmobile.jsx:2940:        badgeClass: '', // will use inline style with color
+  pages\StaffOrdersMobile\staffordersmobile.jsx:2941:        isStageMode: true,
+  pages\StaffOrdersMobile\staffordersmobile.jsx:2942:        isFirstStage,
+  pages\StaffOrdersMobile\staffordersmobile.jsx:2943:        isFinishStage,
+  pages\StaffOrdersMobile\staffordersmobile.jsx:2944:      };
+  pages\StaffOrdersMobile\staffordersmobile.jsx:2945:    }
+ succeeded in 22.25s:
+
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1480:  });
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1481:
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1482:  const handleAdvance = () => {
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1483:    if (!nextAction || advanceMutation.isPending) return;
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1484:    const { order, config } = nextAction;
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1485:    const payload = {};
+> pages\StaffOrdersMobile\staffordersmobile.jsx:1486:    if (config.nextStageId) payload.stage_id = config.nextStageId;
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1487:    else if (config.nextStatus) payload.status = 
+config.nextStatus;
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1488:    if (config.isFirstStage && effectiveUserId && 
+!getAssigneeId(order)) {
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1489:      payload.assignee = effectiveUserId;
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1490:      payload.assigned_at = new Date().toISOString();
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1491:    }
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1492:    if (onClearNotified) onClearNotified(order.id);
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1493:    advanceMutation.mutate({ id: order.id, payload });
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1494:  };
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1495:
+  pages\StaffOrdersMobile\staffordersmobile.jsx:1496:  // Bill data (Block E)
+2026-03-29T10:58:50.765913Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:58:50.766116Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-29T10:58:50.973511Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:58:50.973581Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'nextStageInternalCode|CODE_TO_STATUS'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 12.56s:
+
+2026-03-29T10:59:35.073206Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:59:35.073466Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-29T10:59:35.276339Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T10:59:35.276589Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+codex
+I’ve confirmed the current file still matches the broken pattern from Fix 1: the stage-mode config has no `nextStageInternalCode`, and both mutation paths still write only `stage_id` in stage mode. I’m writing a concise two-finding report to the required pipeline file and mirroring it into the StaffOrdersMobile page folder with a command log.
+Plan update
+  ✓ Read the StaffOrdersMobile page folder context files allowed by scope
+  ✓ Inspect only the three Fix 1 code locations in staffordersmobile.jsx
+  → Write concise findings report and required artifact files
+2026-03-29T11:00:02.584796Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T11:00:02.584891Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-29T11:00:02.788347Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T11:00:02.788529Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/StaffOrdersMobile/commands_2026-03-29.log
+Get-ChildItem -Name 'pages/StaffOrdersMobile'
+Get-Date -Format 'yyyy-MM-dd'
+Get-ChildItem -Name 'pages/StaffOrdersMobile'
+Get-Date -Format 'yyyy-MM-dd'
+Get-Content 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'
+Get-Content 'pages/StaffOrdersMobile/BUGS.md'
+Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'payload\.stage_id = statusConfig\.nextStageId|if \(config\.nextStageId\) payload\.stage_id|nextStageId: nextStage\?\.id \|\| null'
+$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1028; $end=1055; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
+$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1478; $end=1498; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
+$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2928; $end=2952; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
+Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'payload\.stage_id = statusConfig\.nextStageId' -Context 8,12
+Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'if \(config\.nextStageId\) payload\.stage_id = config\.nextStageId;' -Context 6,10
+Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'nextStageId: nextStage\?\.id \|\| null,' -Context 8,10
+Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'nextStageInternalCode|CODE_TO_STATUS'
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md
+# Codex Writer Findings — StaffOrdersMobile
+Chain: staffordersmobile-260329-155109-3e10
+
+## Findings
+1. [P1] `getStatusConfig` still omits `nextStageInternalCode` — In the stage-mode return object at `pages/StaffOrdersMobile/staffordersmobile.jsx:2934`, the file still returns `nextStageId` and `nextStatus: null` but does not expose `nextStage?.internal_code`. That means the two mutation paths have no stage metadata available to derive the canonical `status`, so Part A of Fix 1 is not implemented. FIX: add `nextStageInternalCode: nextStage?.internal_code || null` to the stage-mode object only, leaving the fallback `STATUS_FLOW` branch unchanged.
+2. [P1] Stage-mode updates still write only `stage_id`, leaving `status` stale — `handleAction` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1039` and `handleAdvance` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1486` still set `payload.stage_id` when `nextStageId` exists and never derive/set `payload.status` in that branch. With OrderStages enabled, this preserves the old DB status (`"new"` in the reported case), so CartView keeps the order in the wrong bucket after staff advances it. FIX: in both functions, after writing `stage_id`, derive `status` from `nextStageInternalCode` using the requested inline mapping (`start -> accepted`, `cook/cooking -> in_progress`, `finish/done -> served`, `cancel -> cancelled`) and set `payload.status` only when the code is recognized; keep the `nextStatus` fallback path as-is.
+
+## Summary
+Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None needed for this review-only scope.
+- Scope questions (anything you weren't sure if it's in scope): None.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/StaffOrdersMobile/review_2026-03-29.md
+# Codex Writer Findings — StaffOrdersMobile
+Chain: staffordersmobile-260329-155109-3e10
+
+## Findings
+1. [P1] `getStatusConfig` still omits `nextStageInternalCode` — In the stage-mode return object at `pages/StaffOrdersMobile/staffordersmobile.jsx:2934`, the file still returns `nextStageId` and `nextStatus: null` but does not expose `nextStage?.internal_code`. That means the two mutation paths have no stage metadata available to derive the canonical `status`, so Part A of Fix 1 is not implemented. FIX: add `nextStageInternalCode: nextStage?.internal_code || null` to the stage-mode object only, leaving the fallback `STATUS_FLOW` branch unchanged.
+2. [P1] Stage-mode updates still write only `stage_id`, leaving `status` stale — `handleAction` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1039` and `handleAdvance` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1486` still set `payload.stage_id` when `nextStageId` exists and never derive/set `payload.status` in that branch. With OrderStages enabled, this preserves the old DB status (`"new"` in the reported case), so CartView keeps the order in the wrong bucket after staff advances it. FIX: in both functions, after writing `stage_id`, derive `status` from `nextStageInternalCode` using the requested inline mapping (`start -> accepted`, `cook/cooking -> in_progress`, `finish/done -> served`, `cancel -> cancelled`) and set `payload.status` only when the code is recognized; keep the `nextStatus` fallback path as-is.
+
+## Summary
+Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None needed for this review-only scope.
+- Scope questions (anything you weren't sure if it's in scope): None.
+apply_patch(auto_approved=true) exited 0 in 869ms:
+Success. Updated the following files:
+A pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md
+A pages/StaffOrdersMobile/review_2026-03-29.md
+A pages/StaffOrdersMobile/commands_2026-03-29.log
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-03-29.log b/pages/StaffOrdersMobile/commands_2026-03-29.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..4ae36f6e4053ed71b452d4b8cb5aad028c3c2376
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-03-29.log
+@@ -0,0 +1,14 @@
++Get-ChildItem -Name 'pages/StaffOrdersMobile'
++Get-Date -Format 'yyyy-MM-dd'
++Get-ChildItem -Name 'pages/StaffOrdersMobile'
++Get-Date -Format 'yyyy-MM-dd'
++Get-Content 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'
++Get-Content 'pages/StaffOrdersMobile/BUGS.md'
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'payload\.stage_id = statusConfig\.nextStageId|if \(config\.nextStageId\) payload\.stage_id|nextStageId: nextStage\?\.id \|\| null'
++$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1028; $end=1055; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1478; $end=1498; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2928; $end=2952; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'payload\.stage_id = statusConfig\.nextStageId' -Context 8,12
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'if \(config\.nextStageId\) payload\.stage_id = config\.nextStageId;' -Context 6,10
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'nextStageId: nextStage\?\.id \|\| null,' -Context 8,10
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'nextStageInternalCode|CODE_TO_STATUS'
+diff --git a/pages/StaffOrdersMobile/review_2026-03-29.md b/pages/StaffOrdersMobile/review_2026-03-29.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..aea34003cda84eecc0a9f4abe4a17a46ccfbe933
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-03-29.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260329-155109-3e10
++
++## Findings
++1. [P1] `getStatusConfig` still omits `nextStageInternalCode` — In the stage-mode return object at `pages/StaffOrdersMobile/staffordersmobile.jsx:2934`, the file still returns `nextStageId` and `nextStatus: null` but does not expose `nextStage?.internal_code`. That means the two mutation paths have no stage metadata available to derive the canonical `status`, so Part A of Fix 1 is not implemented. FIX: add `nextStageInternalCode: nextStage?.internal_code || null` to the stage-mode object only, leaving the fallback `STATUS_FLOW` branch unchanged.
++2. [P1] Stage-mode updates still write only `stage_id`, leaving `status` stale — `handleAction` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1039` and `handleAdvance` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1486` still set `payload.stage_id` when `nextStageId` exists and never derive/set `payload.status` in that branch. With OrderStages enabled, this preserves the old DB status (`"new"` in the reported case), so CartView keeps the order in the wrong bucket after staff advances it. FIX: in both functions, after writing `stage_id`, derive `status` from `nextStageInternalCode` using the requested inline mapping (`start -> accepted`, `cook/cooking -> in_progress`, `finish/done -> served`, `cancel -> cancelled`) and set `payload.status` only when the code is recognized; keep the `nextStatus` fallback path as-is.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None needed for this review-only scope.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md b/pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..aea34003cda84eecc0a9f4abe4a17a46ccfbe933
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260329-155109-3e10
++
++## Findings
++1. [P1] `getStatusConfig` still omits `nextStageInternalCode` — In the stage-mode return object at `pages/StaffOrdersMobile/staffordersmobile.jsx:2934`, the file still returns `nextStageId` and `nextStatus: null` but does not expose `nextStage?.internal_code`. That means the two mutation paths have no stage metadata available to derive the canonical `status`, so Part A of Fix 1 is not implemented. FIX: add `nextStageInternalCode: nextStage?.internal_code || null` to the stage-mode object only, leaving the fallback `STATUS_FLOW` branch unchanged.
++2. [P1] Stage-mode updates still write only `stage_id`, leaving `status` stale — `handleAction` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1039` and `handleAdvance` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1486` still set `payload.stage_id` when `nextStageId` exists and never derive/set `payload.status` in that branch. With OrderStages enabled, this preserves the old DB status (`"new"` in the reported case), so CartView keeps the order in the wrong bucket after staff advances it. FIX: in both functions, after writing `stage_id`, derive `status` from `nextStageInternalCode` using the requested inline mapping (`start -> accepted`, `cook/cooking -> in_progress`, `finish/done -> served`, `cancel -> cancelled`) and set `payload.status` only when the code is recognized; keep the `nextStatus` fallback path as-is.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None needed for this review-only scope.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-03-29.log b/pages/StaffOrdersMobile/commands_2026-03-29.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..4ae36f6e4053ed71b452d4b8cb5aad028c3c2376
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-03-29.log
+@@ -0,0 +1,14 @@
++Get-ChildItem -Name 'pages/StaffOrdersMobile'
++Get-Date -Format 'yyyy-MM-dd'
++Get-ChildItem -Name 'pages/StaffOrdersMobile'
++Get-Date -Format 'yyyy-MM-dd'
++Get-Content 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'
++Get-Content 'pages/StaffOrdersMobile/BUGS.md'
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'payload\.stage_id = statusConfig\.nextStageId|if \(config\.nextStageId\) payload\.stage_id|nextStageId: nextStage\?\.id \|\| null'
++$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1028; $end=1055; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1478; $end=1498; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2928; $end=2952; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'payload\.stage_id = statusConfig\.nextStageId' -Context 8,12
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'if \(config\.nextStageId\) payload\.stage_id = config\.nextStageId;' -Context 6,10
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'nextStageId: nextStage\?\.id \|\| null,' -Context 8,10
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'nextStageInternalCode|CODE_TO_STATUS'
+diff --git a/pages/StaffOrdersMobile/review_2026-03-29.md b/pages/StaffOrdersMobile/review_2026-03-29.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..aea34003cda84eecc0a9f4abe4a17a46ccfbe933
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-03-29.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260329-155109-3e10
++
++## Findings
++1. [P1] `getStatusConfig` still omits `nextStageInternalCode` — In the stage-mode return object at `pages/StaffOrdersMobile/staffordersmobile.jsx:2934`, the file still returns `nextStageId` and `nextStatus: null` but does not expose `nextStage?.internal_code`. That means the two mutation paths have no stage metadata available to derive the canonical `status`, so Part A of Fix 1 is not implemented. FIX: add `nextStageInternalCode: nextStage?.internal_code || null` to the stage-mode object only, leaving the fallback `STATUS_FLOW` branch unchanged.
++2. [P1] Stage-mode updates still write only `stage_id`, leaving `status` stale — `handleAction` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1039` and `handleAdvance` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1486` still set `payload.stage_id` when `nextStageId` exists and never derive/set `payload.status` in that branch. With OrderStages enabled, this preserves the old DB status (`"new"` in the reported case), so CartView keeps the order in the wrong bucket after staff advances it. FIX: in both functions, after writing `stage_id`, derive `status` from `nextStageInternalCode` using the requested inline mapping (`start -> accepted`, `cook/cooking -> in_progress`, `finish/done -> served`, `cancel -> cancelled`) and set `payload.status` only when the code is recognized; keep the `nextStatus` fallback path as-is.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None needed for this review-only scope.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md b/pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..aea34003cda84eecc0a9f4abe4a17a46ccfbe933
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260329-155109-3e10
++
++## Findings
++1. [P1] `getStatusConfig` still omits `nextStageInternalCode` — In the stage-mode return object at `pages/StaffOrdersMobile/staffordersmobile.jsx:2934`, the file still returns `nextStageId` and `nextStatus: null` but does not expose `nextStage?.internal_code`. That means the two mutation paths have no stage metadata available to derive the canonical `status`, so Part A of Fix 1 is not implemented. FIX: add `nextStageInternalCode: nextStage?.internal_code || null` to the stage-mode object only, leaving the fallback `STATUS_FLOW` branch unchanged.
++2. [P1] Stage-mode updates still write only `stage_id`, leaving `status` stale — `handleAction` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1039` and `handleAdvance` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1486` still set `payload.stage_id` when `nextStageId` exists and never derive/set `payload.status` in that branch. With OrderStages enabled, this preserves the old DB status (`"new"` in the reported case), so CartView keeps the order in the wrong bucket after staff advances it. FIX: in both functions, after writing `stage_id`, derive `status` from `nextStageInternalCode` using the requested inline mapping (`start -> accepted`, `cook/cooking -> in_progress`, `finish/done -> served`, `cancel -> cancelled`) and set `payload.status` only when the code is recognized; keep the `nextStatus` fallback path as-is.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None needed for this review-only scope.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+2026-03-29T11:00:39.005459Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T11:00:39.005580Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-29T11:00:39.203680Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T11:00:39.203809Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+Plan update
+  ✓ Read the StaffOrdersMobile page folder context files allowed by scope
+  ✓ Inspect only the three Fix 1 code locations in staffordersmobile.jsx
+  ✓ Write concise findings report and required artifact files
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-03-29.log b/pages/StaffOrdersMobile/commands_2026-03-29.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..4ae36f6e4053ed71b452d4b8cb5aad028c3c2376
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-03-29.log
+@@ -0,0 +1,14 @@
++Get-ChildItem -Name 'pages/StaffOrdersMobile'
++Get-Date -Format 'yyyy-MM-dd'
++Get-ChildItem -Name 'pages/StaffOrdersMobile'
++Get-Date -Format 'yyyy-MM-dd'
++Get-Content 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'
++Get-Content 'pages/StaffOrdersMobile/BUGS.md'
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'payload\.stage_id = statusConfig\.nextStageId|if \(config\.nextStageId\) payload\.stage_id|nextStageId: nextStage\?\.id \|\| null'
++$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1028; $end=1055; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1478; $end=1498; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2928; $end=2952; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'payload\.stage_id = statusConfig\.nextStageId' -Context 8,12
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'if \(config\.nextStageId\) payload\.stage_id = config\.nextStageId;' -Context 6,10
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'nextStageId: nextStage\?\.id \|\| null,' -Context 8,10
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'nextStageInternalCode|CODE_TO_STATUS'
+diff --git a/pages/StaffOrdersMobile/review_2026-03-29.md b/pages/StaffOrdersMobile/review_2026-03-29.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..aea34003cda84eecc0a9f4abe4a17a46ccfbe933
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-03-29.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260329-155109-3e10
++
++## Findings
++1. [P1] `getStatusConfig` still omits `nextStageInternalCode` — In the stage-mode return object at `pages/StaffOrdersMobile/staffordersmobile.jsx:2934`, the file still returns `nextStageId` and `nextStatus: null` but does not expose `nextStage?.internal_code`. That means the two mutation paths have no stage metadata available to derive the canonical `status`, so Part A of Fix 1 is not implemented. FIX: add `nextStageInternalCode: nextStage?.internal_code || null` to the stage-mode object only, leaving the fallback `STATUS_FLOW` branch unchanged.
++2. [P1] Stage-mode updates still write only `stage_id`, leaving `status` stale — `handleAction` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1039` and `handleAdvance` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1486` still set `payload.stage_id` when `nextStageId` exists and never derive/set `payload.status` in that branch. With OrderStages enabled, this preserves the old DB status (`"new"` in the reported case), so CartView keeps the order in the wrong bucket after staff advances it. FIX: in both functions, after writing `stage_id`, derive `status` from `nextStageInternalCode` using the requested inline mapping (`start -> accepted`, `cook/cooking -> in_progress`, `finish/done -> served`, `cancel -> cancelled`) and set `payload.status` only when the code is recognized; keep the `nextStatus` fallback path as-is.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None needed for this review-only scope.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md b/pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..aea34003cda84eecc0a9f4abe4a17a46ccfbe933
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260329-155109-3e10
++
++## Findings
++1. [P1] `getStatusConfig` still omits `nextStageInternalCode` — In the stage-mode return object at `pages/StaffOrdersMobile/staffordersmobile.jsx:2934`, the file still returns `nextStageId` and `nextStatus: null` but does not expose `nextStage?.internal_code`. That means the two mutation paths have no stage metadata available to derive the canonical `status`, so Part A of Fix 1 is not implemented. FIX: add `nextStageInternalCode: nextStage?.internal_code || null` to the stage-mode object only, leaving the fallback `STATUS_FLOW` branch unchanged.
++2. [P1] Stage-mode updates still write only `stage_id`, leaving `status` stale — `handleAction` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1039` and `handleAdvance` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1486` still set `payload.stage_id` when `nextStageId` exists and never derive/set `payload.status` in that branch. With OrderStages enabled, this preserves the old DB status (`"new"` in the reported case), so CartView keeps the order in the wrong bucket after staff advances it. FIX: in both functions, after writing `stage_id`, derive `status` from `nextStageInternalCode` using the requested inline mapping (`start -> accepted`, `cook/cooking -> in_progress`, `finish/done -> served`, `cancel -> cancelled`) and set `payload.status` only when the code is recognized; keep the `nextStatus` fallback path as-is.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None needed for this review-only scope.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+2026-03-29T11:00:44.109143Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T11:00:44.109267Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+2026-03-29T11:00:44.315261Z ERROR codex_core::auth: Failed to refresh token: 401 Unauthorized: {
+  "error": {
+    "message": "Your refresh token has already been used to generate a new access token. Please try signing in again.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "refresh_token_reused"
+  }
+}
+2026-03-29T11:00:44.315413Z ERROR codex_core::auth: Failed to refresh token: Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.
+codex
+Found 2 P1 findings within the locked Fix 1 scope only: `getStatusConfig` still does not return `nextStageInternalCode`, and both stage-mode mutation paths still write `stage_id` without syncing `status`, which leaves guest CartView buckets stale. No fixes were applied.
+
+Saved the report to [staffordersmobile-260329-155109-3e10-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md), and mirrored the required repo artifacts to [review_2026-03-29.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/review_2026-03-29.md) and [commands_2026-03-29.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/commands_2026-03-29.log).
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-03-29.log b/pages/StaffOrdersMobile/commands_2026-03-29.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..4ae36f6e4053ed71b452d4b8cb5aad028c3c2376
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-03-29.log
+@@ -0,0 +1,14 @@
++Get-ChildItem -Name 'pages/StaffOrdersMobile'
++Get-Date -Format 'yyyy-MM-dd'
++Get-ChildItem -Name 'pages/StaffOrdersMobile'
++Get-Date -Format 'yyyy-MM-dd'
++Get-Content 'pages/StaffOrdersMobile/StaffOrdersMobile README.md'
++Get-Content 'pages/StaffOrdersMobile/BUGS.md'
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'payload\.stage_id = statusConfig\.nextStageId|if \(config\.nextStageId\) payload\.stage_id|nextStageId: nextStage\?\.id \|\| null'
++$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1028; $end=1055; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=1478; $end=1498; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++$path='pages/StaffOrdersMobile/staffordersmobile.jsx'; $start=2928; $end=2952; $i=0; Get-Content $path | ForEach-Object { $i++; if($i -ge $start -and $i -le $end){ '{0,5}: {1}' -f $i, $_ } }
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'payload\.stage_id = statusConfig\.nextStageId' -Context 8,12
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'if \(config\.nextStageId\) payload\.stage_id = config\.nextStageId;' -Context 6,10
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'nextStageId: nextStage\?\.id \|\| null,' -Context 8,10
++Select-String -Path 'pages/StaffOrdersMobile/staffordersmobile.jsx' -Pattern 'nextStageInternalCode|CODE_TO_STATUS'
+diff --git a/pages/StaffOrdersMobile/review_2026-03-29.md b/pages/StaffOrdersMobile/review_2026-03-29.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..aea34003cda84eecc0a9f4abe4a17a46ccfbe933
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-03-29.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260329-155109-3e10
++
++## Findings
++1. [P1] `getStatusConfig` still omits `nextStageInternalCode` — In the stage-mode return object at `pages/StaffOrdersMobile/staffordersmobile.jsx:2934`, the file still returns `nextStageId` and `nextStatus: null` but does not expose `nextStage?.internal_code`. That means the two mutation paths have no stage metadata available to derive the canonical `status`, so Part A of Fix 1 is not implemented. FIX: add `nextStageInternalCode: nextStage?.internal_code || null` to the stage-mode object only, leaving the fallback `STATUS_FLOW` branch unchanged.
++2. [P1] Stage-mode updates still write only `stage_id`, leaving `status` stale — `handleAction` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1039` and `handleAdvance` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1486` still set `payload.stage_id` when `nextStageId` exists and never derive/set `payload.status` in that branch. With OrderStages enabled, this preserves the old DB status (`"new"` in the reported case), so CartView keeps the order in the wrong bucket after staff advances it. FIX: in both functions, after writing `stage_id`, derive `status` from `nextStageInternalCode` using the requested inline mapping (`start -> accepted`, `cook/cooking -> in_progress`, `finish/done -> served`, `cancel -> cancelled`) and set `payload.status` only when the code is recognized; keep the `nextStatus` fallback path as-is.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None needed for this review-only scope.
++- Scope questions (anything you weren't sure if it's in scope): None.
+diff --git a/pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md b/pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..aea34003cda84eecc0a9f4abe4a17a46ccfbe933
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260329-155109-3e10
++
++## Findings
++1. [P1] `getStatusConfig` still omits `nextStageInternalCode` — In the stage-mode return object at `pages/StaffOrdersMobile/staffordersmobile.jsx:2934`, the file still returns `nextStageId` and `nextStatus: null` but does not expose `nextStage?.internal_code`. That means the two mutation paths have no stage metadata available to derive the canonical `status`, so Part A of Fix 1 is not implemented. FIX: add `nextStageInternalCode: nextStage?.internal_code || null` to the stage-mode object only, leaving the fallback `STATUS_FLOW` branch unchanged.
++2. [P1] Stage-mode updates still write only `stage_id`, leaving `status` stale — `handleAction` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1039` and `handleAdvance` at `pages/StaffOrdersMobile/staffordersmobile.jsx:1486` still set `payload.stage_id` when `nextStageId` exists and never derive/set `payload.status` in that branch. With OrderStages enabled, this preserves the old DB status (`"new"` in the reported case), so CartView keeps the order in the wrong bucket after staff advances it. FIX: in both functions, after writing `stage_id`, derive `status` from `nextStageInternalCode` using the requested inline mapping (`start -> accepted`, `cook/cooking -> in_progress`, `finish/done -> served`, `cancel -> cancelled`) and set `payload.status` only when the code is recognized; keep the `nextStatus` fallback path as-is.
++
++## Summary
++Total: 2 findings (0 P0, 2 P1, 0 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None needed for this review-only scope.
++- Scope questions (anything you weren't sure if it's in scope): None.
+
+tokens used
+53 812
+Found 2 P1 findings within the locked Fix 1 scope only: `getStatusConfig` still does not return `nextStageInternalCode`, and both stage-mode mutation paths still write `stage_id` without syncing `status`, which leaves guest CartView buckets stale. No fixes were applied.
+
+Saved the report to [staffordersmobile-260329-155109-3e10-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/staffordersmobile-260329-155109-3e10-codex-findings.md), and mirrored the required repo artifacts to [review_2026-03-29.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/review_2026-03-29.md) and [commands_2026-03-29.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/commands_2026-03-29.log).

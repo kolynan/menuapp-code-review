@@ -1,0 +1,691 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d6c73-08f0-7be2-9fd1-fc089eb382df
+--------
+user
+**MANDATORY FIRST STEP — run this before anything else:** ``` git fetch origin 2>/dev/null; git reset --hard origin/main ``` This ensures your working copy is in sync with the remote repository (prevents KB-095 stale-copy issue). --- Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260408-143544-d0bc ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # SOS Help Drawer v6.0 — Part B1: Cleanup Dead Code # Runs AFTER КС-A (chain de40, commit 0012e3f) — deployed and verified ## Context File: pages/PublicMenu/x.jsx (TARGET — edit this file ONLY) RELEASE: `260408-01 PublicMenu x RELEASE.jsx` (5457 lines) Task: Remove dead constants, refs, helpers that are no longer referenced after КС-A deployment. Weight: M | Budget: $5 | Chain: С5v2 ## Prerequisites КС-A is deployed. The following are NOW dead code (all JSX call sites existed in old drawer, which will be replaced in a separate B2 task — but these symbols have ZERO references in current JSX already OR are only referenced by OTHER dead code in this cleanup list): ## FROZEN UX (DO NOT CHANGE) - ALL JSX rendering — do NOT touch any JSX return blocks - handleCardTap, handleUndo, handleResolve, handleRetry — KEEP - openHelpDrawer/closeHelpDrawer — KEEP (but clean post-send callback refs) - All imports — do NOT remove any imports - activeRequestCount — do NOT modify --- ## Fix 1 — Remove HELP_PREVIEW_LIMIT [MUST-FIX] ### What `const HELP_PREVIEW_LIMIT = 2;` at line 1834. Has `// TODO: remove in v6.0 Part B` comment. ### Why dead Only used in `focusHelpRow` (line 2786) — which is also being removed in Fix 4. ### Action DELETE the entire line 1834. ### Verification `grep -c "HELP_PREVIEW_LIMIT" pages/PublicMenu/x.jsx` → 0 --- ## Fix 2 — Remove HELP_CHIPS [MUST-FIX] ### What `const HELP_CHIPS = useMemo(...)` block starting at line 1874. Has `// TODO: remove in v6.0 Part B` comment. Ends with `], []);` closing. ### Why dead Only used in old drawer JSX (lines 4976-5281). No other references. ### Action DELETE the entire `HELP_CHIPS` useMemo block (line 1874 through its closing `], []);` at line 1880). ### Verification `grep -c "HELP_CHIPS" pages/PublicMenu/x.jsx` → 0 --- ## Fix 3 — Remove ticketBoardRef + post-send callback refs [MUST-FIX] ### What - `const ticketBoardRef = useRef(null);` at line 1910 - Post-send callback at line ~2568: `ticketBoardRef.current?.scrollIntoView(...)` - Post-send callback at line ~2569: `setHighlightedTicket(action.rowId || action.type);` - Post-send callback at line ~2570: `setTimeout(() => setHighlightedTicket(...))` ### Why dead ticketBoardRef: only used in focusHelpRow (also being removed) and post-send callback. highlightedTicket setters in post-send: no JSX reads highlightedTicket outside old drawer. ### Action - DELETE line 1910 (`ticketBoardRef = useRef(null)`) - In post-send callback (~line 2565-2571): DELETE the 3 lines (scrollIntoView, setHighlightedTicket, setTimeout). KEEP `setIsTicketExpanded(false)` and `setShowOtherForm(false)` which are on lines ~2566-2567. ### Verification `grep -c "ticketBoardRef" pages/PublicMenu/x.jsx` → 0 --- ## Fix 4 — Remove focusHelpRow [MUST-FIX] ### What `const focusHelpRow = useCallback(...)` at line ~2784. Entire useCallback block through closing `}, [activeRequests, setShowOtherForm]);` at line ~2791. ### Why dead References HELP_PREVIEW_LIMIT (removed in Fix 1) and ticketBoardRef (removed in Fix 3). All call sites were in old drawer JSX. ### Action DELETE the entire focusHelpRow useCallback block (lines ~2784-2791). ### Verification `grep -c "focusHelpRow" pages/PublicMenu/x.jsx` → 0 --- ## Fix 5 — Remove 7 dead helper functions [MUST-FIX] ### What Seven helper functions whose ONLY call sites are in old drawer JSX (lines 4976-5281) OR other helpers in this list: - `getHelpReminderWord` (line 2631) — called ONLY by getHelpReminderLabel (also removed) - `getMinutesAgo` (line 2635) — called ONLY by getHelpWaitLabel + getHelpReminderLabel (both removed) - `getHelpWaitLabel` (line 2639) — called ONLY in old drawer JSX - `getHelpReminderLabel` (line 2646) — called ONLY in old drawer JSX - `getHelpResolvedLabel` (line 2657) — called ONLY in old drawer JSX - `getHelpErrorCopy` (line 2668) — called ONLY in old drawer JSX - `getHelpFreshnessLabel` (line 2684) — called ONLY in old drawer JSX ### ⚠️ DO NOT TOUCH handleRetry (line 2697) handleRetry is IMMEDIATELY after getHelpFreshnessLabel. It is NOT dead — it will be used in B2 new JSX grid. ### Action DELETE each of the 7 function definitions. For useCallback blocks: find each function name and its closing `}, [...]);`. For non-useCallback functions: find the full definition block. ### Verification `grep -c "getHelpReminderWord\|getMinutesAgo\|getHelpWaitLabel\|getHelpReminderLabel\|getHelpResolvedLabel\|getHelpErrorCopy\|getHelpFreshnessLabel" pages/PublicMenu/x.jsx` → 0 `grep -c "handleRetry" pages/PublicMenu/x.jsx` → ≥ 1 (must still exist!) --- ## Fix 6 — Comment dead state hooks [MUST-FIX] ### What - `highlightedTicket` (line 1911): useState declaration - `isTicketExpanded` (line 1912): useState declaration ### Why keep (not delete) React hook order must be stable. Removing useState hooks changes call order → potential crash. These will be fully removed when drawer JSX is rewritten in B2. ### Action Add comment AFTER each line (do not modify the declaration itself): ```js const [highlightedTicket, setHighlightedTicket] = useState(null); // SOS v6.0 B1 — dead, kept for hook order until B2 const [isTicketExpanded, setIsTicketExpanded] = useState(false); // SOS v6.0 B1 — dead, kept for hook order until B2 ``` ### Verification `grep -c "highlightedTicket" pages/PublicMenu/x.jsx` → ≥ 1 (useState still there) `grep -c "isTicketExpanded" pages/PublicMenu/x.jsx` → ≥ 2 (useState + setIsTicketExpanded in open/close) --- ## ⛔ SCOPE LOCK Edit ONLY `pages/PublicMenu/x.jsx`. Allowed changes — DELETIONS and COMMENTS only: - HELP_PREVIEW_LIMIT (DELETE line 1834) - HELP_CHIPS (DELETE useMemo block ~1874-1879) - ticketBoardRef (DELETE line 1910) - Post-send callback (DELETE 3 lines ~2568-2570, KEEP 2566-2567) - focusHelpRow (DELETE useCallback block ~2784-2791) - 7 dead helpers (DELETE by name: getHelpReminderWord, getMinutesAgo, getHelpWaitLabel, getHelpReminderLabel, getHelpResolvedLabel, getHelpErrorCopy, getHelpFreshnessLabel — NOT handleRetry) - highlightedTicket, isTicketExpanded (ADD comments only) DO NOT touch JSX return blocks, imports, handleCardTap, handleUndo, handleResolve, handleRetry, openHelpDrawer, closeHelpDrawer, activeRequestCount, or any other code. ## POST-IMPLEMENTATION CHECKS - `wc -l pages/PublicMenu/x.jsx` — expected ~5370 ± 30 (removing ~80 lines of dead code, adding 2 comment lines). If < 5300 → ABORT (KB-095). - `grep -c "HELP_CHIPS\|HELP_PREVIEW_LIMIT\|ticketBoardRef\|focusHelpRow\|getHelpReminderWord\|getMinutesAgo\|getHelpWaitLabel\|getHelpReminderLabel\|getHelpResolvedLabel\|getHelpErrorCopy\|getHelpFreshnessLabel" pages/PublicMenu/x.jsx` → must be 0 - `grep -c "handleRetry" pages/PublicMenu/x.jsx` → must be ≥ 1 - `grep -c "DrawerHeader\|DrawerTitle" pages/PublicMenu/x.jsx` → must be ≥ 4 - `node --check pages/PublicMenu/x.jsx || true` — no syntax errors (note: .jsx may warn, that's OK) - git add pages/PublicMenu/x.jsx - git commit -m "SOS v6.0 Part B1: cleanup dead helpers/refs/constants" === END ===
+mcp startup: no servers
+codex
+I’m syncing the worktree first as requested, then I’ll read only the target page folder context and produce a findings-only review scoped strictly to the numbered fixes.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git fetch origin 2>$null; git reset --hard origin/main' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 29.11s:
+HEAD is now at 0012e3f fix(publicmenu): 10 fixes via consensus chain publicmenu-260408-072228-de40
+codex
+I’ve synced to `origin/main`. Next I’m limiting reads to `pages/PublicMenu` and checking the target file plus `README.md`/`BUGS.md` for the specific dead-code cleanup points only.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Force pages/PublicMenu | Select-Object Name,Length' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 25.07s:
+4988
+ succeeded in 24.55s:
+
+Name                                             Length
+----                                             ------
+components                                             
+screenshots                                            
+versions                                               
+260320-01 useTableSession RELEASE.jsx            29623 
+260321-02 CartView RELEASE.jsx                   48348 
+260321-02 x RELEASE.jsx                          129988
+260323-02 CartView RELEASE.jsx                   41742 
+260323-02 MenuView RELEASE.jsx                   15335 
+260323-02 x RELEASE.jsx                          130581
+260323-03 CheckoutView RELEASE.jsx               7840  
+260327-01 ModeTabs RELEASE.jsx                   3026  
+260328-01 CartView RELEASE.jsx                   44686 
+260328-01 x RELEASE.jsx                          149420
+260329-01 MenuView RELEASE.jsx                   16120 
+260329-01 StickyCartBar RELEASE.jsx              2316  
+260330-02 CartView RELEASE.jsx                   52737 
+260330-09 PublicMenu x RELEASE.jsx               164417
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/README.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'SOS','Help Drawer','v6.0','B1','de40','0012e3f','260408','highlightedTicket','ticketBoardRef','HELP_CHIPS','HELP_PREVIEW_LIMIT' -SimpleMatch | Select-Object LineNumber,Line" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 13.40s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 13.28s:
+
+LineNumber Line                                                                                                        
+---------- ----                                                                                                        
+       145 - **Файл:** x.jsx, lines 327–569 (I18N_FALLBACKS), line 1715 (HELP_CHIPS), lines 2448–2454 (getHelpRemind...
+       146 - **Симптом:** EN mode showed Russian text for ~170 keys because I18N_FALLBACKS had Russian values. HELP_...
+       147 - **Фикс:** (1) Replaced entire I18N_FALLBACKS dictionary with 236-key English version (+15 new keys). (2...
+       150 ### FIX-HD-17a: Help Drawer auto-closes 5s after card tap — FIXED S214                                      
+       164 ### FIX-CHAIN-8992: Help Drawer Phase 1 — Ticket Board Architecture (#214) — FIXED S211                     
+       177 ### FIX-CHAIN-a1d6: Help Drawer Mini-Ticket Board UX (HD-01..HD-08) — FIXED S207                            
+       269 ### FIX-CHAIN-c028: #150+PM-131 — Help drawer redesign + submit fix — FIXED S177                            
+       273   - #150 (P2): Help drawer redesigned — replaced multi-step type-selector+textarea flow with 4 one-tap qu...
+       282   - PM-125 (P1): "Нужна помощь?" converted from Dialog (HelpModal) to inline Drawer (bottom sheet). Cart ...
+
+
+codex
+The page folder context confirms the help drawer has gone through multiple recent refactors. I’m now checking only the named symbols in `x.jsx` against the six requested cleanup fixes and verifying whether the current file actually matches the task’s line/range assumptions.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 1828 -First 95' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/BUGS.md | Select-Object -Skip 135 -First 40' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2558 -First 160' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 22.40s:
+      });
+
+      if (action.type === 'other') {
+        setHelpComment('');
+      }
+
+      if (action.action === 'send') {
+        setIsTicketExpanded(false);
+        setShowOtherForm(false);
+        ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setHighlightedTicket(action.rowId || action.type);
+        setTimeout(() => setHighlightedTicket((prev) => (prev === (action.rowId || action.type) ? null : prev)), 1500);
+      }
+
+      if (action.action === 'remind') {
+        toast({ description: tr('help.reminder_sent', 'Reminder sent'), duration: 2000 });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['helpDrawerRequests', partner?.id, currentTableIdRef.current] });
+    };
+ succeeded in 21.69s:
+  const HELP_STALE_AFTER_MS = HELP_SYNC_INTERVAL_MS * 3;
+  const HELP_RESTORE_TTL_MS = 6 * 60 * 60 * 1000;
+  const HELP_MATCH_GRACE_MS = 2 * 60 * 1000;
+  const HELP_RESOLVED_HIDE_MS = 4000;
+  const HELP_CLOSED_HIDE_MS = 2000;
+  const HELP_PREVIEW_LIMIT = 2; // TODO: remove in v6.0 Part B
+  const HELP_REQUEST_TYPES = useMemo(() => new Set([
+    'call_waiter', 'bill', 'plate', 'napkins', 'utensils', 'clear_table', 'other',
+    'menu', // legacy â€” keep readable for backward compat; NOT shown in SOS grid
+  ]), []);
+  const HELP_ACTIVE_SERVER_STATUSES = useMemo(() => new Set(['new', 'in_progress']), []);
+  const HELP_DONE_SERVER_STATUSES = useMemo(() => new Set(['done']), []);
+  const HELP_COOLDOWN_SECONDS = useMemo(() => ({
+    call_waiter: 90, bill: 150, plate: 120, napkins: 120,
+    utensils: 120, clear_table: 120, other: 120,
+    menu: 240, // legacy
+  }), []);
+  const HELP_CARD_LABELS = useMemo(() => ({
+    call_waiter: tr('help.call_waiter', 'Call a waiter'),
+    bill: tr('help.get_bill', 'Bill'),
+ succeeded in 22.59s:
+---
+
+---
+
+## Fixed Bugs (Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+### FIX-#235: EN i18n â€” Russian fallbacks replaced with English â€” FIXED S219
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P1
+- **ÐšÐ¾Ð³Ð´Ð°:** S219 (chain publicmenu-260404-054037-ad20)
+- **Ð¤Ð°Ð¹Ð»:** x.jsx, lines 327â€“569 (I18N_FALLBACKS), line 1715 (HELP_CHIPS), lines 2448â€“2454 (getHelpReminderWord), lines 2472/2475/2515 ("Ð½Ð°Ð·Ð°Ð´")
+- **Ð¡Ð¸Ð¼Ð¿Ñ‚Ð¾Ð¼:** EN mode showed Russian text for ~170 keys because I18N_FALLBACKS had Russian values. HELP_CHIPS hardcoded in Russian. getHelpReminderWord returned Russian plurals. Three "Ð½Ð°Ð·Ð°Ð´" strings mixed Russian into EN labels.
+- **Ð¤Ð¸ÐºÑ:** (1) Replaced entire I18N_FALLBACKS dictionary with 236-key English version (+15 new keys). (2) HELP_CHIPS uses tr() with EN fallbacks. (3) getHelpReminderWord uses tr() with EN singular/plural. (4) Three "Ð½Ð°Ð·Ð°Ð´" replaced with tr('help.ago', 'ago').
+- **Commit:** 56db694
+
+### FIX-HD-17a: Help Drawer auto-closes 5s after card tap â€” FIXED S214
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P1
+- **ÐšÐ¾Ð³Ð´Ð°:** S214 (chain publicmenu-260401-125045-ef92)
+- **Ð¤Ð°Ð¹Ð»:** x.jsx, handleCardTap ~line 1816
+- **Ð¡Ð¸Ð¼Ð¿Ñ‚Ð¾Ð¼:** After tapping a help request card, drawer auto-closed after 5s because `handlePresetSelect` internally called `setIsHelpModalOpen(false)`.
+- **Ð¤Ð¸ÐºÑ:** Added `setIsHelpModalOpen(true)` after `handlePresetSelect(type)` in the setTimeout callback. Commit d6a0b29 + 80b22ae.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'HELP_PREVIEW_LIMIT|HELP_CHIPS|ticketBoardRef|focusHelpRow|getHelpReminderWord|getMinutesAgo|getHelpWaitLabel|getHelpReminderLabel|getHelpResolvedLabel|getHelpErrorCopy|getHelpFreshnessLabel|highlightedTicket|isTicketExpanded|handleRetry' | Select-Object LineNumber,Line" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2768 -First 40' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 22.61s:
+
+LineNumber Line                                                                                                        
+---------- ----                                                                                                        
+      1834   const HELP_PREVIEW_LIMIT = 2; // TODO: remove in v6.0 Part B                                              
+      1874   const HELP_CHIPS = useMemo(() => [ // TODO: remove in v6.0 Part B                                         
+      1910   const ticketBoardRef = useRef(null);                                                                      
+      1911   const [highlightedTicket, setHighlightedTicket] = useState(null);                                         
+      1912   const [isTicketExpanded, setIsTicketExpanded] = useState(false);                                          
+      2356     setIsTicketExpanded(false);                                                                             
+      2364     setIsTicketExpanded(false);                                                                             
+      2566         setIsTicketExpanded(false);                                                                         
+      2568         ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });                     
+      2569         setHighlightedTicket(action.rowId || action.type);                                                  
+      2570         setTimeout(() => setHighlightedTicket((prev) => (prev === (action.rowId || action.type) ? null : ...
+      2631   const getHelpReminderWord = useCallback((count) => {                                                      
+      2635   const getMinutesAgo = useCallback((timestamp) => {                                                        
+      2639   const getHelpWaitLabel = useCallback((row) => {                                                           
+      2643     return `${tr('help.waiting_prefix', 'Waiting')} ${getMinutesAgo(row.sentAt)} ${tr('help.minutes_short...
+      2644   }, [getMinutesAgo, tr]);                                                                                  
+      2646   const getHelpReminderLabel = useCallback((row) => {                                                       
+ succeeded in 22.72s:
+          errorMessage: '',
+          terminalHideAt: null,
+          syncSource: 'local',
+        },
+      };
+    });
+
+    pendingQuickSendRef.current = { type: row.type, action: 'send', rowId: row.id, message: row.message || '' };
+    if (row.type === 'other' && row.message) {
+      setHelpComment(row.message);
+    }
+    handlePresetSelect(row.type);
+    setPendingHelpActionTick((value) => value + 1);
+  }, [handlePresetSelect, setHelpComment]);
+
+  const focusHelpRow = useCallback((rowId) => {
+    const rowIndex = activeRequests.findIndex((row) => row.id === rowId);
+    setIsTicketExpanded(rowIndex >= HELP_PREVIEW_LIMIT);
+    setShowOtherForm(false);
+    ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+codex
+The current `x.jsx` does not match the task’s “already dead” premise. Those symbols are still read in the live drawer JSX in this file, so I’m validating each numbered fix against actual call sites before writing the report.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 4998 -First 130' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 4968 -First 35' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 24.68s:
+          </div>
+          <div className="px-4 pb-6 space-y-4 overflow-y-auto flex-1">
+            {currentTable && (
+              <div className="flex items-center justify-center gap-2 text-sm text-slate-600">
+                <MapPin className="w-4 h-4" />
+                <span>{currentTable?.name || currentTable?.code}</span>
+              </div>
+            )}
+            {ticketRows.length > 0 && (
+              <div ref={ticketBoardRef} className="mb-4">
+                {!isTicketExpanded && (
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-gray-700">{t('help.my_requests')}</span>
+                    {activeRequestCount > 0 && (
+                      <span className="text-xs text-gray-400">{activeRequestCount} {t('help.active_count')}</span>
+                    )}
+                  </div>
+                )}
+                {(() => {
+                  const visibleRequests = isTicketExpanded
+ succeeded in 23.65s:
+          )}
+        </div>
+      )}
+
+      {/* PM-125: Help as Bottom Drawer (replaces HelpModal Dialog) */}
+      <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
+        <DrawerContent className="max-h-[85vh] rounded-t-2xl flex flex-col">
+          <div className="relative">
+            {isTicketExpanded && (
+              <button
+                onClick={() => { setIsTicketExpanded(false); }}
+                className="absolute top-3 left-3 min-h-[44px] px-3 flex items-center gap-1 rounded-full bg-slate-100 text-slate-700 z-10 text-sm font-medium"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>{t('help.back_to_help')}</span>
+              </button>
+            )}
+            <button
+              onClick={closeHelpDrawer}
+              className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 z-10"
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2348 -First 24' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 5128 -First 120' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 37.78s:
+  const openHelpDrawer = useCallback(() => {
+    if (!currentTableId) {
+      setShowTableConfirmSheet(true);
+      return;
+    }
+    setShowOtherForm(false);
+    setHelpComment('');
+    setIsTicketExpanded(false);
+    setIsHelpModalOpen(true);
+    pushOverlay('help');
+  }, [currentTableId, pushOverlay, setHelpComment, setShowTableConfirmSheet]);
+
+  const closeHelpDrawer = useCallback(() => {
+    popOverlay('help');
+    setIsHelpModalOpen(false);
+    setIsTicketExpanded(false);
+    setShowOtherForm(false);
+    setHelpComment('');
+  }, [popOverlay, setHelpComment]);
+
+ succeeded in 39.22s:
+              <span className="text-sm font-semibold text-gray-700">{t('help.send_more')}</span>
+            )}
+            {!isTicketExpanded && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: 'call_waiter', emoji: '\uD83D\uDE4B', label: t('help.call_waiter') },
+                    { id: 'bill', emoji: '\uD83E\uDDFE', label: t('help.bill') },
+                    { id: 'napkins', emoji: null, label: t('help.napkins') },
+                    { id: 'menu', emoji: '\uD83D\uDCC4', label: t('help.menu') },
+                  ].map(card => {
+                    const activeRow = activeRequests.find((row) => row.type === card.id);
+                    const isSubdued = Boolean(activeRow);
+                    return (
+                      <button
+                        key={card.id}
+                        onClick={() => {
+                          if (activeRow) {
+                            focusHelpRow(activeRow.id);
+                            return;
+codex
+I have the findings. Before writing files, I’m creating the required report/log artifacts only; I’m not touching `pages/PublicMenu/x.jsx`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Force pipeline/chain-state | Select-Object Name' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pages/PublicMenu/review_2026-04-08.md; Test-Path pages/PublicMenu/commands_2026-04-08.log' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 16.32s:
+False
+False
+ succeeded in 17.41s:
+
+Name                                                            
+----                                                            
+partnerorderprocess-260404-060141-d4ba-codex-findings.md        
+partnerorderprocess-260404-204226-0133-cc-findings.md           
+partnerorderprocess-260404-204226-0133-codex-findings.md        
+partnerorderprocess-260404-204226-0133-merge-report.md          
+partnersettings-260321-235750-cc-findings.md                    
+partnersettings-260321-235750-codex-findings.md                 
+partnersettings-260321-235750-comparison.md                     
+partnersettings-260321-235750-discussion.md                     
+partnersettings-260321-235750-merge-report.md                   
+partnersettings-260323-142203-51fa-cc-findings.md               
+partnersettings-260323-142203-51fa-codex-findings.md            
+partnersettings-260323-142203-51fa-comparison.md                
+partnersettings-260323-142203-51fa-discussion.md                
+partnersettings-260323-142203-51fa-merge-report.md              
+partnersettings-260323-185103-86f9-cc-findings.md               
+partnersettings-260323-185103-86f9-codex-findings.md            
+partnersettings-260323-185103-86f9-comparison.md                
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-04-08.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260408-143544-d0bc
+
+## Findings
+1. [P0] Fix 1 + Fix 4 remove live preview/focus symbols — `HELP_PREVIEW_LIMIT` and `focusHelpRow` are still used by the current drawer JSX in `pages/PublicMenu/x.jsx` at lines 5020, 5112, and 5147, so deleting them now would leave active render/click paths referencing missing identifiers. FIX: keep both until the drawer JSX is replaced in B2, or remove/update all current JSX call sites in the same patch.
+2. [P0] Fix 2 deletes `HELP_CHIPS` while the current Other-form still renders it — the chip list is still mapped in the live drawer JSX at line 5187, so removing the `HELP_CHIPS` `useMemo` now would break the render path. FIX: keep `HELP_CHIPS` until that JSX is removed, or delete/replace the chip UI in the same change.
+3. [P0] Fix 3 removes `ticketBoardRef` and post-send highlight logic that the current ticket board still reads — `ticketBoardRef` is still attached in JSX at line 5008 and `highlightedTicket` is still read at line 5025, so deleting the ref plus the highlight setters now would break the current board behavior and leave a missing ref binding. FIX: keep the ref/highlight flow until the board JSX is rewritten, or remove the current board/highlight usage in the same patch.
+4. [P0] Fix 5 deletes helper functions that are still called by live ticket-board JSX — `getHelpFreshnessLabel`, `getHelpReminderLabel`, `getHelpErrorCopy`, `getHelpResolvedLabel`, and `getHelpWaitLabel` are still used at lines 5021, 5030, 5031, 5058, and 5067; `getHelpReminderWord` and `getMinutesAgo` remain required through that helper chain. FIX: do not remove these helpers until the current drawer JSX stops calling them, or replace every current caller in the same patch.
+5. [P2] Fix 6 mislabels live state as dead — `isTicketExpanded` still controls major drawer branches and actions at lines 4977, 4994, 5009, 5018, 5112, 5128, and 5222, and `highlightedTicket` still drives row highlighting at line 5025, so commenting both hooks as “dead” is inaccurate on this snapshot. FIX: leave these hooks documented as live state for now, or defer the “dead, kept for hook order until B2” comments until B2 removes the remaining readers.
+
+## Summary
+Total: 5 findings (4 P0, 0 P1, 1 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 2
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1/4 say `HELP_PREVIEW_LIMIT` and `focusHelpRow` are already dead, but the current `pages/PublicMenu/x.jsx` still uses them in live JSX; Fix 2 says `HELP_CHIPS` has no remaining references, but line 5187 still maps it; Fix 3 says the post-send highlight/ref logic is dead, but the current board still reads `ticketBoardRef` and `highlightedTicket`; Fix 5 says the seven helpers are old-drawer-only, but the current ticket board still calls the helper chain; Fix 6 says the two state hooks are dead, but the current drawer still branches on them heavily.
+- Missing context (what info would have helped): the exact snapshot intended for review, whether the task should be checked against `pages/PublicMenu/x.jsx` or `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, and why the task expects ~5457/~5370 lines when the current target file is 4988 lines on `origin/main`.
+- Scope questions (anything you weren't sure if it's in scope): whether this review should validate the task against the current HEAD file or against a post-B2/deployed snapshot where the old drawer JSX has already been removed.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-04-08.log
+git fetch origin 2>$null; git reset --hard origin/main
+Get-ChildItem -Force pages/PublicMenu | Select-Object Name,Length
+(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
+Get-Content pages/PublicMenu/README.md
+Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'SOS','Help Drawer','v6.0','B1','de40','0012e3f','260408','highlightedTicket','ticketBoardRef','HELP_CHIPS','HELP_PREVIEW_LIMIT' -SimpleMatch | Select-Object LineNumber,Line
+Get-Content pages/PublicMenu/BUGS.md | Select-Object -Skip 135 -First 40
+Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 1828 -First 95
+Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2558 -First 160
+Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2768 -First 40
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'HELP_PREVIEW_LIMIT|HELP_CHIPS|ticketBoardRef|focusHelpRow|getHelpReminderWord|getMinutesAgo|getHelpWaitLabel|getHelpReminderLabel|getHelpResolvedLabel|getHelpErrorCopy|getHelpFreshnessLabel|highlightedTicket|isTicketExpanded|handleRetry' | Select-Object LineNumber,Line
+Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 4998 -First 130
+Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 4968 -First 35
+Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 5128 -First 120
+Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2348 -First 24
+Get-ChildItem -Force pipeline/chain-state | Select-Object Name
+Test-Path pages/PublicMenu/review_2026-04-08.md; Test-Path pages/PublicMenu/commands_2026-04-08.log
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260408-143544-d0bc
+
+## Findings
+1. [P0] Fix 1 + Fix 4 remove live preview/focus symbols — `HELP_PREVIEW_LIMIT` and `focusHelpRow` are still used by the current drawer JSX in `pages/PublicMenu/x.jsx` at lines 5020, 5112, and 5147, so deleting them now would leave active render/click paths referencing missing identifiers. FIX: keep both until the drawer JSX is replaced in B2, or remove/update all current JSX call sites in the same patch.
+2. [P0] Fix 2 deletes `HELP_CHIPS` while the current Other-form still renders it — the chip list is still mapped in the live drawer JSX at line 5187, so removing the `HELP_CHIPS` `useMemo` now would break the render path. FIX: keep `HELP_CHIPS` until that JSX is removed, or delete/replace the chip UI in the same change.
+3. [P0] Fix 3 removes `ticketBoardRef` and post-send highlight logic that the current ticket board still reads — `ticketBoardRef` is still attached in JSX at line 5008 and `highlightedTicket` is still read at line 5025, so deleting the ref plus the highlight setters now would break the current board behavior and leave a missing ref binding. FIX: keep the ref/highlight flow until the board JSX is rewritten, or remove the current board/highlight usage in the same patch.
+4. [P0] Fix 5 deletes helper functions that are still called by live ticket-board JSX — `getHelpFreshnessLabel`, `getHelpReminderLabel`, `getHelpErrorCopy`, `getHelpResolvedLabel`, and `getHelpWaitLabel` are still used at lines 5021, 5030, 5031, 5058, and 5067; `getHelpReminderWord` and `getMinutesAgo` remain required through that helper chain. FIX: do not remove these helpers until the current drawer JSX stops calling them, or replace every current caller in the same patch.
+5. [P2] Fix 6 mislabels live state as dead — `isTicketExpanded` still controls major drawer branches and actions at lines 4977, 4994, 5009, 5018, 5112, 5128, and 5222, and `highlightedTicket` still drives row highlighting at line 5025, so commenting both hooks as “dead” is inaccurate on this snapshot. FIX: leave these hooks documented as live state for now, or defer the “dead, kept for hook order until B2” comments until B2 removes the remaining readers.
+
+## Summary
+Total: 5 findings (4 P0, 0 P1, 1 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 2
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1/4 say `HELP_PREVIEW_LIMIT` and `focusHelpRow` are already dead, but the current `pages/PublicMenu/x.jsx` still uses them in live JSX; Fix 2 says `HELP_CHIPS` has no remaining references, but line 5187 still maps it; Fix 3 says the post-send highlight/ref logic is dead, but the current board still reads `ticketBoardRef` and `highlightedTicket`; Fix 5 says the seven helpers are old-drawer-only, but the current ticket board still calls the helper chain; Fix 6 says the two state hooks are dead, but the current drawer still branches on them heavily.
+- Missing context (what info would have helped): the exact snapshot intended for review, whether the task should be checked against `pages/PublicMenu/x.jsx` or `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, and why the task expects ~5457/~5370 lines when the current target file is 4988 lines on `origin/main`.
+- Scope questions (anything you weren't sure if it's in scope): whether this review should validate the task against the current HEAD file or against a post-B2/deployed snapshot where the old drawer JSX has already been removed.
+apply_patch(auto_approved=true) exited 0 in 3.75s:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md
+A pages/PublicMenu/review_2026-04-08.md
+A pages/PublicMenu/commands_2026-04-08.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-04-08.log b/pages/PublicMenu/commands_2026-04-08.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..cbfe5d9b03763a94910a97a5516a4c5db419e7b4
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-04-08.log
+@@ -0,0 +1,16 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Force pages/PublicMenu | Select-Object Name,Length
++(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
++Get-Content pages/PublicMenu/README.md
++Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'SOS','Help Drawer','v6.0','B1','de40','0012e3f','260408','highlightedTicket','ticketBoardRef','HELP_CHIPS','HELP_PREVIEW_LIMIT' -SimpleMatch | Select-Object LineNumber,Line
++Get-Content pages/PublicMenu/BUGS.md | Select-Object -Skip 135 -First 40
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 1828 -First 95
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2558 -First 160
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2768 -First 40
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'HELP_PREVIEW_LIMIT|HELP_CHIPS|ticketBoardRef|focusHelpRow|getHelpReminderWord|getMinutesAgo|getHelpWaitLabel|getHelpReminderLabel|getHelpResolvedLabel|getHelpErrorCopy|getHelpFreshnessLabel|highlightedTicket|isTicketExpanded|handleRetry' | Select-Object LineNumber,Line
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 4998 -First 130
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 4968 -First 35
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 5128 -First 120
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2348 -First 24
++Get-ChildItem -Force pipeline/chain-state | Select-Object Name
++Test-Path pages/PublicMenu/review_2026-04-08.md; Test-Path pages/PublicMenu/commands_2026-04-08.log
+diff --git a/pages/PublicMenu/review_2026-04-08.md b/pages/PublicMenu/review_2026-04-08.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c2b43961a083cdb496e2fe52e8b68e804fb117eb
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-04-08.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260408-143544-d0bc
++
++## Findings
++1. [P0] Fix 1 + Fix 4 remove live preview/focus symbols — `HELP_PREVIEW_LIMIT` and `focusHelpRow` are still used by the current drawer JSX in `pages/PublicMenu/x.jsx` at lines 5020, 5112, and 5147, so deleting them now would leave active render/click paths referencing missing identifiers. FIX: keep both until the drawer JSX is replaced in B2, or remove/update all current JSX call sites in the same patch.
++2. [P0] Fix 2 deletes `HELP_CHIPS` while the current Other-form still renders it — the chip list is still mapped in the live drawer JSX at line 5187, so removing the `HELP_CHIPS` `useMemo` now would break the render path. FIX: keep `HELP_CHIPS` until that JSX is removed, or delete/replace the chip UI in the same change.
++3. [P0] Fix 3 removes `ticketBoardRef` and post-send highlight logic that the current ticket board still reads — `ticketBoardRef` is still attached in JSX at line 5008 and `highlightedTicket` is still read at line 5025, so deleting the ref plus the highlight setters now would break the current board behavior and leave a missing ref binding. FIX: keep the ref/highlight flow until the board JSX is rewritten, or remove the current board/highlight usage in the same patch.
++4. [P0] Fix 5 deletes helper functions that are still called by live ticket-board JSX — `getHelpFreshnessLabel`, `getHelpReminderLabel`, `getHelpErrorCopy`, `getHelpResolvedLabel`, and `getHelpWaitLabel` are still used at lines 5021, 5030, 5031, 5058, and 5067; `getHelpReminderWord` and `getMinutesAgo` remain required through that helper chain. FIX: do not remove these helpers until the current drawer JSX stops calling them, or replace every current caller in the same patch.
++5. [P2] Fix 6 mislabels live state as dead — `isTicketExpanded` still controls major drawer branches and actions at lines 4977, 4994, 5009, 5018, 5112, 5128, and 5222, and `highlightedTicket` still drives row highlighting at line 5025, so commenting both hooks as “dead” is inaccurate on this snapshot. FIX: leave these hooks documented as live state for now, or defer the “dead, kept for hook order until B2” comments until B2 removes the remaining readers.
++
++## Summary
++Total: 5 findings (4 P0, 0 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 2
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1/4 say `HELP_PREVIEW_LIMIT` and `focusHelpRow` are already dead, but the current `pages/PublicMenu/x.jsx` still uses them in live JSX; Fix 2 says `HELP_CHIPS` has no remaining references, but line 5187 still maps it; Fix 3 says the post-send highlight/ref logic is dead, but the current board still reads `ticketBoardRef` and `highlightedTicket`; Fix 5 says the seven helpers are old-drawer-only, but the current ticket board still calls the helper chain; Fix 6 says the two state hooks are dead, but the current drawer still branches on them heavily.
++- Missing context (what info would have helped): the exact snapshot intended for review, whether the task should be checked against `pages/PublicMenu/x.jsx` or `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, and why the task expects ~5457/~5370 lines when the current target file is 4988 lines on `origin/main`.
++- Scope questions (anything you weren't sure if it's in scope): whether this review should validate the task against the current HEAD file or against a post-B2/deployed snapshot where the old drawer JSX has already been removed.
+diff --git a/pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md b/pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c2b43961a083cdb496e2fe52e8b68e804fb117eb
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260408-143544-d0bc
++
++## Findings
++1. [P0] Fix 1 + Fix 4 remove live preview/focus symbols — `HELP_PREVIEW_LIMIT` and `focusHelpRow` are still used by the current drawer JSX in `pages/PublicMenu/x.jsx` at lines 5020, 5112, and 5147, so deleting them now would leave active render/click paths referencing missing identifiers. FIX: keep both until the drawer JSX is replaced in B2, or remove/update all current JSX call sites in the same patch.
++2. [P0] Fix 2 deletes `HELP_CHIPS` while the current Other-form still renders it — the chip list is still mapped in the live drawer JSX at line 5187, so removing the `HELP_CHIPS` `useMemo` now would break the render path. FIX: keep `HELP_CHIPS` until that JSX is removed, or delete/replace the chip UI in the same change.
++3. [P0] Fix 3 removes `ticketBoardRef` and post-send highlight logic that the current ticket board still reads — `ticketBoardRef` is still attached in JSX at line 5008 and `highlightedTicket` is still read at line 5025, so deleting the ref plus the highlight setters now would break the current board behavior and leave a missing ref binding. FIX: keep the ref/highlight flow until the board JSX is rewritten, or remove the current board/highlight usage in the same patch.
++4. [P0] Fix 5 deletes helper functions that are still called by live ticket-board JSX — `getHelpFreshnessLabel`, `getHelpReminderLabel`, `getHelpErrorCopy`, `getHelpResolvedLabel`, and `getHelpWaitLabel` are still used at lines 5021, 5030, 5031, 5058, and 5067; `getHelpReminderWord` and `getMinutesAgo` remain required through that helper chain. FIX: do not remove these helpers until the current drawer JSX stops calling them, or replace every current caller in the same patch.
++5. [P2] Fix 6 mislabels live state as dead — `isTicketExpanded` still controls major drawer branches and actions at lines 4977, 4994, 5009, 5018, 5112, 5128, and 5222, and `highlightedTicket` still drives row highlighting at line 5025, so commenting both hooks as “dead” is inaccurate on this snapshot. FIX: leave these hooks documented as live state for now, or defer the “dead, kept for hook order until B2” comments until B2 removes the remaining readers.
++
++## Summary
++Total: 5 findings (4 P0, 0 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 2
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1/4 say `HELP_PREVIEW_LIMIT` and `focusHelpRow` are already dead, but the current `pages/PublicMenu/x.jsx` still uses them in live JSX; Fix 2 says `HELP_CHIPS` has no remaining references, but line 5187 still maps it; Fix 3 says the post-send highlight/ref logic is dead, but the current board still reads `ticketBoardRef` and `highlightedTicket`; Fix 5 says the seven helpers are old-drawer-only, but the current ticket board still calls the helper chain; Fix 6 says the two state hooks are dead, but the current drawer still branches on them heavily.
++- Missing context (what info would have helped): the exact snapshot intended for review, whether the task should be checked against `pages/PublicMenu/x.jsx` or `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, and why the task expects ~5457/~5370 lines when the current target file is 4988 lines on `origin/main`.
++- Scope questions (anything you weren't sure if it's in scope): whether this review should validate the task against the current HEAD file or against a post-B2/deployed snapshot where the old drawer JSX has already been removed.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-04-08.log b/pages/PublicMenu/commands_2026-04-08.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..cbfe5d9b03763a94910a97a5516a4c5db419e7b4
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-04-08.log
+@@ -0,0 +1,16 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Force pages/PublicMenu | Select-Object Name,Length
++(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
++Get-Content pages/PublicMenu/README.md
++Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'SOS','Help Drawer','v6.0','B1','de40','0012e3f','260408','highlightedTicket','ticketBoardRef','HELP_CHIPS','HELP_PREVIEW_LIMIT' -SimpleMatch | Select-Object LineNumber,Line
++Get-Content pages/PublicMenu/BUGS.md | Select-Object -Skip 135 -First 40
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 1828 -First 95
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2558 -First 160
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2768 -First 40
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'HELP_PREVIEW_LIMIT|HELP_CHIPS|ticketBoardRef|focusHelpRow|getHelpReminderWord|getMinutesAgo|getHelpWaitLabel|getHelpReminderLabel|getHelpResolvedLabel|getHelpErrorCopy|getHelpFreshnessLabel|highlightedTicket|isTicketExpanded|handleRetry' | Select-Object LineNumber,Line
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 4998 -First 130
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 4968 -First 35
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 5128 -First 120
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2348 -First 24
++Get-ChildItem -Force pipeline/chain-state | Select-Object Name
++Test-Path pages/PublicMenu/review_2026-04-08.md; Test-Path pages/PublicMenu/commands_2026-04-08.log
+diff --git a/pages/PublicMenu/review_2026-04-08.md b/pages/PublicMenu/review_2026-04-08.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c2b43961a083cdb496e2fe52e8b68e804fb117eb
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-04-08.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260408-143544-d0bc
++
++## Findings
++1. [P0] Fix 1 + Fix 4 remove live preview/focus symbols — `HELP_PREVIEW_LIMIT` and `focusHelpRow` are still used by the current drawer JSX in `pages/PublicMenu/x.jsx` at lines 5020, 5112, and 5147, so deleting them now would leave active render/click paths referencing missing identifiers. FIX: keep both until the drawer JSX is replaced in B2, or remove/update all current JSX call sites in the same patch.
++2. [P0] Fix 2 deletes `HELP_CHIPS` while the current Other-form still renders it — the chip list is still mapped in the live drawer JSX at line 5187, so removing the `HELP_CHIPS` `useMemo` now would break the render path. FIX: keep `HELP_CHIPS` until that JSX is removed, or delete/replace the chip UI in the same change.
++3. [P0] Fix 3 removes `ticketBoardRef` and post-send highlight logic that the current ticket board still reads — `ticketBoardRef` is still attached in JSX at line 5008 and `highlightedTicket` is still read at line 5025, so deleting the ref plus the highlight setters now would break the current board behavior and leave a missing ref binding. FIX: keep the ref/highlight flow until the board JSX is rewritten, or remove the current board/highlight usage in the same patch.
++4. [P0] Fix 5 deletes helper functions that are still called by live ticket-board JSX — `getHelpFreshnessLabel`, `getHelpReminderLabel`, `getHelpErrorCopy`, `getHelpResolvedLabel`, and `getHelpWaitLabel` are still used at lines 5021, 5030, 5031, 5058, and 5067; `getHelpReminderWord` and `getMinutesAgo` remain required through that helper chain. FIX: do not remove these helpers until the current drawer JSX stops calling them, or replace every current caller in the same patch.
++5. [P2] Fix 6 mislabels live state as dead — `isTicketExpanded` still controls major drawer branches and actions at lines 4977, 4994, 5009, 5018, 5112, 5128, and 5222, and `highlightedTicket` still drives row highlighting at line 5025, so commenting both hooks as “dead” is inaccurate on this snapshot. FIX: leave these hooks documented as live state for now, or defer the “dead, kept for hook order until B2” comments until B2 removes the remaining readers.
++
++## Summary
++Total: 5 findings (4 P0, 0 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 2
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1/4 say `HELP_PREVIEW_LIMIT` and `focusHelpRow` are already dead, but the current `pages/PublicMenu/x.jsx` still uses them in live JSX; Fix 2 says `HELP_CHIPS` has no remaining references, but line 5187 still maps it; Fix 3 says the post-send highlight/ref logic is dead, but the current board still reads `ticketBoardRef` and `highlightedTicket`; Fix 5 says the seven helpers are old-drawer-only, but the current ticket board still calls the helper chain; Fix 6 says the two state hooks are dead, but the current drawer still branches on them heavily.
++- Missing context (what info would have helped): the exact snapshot intended for review, whether the task should be checked against `pages/PublicMenu/x.jsx` or `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, and why the task expects ~5457/~5370 lines when the current target file is 4988 lines on `origin/main`.
++- Scope questions (anything you weren't sure if it's in scope): whether this review should validate the task against the current HEAD file or against a post-B2/deployed snapshot where the old drawer JSX has already been removed.
+diff --git a/pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md b/pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c2b43961a083cdb496e2fe52e8b68e804fb117eb
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260408-143544-d0bc
++
++## Findings
++1. [P0] Fix 1 + Fix 4 remove live preview/focus symbols — `HELP_PREVIEW_LIMIT` and `focusHelpRow` are still used by the current drawer JSX in `pages/PublicMenu/x.jsx` at lines 5020, 5112, and 5147, so deleting them now would leave active render/click paths referencing missing identifiers. FIX: keep both until the drawer JSX is replaced in B2, or remove/update all current JSX call sites in the same patch.
++2. [P0] Fix 2 deletes `HELP_CHIPS` while the current Other-form still renders it — the chip list is still mapped in the live drawer JSX at line 5187, so removing the `HELP_CHIPS` `useMemo` now would break the render path. FIX: keep `HELP_CHIPS` until that JSX is removed, or delete/replace the chip UI in the same change.
++3. [P0] Fix 3 removes `ticketBoardRef` and post-send highlight logic that the current ticket board still reads — `ticketBoardRef` is still attached in JSX at line 5008 and `highlightedTicket` is still read at line 5025, so deleting the ref plus the highlight setters now would break the current board behavior and leave a missing ref binding. FIX: keep the ref/highlight flow until the board JSX is rewritten, or remove the current board/highlight usage in the same patch.
++4. [P0] Fix 5 deletes helper functions that are still called by live ticket-board JSX — `getHelpFreshnessLabel`, `getHelpReminderLabel`, `getHelpErrorCopy`, `getHelpResolvedLabel`, and `getHelpWaitLabel` are still used at lines 5021, 5030, 5031, 5058, and 5067; `getHelpReminderWord` and `getMinutesAgo` remain required through that helper chain. FIX: do not remove these helpers until the current drawer JSX stops calling them, or replace every current caller in the same patch.
++5. [P2] Fix 6 mislabels live state as dead — `isTicketExpanded` still controls major drawer branches and actions at lines 4977, 4994, 5009, 5018, 5112, 5128, and 5222, and `highlightedTicket` still drives row highlighting at line 5025, so commenting both hooks as “dead” is inaccurate on this snapshot. FIX: leave these hooks documented as live state for now, or defer the “dead, kept for hook order until B2” comments until B2 removes the remaining readers.
++
++## Summary
++Total: 5 findings (4 P0, 0 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 2
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1/4 say `HELP_PREVIEW_LIMIT` and `focusHelpRow` are already dead, but the current `pages/PublicMenu/x.jsx` still uses them in live JSX; Fix 2 says `HELP_CHIPS` has no remaining references, but line 5187 still maps it; Fix 3 says the post-send highlight/ref logic is dead, but the current board still reads `ticketBoardRef` and `highlightedTicket`; Fix 5 says the seven helpers are old-drawer-only, but the current ticket board still calls the helper chain; Fix 6 says the two state hooks are dead, but the current drawer still branches on them heavily.
++- Missing context (what info would have helped): the exact snapshot intended for review, whether the task should be checked against `pages/PublicMenu/x.jsx` or `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, and why the task expects ~5457/~5370 lines when the current target file is 4988 lines on `origin/main`.
++- Scope questions (anything you weren't sure if it's in scope): whether this review should validate the task against the current HEAD file or against a post-B2/deployed snapshot where the old drawer JSX has already been removed.
+
+codex
+The findings and command log are written. I’m doing a quick existence check on the saved artifacts, then I’ll close with the highest-signal summary only.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Item pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md | Select-Object FullName,Length' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Item pages/PublicMenu/review_2026-04-08.md, pages/PublicMenu/commands_2026-04-08.log | Select-Object FullName,Length' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 16.26s:
+
+FullName                                                                                      Length
+--------                                                                                      ------
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\review_2026-04-08.md      3554
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\commands_2026-04-08.log   1520
+
+
+ succeeded in 16.38s:
+
+FullName                                                                                                               
+--------                                                                                                               
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pipeline\chain-state\publicmenu-260408-143544-d0bc-codex-findin...
+
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-04-08.log b/pages/PublicMenu/commands_2026-04-08.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..cbfe5d9b03763a94910a97a5516a4c5db419e7b4
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-04-08.log
+@@ -0,0 +1,16 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Force pages/PublicMenu | Select-Object Name,Length
++(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
++Get-Content pages/PublicMenu/README.md
++Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'SOS','Help Drawer','v6.0','B1','de40','0012e3f','260408','highlightedTicket','ticketBoardRef','HELP_CHIPS','HELP_PREVIEW_LIMIT' -SimpleMatch | Select-Object LineNumber,Line
++Get-Content pages/PublicMenu/BUGS.md | Select-Object -Skip 135 -First 40
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 1828 -First 95
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2558 -First 160
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2768 -First 40
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'HELP_PREVIEW_LIMIT|HELP_CHIPS|ticketBoardRef|focusHelpRow|getHelpReminderWord|getMinutesAgo|getHelpWaitLabel|getHelpReminderLabel|getHelpResolvedLabel|getHelpErrorCopy|getHelpFreshnessLabel|highlightedTicket|isTicketExpanded|handleRetry' | Select-Object LineNumber,Line
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 4998 -First 130
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 4968 -First 35
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 5128 -First 120
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2348 -First 24
++Get-ChildItem -Force pipeline/chain-state | Select-Object Name
++Test-Path pages/PublicMenu/review_2026-04-08.md; Test-Path pages/PublicMenu/commands_2026-04-08.log
+diff --git a/pages/PublicMenu/review_2026-04-08.md b/pages/PublicMenu/review_2026-04-08.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c2b43961a083cdb496e2fe52e8b68e804fb117eb
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-04-08.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260408-143544-d0bc
++
++## Findings
++1. [P0] Fix 1 + Fix 4 remove live preview/focus symbols — `HELP_PREVIEW_LIMIT` and `focusHelpRow` are still used by the current drawer JSX in `pages/PublicMenu/x.jsx` at lines 5020, 5112, and 5147, so deleting them now would leave active render/click paths referencing missing identifiers. FIX: keep both until the drawer JSX is replaced in B2, or remove/update all current JSX call sites in the same patch.
++2. [P0] Fix 2 deletes `HELP_CHIPS` while the current Other-form still renders it — the chip list is still mapped in the live drawer JSX at line 5187, so removing the `HELP_CHIPS` `useMemo` now would break the render path. FIX: keep `HELP_CHIPS` until that JSX is removed, or delete/replace the chip UI in the same change.
++3. [P0] Fix 3 removes `ticketBoardRef` and post-send highlight logic that the current ticket board still reads — `ticketBoardRef` is still attached in JSX at line 5008 and `highlightedTicket` is still read at line 5025, so deleting the ref plus the highlight setters now would break the current board behavior and leave a missing ref binding. FIX: keep the ref/highlight flow until the board JSX is rewritten, or remove the current board/highlight usage in the same patch.
++4. [P0] Fix 5 deletes helper functions that are still called by live ticket-board JSX — `getHelpFreshnessLabel`, `getHelpReminderLabel`, `getHelpErrorCopy`, `getHelpResolvedLabel`, and `getHelpWaitLabel` are still used at lines 5021, 5030, 5031, 5058, and 5067; `getHelpReminderWord` and `getMinutesAgo` remain required through that helper chain. FIX: do not remove these helpers until the current drawer JSX stops calling them, or replace every current caller in the same patch.
++5. [P2] Fix 6 mislabels live state as dead — `isTicketExpanded` still controls major drawer branches and actions at lines 4977, 4994, 5009, 5018, 5112, 5128, and 5222, and `highlightedTicket` still drives row highlighting at line 5025, so commenting both hooks as “dead” is inaccurate on this snapshot. FIX: leave these hooks documented as live state for now, or defer the “dead, kept for hook order until B2” comments until B2 removes the remaining readers.
++
++## Summary
++Total: 5 findings (4 P0, 0 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 2
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1/4 say `HELP_PREVIEW_LIMIT` and `focusHelpRow` are already dead, but the current `pages/PublicMenu/x.jsx` still uses them in live JSX; Fix 2 says `HELP_CHIPS` has no remaining references, but line 5187 still maps it; Fix 3 says the post-send highlight/ref logic is dead, but the current board still reads `ticketBoardRef` and `highlightedTicket`; Fix 5 says the seven helpers are old-drawer-only, but the current ticket board still calls the helper chain; Fix 6 says the two state hooks are dead, but the current drawer still branches on them heavily.
++- Missing context (what info would have helped): the exact snapshot intended for review, whether the task should be checked against `pages/PublicMenu/x.jsx` or `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, and why the task expects ~5457/~5370 lines when the current target file is 4988 lines on `origin/main`.
++- Scope questions (anything you weren't sure if it's in scope): whether this review should validate the task against the current HEAD file or against a post-B2/deployed snapshot where the old drawer JSX has already been removed.
+diff --git a/pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md b/pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c2b43961a083cdb496e2fe52e8b68e804fb117eb
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260408-143544-d0bc
++
++## Findings
++1. [P0] Fix 1 + Fix 4 remove live preview/focus symbols — `HELP_PREVIEW_LIMIT` and `focusHelpRow` are still used by the current drawer JSX in `pages/PublicMenu/x.jsx` at lines 5020, 5112, and 5147, so deleting them now would leave active render/click paths referencing missing identifiers. FIX: keep both until the drawer JSX is replaced in B2, or remove/update all current JSX call sites in the same patch.
++2. [P0] Fix 2 deletes `HELP_CHIPS` while the current Other-form still renders it — the chip list is still mapped in the live drawer JSX at line 5187, so removing the `HELP_CHIPS` `useMemo` now would break the render path. FIX: keep `HELP_CHIPS` until that JSX is removed, or delete/replace the chip UI in the same change.
++3. [P0] Fix 3 removes `ticketBoardRef` and post-send highlight logic that the current ticket board still reads — `ticketBoardRef` is still attached in JSX at line 5008 and `highlightedTicket` is still read at line 5025, so deleting the ref plus the highlight setters now would break the current board behavior and leave a missing ref binding. FIX: keep the ref/highlight flow until the board JSX is rewritten, or remove the current board/highlight usage in the same patch.
++4. [P0] Fix 5 deletes helper functions that are still called by live ticket-board JSX — `getHelpFreshnessLabel`, `getHelpReminderLabel`, `getHelpErrorCopy`, `getHelpResolvedLabel`, and `getHelpWaitLabel` are still used at lines 5021, 5030, 5031, 5058, and 5067; `getHelpReminderWord` and `getMinutesAgo` remain required through that helper chain. FIX: do not remove these helpers until the current drawer JSX stops calling them, or replace every current caller in the same patch.
++5. [P2] Fix 6 mislabels live state as dead — `isTicketExpanded` still controls major drawer branches and actions at lines 4977, 4994, 5009, 5018, 5112, 5128, and 5222, and `highlightedTicket` still drives row highlighting at line 5025, so commenting both hooks as “dead” is inaccurate on this snapshot. FIX: leave these hooks documented as live state for now, or defer the “dead, kept for hook order until B2” comments until B2 removes the remaining readers.
++
++## Summary
++Total: 5 findings (4 P0, 0 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 2
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1/4 say `HELP_PREVIEW_LIMIT` and `focusHelpRow` are already dead, but the current `pages/PublicMenu/x.jsx` still uses them in live JSX; Fix 2 says `HELP_CHIPS` has no remaining references, but line 5187 still maps it; Fix 3 says the post-send highlight/ref logic is dead, but the current board still reads `ticketBoardRef` and `highlightedTicket`; Fix 5 says the seven helpers are old-drawer-only, but the current ticket board still calls the helper chain; Fix 6 says the two state hooks are dead, but the current drawer still branches on them heavily.
++- Missing context (what info would have helped): the exact snapshot intended for review, whether the task should be checked against `pages/PublicMenu/x.jsx` or `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, and why the task expects ~5457/~5370 lines when the current target file is 4988 lines on `origin/main`.
++- Scope questions (anything you weren't sure if it's in scope): whether this review should validate the task against the current HEAD file or against a post-B2/deployed snapshot where the old drawer JSX has already been removed.
+
+codex
+Review complete. The current [`x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) does not match the task’s “already dead code” premise: the listed symbols are still referenced by live drawer JSX, so applying Fixes 1-5 as written would break the page. I recorded 5 findings total: 4 `P0`, 1 `P2`, and rated prompt clarity `2/5` because the task targets a 5457-line snapshot while current `origin/main` has 4988 lines.
+
+Saved outputs:
+- Findings file: [publicmenu-260408-143544-d0bc-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md)
+- Page report copy: [review_2026-04-08.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-04-08.md)
+- Command log: [commands_2026-04-08.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-04-08.log)
+
+`pages/PublicMenu/x.jsx` was not modified.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-04-08.log b/pages/PublicMenu/commands_2026-04-08.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..cbfe5d9b03763a94910a97a5516a4c5db419e7b4
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-04-08.log
+@@ -0,0 +1,16 @@
++git fetch origin 2>$null; git reset --hard origin/main
++Get-ChildItem -Force pages/PublicMenu | Select-Object Name,Length
++(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
++Get-Content pages/PublicMenu/README.md
++Select-String -Path pages/PublicMenu/BUGS.md -Pattern 'SOS','Help Drawer','v6.0','B1','de40','0012e3f','260408','highlightedTicket','ticketBoardRef','HELP_CHIPS','HELP_PREVIEW_LIMIT' -SimpleMatch | Select-Object LineNumber,Line
++Get-Content pages/PublicMenu/BUGS.md | Select-Object -Skip 135 -First 40
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 1828 -First 95
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2558 -First 160
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2768 -First 40
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'HELP_PREVIEW_LIMIT|HELP_CHIPS|ticketBoardRef|focusHelpRow|getHelpReminderWord|getMinutesAgo|getHelpWaitLabel|getHelpReminderLabel|getHelpResolvedLabel|getHelpErrorCopy|getHelpFreshnessLabel|highlightedTicket|isTicketExpanded|handleRetry' | Select-Object LineNumber,Line
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 4998 -First 130
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 4968 -First 35
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 5128 -First 120
++Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip 2348 -First 24
++Get-ChildItem -Force pipeline/chain-state | Select-Object Name
++Test-Path pages/PublicMenu/review_2026-04-08.md; Test-Path pages/PublicMenu/commands_2026-04-08.log
+diff --git a/pages/PublicMenu/review_2026-04-08.md b/pages/PublicMenu/review_2026-04-08.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c2b43961a083cdb496e2fe52e8b68e804fb117eb
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-04-08.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260408-143544-d0bc
++
++## Findings
++1. [P0] Fix 1 + Fix 4 remove live preview/focus symbols — `HELP_PREVIEW_LIMIT` and `focusHelpRow` are still used by the current drawer JSX in `pages/PublicMenu/x.jsx` at lines 5020, 5112, and 5147, so deleting them now would leave active render/click paths referencing missing identifiers. FIX: keep both until the drawer JSX is replaced in B2, or remove/update all current JSX call sites in the same patch.
++2. [P0] Fix 2 deletes `HELP_CHIPS` while the current Other-form still renders it — the chip list is still mapped in the live drawer JSX at line 5187, so removing the `HELP_CHIPS` `useMemo` now would break the render path. FIX: keep `HELP_CHIPS` until that JSX is removed, or delete/replace the chip UI in the same change.
++3. [P0] Fix 3 removes `ticketBoardRef` and post-send highlight logic that the current ticket board still reads — `ticketBoardRef` is still attached in JSX at line 5008 and `highlightedTicket` is still read at line 5025, so deleting the ref plus the highlight setters now would break the current board behavior and leave a missing ref binding. FIX: keep the ref/highlight flow until the board JSX is rewritten, or remove the current board/highlight usage in the same patch.
++4. [P0] Fix 5 deletes helper functions that are still called by live ticket-board JSX — `getHelpFreshnessLabel`, `getHelpReminderLabel`, `getHelpErrorCopy`, `getHelpResolvedLabel`, and `getHelpWaitLabel` are still used at lines 5021, 5030, 5031, 5058, and 5067; `getHelpReminderWord` and `getMinutesAgo` remain required through that helper chain. FIX: do not remove these helpers until the current drawer JSX stops calling them, or replace every current caller in the same patch.
++5. [P2] Fix 6 mislabels live state as dead — `isTicketExpanded` still controls major drawer branches and actions at lines 4977, 4994, 5009, 5018, 5112, 5128, and 5222, and `highlightedTicket` still drives row highlighting at line 5025, so commenting both hooks as “dead” is inaccurate on this snapshot. FIX: leave these hooks documented as live state for now, or defer the “dead, kept for hook order until B2” comments until B2 removes the remaining readers.
++
++## Summary
++Total: 5 findings (4 P0, 0 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 2
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1/4 say `HELP_PREVIEW_LIMIT` and `focusHelpRow` are already dead, but the current `pages/PublicMenu/x.jsx` still uses them in live JSX; Fix 2 says `HELP_CHIPS` has no remaining references, but line 5187 still maps it; Fix 3 says the post-send highlight/ref logic is dead, but the current board still reads `ticketBoardRef` and `highlightedTicket`; Fix 5 says the seven helpers are old-drawer-only, but the current ticket board still calls the helper chain; Fix 6 says the two state hooks are dead, but the current drawer still branches on them heavily.
++- Missing context (what info would have helped): the exact snapshot intended for review, whether the task should be checked against `pages/PublicMenu/x.jsx` or `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, and why the task expects ~5457/~5370 lines when the current target file is 4988 lines on `origin/main`.
++- Scope questions (anything you weren't sure if it's in scope): whether this review should validate the task against the current HEAD file or against a post-B2/deployed snapshot where the old drawer JSX has already been removed.
+diff --git a/pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md b/pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c2b43961a083cdb496e2fe52e8b68e804fb117eb
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260408-143544-d0bc
++
++## Findings
++1. [P0] Fix 1 + Fix 4 remove live preview/focus symbols — `HELP_PREVIEW_LIMIT` and `focusHelpRow` are still used by the current drawer JSX in `pages/PublicMenu/x.jsx` at lines 5020, 5112, and 5147, so deleting them now would leave active render/click paths referencing missing identifiers. FIX: keep both until the drawer JSX is replaced in B2, or remove/update all current JSX call sites in the same patch.
++2. [P0] Fix 2 deletes `HELP_CHIPS` while the current Other-form still renders it — the chip list is still mapped in the live drawer JSX at line 5187, so removing the `HELP_CHIPS` `useMemo` now would break the render path. FIX: keep `HELP_CHIPS` until that JSX is removed, or delete/replace the chip UI in the same change.
++3. [P0] Fix 3 removes `ticketBoardRef` and post-send highlight logic that the current ticket board still reads — `ticketBoardRef` is still attached in JSX at line 5008 and `highlightedTicket` is still read at line 5025, so deleting the ref plus the highlight setters now would break the current board behavior and leave a missing ref binding. FIX: keep the ref/highlight flow until the board JSX is rewritten, or remove the current board/highlight usage in the same patch.
++4. [P0] Fix 5 deletes helper functions that are still called by live ticket-board JSX — `getHelpFreshnessLabel`, `getHelpReminderLabel`, `getHelpErrorCopy`, `getHelpResolvedLabel`, and `getHelpWaitLabel` are still used at lines 5021, 5030, 5031, 5058, and 5067; `getHelpReminderWord` and `getMinutesAgo` remain required through that helper chain. FIX: do not remove these helpers until the current drawer JSX stops calling them, or replace every current caller in the same patch.
++5. [P2] Fix 6 mislabels live state as dead — `isTicketExpanded` still controls major drawer branches and actions at lines 4977, 4994, 5009, 5018, 5112, 5128, and 5222, and `highlightedTicket` still drives row highlighting at line 5025, so commenting both hooks as “dead” is inaccurate on this snapshot. FIX: leave these hooks documented as live state for now, or defer the “dead, kept for hook order until B2” comments until B2 removes the remaining readers.
++
++## Summary
++Total: 5 findings (4 P0, 0 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 2
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1/4 say `HELP_PREVIEW_LIMIT` and `focusHelpRow` are already dead, but the current `pages/PublicMenu/x.jsx` still uses them in live JSX; Fix 2 says `HELP_CHIPS` has no remaining references, but line 5187 still maps it; Fix 3 says the post-send highlight/ref logic is dead, but the current board still reads `ticketBoardRef` and `highlightedTicket`; Fix 5 says the seven helpers are old-drawer-only, but the current ticket board still calls the helper chain; Fix 6 says the two state hooks are dead, but the current drawer still branches on them heavily.
++- Missing context (what info would have helped): the exact snapshot intended for review, whether the task should be checked against `pages/PublicMenu/x.jsx` or `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, and why the task expects ~5457/~5370 lines when the current target file is 4988 lines on `origin/main`.
++- Scope questions (anything you weren't sure if it's in scope): whether this review should validate the task against the current HEAD file or against a post-B2/deployed snapshot where the old drawer JSX has already been removed.
+
+tokens used
+174 222
+Review complete. The current [`x.jsx`](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx) does not match the task’s “already dead code” premise: the listed symbols are still referenced by live drawer JSX, so applying Fixes 1-5 as written would break the page. I recorded 5 findings total: 4 `P0`, 1 `P2`, and rated prompt clarity `2/5` because the task targets a 5457-line snapshot while current `origin/main` has 4988 lines.
+
+Saved outputs:
+- Findings file: [publicmenu-260408-143544-d0bc-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260408-143544-d0bc-codex-findings.md)
+- Page report copy: [review_2026-04-08.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-04-08.md)
+- Command log: [commands_2026-04-08.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-04-08.log)
+
+`pages/PublicMenu/x.jsx` was not modified.

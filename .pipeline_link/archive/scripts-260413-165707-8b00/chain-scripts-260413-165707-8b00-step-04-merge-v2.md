@@ -1,0 +1,181 @@
+---
+chain: scripts-260413-165707-8b00
+chain_step: 4
+chain_total: 4
+chain_step_name: merge-v2
+page: scripts
+budget: 8.00
+runner: cc
+type: chain-step
+---
+=== CHAIN STEP: Merge (4/4) ===
+Chain: scripts-260413-165707-8b00
+Page: scripts
+
+You are the Merge step in a modular consensus pipeline.
+Your job: apply the fix plan to the actual code.
+
+INSTRUCTIONS:
+1. Read the comparison: pipeline/chain-state/scripts-260413-165707-8b00-comparison.md
+2. Check if discussion report exists: pipeline/chain-state/scripts-260413-165707-8b00-discussion.md
+   - If it exists AND has an "Updated Fix Plan" section → use THAT for disputed items
+   - If it says "No disputes" or doesn't exist → use Comparator's "Final Fix Plan" as-is
+   - Items marked "Unresolved (for Arman)" → SKIP these, do NOT apply
+3. **File integrity check (KB-121 prevention):**
+   Run: `wc -l pages/scripts/*.jsx`
+   - If result matches expected line count from comparison/findings → proceed.
+   - If result is unexpectedly low (e.g. differs by 200+ lines from what findings mention) →
+     run `git fetch origin && git reset --hard origin/main` then verify again.
+   - If still wrong after reset → STOP and write merge report explaining the issue. Do NOT apply changes to a truncated file.
+4. Read the code file: pages/scripts/*.jsx
+5. Apply ALL fixes from the fix plan, in priority order (P0 first)
+   - Agreed items from Comparator: always apply
+   - Discussion-resolved items: apply the winning solution
+   - Unresolved disputes: SKIP (note in merge report)
+   - [MUST-FIX] items: CANNOT be skipped. If you cannot apply a MUST-FIX, explain WHY in detail in merge report — do NOT silently skip.
+6. After applying fixes:
+   a. Update BUGS.md in pages/scripts/ with fixed items
+   b. Update README.md in pages/scripts/ if needed
+7. Git commit and push:
+   - git add <specific files only> (NEVER git add . or git add -A)
+   - git commit -m "fix(scripts): N bugs fixed via consensus chain scripts-260413-165707-8b00"
+   - git push
+8. Write merge report to: pipeline/chain-state/scripts-260413-165707-8b00-merge-report.md
+
+FORMAT for merge report:
+# Merge Report — scripts
+Chain: scripts-260413-165707-8b00
+
+## Applied Fixes
+1. [P0] Fix title — Source: agreed/discussion-resolved — DONE
+2. [P1] Fix title — Source: comparator — DONE
+...
+
+## Skipped — Unresolved Disputes (for Arman)
+- Dispute: [title] — CC says X, Codex says Y — NEEDS DECISION
+
+## Skipped — Could Not Apply
+- Reason...
+
+## Git
+- Commit: <hash>
+- Lines before: <N>
+- Lines after: <N>
+- Files changed: N
+
+## Prompt Feedback
+Collect Prompt Clarity sections from CC and Codex findings files (if present), then add your own observations:
+- CC clarity score: [N/5]
+- Codex clarity score: [N/5]
+- Fixes where writers diverged due to unclear description: ...
+- Fixes where description was perfect (both writers agreed immediately): ...
+- Recommendation for improving task descriptions: ...
+
+## Summary
+- Applied: N fixes
+- Skipped (unresolved): N disputes
+- Skipped (other): N fixes
+- MUST-FIX not applied: N (with reasons)
+- Commit: <hash>
+
+=== TASK CONTEXT ===
+# #291+#292: Auto lock-files for work streams in task-watcher-v3.py
+
+**Context:** When a КС chain starts, a lock file (e.g. `pipeline/signals/lock-WS-SOM.md`) must be created automatically. When the chain completes (TG DONE), the lock file must be deleted. Currently lock files are created/deleted manually.
+
+**File:** `scripts/task-watcher-v3.py` (v5.17, ~2900 lines, Python)
+
+**References:**
+- Existing lock files: `pipeline/signals/lock-WS-SOM.md`, `lock-WS-MON.md` — see format below
+- Chain expansion: function `expand_chain_task_if_needed` (grep: `def expand_chain_task_if_needed`)
+- Chain completion: function `update_chain_after_step` (grep: `def update_chain_after_step`)
+- Chain state storage: `save_chain_state` / `load_chain_state` functions
+
+---
+
+## Fix 1 — #291 (P2) [MUST-FIX]: Create lock file when chain starts
+
+### Сейчас
+When a chain is expanded via `expand_chain_task_if_needed`, no lock file is created. Lock files must be created manually before starting a КС chain.
+
+### Должно быть
+After successful chain expansion (after `save_chain_state` at the end of `expand_chain_task_if_needed`), automatically create `pipeline/signals/lock-{ws}.md` where `{ws}` comes from:
+1. Frontmatter field `ws` (e.g. `ws: WS-SOM`) — **primary source**
+2. If `ws` is not in frontmatter → **skip lock creation** (backward compatible)
+
+The lock file format must match existing convention:
+```markdown
+---
+ws: {ws}
+session: КС {chain_id}
+task: "{task description from frontmatter or filename}"
+started: {YYYY-MM-DD}
+---
+
+КС chain {chain_id} работает над {ws}.
+Автоматически создан task-watcher-v3.py.
+Удалится автоматически при завершении chain.
+```
+
+### НЕ должно быть
+- Lock creation must NOT happen if `ws` field is missing from frontmatter (no guessing)
+- Lock creation must NOT fail silently — log a warning if file write fails
+- Must NOT overwrite an existing lock file for the same WS — if `lock-{ws}.md` already exists, log a warning and skip (another chain/session owns it)
+
+### Файл и локация
+`scripts/task-watcher-v3.py`, function `expand_chain_task_if_needed` (grep: `def expand_chain_task_if_needed`).
+Insert lock creation AFTER the line `save_chain_state(pipeline_dir, chain_id, state)` (the second call, after step_names are saved — grep: `state\['step_names'\]`).
+Also: store `ws` in chain state dict so Fix 2 can read it.
+
+### Проверка
+1. Create a queue file with `ws: WS-TEST` in frontmatter + `chain_template: consensus-with-discussion-v2`
+2. After expansion → `pipeline/signals/lock-WS-TEST.md` exists with correct format
+3. Queue file WITHOUT `ws` → no lock file created, no errors
+
+---
+
+## Fix 2 — #292 (P2) [MUST-FIX]: Delete lock file when chain completes
+
+### Сейчас
+When a chain completes successfully (`status = 'completed'` in `update_chain_after_step`), no lock file is deleted. Lock files must be removed manually.
+
+### Должно быть
+In `update_chain_after_step`, when `chain_step >= chain_total` and chain status becomes `'completed'`:
+1. Read `ws` from chain state (stored in Fix 1)
+2. If `ws` is present → delete `pipeline/signals/lock-{ws}.md`
+3. Log the deletion: `logger.info(f'Lock released: lock-{ws}.md (chain {chain_id} completed)')`
+
+### НЕ должно быть
+- Must NOT delete lock on chain ERROR/PAUSE — only on successful completion
+- Must NOT crash if lock file doesn't exist (use `Path.unlink(missing_ok=True)`)
+- Must NOT delete lock if `ws` is not in chain state (backward compat with old chains)
+
+### Файл и локация
+`scripts/task-watcher-v3.py`, function `update_chain_after_step` (grep: `def update_chain_after_step`).
+Insert lock deletion in the block where `state['status'] = 'completed'` (grep: `state\['status'\] = 'completed'`), AFTER `save_chain_state` and BEFORE the final TG summary update.
+
+### Проверка
+1. After chain completes (all steps done, TG shows ✅ DONE) → `lock-WS-TEST.md` is deleted from `pipeline/signals/`
+2. Chain that errors at step 2/5 → lock file remains (WS still blocked)
+3. Chain without `ws` in state → no deletion attempt, no errors
+
+---
+
+## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано выше
+
+- Change ONLY `expand_chain_task_if_needed` and `update_chain_after_step` functions
+- Do NOT modify chain expansion logic, step ordering, TG messaging, or any other function
+- Do NOT change the existing lock file format (ws/session/task/started YAML frontmatter)
+- Do NOT add new imports (use existing `Path`, `shutil`, `datetime`)
+- Do NOT rename or restructure existing variables
+
+## Implementation Notes
+- File: `scripts/task-watcher-v3.py` (single file, Python 3.13)
+- Lock directory: `pipeline/signals/` (relative to pipeline_dir)
+- Use `write_text()` helper (already defined in the file) for creating lock files
+- Use `Path.unlink(missing_ok=True)` for deletion
+- Thread safety: lock creation is in the main thread (expand runs sequentially). Lock deletion is also main-thread (update_chain_after_step is called from the poll loop). No extra locking needed.
+- `pipeline_dir` is available in both functions — use `pipeline_dir / 'signals' / f'lock-{ws}.md'`
+- Date format for `started` field: `datetime.now().strftime('%Y-%m-%d')` (already imported)
+- git commit after all fixes
+=== END ===

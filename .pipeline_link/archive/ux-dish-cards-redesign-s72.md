@@ -1,0 +1,98 @@
+---
+task_id: ux-dish-cards-redesign-s72
+type: discussion
+priority: high
+created: 2026-03-03
+session: S72
+budget: 12.00
+---
+
+# UX Discussion: Dish Card Redesign — Alignment, "+" Button, Two View Modes
+
+Use @discussion-moderator agent to run this CC+Codex design session.
+
+**IMPORTANT: Read existing UX concept first:**
+`ux-concepts/public-menu.md` — v2.0, Session 26. Phase 2 decisions #4 and #12 are directly relevant:
+- Decision #4: Add "+" button on card photo instead of "Добавить" + stepper (⏳ Planned, Phase 2)
+- Decision #12: Improve card hierarchy (Фото → Название 2 строки → Цена → Рейтинг, remove description) (⏳ Planned, Phase 2)
+
+**Context:** PublicMenu page (`menuapp-code-review/pages/PublicMenu/`).
+**Live app:** https://menu-app-mvp-49a4f5b2.base44.app/x?partner=69540a85f2492cff3e46a283&mode=hall&lang=RU
+
+---
+
+## Current Situation (observed in browser, S72)
+
+There are TWO view modes already implemented:
+1. **Tile view (menu.tile)** — 3-column grid. PROBLEMS: uneven card heights due to variable dish name length (e.g. "New York Steak" wraps to 3 lines), causing buttons and prices to appear at different vertical positions across cards.
+2. **List view (menu.list)** — horizontal rows. Already looks GOOD: photo left, name/price/rating center, "+" button right. The "+" is already implemented here.
+
+The toggle buttons themselves show raw i18n keys (`menu.tile`, `menu.list`) — these are being fixed separately via translationadmin.
+
+---
+
+## Questions to Resolve
+
+### Q1: Tile view — fix misaligned buttons
+
+Root cause: variable-height dish names. Solutions:
+- **Option A:** Fixed card height + name area max 2 lines with ellipsis truncation
+- **Option B:** CSS flex column on card + `margin-top: auto` on price/button area (button always pins to bottom)
+- **Option C:** Minimum height on name block (always reserves 2-line space)
+
+Which approach does ЛМП recommend for restaurant menu grids? Which is most buildable in Base44/React?
+
+### Q2: "+" button for tile view — how exactly?
+
+The list view (menu.list) already has a "+" button (purple rounded square, right side). Decision #4 says to add "+" to tile view too. Options:
+- **Option A:** Round "+" button in bottom-right corner of the card photo area (overlapping the photo corner — Glovo style)
+- **Option B:** Full-width "+" button at card bottom (replaces current "Добавить" but styled as "+" with counter)
+- **Option C:** Keep "Добавить" text for tile view only (since larger target area needed on desktop grid)
+
+Also: when item is already in cart, should the "+" become a stepper (− 1 +) as per Decision #4?
+
+### Q3: Photo placeholder in tile view
+
+Cards without photos show "Фото будет позже" text in a grey area. Options:
+- **Option A:** Keep as-is
+- **Option B:** Show a food icon silhouette instead of text
+- **Option C:** Show a neutral gradient placeholder
+
+What does ЛМП say? What's easiest to implement?
+
+### Q4: Should the tile view be the default or list view?
+
+Currently there's a toggle. Should there be a preferred default?
+- Most delivery apps (Wolt, Glovo) use grid/tile as default on desktop, list on mobile
+- The app is mobile-first (QR code scanning)
+- Consider: list view shows more info per item, tile view shows more items at once
+
+What is the ЛМП recommendation for mobile-first restaurant menus?
+
+---
+
+## Required Output
+
+### Deliverable 1: `outputs/Design_DishCards_S72.md`
+
+- Final answers to Q1-Q4 with justification
+- ASCII wireframe of redesigned tile card (with photo / without photo variants)
+- ASCII wireframe of "+" button placement
+- Update recommendations for `ux-concepts/public-menu.md` (what decisions change or get confirmed)
+
+### Deliverable 2: `outputs/Design_DishCards_Backlog_S72.md`
+
+- Specific code changes needed (component names from public-menu.md: MenuView, etc.)
+- Implementation complexity S/M/L for each change
+- Recommended order
+
+---
+
+## Discussion Format
+
+3 rounds:
+- Round 1: Each AI answers Q1-Q4 independently, referencing the existing concept
+- Round 2: Debate, challenge, bring real app patterns (Wolt, Glovo, iiko, Yandex Еда)
+- Round 3: Final agreed spec, confirm or update Decision #4 and #12
+
+**Git:** Start with `git add . && git commit -m "S72 dish-cards pre-discussion snapshot" && git push`

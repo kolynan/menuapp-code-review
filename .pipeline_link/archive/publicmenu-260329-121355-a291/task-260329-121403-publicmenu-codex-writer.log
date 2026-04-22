@@ -1,0 +1,865 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d3871-9bfe-7af2-8374-fe1c5aec5d7c
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260329-121355-a291 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # UX Batch 4: Floating Point, Confirmation Screen Cleanup, Whitespace, Line-Clamp, StickyCartBar Visual (#185) Reference: `BUGS_MASTER.md`, `ux-concepts/cart-view.md`, `DECISIONS_INDEX.md §2`. Production page. App URL: https://menu-app-mvp-49a4f5b2.base44.app **Context:** MenuApp — QR-menu and table ordering system for restaurants. Primary usage: customer phone at the table (mobile-first). This batch fixes 5 issues across 4 files in PublicMenu. All fixes are independent of each other. TARGET FILES (modify): - `pages/PublicMenu/x.jsx` - `pages/PublicMenu/CartView.jsx` - `pages/PublicMenu/MenuView.jsx` - `pages/PublicMenu/StickyCartBar.jsx` CONTEXT FILES (read-only, for reference): - `pages/PublicMenu/useTableSession.jsx` --- ## Fix 1 — PM-157 (P1) [MUST-FIX]: Floating point in StickyCartBar "МОЙ СЧЁТ" amount ### Current behavior When the guest has submitted orders, StickyCartBar shows "МОЙ СЧЁТ" mode with total like `189.039999...₸` (raw JS float). Affects both `myBill.total` and `tableTotal` display in the sticky bar. ### Expected behavior All monetary amounts in StickyCartBar must display with exactly 2 decimal places: `189.04₸`. Same fix as PM-155 (discount prices) and PM-151 (confirmation screen) — apply `parseFloat(value.toFixed(2))` before passing to `formatPrice()`. ### Must NOT be - Do NOT change any StickyCartBar layout, text modes, or visibility logic. - Do NOT change `formatPrice()` function itself. ### File and location File: `pages/PublicMenu/x.jsx` Look for: `const hallStickyBillTotal =` (around line 2283) Current code: ``` const hallStickyBillTotal = hallStickyMode === "myBill" ? formatPrice(myBill.total) : hallStickyMode === "tableOrders" ? formatPrice(tableTotal) : ""; ``` Fix: wrap each value with `parseFloat((value || 0).toFixed(2))` before `formatPrice`: ``` const hallStickyBillTotal = hallStickyMode === "myBill" ? formatPrice(parseFloat((myBill.total || 0).toFixed(2))) : hallStickyMode === "tableOrders" ? formatPrice(parseFloat((tableTotal || 0).toFixed(2))) : ""; ``` ### Verification 1. Add 2 dishes to cart → submit order → StickyCartBar shows "МОЙ СЧЁТ" mode. 2. The amount must show clean price like `189.04₸`, NOT `189.039999...₸`. --- ## Fix 2 — #197 (P2) [MUST-FIX]: OrderConfirmationScreen — remove "Ваш заказ" header and guest label ### Current behavior After submitting an order, the `OrderConfirmationScreen` shows: - A header text "Ваш заказ" above the list of items (line ~702-704) - A line "Гость: Гость 1" below the items list (lines ~737-741) Both are redundant: the items list is self-evident, and the guest already knows their own name. ### Expected behavior - Remove the `<p>` tag containing `{tr("confirmation.your_order", "Ваш заказ")}` — the items list remains, just without the header label. - Remove the `{guestLabel && (...)}` block that renders "Гость: [name]". - Keep everything else: items list, total ("Итого"), buttons ("Вернуться в меню", "Мои заказы"). ### Must NOT be - Do NOT remove the items list or the total. - Do NOT remove `clientName` display for pickup/delivery mode (only remove `guestLabel` display). - Do NOT change button labels or order. ### File and location File: `pages/PublicMenu/x.jsx`, function `OrderConfirmationScreen` Remove line ~702-704 (`<p>` with `confirmation.your_order`): ```jsx <p className="text-sm font-medium text-slate-600 mb-3"> {tr("confirmation.your_order", "Ваш заказ")} </p> ``` Remove lines ~737-741 (guestLabel block): ```jsx {guestLabel && ( <p className="text-sm text-slate-500 mt-3"> {tr("confirmation.guest_label", "Гость")}: {guestLabel} </p> )} ``` ### Verification 1. Add items, submit order → confirmation screen appears. 2. Screen shows: checkmark animation → "Заказ отправлен!" → list of items → "Итого: X ₸" → buttons. 3. NO "Ваш заказ" header. NO "Гость: Гость 1" line. --- ## Fix 3 — PM-159 (P3) [NICE-TO-HAVE]: Extra whitespace between "Новый заказ" card and "Отправить" button (1 item in cart) ### Current behavior When there is exactly 1 item in the cart ("Новый заказ" section), there is visible extra whitespace between the bottom of the item card and the "Отправить официанту" submit button. With 2+ items this gap looks normal. ### Expected behavior The gap between the "Новый заказ" card and the submit button should be consistent regardless of item count (1 item or many). The button should sit close to the card content without excessive empty space. ### Must NOT be - Do NOT change item display, stepper buttons, or submit button logic. - Do NOT affect layout when 2+ items are in cart. ### File and location File: `pages/PublicMenu/CartView.jsx` (~1063 lines) Search for: `new_order` to find the "Новый заказ" bucket section, then look for the submit button container nearby. Also search for `renderBucketOrders` to find the rendering function. The whitespace is likely in the `mb-` or `py-` padding on the Card or container wrapping the new_order section, or the gap between card and submit button in the outer flex layout. If a clean fix is not obvious without introducing conditional layout logic, SKIP this fix (it is [NICE-TO-HAVE]). ### Verification 1. Add exactly 1 item to cart → open CartView drawer. 2. The "Новый заказ" card shows close to "Отправить официанту" button without large gap. --- ## Fix 4 — #193 (P2) [MUST-FIX]: MenuView list-mode — revert description to line-clamp-1 ### Current behavior In list-mode dish cards, both dish name and description each show up to 2 lines (line-clamp-2). On real restaurant data with long names and descriptions, this makes cards very tall and the dish photo is no longer vertically centered. ### Expected behavior Both dish name AND description in list-mode cards: `line-clamp-1` (1 line each, with `...` truncation if too long). Full text is always visible when the user opens the detail card (drawer). Pattern: Wolt, Uber Eats — list cards are compact, details in the modal. ### Must NOT be - Do NOT change tile-mode cards (only list-mode). - Do NOT change the detail card/drawer. - Do NOT change stepper buttons or any other list card element. ### Intentional change note Fix PM-147 (S186) previously changed description from line-clamp-1 → line-clamp-2. This fix intentionally REVERTS the description back to line-clamp-1. This is a design decision, not a regression. ### File and location File: `pages/PublicMenu/MenuView.jsx`, function `renderListCard` Look for: dish name className with `line-clamp-` and description className with `line-clamp-`. Change: Both `line-clamp-2` occurrences in list-mode → `line-clamp-1`. ### Verification 1. Open menu in list-mode (Wolt-style cards with photo on right). 2. Each card shows dish name (1 line max, truncated) + description (1 line max, truncated). 3. Cards are compact, photo is vertically centered. --- ## Fix 5 — #144 (P3) [NICE-TO-HAVE]: StickyCartBar visual redesign — Uber Eats style ### Current behavior StickyCartBar shows items count + text + price in separate visual elements. The panel may not be fully tappable as a single unit. ### Expected behavior The entire StickyCartBar panel = one tappable button (whole area is clickable, opens CartView drawer). Layout (single row): `[ ⑥ badge ] [ Оформить заказ — centered ] [ 14 497 ₸ → ]` - Left: circular badge with item count (quantity, not SKUs) - Center: "Оформить заказ" (or equivalent text label from current props) - Right: formatted price + "→" or "›" chevron - If price text is very long: "Оформить заказ" text compresses (truncates), price NEVER gets cut off ### Must NOT be - Do NOT add separate icon + two-row text layout. Single row only. - Do NOT change the EXISTING state logic (myBill, tableOrders, draft modes). Only change the visual layout. - Do NOT remove or change the click handler — just ensure the WHOLE panel area triggers the same onClick. - Do NOT change when the panel is visible/hidden (visibility logic stays the same). - Do NOT use ALL CAPS for button text. ### File and location File: `pages/PublicMenu/StickyCartBar.jsx` The component receives `cartTotalItems`, `formattedCartTotal`, `formattedBillTotal`, `showBillAmount`, `isLoadingBill` as props. Keep existing props, redesign only the render/layout. If the redesign requires changes to click handler wiring in `x.jsx` (e.g., passing `onClick` prop), make minimal changes to `x.jsx` as well. ### Verification 1. Add 2 dishes to cart → StickyCartBar appears at bottom. 2. Shows: circular badge with "2" + centered label + price on right — all in one row. 3. Tapping ANYWHERE on the bar (not just a button) opens CartView drawer. --- ## ⛔ SCOPE LOCK — change ONLY what is described in Fix sections above - Modify ONLY the code described in Fix 1–5. - Do NOT touch any other logic, layout, UX behavior, or code outside the Fix scope. - If you see a potential problem NOT listed here → skip it, do not fix it. - NEVER apply code changes from memory of previous tasks — only from this task description. - Fix 3 and Fix 5 are [NICE-TO-HAVE]: if they conflict with other fixes or risk regression, skip them and note in the report. ## FROZEN UX — DO NOT CHANGE these confirmed features The following features are tested and confirmed working on Android. Do NOT modify: - StickyCartBar 3 text modes: draft ("КОРЗИНА: N ПОЗИЦИЙ"), visit ("МОЙ СЧЁТ"), closed ("ВАШИ ЗАКАЗЫ") — PM-059/060/065/066 ✅ - CartView section order: Подано (top) → Заказано → Новый заказ (bottom) — PM-144/CV-01 ✅ - CartView date filter: only today's orders (06:00 business-day cutoff) — PM-154 ✅ - CartView floating point total — PM-145 ✅ - Guest name display (no "#1313" suffix) — PM-149 ✅ - Confirmation screen total formatting (`parseFloat(...toFixed(2))`) — PM-151 ✅ - Discount price formatting in MenuView — PM-155 ✅ - Stepper buttons size w-11 h-11 in list-mode — PM-132 ✅ ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Primary usage: customer phone at the table. Before committing, verify ALL changes at 375px viewport width: - [ ] Close/chevron buttons: RIGHT-ALIGNED (not centered), sticky top - [ ] Touch targets ≥ 44×44px (h-11 w-11) - [ ] No excessive whitespace/gaps on small screens - [ ] Bottom sheet content scrollable without losing close/submit button - [ ] No duplicate visual indicators (e.g. two gray lines that look the same) - [ ] Text truncation: long item names don't overflow - [ ] Sticky footer buttons don't overlap content ## Regression Check (MANDATORY after implementation) After all fixes are applied, verify these EXISTING features still work correctly: - [ ] StickyCartBar shows correct text in all 3 modes: draft ("КОРЗИНА: N ПОЗИЦИЙ"), visit ("МОЙ СЧЁТ / price"), closed ("ВАШИ ЗАКАЗЫ / Посмотреть") - [ ] CartView drawer sections display in correct order: Подано (top) → Заказано → Новый заказ (bottom) with submit button - [ ] OrderConfirmationScreen still shows: checkmark + "Заказ отправлен!" + items list + "Итого" + two buttons ("Вернуться в меню", "Мои заказы") - [ ] MenuView list-mode shows dish photo on right + name + description (both 1 line, truncated) with stepper buttons - [ ] Discount prices in MenuView show clean 2-decimal format (not 30.4094...) ## Implementation Notes - TARGET FILES: `pages/PublicMenu/x.jsx`, `pages/PublicMenu/CartView.jsx`, `pages/PublicMenu/MenuView.jsx`, `pages/PublicMenu/StickyCartBar.jsx` - CONTEXT FILES (read-only): `pages/PublicMenu/useTableSession.jsx` - Do NOT break: PM-059 (StickyCartBar modes), PM-144 (CartView sections), PM-154 (date filter), PM-155 (discount prices) - FROZEN UX grep verification before commit: ``` grep -n "hallStickyMode\|hallStickyBillTotal" pages/PublicMenu/x.jsx | head -10 grep -n "todayMyOrders\|cutoffDay\|cutoffDate" pages/PublicMenu/CartView.jsx | head -5 grep -n "line-clamp" pages/PublicMenu/MenuView.jsx ``` - git add pages/PublicMenu/x.jsx pages/PublicMenu/CartView.jsx pages/PublicMenu/MenuView.jsx pages/PublicMenu/StickyCartBar.jsx && git commit -m "fix: batch 4 — floating point, confirmation cleanup, line-clamp, StickyCartBar visual" && git push === END ===
+mcp startup: no servers
+codex
+Reviewing the four `pages/PublicMenu` targets plus `README.md` and `BUGS.md`, then I’ll write a scoped findings report for Fix 1–5 only.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/README.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/BUGS.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 13.86s:
+
+ exited 124 in 14.20s:
+
+ exited 124 in 13.95s:
+
+codex
+The first reads timed out; I’m retrying with narrower, file-scoped commands and longer timeouts so I stay inside the page-folder scope.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/BUGS.md -TotalCount 250' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/README.md -TotalCount 250' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 23.85s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 24.02s:
+---
+version: "38.0"
+updated: "2026-03-28"
+session: 186
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*9 active bugs remaining (0x P0, 4x P1, 4x P2, 0x P3, 1x suggestion).*
+
+### BUG-PM-132: List mode stepper buttons use w-9 h-9 (36px) instead of w-11 h-11 (44px) (P2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P2
+- **ÐšÐ¾Ð³Ð´Ð°:** S177 (found by Codex in chain 74b9, confirmed by CC)
+ succeeded in 27.52s:
+components
+versions
+260320-01 useTableSession RELEASE.jsx
+260323-03 CheckoutView RELEASE.jsx
+260327-01 ModeTabs RELEASE.jsx
+260327-03 MenuView RELEASE.jsx
+260329-00 CartView RELEASE.jsx
+260329-00 x RELEASE.jsx
+ACCEPTANCE_CRITERIA_PHASE1.md
+BUGS.md
+CartView.jsx
+CheckoutView.jsx
+COPY_SPEC.md
+i18n_DrawerUX_S79.csv
+i18n_WorkingHours_S79.csv
+MenuView.jsx
+ModeTabs.jsx
+PublicMenu README.md
+PublicMenu_BASE.txt
+README.md
+codex
+I have the page-folder context. Next I’m checking only the fix-related snippets in `x.jsx`, `CartView.jsx`, `MenuView.jsx`, and `StickyCartBar.jsx` to see whether any of the five requested fixes were implemented incorrectly or left incomplete.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/StickyCartBar.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'hallStickyBillTotal|OrderConfirmationScreen|confirmation\\.your_order|confirmation\\.guest_label|<StickyCartBar|showBillAmount|formattedBillTotal' -Context 6,10" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/MenuView.jsx -Pattern 'renderListCard|line-clamp-' -Context 4,6" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'new_order|renderBucketOrders|Отправить официанту|submit' -Context 6,12" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 28.64s:
+// ======================================================
+// components/publicMenu/StickyCartBar.jsx
+// UPDATED: TASK-260322-B44 - Add primaryColor prop
+// ======================================================
+
+import React, { useState } from "react";
+import { ShoppingCart, ClipboardList, ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+export default function StickyCartBar({
+  t,
+  isHallMode,
+  hasCart,
+  cartTotalItems,
+  formattedCartTotal,
+  isLoadingBill,
+  formattedBillTotal,
+  onButtonClick,
+  buttonLabel,
+  hallModeLabel,
+ succeeded in 29.43s:
+
+  pages\PublicMenu\MenuView.jsx:77:
+  pages\PublicMenu\MenuView.jsx:78:  const gridColsClass = `${MOBILE_GRID[mobileCols]} ${DESKTOP_GRID[desktopCols]}`;
+  pages\PublicMenu\MenuView.jsx:79:
+  pages\PublicMenu\MenuView.jsx:80:  // Render dish card for LIST mode (horizontal layout)
+> pages\PublicMenu\MenuView.jsx:81:  const renderListCard = (dish) => {
+  pages\PublicMenu\MenuView.jsx:82:    const inCart = cart.find((i) => i.dishId === dish.id);
+  pages\PublicMenu\MenuView.jsx:83:    
+  pages\PublicMenu\MenuView.jsx:84:    return (
+  pages\PublicMenu\MenuView.jsx:85:      <Card
+  pages\PublicMenu\MenuView.jsx:86:        key={dish.id}
+  pages\PublicMenu\MenuView.jsx:87:        className="overflow-hidden hover:shadow-md transition-shadow 
+border-slate-200 cursor-pointer"
+  pages\PublicMenu\MenuView.jsx:90:        <CardContent className="p-3 flex gap-3">
+  pages\PublicMenu\MenuView.jsx:91:          {/* Text LEFT — name, description, price, stepper */}
+  pages\PublicMenu\MenuView.jsx:92:          <div className="flex-1 min-w-0 flex flex-col justify-between 
+min-h-[96px]">
+  pages\PublicMenu\MenuView.jsx:93:            <div>
+> pages\PublicMenu\MenuView.jsx:94:              <h3 className="font-semibold text-base text-slate-900 
+line-clamp-2">{getDishName(dish)}</h3>
+ succeeded in 30.54s:
+
+  pages\PublicMenu\x.jsx:425:  "menu.list": "Список",
+  pages\PublicMenu\x.jsx:426:  "menu.no_items": "Нет блюд в этой категории",
+  pages\PublicMenu\x.jsx:427:  // Mode tabs
+  pages\PublicMenu\x.jsx:428:  "mode.coming_soon": "Скоро",
+  pages\PublicMenu\x.jsx:429:  // Confirmation screen
+  pages\PublicMenu\x.jsx:430:  "confirmation.title": "Заказ отправлен!",
+> pages\PublicMenu\x.jsx:431:  "confirmation.your_order": "Ваш заказ",
+  pages\PublicMenu\x.jsx:432:  "confirmation.total": "Итого",
+> pages\PublicMenu\x.jsx:433:  "confirmation.guest_label": "Гость",
+  pages\PublicMenu\x.jsx:434:  "confirmation.client_name": "Имя",
+  pages\PublicMenu\x.jsx:435:  "confirmation.back_to_menu": "Вернуться в меню",
+  pages\PublicMenu\x.jsx:436:  "confirmation.my_orders": "Мои заказы",
+  pages\PublicMenu\x.jsx:437:  "confirmation.track_order": "Отследить заказ",
+  pages\PublicMenu\x.jsx:438:  // Reviews & misc
+  pages\PublicMenu\x.jsx:439:  "review.thanks": "Спасибо за оценку!",
+  pages\PublicMenu\x.jsx:440:  "review.add_comments": "Добавить комментарии",
+  pages\PublicMenu\x.jsx:441:  "review.points": "баллов",
+  pages\PublicMenu\x.jsx:442:  "review.rate_others": "Оценить блюда гостей",
+  pages\PublicMenu\x.jsx:443:  "guest.name_saved": "Имя сохранено",
+ succeeded in 30.82s:
+
+  pages\PublicMenu\CartView.jsx:41:  redeemedPoints,
+  pages\PublicMenu\CartView.jsx:42:  setRedeemedPoints,
+  pages\PublicMenu\CartView.jsx:43:  toast,
+  pages\PublicMenu\CartView.jsx:44:  cartTotalAmount,
+  pages\PublicMenu\CartView.jsx:45:  discountAmount,
+  pages\PublicMenu\CartView.jsx:46:  pointsDiscountAmount,
+> pages\PublicMenu\CartView.jsx:47:  isSubmitting,
+> pages\PublicMenu\CartView.jsx:48:  submitError,
+> pages\PublicMenu\CartView.jsx:49:  setSubmitError,
+> pages\PublicMenu\CartView.jsx:50:  handleSubmitOrder,
+  pages\PublicMenu\CartView.jsx:51:  myOrders,
+  pages\PublicMenu\CartView.jsx:52:  itemsByOrder,
+  pages\PublicMenu\CartView.jsx:53:  getOrderStatus,
+  pages\PublicMenu\CartView.jsx:54:  reviewedItems,
+  pages\PublicMenu\CartView.jsx:55:  draftRatings,
+  pages\PublicMenu\CartView.jsx:56:  updateDraftRating,
+  pages\PublicMenu\CartView.jsx:57:  sessionItems,
+  pages\PublicMenu\CartView.jsx:58:  sessionOrders,
+  pages\PublicMenu\CartView.jsx:59:  myBill,
+codex
+I’ve confirmed several fix scopes are still in pre-fix state. I’m pulling exact line references now so the report stays patch-scoped and concise.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { if($i -ge 90 -and $i -le 98){ '"'{0}:{1}' -f "'$i, $_ }; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { if($i -ge 697 -and $i -le 741){ '"'{0}:{1}' -f "'$i, $_ }; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { if($i -ge 2281 -and $i -le 2288){ '"'{0}:{1}' -f "'$i, $_ }; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content pages/PublicMenu/StickyCartBar.jsx | ForEach-Object { '"'{0}:{1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 32.03s:
+
+ exited 124 in 31.94s:
+
+ exited 124 in 31.70s:
+
+ exited 124 in 32.18s:
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/x.jsx -TotalCount 2288 | Select-Object -Last 10' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/MenuView.jsx -TotalCount 98 | Select-Object -Last 12' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/x.jsx -TotalCount 741 | Select-Object -Last 45' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/StickyCartBar.jsx -TotalCount 200' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 34.33s:
+        className="overflow-hidden hover:shadow-md transition-shadow border-slate-200 cursor-pointer"
+        onClick={() => onDishClick?.(dish)}
+      >
+        <CardContent className="p-3 flex gap-3">
+          {/* Text LEFT â€” name, description, price, stepper */}
+          <div className="flex-1 min-w-0 flex flex-col justify-between min-h-[96px]">
+            <div>
+              <h3 className="font-semibold text-base text-slate-900 line-clamp-2">{getDishName(dish)}</h3>
+              {getDishDescription(dish) && (
+                <p className="text-sm text-slate-500 mt-0.5 line-clamp-2">
+                  {getDishDescription(dish)}
+                </p>
+ succeeded in 34.28s:
+        ? tr("cart.table_orders", "Ð—Ð°ÐºÐ°Ð·Ñ‹ ÑÑ‚Ð¾Ð»Ð°")
+        : tr("cart.your_orders", "Ð’Ð°ÑˆÐ¸ Ð·Ð°ÐºÐ°Ð·Ñ‹");
+
+  // Hall StickyBar: ÑÑƒÐ¼Ð¼Ð° Ð´Ð»Ñ Ð¿Ð¾ÐºÐ°Ð·Ð°
+  const hallStickyBillTotal = 
+    hallStickyMode === "myBill" 
+      ? formatPrice(myBill.total) 
+      : hallStickyMode === "tableOrders" 
+        ? formatPrice(tableTotal) 
+        : "";
+ succeeded in 35.64s:
+      </h2>
+
+      {/* Order summary card */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <p className="text-sm font-medium text-slate-600 mb-3">
+            {tr("confirmation.your_order", "Ð’Ð°Ñˆ Ð·Ð°ÐºÐ°Ð·")}
+          </p>
+
+          {/* Items list */}
+          <div className="space-y-2 mb-3">
+            {items.map((item, idx) => (
+              <div
+                key={item.dishId || idx}
+                className="flex justify-between items-center text-sm"
+              >
+                <span className="text-slate-700">
+                  {item.name}{" "}
+                  <span className="text-slate-400">x{item.quantity}</span>
+                </span>
+ succeeded in 30.00s:
+// ======================================================
+// components/publicMenu/StickyCartBar.jsx
+// UPDATED: TASK-260322-B44 - Add primaryColor prop
+// ======================================================
+
+import React, { useState } from "react";
+import { ShoppingCart, ClipboardList, ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+export default function StickyCartBar({
+  t,
+  isHallMode,
+  hasCart,
+  cartTotalItems,
+  formattedCartTotal,
+  isLoadingBill,
+  formattedBillTotal,
+  onButtonClick,
+  buttonLabel,
+  hallModeLabel,
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/CartView.jsx -TotalCount 1016 | Select-Object -Last 25' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/CartView.jsx -TotalCount 1047 | Select-Object -Last 35' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 14.65s:
+
+            {/* PM-086: Pre-checkout loyalty email removed â€” motivation text near submit button is sufficient */}
+
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Spacer so sticky footer doesn't overlap last content */}
+      {(cart.length > 0 || todayMyOrders.length > 0) && <div className="h-20" />}
+
+      {/* AC-08: Error state with retry */}
+      {submitError && cart.length > 0 && (
+        <div className="mx-0 mb-2 p-3 bg-red-50 border border-red-200 rounded-lg text-center">
+          <p className="text-sm font-medium text-red-700">{submitError}</p>
+          <p className="text-xs text-red-500 mt-1">
+            {tr('error.send.subtitle', 'ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ ÑÐ½Ð¾Ð²Ð°')}
+          </p>
+        </div>
+      )}
+
+ succeeded in 14.34s:
+      {(cart.length > 0 || todayMyOrders.length > 0) && (
+        <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 -mx-4">
+          {cart.length > 0 ? (
+            <>
+              {/* Motivation text â€” only if loyalty enabled (#87 KS-1 Fix 1) */}
+              {partner?.loyalty_enabled && (() => {
+                const motivationPoints = Math.round((Number(cartTotalAmount) || 0) * (Number(partner?.loyalty_points_per_currency) || 1));
+                return motivationPoints > 0 ? (
+                  <p className="text-sm text-gray-500 text-center mt-1 mb-1">
+                    {trFormat('cart.motivation_bonus', { points: motivationPoints }, `ÐžÑ‚Ð¿Ñ€Ð°Ð²ÑŒÑ‚Ðµ Ð·Ð°ÐºÐ°Ð· Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ Ð¸ Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ñ‚Ðµ +${motivationPoints} Ð±Ð¾Ð½ÑƒÑÐ¾Ð²`)}
+                  </p>
+                ) : null;
+              })()}
+              <Button
+                size="lg"
+                className={`w-full text-white ${
+                  isSubmitting || emailError
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
+                    : submitError
+                      ? 'bg-red-600 hover:bg-red-700'
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'Spacer so sticky footer|h-20|SECTION 2: NEW ORDER|Card className=\"mb-2\"|sticky bottom-0' -Context 1,2" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/StickyCartBar.jsx -Pattern 'fixed bottom-0|Button|onButtonClick|cartTotalItems|formattedCartTotal|formattedBillTotal|hallModeLabel|showBillAmount|buttonLabel' -Context 0,2" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 14.25s:
+
+> pages\PublicMenu\StickyCartBar.jsx:8:import { Button } from "@/components/ui/button";
+  pages\PublicMenu\StickyCartBar.jsx:9:
+  pages\PublicMenu\StickyCartBar.jsx:10:export default function StickyCartBar({
+> pages\PublicMenu\StickyCartBar.jsx:14:  cartTotalItems,
+> pages\PublicMenu\StickyCartBar.jsx:15:  formattedCartTotal,
+  pages\PublicMenu\StickyCartBar.jsx:16:  isLoadingBill,
+> pages\PublicMenu\StickyCartBar.jsx:17:  formattedBillTotal,
+> pages\PublicMenu\StickyCartBar.jsx:18:  onButtonClick,
+> pages\PublicMenu\StickyCartBar.jsx:19:  buttonLabel,
+> pages\PublicMenu\StickyCartBar.jsx:20:  hallModeLabel,
+> pages\PublicMenu\StickyCartBar.jsx:21:  showBillAmount,
+  pages\PublicMenu\StickyCartBar.jsx:22:  isDrawerOpen,
+  pages\PublicMenu\StickyCartBar.jsx:23:  primaryColor = '#1A1A1A',
+> pages\PublicMenu\StickyCartBar.jsx:31:    <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg 
+p-4 safe-area-pb z-30">
+  pages\PublicMenu\StickyCartBar.jsx:32:      <div className="max-w-2xl mx-auto flex items-center justify-between">
+  pages\PublicMenu\StickyCartBar.jsx:33:        <div className="flex items-center gap-3">
+> pages\PublicMenu\StickyCartBar.jsx:45:        <Button
+> pages\PublicMenu\StickyCartBar.jsx:46:          onClick={onButtonClick}
+ succeeded in 14.40s:
+
+  pages\PublicMenu\CartView.jsx:947:
+> pages\PublicMenu\CartView.jsx:948:      {/* SECTION 2: NEW ORDER */}
+  pages\PublicMenu\CartView.jsx:949:      {cart.length > 0 && (
+> pages\PublicMenu\CartView.jsx:950:        <Card className="mb-2">
+  pages\PublicMenu\CartView.jsx:951:          <CardContent className="px-3 py-2">
+  pages\PublicMenu\CartView.jsx:952:            <div className="flex items-center justify-between mb-3">
+  pages\PublicMenu\CartView.jsx:998:
+> pages\PublicMenu\CartView.jsx:999:      {/* Spacer so sticky footer doesn't overlap last content */}
+> pages\PublicMenu\CartView.jsx:1000:      {(cart.length > 0 || todayMyOrders.length > 0) && <div className="h-20" />}
+  pages\PublicMenu\CartView.jsx:1001:
+  pages\PublicMenu\CartView.jsx:1002:      {/* AC-08: Error state with retry */}
+  pages\PublicMenu\CartView.jsx:1013:      {(cart.length > 0 || todayMyOrders.length > 0) && (
+> pages\PublicMenu\CartView.jsx:1014:        <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 
+-mx-4">
+  pages\PublicMenu\CartView.jsx:1015:          {cart.length > 0 ? (
+  pages\PublicMenu\CartView.jsx:1016:            <>
+
+
+codex
+I’ve finished the scoped review. I’m writing three repo artifacts now: the requested pipeline findings file, the page-level review copy, and the command log required by this workspace.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pipeline/chain-state' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Test-Path pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 11.00s:
+
+ exited 124 in 11.22s:
+
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-29.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260329-121355-a291
+
+## Findings
+1. [P1] Fix 1 raw float is still passed into StickyCartBar totals - `pages/PublicMenu/x.jsx:2283-2287` still calls `formatPrice(myBill.total)` and `formatPrice(tableTotal)` directly, so hall-mode "Мой счёт" / "Заказы стола" can still expose JS precision artifacts like `189.039999...₸`. FIX: wrap both values with `parseFloat((value || 0).toFixed(2))` before passing them to `formatPrice()`.
+2. [P2] Fix 2 confirmation cleanup was not applied - `pages/PublicMenu/x.jsx:702-704` still renders the redundant `{tr("confirmation.your_order", "Ваш заказ")}` header, and `pages/PublicMenu/x.jsx:737-741` still renders the `guestLabel` line. The confirmation screen therefore still shows both elements the task asked to remove. FIX: delete the header `<p>` above the items list and remove the `{guestLabel && (...)}` block, while keeping the items list, total, buttons, and pickup/delivery `clientName`.
+3. [P3] Fix 3 whitespace gap below "Новый заказ" is still present in layout - `pages/PublicMenu/CartView.jsx:950` keeps the new-order card, then `pages/PublicMenu/CartView.jsx:999-1000` inserts an unconditional `h-20` spacer before the sticky footer at `pages/PublicMenu/CartView.jsx:1014`. With a one-item cart, that spacer still creates visible empty space above the submit button. FIX: remove or reduce the unconditional spacer for the cart-present state, or replace it with footer-safe padding that does not create a visible gap after the new-order card.
+4. [P2] Fix 4 list-mode card text is still clamped to two lines - `pages/PublicMenu/MenuView.jsx:94-96` still uses `line-clamp-2` for both the dish name and the description inside `renderListCard`, so list cards remain taller than the requested compact one-line layout. FIX: change both list-mode clamps to `line-clamp-1` and leave tile-mode and the detail drawer unchanged.
+5. [P3] Fix 5 StickyCartBar redesign is not implemented - `pages/PublicMenu/StickyCartBar.jsx:31-57` still renders a left icon block plus a separate right-side `<Button>`, so the whole bar is not one tappable surface. In the same component, `cartTotalItems`, `formattedCartTotal`, `formattedBillTotal`, `hallModeLabel`, and `showBillAmount` are accepted at `pages/PublicMenu/StickyCartBar.jsx:14-21` but not rendered, so the required single-row badge + centered label + right-aligned price layout cannot appear. FIX: make the entire bar a single clickable control wired to the existing handler, render the quantity badge on the left, the current label text in the center, and a non-truncating price + chevron on the right.
+
+## Summary
+Total: 5 findings (0 P0, 1 P1, 2 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 - the bug was described clearly, but the exact offending element was not pinpointed; the task only suggested likely spacing sources.
+- Missing context (what info would have helped): The task referenced `BUGS_MASTER.md`, `ux-concepts/cart-view.md`, and `DECISIONS_INDEX.md §2`, but the speed rule limited review to the page folder, so those references could not be consulted.
+- Scope questions (anything you weren't sure if it's in scope): The task listed `pages/PublicMenu/useTableSession.jsx` as a context file, while the speed rule said to read only the target files plus `README.md` / `BUGS.md`; I treated `useTableSession.jsx` as out of scope.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260329-121355-a291
+
+## Findings
+1. [P1] Fix 1 raw float is still passed into StickyCartBar totals - `pages/PublicMenu/x.jsx:2283-2287` still calls `formatPrice(myBill.total)` and `formatPrice(tableTotal)` directly, so hall-mode "Мой счёт" / "Заказы стола" can still expose JS precision artifacts like `189.039999...₸`. FIX: wrap both values with `parseFloat((value || 0).toFixed(2))` before passing them to `formatPrice()`.
+2. [P2] Fix 2 confirmation cleanup was not applied - `pages/PublicMenu/x.jsx:702-704` still renders the redundant `{tr("confirmation.your_order", "Ваш заказ")}` header, and `pages/PublicMenu/x.jsx:737-741` still renders the `guestLabel` line. The confirmation screen therefore still shows both elements the task asked to remove. FIX: delete the header `<p>` above the items list and remove the `{guestLabel && (...)}` block, while keeping the items list, total, buttons, and pickup/delivery `clientName`.
+3. [P3] Fix 3 whitespace gap below "Новый заказ" is still present in layout - `pages/PublicMenu/CartView.jsx:950` keeps the new-order card, then `pages/PublicMenu/CartView.jsx:999-1000` inserts an unconditional `h-20` spacer before the sticky footer at `pages/PublicMenu/CartView.jsx:1014`. With a one-item cart, that spacer still creates visible empty space above the submit button. FIX: remove or reduce the unconditional spacer for the cart-present state, or replace it with footer-safe padding that does not create a visible gap after the new-order card.
+4. [P2] Fix 4 list-mode card text is still clamped to two lines - `pages/PublicMenu/MenuView.jsx:94-96` still uses `line-clamp-2` for both the dish name and the description inside `renderListCard`, so list cards remain taller than the requested compact one-line layout. FIX: change both list-mode clamps to `line-clamp-1` and leave tile-mode and the detail drawer unchanged.
+5. [P3] Fix 5 StickyCartBar redesign is not implemented - `pages/PublicMenu/StickyCartBar.jsx:31-57` still renders a left icon block plus a separate right-side `<Button>`, so the whole bar is not one tappable surface. In the same component, `cartTotalItems`, `formattedCartTotal`, `formattedBillTotal`, `hallModeLabel`, and `showBillAmount` are accepted at `pages/PublicMenu/StickyCartBar.jsx:14-21` but not rendered, so the required single-row badge + centered label + right-aligned price layout cannot appear. FIX: make the entire bar a single clickable control wired to the existing handler, render the quantity badge on the left, the current label text in the center, and a non-truncating price + chevron on the right.
+
+## Summary
+Total: 5 findings (0 P0, 1 P1, 2 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 - the bug was described clearly, but the exact offending element was not pinpointed; the task only suggested likely spacing sources.
+- Missing context (what info would have helped): The task referenced `BUGS_MASTER.md`, `ux-concepts/cart-view.md`, and `DECISIONS_INDEX.md §2`, but the speed rule limited review to the page folder, so those references could not be consulted.
+- Scope questions (anything you weren't sure if it's in scope): The task listed `pages/PublicMenu/useTableSession.jsx` as a context file, while the speed rule said to read only the target files plus `README.md` / `BUGS.md`; I treated `useTableSession.jsx` as out of scope.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/round1_2026-03-29.md
+# Round 1 — PublicMenu Batch 4 review
+
+Scoped review covered only Fix 1-5 in `x.jsx`, `CartView.jsx`, `MenuView.jsx`, and `StickyCartBar.jsx`, plus `README.md` and `BUGS.md` in `pages/PublicMenu`.
+
+Result: 5 in-scope findings remain open. See `review_2026-03-29.md` for the full report and `pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md` for the pipeline copy.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-29.log
+[timeout] Get-ChildItem -Name pages/PublicMenu
+[timeout] Get-Content pages/PublicMenu/README.md
+[timeout] Get-Content pages/PublicMenu/BUGS.md
+Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
+Get-Content pages/PublicMenu/README.md -TotalCount 250
+Get-Content pages/PublicMenu/BUGS.md -TotalCount 250
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'hallStickyBillTotal|OrderConfirmationScreen|confirmation\.your_order|confirmation\.guest_label|<StickyCartBar|showBillAmount|formattedBillTotal' -Context 6,10
+Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'new_order|renderBucketOrders|Отправить официанту|submit' -Context 6,12
+Select-String -Path pages/PublicMenu/MenuView.jsx -Pattern 'renderListCard|line-clamp-' -Context 4,6
+Get-Content pages/PublicMenu/StickyCartBar.jsx
+[timeout] $i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { if($i -ge 697 -and $i -le 741){ '{0}:{1}' -f $i, $_ }; $i++ }
+[timeout] $i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { if($i -ge 2281 -and $i -le 2288){ '{0}:{1}' -f $i, $_ }; $i++ }
+[timeout] $i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { if($i -ge 90 -and $i -le 98){ '{0}:{1}' -f $i, $_ }; $i++ }
+[timeout] $i=1; Get-Content pages/PublicMenu/StickyCartBar.jsx | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
+Get-Content pages/PublicMenu/x.jsx -TotalCount 741 | Select-Object -Last 45
+Get-Content pages/PublicMenu/x.jsx -TotalCount 2288 | Select-Object -Last 10
+Get-Content pages/PublicMenu/MenuView.jsx -TotalCount 98 | Select-Object -Last 12
+Get-Content pages/PublicMenu/StickyCartBar.jsx -TotalCount 200
+Get-Content pages/PublicMenu/CartView.jsx -TotalCount 1016 | Select-Object -Last 25
+Get-Content pages/PublicMenu/CartView.jsx -TotalCount 1047 | Select-Object -Last 35
+Select-String -Path pages/PublicMenu/StickyCartBar.jsx -Pattern 'fixed bottom-0|Button|onButtonClick|cartTotalItems|formattedCartTotal|formattedBillTotal|hallModeLabel|showBillAmount|buttonLabel' -Context 0,2
+Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'Spacer so sticky footer|h-20|SECTION 2: NEW ORDER|Card className=\"mb-2\"|sticky bottom-0' -Context 1,2
+apply_patch(auto_approved=true) exited 0 in 5.55s:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md
+A pages/PublicMenu/review_2026-03-29.md
+A pages/PublicMenu/round1_2026-03-29.md
+A pages/PublicMenu/commands_2026-03-29.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-29.log b/pages/PublicMenu/commands_2026-03-29.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..b76fab556ebb282588955abdcb753f2e52f79db4
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-29.log
+@@ -0,0 +1,22 @@
++[timeout] Get-ChildItem -Name pages/PublicMenu
++[timeout] Get-Content pages/PublicMenu/README.md
++[timeout] Get-Content pages/PublicMenu/BUGS.md
++Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
++Get-Content pages/PublicMenu/README.md -TotalCount 250
++Get-Content pages/PublicMenu/BUGS.md -TotalCount 250
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'hallStickyBillTotal|OrderConfirmationScreen|confirmation\.your_order|confirmation\.guest_label|<StickyCartBar|showBillAmount|formattedBillTotal' -Context 6,10
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'new_order|renderBucketOrders|Отправить официанту|submit' -Context 6,12
++Select-String -Path pages/PublicMenu/MenuView.jsx -Pattern 'renderListCard|line-clamp-' -Context 4,6
++Get-Content pages/PublicMenu/StickyCartBar.jsx
++[timeout] $i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { if($i -ge 697 -and $i -le 741){ '{0}:{1}' -f $i, $_ }; $i++ }
++[timeout] $i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { if($i -ge 2281 -and $i -le 2288){ '{0}:{1}' -f $i, $_ }; $i++ }
++[timeout] $i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { if($i -ge 90 -and $i -le 98){ '{0}:{1}' -f $i, $_ }; $i++ }
++[timeout] $i=1; Get-Content pages/PublicMenu/StickyCartBar.jsx | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++Get-Content pages/PublicMenu/x.jsx -TotalCount 741 | Select-Object -Last 45
++Get-Content pages/PublicMenu/x.jsx -TotalCount 2288 | Select-Object -Last 10
++Get-Content pages/PublicMenu/MenuView.jsx -TotalCount 98 | Select-Object -Last 12
++Get-Content pages/PublicMenu/StickyCartBar.jsx -TotalCount 200
++Get-Content pages/PublicMenu/CartView.jsx -TotalCount 1016 | Select-Object -Last 25
++Get-Content pages/PublicMenu/CartView.jsx -TotalCount 1047 | Select-Object -Last 35
++Select-String -Path pages/PublicMenu/StickyCartBar.jsx -Pattern 'fixed bottom-0|Button|onButtonClick|cartTotalItems|formattedCartTotal|formattedBillTotal|hallModeLabel|showBillAmount|buttonLabel' -Context 0,2
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'Spacer so sticky footer|h-20|SECTION 2: NEW ORDER|Card className=\"mb-2\"|sticky bottom-0' -Context 1,2
+diff --git a/pages/PublicMenu/review_2026-03-29.md b/pages/PublicMenu/review_2026-03-29.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..53f1008d42cc79e0734e31dffde0a609da5987c0
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-29.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260329-121355-a291
++
++## Findings
++1. [P1] Fix 1 raw float is still passed into StickyCartBar totals - `pages/PublicMenu/x.jsx:2283-2287` still calls `formatPrice(myBill.total)` and `formatPrice(tableTotal)` directly, so hall-mode "Мой счёт" / "Заказы стола" can still expose JS precision artifacts like `189.039999...₸`. FIX: wrap both values with `parseFloat((value || 0).toFixed(2))` before passing them to `formatPrice()`.
++2. [P2] Fix 2 confirmation cleanup was not applied - `pages/PublicMenu/x.jsx:702-704` still renders the redundant `{tr("confirmation.your_order", "Ваш заказ")}` header, and `pages/PublicMenu/x.jsx:737-741` still renders the `guestLabel` line. The confirmation screen therefore still shows both elements the task asked to remove. FIX: delete the header `<p>` above the items list and remove the `{guestLabel && (...)}` block, while keeping the items list, total, buttons, and pickup/delivery `clientName`.
++3. [P3] Fix 3 whitespace gap below "Новый заказ" is still present in layout - `pages/PublicMenu/CartView.jsx:950` keeps the new-order card, then `pages/PublicMenu/CartView.jsx:999-1000` inserts an unconditional `h-20` spacer before the sticky footer at `pages/PublicMenu/CartView.jsx:1014`. With a one-item cart, that spacer still creates visible empty space above the submit button. FIX: remove or reduce the unconditional spacer for the cart-present state, or replace it with footer-safe padding that does not create a visible gap after the new-order card.
++4. [P2] Fix 4 list-mode card text is still clamped to two lines - `pages/PublicMenu/MenuView.jsx:94-96` still uses `line-clamp-2` for both the dish name and the description inside `renderListCard`, so list cards remain taller than the requested compact one-line layout. FIX: change both list-mode clamps to `line-clamp-1` and leave tile-mode and the detail drawer unchanged.
++5. [P3] Fix 5 StickyCartBar redesign is not implemented - `pages/PublicMenu/StickyCartBar.jsx:31-57` still renders a left icon block plus a separate right-side `<Button>`, so the whole bar is not one tappable surface. In the same component, `cartTotalItems`, `formattedCartTotal`, `formattedBillTotal`, `hallModeLabel`, and `showBillAmount` are accepted at `pages/PublicMenu/StickyCartBar.jsx:14-21` but not rendered, so the required single-row badge + centered label + right-aligned price layout cannot appear. FIX: make the entire bar a single clickable control wired to the existing handler, render the quantity badge on the left, the current label text in the center, and a non-truncating price + chevron on the right.
++
++## Summary
++Total: 5 findings (0 P0, 1 P1, 2 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 - the bug was described clearly, but the exact offending element was not pinpointed; the task only suggested likely spacing sources.
++- Missing context (what info would have helped): The task referenced `BUGS_MASTER.md`, `ux-concepts/cart-view.md`, and `DECISIONS_INDEX.md §2`, but the speed rule limited review to the page folder, so those references could not be consulted.
++- Scope questions (anything you weren't sure if it's in scope): The task listed `pages/PublicMenu/useTableSession.jsx` as a context file, while the speed rule said to read only the target files plus `README.md` / `BUGS.md`; I treated `useTableSession.jsx` as out of scope.
+diff --git a/pages/PublicMenu/round1_2026-03-29.md b/pages/PublicMenu/round1_2026-03-29.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6a0e19a0181f2c265503d7bc61321fe2f5ab7ee1
+--- /dev/null
++++ b/pages/PublicMenu/round1_2026-03-29.md
+@@ -0,0 +1,5 @@
++# Round 1 — PublicMenu Batch 4 review
++
++Scoped review covered only Fix 1-5 in `x.jsx`, `CartView.jsx`, `MenuView.jsx`, and `StickyCartBar.jsx`, plus `README.md` and `BUGS.md` in `pages/PublicMenu`.
++
++Result: 5 in-scope findings remain open. See `review_2026-03-29.md` for the full report and `pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md` for the pipeline copy.
+diff --git a/pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md b/pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..53f1008d42cc79e0734e31dffde0a609da5987c0
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260329-121355-a291
++
++## Findings
++1. [P1] Fix 1 raw float is still passed into StickyCartBar totals - `pages/PublicMenu/x.jsx:2283-2287` still calls `formatPrice(myBill.total)` and `formatPrice(tableTotal)` directly, so hall-mode "Мой счёт" / "Заказы стола" can still expose JS precision artifacts like `189.039999...₸`. FIX: wrap both values with `parseFloat((value || 0).toFixed(2))` before passing them to `formatPrice()`.
++2. [P2] Fix 2 confirmation cleanup was not applied - `pages/PublicMenu/x.jsx:702-704` still renders the redundant `{tr("confirmation.your_order", "Ваш заказ")}` header, and `pages/PublicMenu/x.jsx:737-741` still renders the `guestLabel` line. The confirmation screen therefore still shows both elements the task asked to remove. FIX: delete the header `<p>` above the items list and remove the `{guestLabel && (...)}` block, while keeping the items list, total, buttons, and pickup/delivery `clientName`.
++3. [P3] Fix 3 whitespace gap below "Новый заказ" is still present in layout - `pages/PublicMenu/CartView.jsx:950` keeps the new-order card, then `pages/PublicMenu/CartView.jsx:999-1000` inserts an unconditional `h-20` spacer before the sticky footer at `pages/PublicMenu/CartView.jsx:1014`. With a one-item cart, that spacer still creates visible empty space above the submit button. FIX: remove or reduce the unconditional spacer for the cart-present state, or replace it with footer-safe padding that does not create a visible gap after the new-order card.
++4. [P2] Fix 4 list-mode card text is still clamped to two lines - `pages/PublicMenu/MenuView.jsx:94-96` still uses `line-clamp-2` for both the dish name and the description inside `renderListCard`, so list cards remain taller than the requested compact one-line layout. FIX: change both list-mode clamps to `line-clamp-1` and leave tile-mode and the detail drawer unchanged.
++5. [P3] Fix 5 StickyCartBar redesign is not implemented - `pages/PublicMenu/StickyCartBar.jsx:31-57` still renders a left icon block plus a separate right-side `<Button>`, so the whole bar is not one tappable surface. In the same component, `cartTotalItems`, `formattedCartTotal`, `formattedBillTotal`, `hallModeLabel`, and `showBillAmount` are accepted at `pages/PublicMenu/StickyCartBar.jsx:14-21` but not rendered, so the required single-row badge + centered label + right-aligned price layout cannot appear. FIX: make the entire bar a single clickable control wired to the existing handler, render the quantity badge on the left, the current label text in the center, and a non-truncating price + chevron on the right.
++
++## Summary
++Total: 5 findings (0 P0, 1 P1, 2 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 - the bug was described clearly, but the exact offending element was not pinpointed; the task only suggested likely spacing sources.
++- Missing context (what info would have helped): The task referenced `BUGS_MASTER.md`, `ux-concepts/cart-view.md`, and `DECISIONS_INDEX.md §2`, but the speed rule limited review to the page folder, so those references could not be consulted.
++- Scope questions (anything you weren't sure if it's in scope): The task listed `pages/PublicMenu/useTableSession.jsx` as a context file, while the speed rule said to read only the target files plus `README.md` / `BUGS.md`; I treated `useTableSession.jsx` as out of scope.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-29.log b/pages/PublicMenu/commands_2026-03-29.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..b76fab556ebb282588955abdcb753f2e52f79db4
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-29.log
+@@ -0,0 +1,22 @@
++[timeout] Get-ChildItem -Name pages/PublicMenu
++[timeout] Get-Content pages/PublicMenu/README.md
++[timeout] Get-Content pages/PublicMenu/BUGS.md
++Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
++Get-Content pages/PublicMenu/README.md -TotalCount 250
++Get-Content pages/PublicMenu/BUGS.md -TotalCount 250
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'hallStickyBillTotal|OrderConfirmationScreen|confirmation\.your_order|confirmation\.guest_label|<StickyCartBar|showBillAmount|formattedBillTotal' -Context 6,10
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'new_order|renderBucketOrders|Отправить официанту|submit' -Context 6,12
++Select-String -Path pages/PublicMenu/MenuView.jsx -Pattern 'renderListCard|line-clamp-' -Context 4,6
++Get-Content pages/PublicMenu/StickyCartBar.jsx
++[timeout] $i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { if($i -ge 697 -and $i -le 741){ '{0}:{1}' -f $i, $_ }; $i++ }
++[timeout] $i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { if($i -ge 2281 -and $i -le 2288){ '{0}:{1}' -f $i, $_ }; $i++ }
++[timeout] $i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { if($i -ge 90 -and $i -le 98){ '{0}:{1}' -f $i, $_ }; $i++ }
++[timeout] $i=1; Get-Content pages/PublicMenu/StickyCartBar.jsx | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++Get-Content pages/PublicMenu/x.jsx -TotalCount 741 | Select-Object -Last 45
++Get-Content pages/PublicMenu/x.jsx -TotalCount 2288 | Select-Object -Last 10
++Get-Content pages/PublicMenu/MenuView.jsx -TotalCount 98 | Select-Object -Last 12
++Get-Content pages/PublicMenu/StickyCartBar.jsx -TotalCount 200
++Get-Content pages/PublicMenu/CartView.jsx -TotalCount 1016 | Select-Object -Last 25
++Get-Content pages/PublicMenu/CartView.jsx -TotalCount 1047 | Select-Object -Last 35
++Select-String -Path pages/PublicMenu/StickyCartBar.jsx -Pattern 'fixed bottom-0|Button|onButtonClick|cartTotalItems|formattedCartTotal|formattedBillTotal|hallModeLabel|showBillAmount|buttonLabel' -Context 0,2
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'Spacer so sticky footer|h-20|SECTION 2: NEW ORDER|Card className=\"mb-2\"|sticky bottom-0' -Context 1,2
+diff --git a/pages/PublicMenu/review_2026-03-29.md b/pages/PublicMenu/review_2026-03-29.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..53f1008d42cc79e0734e31dffde0a609da5987c0
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-29.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260329-121355-a291
++
++## Findings
++1. [P1] Fix 1 raw float is still passed into StickyCartBar totals - `pages/PublicMenu/x.jsx:2283-2287` still calls `formatPrice(myBill.total)` and `formatPrice(tableTotal)` directly, so hall-mode "Мой счёт" / "Заказы стола" can still expose JS precision artifacts like `189.039999...₸`. FIX: wrap both values with `parseFloat((value || 0).toFixed(2))` before passing them to `formatPrice()`.
++2. [P2] Fix 2 confirmation cleanup was not applied - `pages/PublicMenu/x.jsx:702-704` still renders the redundant `{tr("confirmation.your_order", "Ваш заказ")}` header, and `pages/PublicMenu/x.jsx:737-741` still renders the `guestLabel` line. The confirmation screen therefore still shows both elements the task asked to remove. FIX: delete the header `<p>` above the items list and remove the `{guestLabel && (...)}` block, while keeping the items list, total, buttons, and pickup/delivery `clientName`.
++3. [P3] Fix 3 whitespace gap below "Новый заказ" is still present in layout - `pages/PublicMenu/CartView.jsx:950` keeps the new-order card, then `pages/PublicMenu/CartView.jsx:999-1000` inserts an unconditional `h-20` spacer before the sticky footer at `pages/PublicMenu/CartView.jsx:1014`. With a one-item cart, that spacer still creates visible empty space above the submit button. FIX: remove or reduce the unconditional spacer for the cart-present state, or replace it with footer-safe padding that does not create a visible gap after the new-order card.
++4. [P2] Fix 4 list-mode card text is still clamped to two lines - `pages/PublicMenu/MenuView.jsx:94-96` still uses `line-clamp-2` for both the dish name and the description inside `renderListCard`, so list cards remain taller than the requested compact one-line layout. FIX: change both list-mode clamps to `line-clamp-1` and leave tile-mode and the detail drawer unchanged.
++5. [P3] Fix 5 StickyCartBar redesign is not implemented - `pages/PublicMenu/StickyCartBar.jsx:31-57` still renders a left icon block plus a separate right-side `<Button>`, so the whole bar is not one tappable surface. In the same component, `cartTotalItems`, `formattedCartTotal`, `formattedBillTotal`, `hallModeLabel`, and `showBillAmount` are accepted at `pages/PublicMenu/StickyCartBar.jsx:14-21` but not rendered, so the required single-row badge + centered label + right-aligned price layout cannot appear. FIX: make the entire bar a single clickable control wired to the existing handler, render the quantity badge on the left, the current label text in the center, and a non-truncating price + chevron on the right.
++
++## Summary
++Total: 5 findings (0 P0, 1 P1, 2 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 - the bug was described clearly, but the exact offending element was not pinpointed; the task only suggested likely spacing sources.
++- Missing context (what info would have helped): The task referenced `BUGS_MASTER.md`, `ux-concepts/cart-view.md`, and `DECISIONS_INDEX.md §2`, but the speed rule limited review to the page folder, so those references could not be consulted.
++- Scope questions (anything you weren't sure if it's in scope): The task listed `pages/PublicMenu/useTableSession.jsx` as a context file, while the speed rule said to read only the target files plus `README.md` / `BUGS.md`; I treated `useTableSession.jsx` as out of scope.
+diff --git a/pages/PublicMenu/round1_2026-03-29.md b/pages/PublicMenu/round1_2026-03-29.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6a0e19a0181f2c265503d7bc61321fe2f5ab7ee1
+--- /dev/null
++++ b/pages/PublicMenu/round1_2026-03-29.md
+@@ -0,0 +1,5 @@
++# Round 1 — PublicMenu Batch 4 review
++
++Scoped review covered only Fix 1-5 in `x.jsx`, `CartView.jsx`, `MenuView.jsx`, and `StickyCartBar.jsx`, plus `README.md` and `BUGS.md` in `pages/PublicMenu`.
++
++Result: 5 in-scope findings remain open. See `review_2026-03-29.md` for the full report and `pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md` for the pipeline copy.
+diff --git a/pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md b/pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..53f1008d42cc79e0734e31dffde0a609da5987c0
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260329-121355-a291
++
++## Findings
++1. [P1] Fix 1 raw float is still passed into StickyCartBar totals - `pages/PublicMenu/x.jsx:2283-2287` still calls `formatPrice(myBill.total)` and `formatPrice(tableTotal)` directly, so hall-mode "Мой счёт" / "Заказы стола" can still expose JS precision artifacts like `189.039999...₸`. FIX: wrap both values with `parseFloat((value || 0).toFixed(2))` before passing them to `formatPrice()`.
++2. [P2] Fix 2 confirmation cleanup was not applied - `pages/PublicMenu/x.jsx:702-704` still renders the redundant `{tr("confirmation.your_order", "Ваш заказ")}` header, and `pages/PublicMenu/x.jsx:737-741` still renders the `guestLabel` line. The confirmation screen therefore still shows both elements the task asked to remove. FIX: delete the header `<p>` above the items list and remove the `{guestLabel && (...)}` block, while keeping the items list, total, buttons, and pickup/delivery `clientName`.
++3. [P3] Fix 3 whitespace gap below "Новый заказ" is still present in layout - `pages/PublicMenu/CartView.jsx:950` keeps the new-order card, then `pages/PublicMenu/CartView.jsx:999-1000` inserts an unconditional `h-20` spacer before the sticky footer at `pages/PublicMenu/CartView.jsx:1014`. With a one-item cart, that spacer still creates visible empty space above the submit button. FIX: remove or reduce the unconditional spacer for the cart-present state, or replace it with footer-safe padding that does not create a visible gap after the new-order card.
++4. [P2] Fix 4 list-mode card text is still clamped to two lines - `pages/PublicMenu/MenuView.jsx:94-96` still uses `line-clamp-2` for both the dish name and the description inside `renderListCard`, so list cards remain taller than the requested compact one-line layout. FIX: change both list-mode clamps to `line-clamp-1` and leave tile-mode and the detail drawer unchanged.
++5. [P3] Fix 5 StickyCartBar redesign is not implemented - `pages/PublicMenu/StickyCartBar.jsx:31-57` still renders a left icon block plus a separate right-side `<Button>`, so the whole bar is not one tappable surface. In the same component, `cartTotalItems`, `formattedCartTotal`, `formattedBillTotal`, `hallModeLabel`, and `showBillAmount` are accepted at `pages/PublicMenu/StickyCartBar.jsx:14-21` but not rendered, so the required single-row badge + centered label + right-aligned price layout cannot appear. FIX: make the entire bar a single clickable control wired to the existing handler, render the quantity badge on the left, the current label text in the center, and a non-truncating price + chevron on the right.
++
++## Summary
++Total: 5 findings (0 P0, 1 P1, 2 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 - the bug was described clearly, but the exact offending element was not pinpointed; the task only suggested likely spacing sources.
++- Missing context (what info would have helped): The task referenced `BUGS_MASTER.md`, `ux-concepts/cart-view.md`, and `DECISIONS_INDEX.md §2`, but the speed rule limited review to the page folder, so those references could not be consulted.
++- Scope questions (anything you weren't sure if it's in scope): The task listed `pages/PublicMenu/useTableSession.jsx` as a context file, while the speed rule said to read only the target files plus `README.md` / `BUGS.md`; I treated `useTableSession.jsx` as out of scope.
+
+codex
+The report files are written. I’m doing one quick sanity read to confirm the pipeline file and page-level copies match the scoped findings.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/review_2026-03-29.md -TotalCount 80' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md -TotalCount 80' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/commands_2026-03-29.log -TotalCount 80' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 19.90s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260329-121355-a291
+
+## Findings
+1. [P1] Fix 1 raw float is still passed into StickyCartBar totals - `pages/PublicMenu/x.jsx:2283-2287` still calls `formatPrice(myBill.total)` and `formatPrice(tableTotal)` directly, so hall-mode "ÐœÐ¾Ð¹ ÑÑ‡Ñ‘Ñ‚" / "Ð—Ð°ÐºÐ°Ð·Ñ‹ ÑÑ‚Ð¾Ð»Ð°" can still expose JS precision artifacts like `189.039999...â‚¸`. FIX: wrap both values with `parseFloat((value || 0).toFixed(2))` before passing them to `formatPrice()`.
+2. [P2] Fix 2 confirmation cleanup was not applied - `pages/PublicMenu/x.jsx:702-704` still renders the redundant `{tr("confirmation.your_order", "Ð’Ð°Ñˆ Ð·Ð°ÐºÐ°Ð·")}` header, and `pages/PublicMenu/x.jsx:737-741` still renders the `guestLabel` line. The confirmation screen therefore still shows both elements the task asked to remove. FIX: delete the header `<p>` above the items list and remove the `{guestLabel && (...)}` block, while keeping the items list, total, buttons, and pickup/delivery `clientName`.
+3. [P3] Fix 3 whitespace gap below "ÐÐ¾Ð²Ñ‹Ð¹ Ð·Ð°ÐºÐ°Ð·" is still present in layout - `pages/PublicMenu/CartView.jsx:950` keeps the new-order card, then `pages/PublicMenu/CartView.jsx:999-1000` inserts an unconditional `h-20` spacer before the sticky footer at `pages/PublicMenu/CartView.jsx:1014`. With a one-item cart, that spacer still creates visible empty space above the submit button. FIX: remove or reduce the unconditional spacer for the cart-present state, or replace it with footer-safe padding that does not create a visible gap after the new-order card.
+4. [P2] Fix 4 list-mode card text is still clamped to two lines - `pages/PublicMenu/MenuView.jsx:94-96` still uses `line-clamp-2` for both the dish name and the description inside `renderListCard`, so list cards remain taller than the requested compact one-line layout. FIX: change both list-mode clamps to `line-clamp-1` and leave tile-mode and the detail drawer unchanged.
+5. [P3] Fix 5 StickyCartBar redesign is not implemented - `pages/PublicMenu/StickyCartBar.jsx:31-57` still renders a left icon block plus a separate right-side `<Button>`, so the whole bar is not one tappable surface. In the same component, `cartTotalItems`, `formattedCartTotal`, `formattedBillTotal`, `hallModeLabel`, and `showBillAmount` are accepted at `pages/PublicMenu/StickyCartBar.jsx:14-21` but not rendered, so the required single-row badge + centered label + right-aligned price layout cannot appear. FIX: make the entire bar a single clickable control wired to the existing handler, render the quantity badge on the left, the current label text in the center, and a non-truncating price + chevron on the right.
+
+## Summary
+Total: 5 findings (0 P0, 1 P1, 2 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY â€” do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 - the bug was described clearly, but the exact offending element was not pinpointed; the task only suggested likely spacing sources.
+- Missing context (what info would have helped): The task referenced `BUGS_MASTER.md`, `ux-concepts/cart-view.md`, and `DECISIONS_INDEX.md Â§2`, but the speed rule limited review to the page folder, so those references could not be consulted.
+- Scope questions (anything you weren't sure if it's in scope): The task listed `pages/PublicMenu/useTableSession.jsx` as a context file, while the speed rule said to read only the target files plus `README.md` / `BUGS.md`; I treated `useTableSession.jsx` as out of scope.
+ succeeded in 20.38s:
+[timeout] Get-ChildItem -Name pages/PublicMenu
+[timeout] Get-Content pages/PublicMenu/README.md
+[timeout] Get-Content pages/PublicMenu/BUGS.md
+Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
+Get-Content pages/PublicMenu/README.md -TotalCount 250
+Get-Content pages/PublicMenu/BUGS.md -TotalCount 250
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'hallStickyBillTotal|OrderConfirmationScreen|confirmation\.your_order|confirmation\.guest_label|<StickyCartBar|showBillAmount|formattedBillTotal' -Context 6,10
+Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'new_order|renderBucketOrders|ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ|submit' -Context 6,12
+Select-String -Path pages/PublicMenu/MenuView.jsx -Pattern 'renderListCard|line-clamp-' -Context 4,6
+Get-Content pages/PublicMenu/StickyCartBar.jsx
+[timeout] $i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { if($i -ge 697 -and $i -le 741){ '{0}:{1}' -f $i, $_ }; $i++ }
+[timeout] $i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { if($i -ge 2281 -and $i -le 2288){ '{0}:{1}' -f $i, $_ }; $i++ }
+[timeout] $i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { if($i -ge 90 -and $i -le 98){ '{0}:{1}' -f $i, $_ }; $i++ }
+[timeout] $i=1; Get-Content pages/PublicMenu/StickyCartBar.jsx | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
+Get-Content pages/PublicMenu/x.jsx -TotalCount 741 | Select-Object -Last 45
+Get-Content pages/PublicMenu/x.jsx -TotalCount 2288 | Select-Object -Last 10
+Get-Content pages/PublicMenu/MenuView.jsx -TotalCount 98 | Select-Object -Last 12
+Get-Content pages/PublicMenu/StickyCartBar.jsx -TotalCount 200
+Get-Content pages/PublicMenu/CartView.jsx -TotalCount 1016 | Select-Object -Last 25
+Get-Content pages/PublicMenu/CartView.jsx -TotalCount 1047 | Select-Object -Last 35
+ succeeded in 20.28s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260329-121355-a291
+
+## Findings
+1. [P1] Fix 1 raw float is still passed into StickyCartBar totals - `pages/PublicMenu/x.jsx:2283-2287` still calls `formatPrice(myBill.total)` and `formatPrice(tableTotal)` directly, so hall-mode "ÐœÐ¾Ð¹ ÑÑ‡Ñ‘Ñ‚" / "Ð—Ð°ÐºÐ°Ð·Ñ‹ ÑÑ‚Ð¾Ð»Ð°" can still expose JS precision artifacts like `189.039999...â‚¸`. FIX: wrap both values with `parseFloat((value || 0).toFixed(2))` before passing them to `formatPrice()`.
+2. [P2] Fix 2 confirmation cleanup was not applied - `pages/PublicMenu/x.jsx:702-704` still renders the redundant `{tr("confirmation.your_order", "Ð’Ð°Ñˆ Ð·Ð°ÐºÐ°Ð·")}` header, and `pages/PublicMenu/x.jsx:737-741` still renders the `guestLabel` line. The confirmation screen therefore still shows both elements the task asked to remove. FIX: delete the header `<p>` above the items list and remove the `{guestLabel && (...)}` block, while keeping the items list, total, buttons, and pickup/delivery `clientName`.
+3. [P3] Fix 3 whitespace gap below "ÐÐ¾Ð²Ñ‹Ð¹ Ð·Ð°ÐºÐ°Ð·" is still present in layout - `pages/PublicMenu/CartView.jsx:950` keeps the new-order card, then `pages/PublicMenu/CartView.jsx:999-1000` inserts an unconditional `h-20` spacer before the sticky footer at `pages/PublicMenu/CartView.jsx:1014`. With a one-item cart, that spacer still creates visible empty space above the submit button. FIX: remove or reduce the unconditional spacer for the cart-present state, or replace it with footer-safe padding that does not create a visible gap after the new-order card.
+4. [P2] Fix 4 list-mode card text is still clamped to two lines - `pages/PublicMenu/MenuView.jsx:94-96` still uses `line-clamp-2` for both the dish name and the description inside `renderListCard`, so list cards remain taller than the requested compact one-line layout. FIX: change both list-mode clamps to `line-clamp-1` and leave tile-mode and the detail drawer unchanged.
+5. [P3] Fix 5 StickyCartBar redesign is not implemented - `pages/PublicMenu/StickyCartBar.jsx:31-57` still renders a left icon block plus a separate right-side `<Button>`, so the whole bar is not one tappable surface. In the same component, `cartTotalItems`, `formattedCartTotal`, `formattedBillTotal`, `hallModeLabel`, and `showBillAmount` are accepted at `pages/PublicMenu/StickyCartBar.jsx:14-21` but not rendered, so the required single-row badge + centered label + right-aligned price layout cannot appear. FIX: make the entire bar a single clickable control wired to the existing handler, render the quantity badge on the left, the current label text in the center, and a non-truncating price + chevron on the right.
+
+## Summary
+Total: 5 findings (0 P0, 1 P1, 2 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY â€” do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 - the bug was described clearly, but the exact offending element was not pinpointed; the task only suggested likely spacing sources.
+- Missing context (what info would have helped): The task referenced `BUGS_MASTER.md`, `ux-concepts/cart-view.md`, and `DECISIONS_INDEX.md Â§2`, but the speed rule limited review to the page folder, so those references could not be consulted.
+- Scope questions (anything you weren't sure if it's in scope): The task listed `pages/PublicMenu/useTableSession.jsx` as a context file, while the speed rule said to read only the target files plus `README.md` / `BUGS.md`; I treated `useTableSession.jsx` as out of scope.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-29.log b/pages/PublicMenu/commands_2026-03-29.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..b76fab556ebb282588955abdcb753f2e52f79db4
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-29.log
+@@ -0,0 +1,22 @@
++[timeout] Get-ChildItem -Name pages/PublicMenu
++[timeout] Get-Content pages/PublicMenu/README.md
++[timeout] Get-Content pages/PublicMenu/BUGS.md
++Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
++Get-Content pages/PublicMenu/README.md -TotalCount 250
++Get-Content pages/PublicMenu/BUGS.md -TotalCount 250
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'hallStickyBillTotal|OrderConfirmationScreen|confirmation\.your_order|confirmation\.guest_label|<StickyCartBar|showBillAmount|formattedBillTotal' -Context 6,10
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'new_order|renderBucketOrders|Отправить официанту|submit' -Context 6,12
++Select-String -Path pages/PublicMenu/MenuView.jsx -Pattern 'renderListCard|line-clamp-' -Context 4,6
++Get-Content pages/PublicMenu/StickyCartBar.jsx
++[timeout] $i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { if($i -ge 697 -and $i -le 741){ '{0}:{1}' -f $i, $_ }; $i++ }
++[timeout] $i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { if($i -ge 2281 -and $i -le 2288){ '{0}:{1}' -f $i, $_ }; $i++ }
++[timeout] $i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { if($i -ge 90 -and $i -le 98){ '{0}:{1}' -f $i, $_ }; $i++ }
++[timeout] $i=1; Get-Content pages/PublicMenu/StickyCartBar.jsx | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++Get-Content pages/PublicMenu/x.jsx -TotalCount 741 | Select-Object -Last 45
++Get-Content pages/PublicMenu/x.jsx -TotalCount 2288 | Select-Object -Last 10
++Get-Content pages/PublicMenu/MenuView.jsx -TotalCount 98 | Select-Object -Last 12
++Get-Content pages/PublicMenu/StickyCartBar.jsx -TotalCount 200
++Get-Content pages/PublicMenu/CartView.jsx -TotalCount 1016 | Select-Object -Last 25
++Get-Content pages/PublicMenu/CartView.jsx -TotalCount 1047 | Select-Object -Last 35
++Select-String -Path pages/PublicMenu/StickyCartBar.jsx -Pattern 'fixed bottom-0|Button|onButtonClick|cartTotalItems|formattedCartTotal|formattedBillTotal|hallModeLabel|showBillAmount|buttonLabel' -Context 0,2
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'Spacer so sticky footer|h-20|SECTION 2: NEW ORDER|Card className=\"mb-2\"|sticky bottom-0' -Context 1,2
+diff --git a/pages/PublicMenu/review_2026-03-29.md b/pages/PublicMenu/review_2026-03-29.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..53f1008d42cc79e0734e31dffde0a609da5987c0
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-29.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260329-121355-a291
++
++## Findings
++1. [P1] Fix 1 raw float is still passed into StickyCartBar totals - `pages/PublicMenu/x.jsx:2283-2287` still calls `formatPrice(myBill.total)` and `formatPrice(tableTotal)` directly, so hall-mode "Мой счёт" / "Заказы стола" can still expose JS precision artifacts like `189.039999...₸`. FIX: wrap both values with `parseFloat((value || 0).toFixed(2))` before passing them to `formatPrice()`.
++2. [P2] Fix 2 confirmation cleanup was not applied - `pages/PublicMenu/x.jsx:702-704` still renders the redundant `{tr("confirmation.your_order", "Ваш заказ")}` header, and `pages/PublicMenu/x.jsx:737-741` still renders the `guestLabel` line. The confirmation screen therefore still shows both elements the task asked to remove. FIX: delete the header `<p>` above the items list and remove the `{guestLabel && (...)}` block, while keeping the items list, total, buttons, and pickup/delivery `clientName`.
++3. [P3] Fix 3 whitespace gap below "Новый заказ" is still present in layout - `pages/PublicMenu/CartView.jsx:950` keeps the new-order card, then `pages/PublicMenu/CartView.jsx:999-1000` inserts an unconditional `h-20` spacer before the sticky footer at `pages/PublicMenu/CartView.jsx:1014`. With a one-item cart, that spacer still creates visible empty space above the submit button. FIX: remove or reduce the unconditional spacer for the cart-present state, or replace it with footer-safe padding that does not create a visible gap after the new-order card.
++4. [P2] Fix 4 list-mode card text is still clamped to two lines - `pages/PublicMenu/MenuView.jsx:94-96` still uses `line-clamp-2` for both the dish name and the description inside `renderListCard`, so list cards remain taller than the requested compact one-line layout. FIX: change both list-mode clamps to `line-clamp-1` and leave tile-mode and the detail drawer unchanged.
++5. [P3] Fix 5 StickyCartBar redesign is not implemented - `pages/PublicMenu/StickyCartBar.jsx:31-57` still renders a left icon block plus a separate right-side `<Button>`, so the whole bar is not one tappable surface. In the same component, `cartTotalItems`, `formattedCartTotal`, `formattedBillTotal`, `hallModeLabel`, and `showBillAmount` are accepted at `pages/PublicMenu/StickyCartBar.jsx:14-21` but not rendered, so the required single-row badge + centered label + right-aligned price layout cannot appear. FIX: make the entire bar a single clickable control wired to the existing handler, render the quantity badge on the left, the current label text in the center, and a non-truncating price + chevron on the right.
++
++## Summary
++Total: 5 findings (0 P0, 1 P1, 2 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 - the bug was described clearly, but the exact offending element was not pinpointed; the task only suggested likely spacing sources.
++- Missing context (what info would have helped): The task referenced `BUGS_MASTER.md`, `ux-concepts/cart-view.md`, and `DECISIONS_INDEX.md §2`, but the speed rule limited review to the page folder, so those references could not be consulted.
++- Scope questions (anything you weren't sure if it's in scope): The task listed `pages/PublicMenu/useTableSession.jsx` as a context file, while the speed rule said to read only the target files plus `README.md` / `BUGS.md`; I treated `useTableSession.jsx` as out of scope.
+diff --git a/pages/PublicMenu/round1_2026-03-29.md b/pages/PublicMenu/round1_2026-03-29.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6a0e19a0181f2c265503d7bc61321fe2f5ab7ee1
+--- /dev/null
++++ b/pages/PublicMenu/round1_2026-03-29.md
+@@ -0,0 +1,5 @@
++# Round 1 — PublicMenu Batch 4 review
++
++Scoped review covered only Fix 1-5 in `x.jsx`, `CartView.jsx`, `MenuView.jsx`, and `StickyCartBar.jsx`, plus `README.md` and `BUGS.md` in `pages/PublicMenu`.
++
++Result: 5 in-scope findings remain open. See `review_2026-03-29.md` for the full report and `pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md` for the pipeline copy.
+diff --git a/pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md b/pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..53f1008d42cc79e0734e31dffde0a609da5987c0
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260329-121355-a291
++
++## Findings
++1. [P1] Fix 1 raw float is still passed into StickyCartBar totals - `pages/PublicMenu/x.jsx:2283-2287` still calls `formatPrice(myBill.total)` and `formatPrice(tableTotal)` directly, so hall-mode "Мой счёт" / "Заказы стола" can still expose JS precision artifacts like `189.039999...₸`. FIX: wrap both values with `parseFloat((value || 0).toFixed(2))` before passing them to `formatPrice()`.
++2. [P2] Fix 2 confirmation cleanup was not applied - `pages/PublicMenu/x.jsx:702-704` still renders the redundant `{tr("confirmation.your_order", "Ваш заказ")}` header, and `pages/PublicMenu/x.jsx:737-741` still renders the `guestLabel` line. The confirmation screen therefore still shows both elements the task asked to remove. FIX: delete the header `<p>` above the items list and remove the `{guestLabel && (...)}` block, while keeping the items list, total, buttons, and pickup/delivery `clientName`.
++3. [P3] Fix 3 whitespace gap below "Новый заказ" is still present in layout - `pages/PublicMenu/CartView.jsx:950` keeps the new-order card, then `pages/PublicMenu/CartView.jsx:999-1000` inserts an unconditional `h-20` spacer before the sticky footer at `pages/PublicMenu/CartView.jsx:1014`. With a one-item cart, that spacer still creates visible empty space above the submit button. FIX: remove or reduce the unconditional spacer for the cart-present state, or replace it with footer-safe padding that does not create a visible gap after the new-order card.
++4. [P2] Fix 4 list-mode card text is still clamped to two lines - `pages/PublicMenu/MenuView.jsx:94-96` still uses `line-clamp-2` for both the dish name and the description inside `renderListCard`, so list cards remain taller than the requested compact one-line layout. FIX: change both list-mode clamps to `line-clamp-1` and leave tile-mode and the detail drawer unchanged.
++5. [P3] Fix 5 StickyCartBar redesign is not implemented - `pages/PublicMenu/StickyCartBar.jsx:31-57` still renders a left icon block plus a separate right-side `<Button>`, so the whole bar is not one tappable surface. In the same component, `cartTotalItems`, `formattedCartTotal`, `formattedBillTotal`, `hallModeLabel`, and `showBillAmount` are accepted at `pages/PublicMenu/StickyCartBar.jsx:14-21` but not rendered, so the required single-row badge + centered label + right-aligned price layout cannot appear. FIX: make the entire bar a single clickable control wired to the existing handler, render the quantity badge on the left, the current label text in the center, and a non-truncating price + chevron on the right.
++
++## Summary
++Total: 5 findings (0 P0, 1 P1, 2 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 - the bug was described clearly, but the exact offending element was not pinpointed; the task only suggested likely spacing sources.
++- Missing context (what info would have helped): The task referenced `BUGS_MASTER.md`, `ux-concepts/cart-view.md`, and `DECISIONS_INDEX.md §2`, but the speed rule limited review to the page folder, so those references could not be consulted.
++- Scope questions (anything you weren't sure if it's in scope): The task listed `pages/PublicMenu/useTableSession.jsx` as a context file, while the speed rule said to read only the target files plus `README.md` / `BUGS.md`; I treated `useTableSession.jsx` as out of scope.
+
+codex
+Findings are written to [publicmenu-260329-121355-a291-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md).
+
+I logged 5 in-scope findings only:
+Fix 1 float formatting is still missing in `hallStickyBillTotal`, Fix 2 confirmation cleanup was not applied, Fix 3 the one-item cart gap is still created by the spacer before the sticky footer, Fix 4 list-mode cards still use `line-clamp-2`, and Fix 5 the StickyCartBar redesign is not implemented and the whole bar is not a single tappable surface.
+
+Workspace copies are here:
+[review_2026-03-29.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-29.md)
+[round1_2026-03-29.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/round1_2026-03-29.md)
+[commands_2026-03-29.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-29.log)
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-29.log b/pages/PublicMenu/commands_2026-03-29.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..b76fab556ebb282588955abdcb753f2e52f79db4
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-29.log
+@@ -0,0 +1,22 @@
++[timeout] Get-ChildItem -Name pages/PublicMenu
++[timeout] Get-Content pages/PublicMenu/README.md
++[timeout] Get-Content pages/PublicMenu/BUGS.md
++Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
++Get-Content pages/PublicMenu/README.md -TotalCount 250
++Get-Content pages/PublicMenu/BUGS.md -TotalCount 250
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'hallStickyBillTotal|OrderConfirmationScreen|confirmation\.your_order|confirmation\.guest_label|<StickyCartBar|showBillAmount|formattedBillTotal' -Context 6,10
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'new_order|renderBucketOrders|Отправить официанту|submit' -Context 6,12
++Select-String -Path pages/PublicMenu/MenuView.jsx -Pattern 'renderListCard|line-clamp-' -Context 4,6
++Get-Content pages/PublicMenu/StickyCartBar.jsx
++[timeout] $i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { if($i -ge 697 -and $i -le 741){ '{0}:{1}' -f $i, $_ }; $i++ }
++[timeout] $i=1; Get-Content pages/PublicMenu/x.jsx | ForEach-Object { if($i -ge 2281 -and $i -le 2288){ '{0}:{1}' -f $i, $_ }; $i++ }
++[timeout] $i=1; Get-Content pages/PublicMenu/MenuView.jsx | ForEach-Object { if($i -ge 90 -and $i -le 98){ '{0}:{1}' -f $i, $_ }; $i++ }
++[timeout] $i=1; Get-Content pages/PublicMenu/StickyCartBar.jsx | ForEach-Object { '{0}:{1}' -f $i, $_; $i++ }
++Get-Content pages/PublicMenu/x.jsx -TotalCount 741 | Select-Object -Last 45
++Get-Content pages/PublicMenu/x.jsx -TotalCount 2288 | Select-Object -Last 10
++Get-Content pages/PublicMenu/MenuView.jsx -TotalCount 98 | Select-Object -Last 12
++Get-Content pages/PublicMenu/StickyCartBar.jsx -TotalCount 200
++Get-Content pages/PublicMenu/CartView.jsx -TotalCount 1016 | Select-Object -Last 25
++Get-Content pages/PublicMenu/CartView.jsx -TotalCount 1047 | Select-Object -Last 35
++Select-String -Path pages/PublicMenu/StickyCartBar.jsx -Pattern 'fixed bottom-0|Button|onButtonClick|cartTotalItems|formattedCartTotal|formattedBillTotal|hallModeLabel|showBillAmount|buttonLabel' -Context 0,2
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern 'Spacer so sticky footer|h-20|SECTION 2: NEW ORDER|Card className=\"mb-2\"|sticky bottom-0' -Context 1,2
+diff --git a/pages/PublicMenu/review_2026-03-29.md b/pages/PublicMenu/review_2026-03-29.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..53f1008d42cc79e0734e31dffde0a609da5987c0
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-29.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260329-121355-a291
++
++## Findings
++1. [P1] Fix 1 raw float is still passed into StickyCartBar totals - `pages/PublicMenu/x.jsx:2283-2287` still calls `formatPrice(myBill.total)` and `formatPrice(tableTotal)` directly, so hall-mode "Мой счёт" / "Заказы стола" can still expose JS precision artifacts like `189.039999...₸`. FIX: wrap both values with `parseFloat((value || 0).toFixed(2))` before passing them to `formatPrice()`.
++2. [P2] Fix 2 confirmation cleanup was not applied - `pages/PublicMenu/x.jsx:702-704` still renders the redundant `{tr("confirmation.your_order", "Ваш заказ")}` header, and `pages/PublicMenu/x.jsx:737-741` still renders the `guestLabel` line. The confirmation screen therefore still shows both elements the task asked to remove. FIX: delete the header `<p>` above the items list and remove the `{guestLabel && (...)}` block, while keeping the items list, total, buttons, and pickup/delivery `clientName`.
++3. [P3] Fix 3 whitespace gap below "Новый заказ" is still present in layout - `pages/PublicMenu/CartView.jsx:950` keeps the new-order card, then `pages/PublicMenu/CartView.jsx:999-1000` inserts an unconditional `h-20` spacer before the sticky footer at `pages/PublicMenu/CartView.jsx:1014`. With a one-item cart, that spacer still creates visible empty space above the submit button. FIX: remove or reduce the unconditional spacer for the cart-present state, or replace it with footer-safe padding that does not create a visible gap after the new-order card.
++4. [P2] Fix 4 list-mode card text is still clamped to two lines - `pages/PublicMenu/MenuView.jsx:94-96` still uses `line-clamp-2` for both the dish name and the description inside `renderListCard`, so list cards remain taller than the requested compact one-line layout. FIX: change both list-mode clamps to `line-clamp-1` and leave tile-mode and the detail drawer unchanged.
++5. [P3] Fix 5 StickyCartBar redesign is not implemented - `pages/PublicMenu/StickyCartBar.jsx:31-57` still renders a left icon block plus a separate right-side `<Button>`, so the whole bar is not one tappable surface. In the same component, `cartTotalItems`, `formattedCartTotal`, `formattedBillTotal`, `hallModeLabel`, and `showBillAmount` are accepted at `pages/PublicMenu/StickyCartBar.jsx:14-21` but not rendered, so the required single-row badge + centered label + right-aligned price layout cannot appear. FIX: make the entire bar a single clickable control wired to the existing handler, render the quantity badge on the left, the current label text in the center, and a non-truncating price + chevron on the right.
++
++## Summary
++Total: 5 findings (0 P0, 1 P1, 2 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 - the bug was described clearly, but the exact offending element was not pinpointed; the task only suggested likely spacing sources.
++- Missing context (what info would have helped): The task referenced `BUGS_MASTER.md`, `ux-concepts/cart-view.md`, and `DECISIONS_INDEX.md §2`, but the speed rule limited review to the page folder, so those references could not be consulted.
++- Scope questions (anything you weren't sure if it's in scope): The task listed `pages/PublicMenu/useTableSession.jsx` as a context file, while the speed rule said to read only the target files plus `README.md` / `BUGS.md`; I treated `useTableSession.jsx` as out of scope.
+diff --git a/pages/PublicMenu/round1_2026-03-29.md b/pages/PublicMenu/round1_2026-03-29.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6a0e19a0181f2c265503d7bc61321fe2f5ab7ee1
+--- /dev/null
++++ b/pages/PublicMenu/round1_2026-03-29.md
+@@ -0,0 +1,5 @@
++# Round 1 — PublicMenu Batch 4 review
++
++Scoped review covered only Fix 1-5 in `x.jsx`, `CartView.jsx`, `MenuView.jsx`, and `StickyCartBar.jsx`, plus `README.md` and `BUGS.md` in `pages/PublicMenu`.
++
++Result: 5 in-scope findings remain open. See `review_2026-03-29.md` for the full report and `pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md` for the pipeline copy.
+diff --git a/pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md b/pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..53f1008d42cc79e0734e31dffde0a609da5987c0
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md
+@@ -0,0 +1,17 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260329-121355-a291
++
++## Findings
++1. [P1] Fix 1 raw float is still passed into StickyCartBar totals - `pages/PublicMenu/x.jsx:2283-2287` still calls `formatPrice(myBill.total)` and `formatPrice(tableTotal)` directly, so hall-mode "Мой счёт" / "Заказы стола" can still expose JS precision artifacts like `189.039999...₸`. FIX: wrap both values with `parseFloat((value || 0).toFixed(2))` before passing them to `formatPrice()`.
++2. [P2] Fix 2 confirmation cleanup was not applied - `pages/PublicMenu/x.jsx:702-704` still renders the redundant `{tr("confirmation.your_order", "Ваш заказ")}` header, and `pages/PublicMenu/x.jsx:737-741` still renders the `guestLabel` line. The confirmation screen therefore still shows both elements the task asked to remove. FIX: delete the header `<p>` above the items list and remove the `{guestLabel && (...)}` block, while keeping the items list, total, buttons, and pickup/delivery `clientName`.
++3. [P3] Fix 3 whitespace gap below "Новый заказ" is still present in layout - `pages/PublicMenu/CartView.jsx:950` keeps the new-order card, then `pages/PublicMenu/CartView.jsx:999-1000` inserts an unconditional `h-20` spacer before the sticky footer at `pages/PublicMenu/CartView.jsx:1014`. With a one-item cart, that spacer still creates visible empty space above the submit button. FIX: remove or reduce the unconditional spacer for the cart-present state, or replace it with footer-safe padding that does not create a visible gap after the new-order card.
++4. [P2] Fix 4 list-mode card text is still clamped to two lines - `pages/PublicMenu/MenuView.jsx:94-96` still uses `line-clamp-2` for both the dish name and the description inside `renderListCard`, so list cards remain taller than the requested compact one-line layout. FIX: change both list-mode clamps to `line-clamp-1` and leave tile-mode and the detail drawer unchanged.
++5. [P3] Fix 5 StickyCartBar redesign is not implemented - `pages/PublicMenu/StickyCartBar.jsx:31-57` still renders a left icon block plus a separate right-side `<Button>`, so the whole bar is not one tappable surface. In the same component, `cartTotalItems`, `formattedCartTotal`, `formattedBillTotal`, `hallModeLabel`, and `showBillAmount` are accepted at `pages/PublicMenu/StickyCartBar.jsx:14-21` but not rendered, so the required single-row badge + centered label + right-aligned price layout cannot appear. FIX: make the entire bar a single clickable control wired to the existing handler, render the quantity badge on the left, the current label text in the center, and a non-truncating price + chevron on the right.
++
++## Summary
++Total: 5 findings (0 P0, 1 P1, 2 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 3 - the bug was described clearly, but the exact offending element was not pinpointed; the task only suggested likely spacing sources.
++- Missing context (what info would have helped): The task referenced `BUGS_MASTER.md`, `ux-concepts/cart-view.md`, and `DECISIONS_INDEX.md §2`, but the speed rule limited review to the page folder, so those references could not be consulted.
++- Scope questions (anything you weren't sure if it's in scope): The task listed `pages/PublicMenu/useTableSession.jsx` as a context file, while the speed rule said to read only the target files plus `README.md` / `BUGS.md`; I treated `useTableSession.jsx` as out of scope.
+
+tokens used
+53 499
+Findings are written to [publicmenu-260329-121355-a291-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260329-121355-a291-codex-findings.md).
+
+I logged 5 in-scope findings only:
+Fix 1 float formatting is still missing in `hallStickyBillTotal`, Fix 2 confirmation cleanup was not applied, Fix 3 the one-item cart gap is still created by the spacer before the sticky footer, Fix 4 list-mode cards still use `line-clamp-2`, and Fix 5 the StickyCartBar redesign is not implemented and the whole bar is not a single tappable surface.
+
+Workspace copies are here:
+[review_2026-03-29.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-29.md)
+[round1_2026-03-29.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/round1_2026-03-29.md)
+[commands_2026-03-29.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-29.log)

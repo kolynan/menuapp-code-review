@@ -1,0 +1,148 @@
+# PSSK v3: CC Review of KS Prompt — SOM Batch A Android Quick-Fix
+# Reviewer: Claude Code (CC)
+# Date: 2026-04-14
+# Session: S267, Task: task-260414-045840
+
+## Executive Summary
+
+Line numbers verified against `260413-00 StaffOrdersMobile RELEASE.jsx` (4524 lines).
+All 10 Fix1 locations, Fix2 code structures, Fix3 badge locations, Fix4 branch locations confirmed accurate.
+
+**1 BLOCKER found in Fix2 Change 3.** The replacement code for `filteredGroups` and `tabCounts` silently changes the `hasActiveRequest` computation from `activeRequests` (external filtered array, matched by table ID) to `group.requests` (property that DOES NOT EXIST on group objects). This would make `hasActiveRequest` always false, breaking request-based tab filtering.
+
+## Per-Fix Ratings
+
+### Fix 1 — Guest counter: 4.5/5 ✅ Clear (minor nits)
+
+**Line numbers:** All 10 verified correct.
+- B1: 670 (newOrders), 680 (inProgressOrders), 708 (readyOrders) ✓
+- B3: 1281 (newOrders), 1291 (inProgressOrders), 1319 (readyOrders) ✓
+- B6: 2331 (newOrders), 2333 (section.orders), 2335 (readyOrders), 2337 (servedOrders) ✓
+
+**Grep coverage:** HALL_UI_TEXT.guests catches B1+B3 (6 hits). pluralRu.*гост catches B6 (4 hits). Total 10. ✓
+
+**Nits (non-blocking):**
+1. ⚠️ The "Pattern to change" example only shows HALL_UI_TEXT.guests form. B6 uses hardcoded "гость"/"гостя"/"гостей". An implementor might not connect the dots. Suggestion: add a second pattern example for B6.
+2. ⚠️ `uniqueGuests(orders)` is called twice per template literal (once for number, once for pluralRu). Minor perf concern but acceptable for small datasets. Could use local const but not required.
+3. Fix1+Fix4 interaction is well-documented (lines 680/1291 get changed by Fix1, then deleted by Fix4). The APPLICATION ORDER section handles this correctly.
+
+### Fix 2 — Served visibility: 3/5 ❌ BLOCKER (Change 3 broken)
+
+**Change 1 (sessionHelpers.js closeSession):** ✅ Clear
+- closeSession verified at components/sessionHelpers.js:158-163
+- Callers verified: SOM (line 202 import, line 4098 call) + PartnerTables (line 61 import, line 1981 call). No other callers.
+- PartnerTables semantics verified: handleCloseSession at lines 1972-1991 — admin closes table, bulk-closing orders is correct.
+- Template code is safe.
+
+**Change 2 (line 3540 activeOrders filter):** ✅ Clear
+- Verified: line 3540 is `return o.status !== 'served' && o.status !== 'closed' && o.status !== 'cancelled';`
+- Removing 'served' keeps served orders in visibleOrders. Correct fix.
+
+**Change 3 (filteredGroups + tabCounts):** ❌ BLOCKER — `group.requests` DOES NOT EXIST
+
+Current code (line 3797):
+```javascript
+const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+```
+
+Prompt's replacement code:
+```javascript
+const hasActiveRequest = (group.requests || []).some(r => r.status !== 'resolved' && r.status !== 'cancelled');
+```
+
+**Problem:** Group objects are constructed at lines 3700-3746 with shape `{ type, id, displayName, orders }`. There is NO `requests` property. `group.requests` will always be `undefined`, so `(group.requests || [])` will always be `[]`, making `hasActiveRequest` always `false`.
+
+This silently breaks: tables with active requests but no active orders would no longer appear in the Active tab.
+
+**Fix needed:** The `hasActiveRequest` computation must remain unchanged from the current code. The ONLY addition should be `hasServedButNotClosed`. Corrected code:
+
+```javascript
+// filteredGroups — ONLY add hasServedButNotClosed, keep hasActiveRequest AS-IS
+const filteredGroups = orderGroups.filter(group => {
+  const hasActiveOrder = group.orders.some(o => {
+    const config = getStatusConfig(o);
+    return !config.isFinishStage && o.status !== 'cancelled';
+  });
+  const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+  // NEW (S267): served-but-not-closed — keep in Active tab until closeSession
+  const hasServedButNotClosed = group.orders.some(o => {
+    const config = getStatusConfig(o);
+    return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+  });
+  return activeTab === 'active'
+    ? (hasActiveOrder || hasActiveRequest || hasServedButNotClosed)
+    : (!hasActiveOrder && !hasActiveRequest && !hasServedButNotClosed);
+});
+```
+
+Same pattern for tabCounts — keep `hasActiveRequest` computation unchanged, only add `hasServedButNotClosed`.
+
+**Additional nit on Change 3:**
+- ⚠️ Current tabCounts uses `forEach` + mutable vars. Prompt provides `reduce` version. Minor style change, but should match existing pattern to avoid unnecessary diffs. Use `forEach` in the prompt.
+
+### Fix 3 — Star badge stopPropagation: 5/5 ✅ Clear
+
+- Line 2250: ★ mine badge — plain `<div>`, no onClick, no stopPropagation. Confirmed. ✓
+- Line 2260: ☆ free badge — plain `<div>`, no onClick, no stopPropagation. Confirmed. ✓
+- Line 2255: 🔒 other badge — already has `onClick` with `stopPropagation`. Confirmed. ✓
+- Fix is minimal, clear, well-scoped. No issues.
+
+### Fix 4 — Remove wrapper: 4/5 ⚠️ Needs minor clarification
+
+**Line numbers:** All 4 branches verified correct.
+- B1: 677-703 (uses inProgressSections.map, wrapped in inProgressExpanded toggle) ✓
+- B2: 761-769 (uses subGroups.map with subGroups.length===1 shortcut at line 767) ✓
+- B3: 1288-1314 (mirror of B1) ✓
+- B4: 1374-1398 (uses subGroups.map with subGroups.length===1 shortcut at line 1385) ✓
+
+**inProgressExpanded state:** Verified at lines 1780, 1816, 1823, 2346. After Fix4, 4 hits remain — correct. ✓
+
+**subGroups.length === 1 shortcut:** Found at lines 767 (B2), 1385 (B4), and 2346 (legacy, out of scope). Prompt correctly says to drop it in B2/B4. ✓
+
+**Clarifications needed (non-blocking):**
+
+1. ⚠️ B2/B4 currently use `renderLegacyOrderCard` (line 767: `orders.map(renderLegacyOrderCard)`). After migrating from `subGroups.map` to `inProgressSections.map`, should B2/B4 continue using `renderLegacyOrderCard` or switch to `renderHallRows`? The B6 reference model uses `renderHallRows`. The prompt doesn't explicitly state which render function to use in B2/B4 post-migration. Since B2/B4 are "legacy card" variants, they should keep `renderLegacyOrderCard`, but this should be explicitly stated.
+
+2. ⚠️ B2/B4 destructure `subGroups` items as `{ sid, orders, cfg }`, but `inProgressSections` items have different properties: `{ sid, orders, label, rowCount, bulkLabel, rows }`. After migration, code referencing `cfg.label` needs to become `section.label`, and `orders.length` for display needs to become `section.rowCount` (for dish count). The prompt's "Rules per section" section covers this but doesn't give B2/B4-specific code. Minor risk of implementor confusion.
+
+3. ⚠️ B1/B3 per-section headers currently show only `(${section.rowCount})` at line 692. After Fix4 promotes them to root level, the prompt says headers should have guest count + dish count format. This is covered in Fix4's "Rules per section" but the exact code isn't provided for B1/B3 either. B6 at line 2333 is the reference model — implementor should replicate that header format.
+
+**Grep verification:** All post-fix grep patterns are correct and comprehensive. ✓
+
+## Additional Findings
+
+### A1 — File line count correct
+Prompt says "4524 lines" — confirmed: `wc -l` returns 4524. ✓
+
+### A2 — APPLICATION ORDER is sound
+Fix1→Fix4→Fix2→Fix3 avoids conflicts. Fix1 changes lines that Fix4 later deletes, but this is explicitly documented. ✓
+
+### A3 — Scope lock is comprehensive
+All out-of-scope areas are correctly identified. Legacy branch 2346, PublicMenu, CartView, OrdersList, PartnerTables page code — all correctly excluded. ✓
+
+### A4 — Codex partial results
+Codex verified file identity (worktree `staffordersmobile.jsx` == `260413-00 RELEASE.jsx`, SHA256 match) and confirmed line numbers but did not produce structured Fix ratings due to path resolution issues consuming most of its execution time.
+
+## Summary Table
+
+| Fix | Rating | Status | Notes |
+|-----|--------|--------|-------|
+| Fix1 | 4.5/5 | ✅ Clear | Add B6 pattern example |
+| Fix2 | 3/5 | ❌ BLOCKER | Change 3: group.requests doesn't exist; must preserve original hasActiveRequest |
+| Fix3 | 5/5 | ✅ Clear | No changes needed |
+| Fix4 | 4/5 | ⚠️ Needs clarification | Specify B2/B4 render function; explicit header format |
+
+## Blocker Resolution Required
+
+Fix2 Change 3 MUST be rewritten before implementation round. The `group.requests` reference is a fabrication — this property does not exist on group objects. The fix is simple: keep the existing `hasActiveRequest` computation unchanged, only add `hasServedButNotClosed` as a third predicate. Corrected code provided above.
+
+**After this fix, Fix2 would rate 4.5/5 ✅.**
+
+## Target Check: All Fixes >= 4/5?
+
+- Fix1: 4.5/5 ✅ (passes)
+- Fix2: 3/5 ❌ (FAILS — needs Change 3 rewrite)
+- Fix3: 5/5 ✅ (passes)
+- Fix4: 4/5 ⚠️ (passes with minor clarifications)
+
+**Verdict: NOT ready for implementation. Fix2 Change 3 must be corrected first.**

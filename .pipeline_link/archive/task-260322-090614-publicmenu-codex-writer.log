@@ -1,0 +1,1025 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d13b9-11d1-7ac2-8b05-4fbd98a72b96
+--------
+user
+Review the file pages/PublicMenu/*.jsx for bugs in a React restaurant QR-menu app on Base44 platform. Also check pages/PublicMenu/README.md and pages/PublicMenu/BUGS.md for context (ONLY these 3 files, nothing else). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the 3 files above. Do NOT search the repo, do NOT read old findings, do NOT read files outside pages/PublicMenu/. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. Find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260322-090606-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260322-090606 ## Findings 1. [P0] Title — Description. FIX: ... 2. [P1] Title — Description. FIX: ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... Do NOT apply fixes — only document findings. === TASK CONTEXT === # Feature: Dynamic primary color в PublicMenu (#82, часть 2 из 2) Reference: `BUGS_MASTER.md` (PM-S81-04, PM-062), `references/PROMPT_TEMPLATES.md`, `ux-concepts/UX_LOCKED_PublicMenu.md`. Production page. **Контекст:** Задача #82 часть 1 добавила color picker в PartnerSettings — партнёр выбирает `primary_color` (hex-код) из 8 пресетов. Эта задача делает PublicMenu динамическим: вместо захардкоженного `#B5543A` (terracotta) используется цвет из `partner.primary_color`. **Pre-requisite:** - Поле `primary_color` уже существует в Partner entity (добавлено ранее). - PartnerSettings уже умеет записывать значение (часть 1, commit afeb603). - Если `primary_color` = null/undefined/пустая строка → использовать дефолт `#1A1A1A`. **Retry note:** Предыдущие прогоны падали из-за: (1) Codex cwd не git repo — fixed v5.4 KB-082; (2) Windows cmd.exe pipe в prompt — fixed v5.5 KB-083. --- ## Fix 1 — PM-S81-04 (P2) [MUST-FIX]: Заменить hardcoded #B5543A на dynamic primary_color ### Сейчас В x.jsx (и возможно CartView.jsx, ModeTabs.jsx) цвет `#B5543A` захардкожен в множестве мест: - CTA-кнопки: `bg-[#B5543A]` - Hover: `hover:bg-[#9A4530]` - Активные чипы/табы: `bg-[#F5E6E0] text-[#B5543A]` - Цена: `text-[#B5543A]` - FAB кнопка "+": `bg-[#B5543A]` - И другие акценты ### Должно быть 1. **Читать** `partner.primary_color` из Partner entity (объект `partner` уже загружается в x.jsx). 2. **Определить** цвет в начале компонента: ```javascript const primaryColor = partner?.primary_color || '#1A1A1A'; ``` 3. **Создать helper** для генерации hover-варианта (затемнение на 15%): ```javascript function darkenColor(hex, percent = 15) { const num = parseInt(hex.replace('#', ''), 16); const r = Math.max(0, (num >> 16) - Math.round(255 * percent / 100)); const g = Math.max(0, ((num >> 8) & 0x00FF) - Math.round(255 * percent / 100)); const b = Math.max(0, (num & 0x0000FF) - Math.round(255 * percent / 100)); return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`; } const primaryHover = darkenColor(primaryColor); ``` 4. **Создать helper** для light-варианта (фон активного чипа — 10% opacity): ```javascript function lightenColor(hex, opacity = 0.1) { const num = parseInt(hex.replace('#', ''), 16); const r = (num >> 16) & 0xFF; const g = (num >> 8) & 0xFF; const b = num & 0xFF; return `rgba(${r}, ${g}, ${b}, ${opacity})`; } const primaryLight = lightenColor(primaryColor); ``` 5. **Заменить ВСЕ** `bg-[#B5543A]` на `style={{ backgroundColor: primaryColor }}` 6. **Заменить ВСЕ** `hover:bg-[#9A4530]` на inline style или onMouseEnter/Leave с `primaryHover` 7. **Заменить ВСЕ** `text-[#B5543A]` на `style={{ color: primaryColor }}` 8. **Заменить ВСЕ** `bg-[#F5E6E0]` на `style={{ backgroundColor: primaryLight }}` ### НЕ должно быть - НИ ОДНОГО оставшегося `#B5543A` или `#9A4530` или `#F5E6E0` в коде — все три цвета должны стать динамическими - Hardcoded fallback на terracotta — если нет primary_color, дефолт = `#1A1A1A` (чёрный) - CSS variables через style тег — использовать inline styles (проще, надёжнее в B44) - Ломать UX LOCKED решения (см. UX_LOCKED_PublicMenu.md): FAB "+" остаётся fixed bottom-right ### Файл и локация Основной файл: `pages/PublicMenu/x.jsx` Вероятно затронуты: `CartView.jsx`, `ModeTabs.jsx` (если содержат hardcoded #B5543A) Entity read: `partner.primary_color` — объект `partner` уже доступен в компоненте. ### Уже пробовали PM-062 (chips indigo) пробовали фиксить 3 раза через КС — проблема была в компоненте CategoryChips который игнорировал prop. Здесь другой подход: мы заменяем ВСЕ hardcoded цвета на inline styles с динамическим значением, включая CategoryChips. ### Проверка 1. Partner с `primary_color: "#E8590C"` (оранжевый) — открыть /x — ВСЕ кнопки, чипы, акценты оранжевые. 2. Partner с `primary_color: null` — открыть /x — ВСЕ кнопки, чипы, акценты чёрные (`#1A1A1A`). 3. `grep -r "B5543A" pages/PublicMenu/` — 0 результатов (ни одного hardcoded цвета). 4. FAB кнопка "+" — цвет динамический, позиция fixed bottom-right (не изменена). 5. Корзина, checkout, drawer — все CTA-кнопки используют динамический цвет. --- ## SCOPE LOCK — менять ТОЛЬКО то, что указано выше - Заменять ТОЛЬКО цвета `#B5543A`, `#9A4530`, `#F5E6E0` на динамические. - ВСЁ остальное (layout, позиции, размеры, поведение, state logic) — НЕ ТРОГАТЬ. - UX LOCKED решения (см. `ux-concepts/UX_LOCKED_PublicMenu.md`) — ЗАПРЕЩЕНО менять. - НЕ рефакторить компоненты, НЕ менять структуру файлов, НЕ добавлять новые компоненты. - НЕ трогать: polling logic, order flow, cart logic, drawer behavior, i18n. - Если видишь проблему не из этой задачи — ПРОПУСТИ, не чини. ## Implementation Notes - Файлы: `x.jsx`, `CartView.jsx`, `ModeTabs.jsx` (проверить все три на hardcoded цвета) - Helper functions (darkenColor, lightenColor) определить В НАЧАЛЕ файла x.jsx, перед компонентом - partner объект уже загружается — просто добавить .primary_color - Inline styles имеют приоритет над Tailwind классами — это ОК для динамических цветов - git add pages/PublicMenu/x.jsx pages/PublicMenu/CartView.jsx pages/PublicMenu/ModeTabs.jsx && git commit -m "feat: dynamic primary color from partner settings (#82)" && git push === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/PublicMenu` within the scope you set. I’m only reading the target JSX file plus `README.md` and `BUGS.md`, then I’ll write the findings file and the command log into the required locations.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/BUGS.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/README.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 11.40s:
+
+ exited 124 in 11.47s:
+
+ exited 124 in 12.26s:
+
+codex
+The first reads timed out, likely due to file size or shell startup overhead. I’m retrying with longer timeouts and still keeping scope limited to `pages/PublicMenu` only.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/BUGS.md -Raw' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/README.md -Raw' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 13.31s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 13.81s:
+---
+version: "29.0"
+updated: "2026-03-21"
+session: 153
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*18 active bugs remaining (0x P0, 8x P1, 7x P2, 2x P3, 1x suggestion).*
+
+### BUG-PM-056: Drawer layout not visit-state-driven (P1 â€” Batch 2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P1
+- **ÐšÐ¾Ð³Ð´Ð°:** S153 (consensus chain publicmenu-260321-093745)
+ succeeded in 14.55s:
+versions
+260320-01 useTableSession RELEASE.jsx
+260321-02 CartView RELEASE.jsx
+260321-02 x RELEASE.jsx
+ACCEPTANCE_CRITERIA_PHASE1.md
+BUGS.md
+CartView.jsx
+CheckoutView.jsx
+COPY_SPEC.md
+i18n_DrawerUX_S79.csv
+i18n_WorkingHours_S79.csv
+MenuView.jsx
+ModeTabs.jsx
+PublicMenu README.md
+PublicMenu_BASE.txt
+README.md
+STYLE_GUIDE.md
+TESTING_LOG.md
+TEST_PLAN_batch-a5.md
+TEST_PLAN_batch4.md
+codex
+I’ve confirmed the folder contents. Given your “only these 3 files” restriction, I’m treating the target JSX as `pages/PublicMenu/x.jsx` plus `README.md` and `BUGS.md`, and not opening the other JSX files.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/x.jsx -Raw' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 22.63s:
+// ======================================================
+// pages/x.jsx â€” PUBLIC MENU with i18n + Channels Visibility + Gating
+// UPDATED: Simplified Hall logic (TASK-260123-01b)
+// FIXED: P0-1..P0-7 security and functionality fixes
+// UPDATED: TASK-260127-01 - session restore, UI cleanup
+// PATCHED: 2026-01-28 - P0-1, P0-2, P0-2b, P1-1..P1-4
+// PATCHED: 2026-02-01 - FIX-260131-07 FINAL - guest safeguard in submit
+// PATCHED: 2026-02-01 - TASK-260201-01 - Hall StickyBar always visible
+// PATCHED: 2026-03-03 - GAP-01 - Order Confirmation Screen
+// FIXED: 2026-03-03 - GAP-01 fix - Confirmation as full-screen overlay (z-60)
+// FIXED: 2026-03-03 - GAP-02 fix - Embed OrderStatusScreen inside x.jsx (no /orderstatus route)
+// FIXED: 2026-03-03 - GAP-02 fix - Remove auto-dismiss timer (race condition: ghost click on menu)
+// ======================================================
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { useI18n } from "@/components/i18n";
+import { toast } from "sonner"; // P0-6: sonner instead of custom toast
+ succeeded in 24.10s:
+3275
+codex
+I have the main file loaded. Next I’m narrowing to concrete hotspots inside `x.jsx`: hardcoded palette values, partner lookup/error handling, remaining hardcoded copy, and a few mobile-sheet interactions that tend to regress.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern '#B5543A','#9A4530','#F5E6E0','primary_color','partner_not_found','common.loading','restaurant not found','catch','aria-label','setTimeout','console.log','console.error' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'Partner.findById|Partner\\.|partnerId|useQuery\\(|queryFn|error\\.partner_not_found|return null' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 6.34s:
+145:} catch {
+178:} catch {}
+192:} catch {}
+202:} catch {
+212:} catch {}
+289:} catch { return false; }
+296:} catch { /* private browsing — ignore */ }
+384:"error.partner_not_found": "Ресторан не найден",
+445:"common.loading": "Загрузка...",
+751:style={{backgroundColor:'#B5543A'}}
+770:style={{color:'#B5543A'}}
+963:} catch { /* retry on next poll */ }
+1024:<Loader2 className="w-8 h-8 animate-spin" style={{color:'#B5543A'}} />
+1156:<Phone className="w-5 h-5" style={{color:'#B5543A'}} />
+1157:<span className="text-sm font-medium" style={{color:'#B5543A'}}>{phoneLink.url.replace("tel:", "")}</span>
+1335:} catch (e) {
+1342:} catch (e) {
+1383:} catch (e) {
+1400:} catch (e) {
+1529:} catch (e) {
+ succeeded in 6.43s:
+127:const looksLikePartnerId = (value) =>
+169:const saveCartToStorage = (partnerId, cartData) => {
+170:if (!partnerId) return;
+172:const key = `menuapp_cart_${partnerId}`;
+181:const getCartFromStorage = (partnerId) => {
+182:if (!partnerId) return null;
+184:const key = `menuapp_cart_${partnerId}`;
+186:if (!raw) return null;
+195:if (!data || !Array.isArray(data.items)) return null;
+199:return null;
+203:return null;
+207:const clearCartStorage = (partnerId) => {
+208:if (!partnerId) return;
+210:const key = `menuapp_cart_${partnerId}`;
+303:if (!stages?.length) return null;
+384:"error.partner_not_found": "Ресторан не найден",
+886:function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }) {
+895:} = useQuery({
+900:queryFn: async () => {
+902:if (!orders || orders.length === 0) return null;
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=3184; $end=3193; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=1318; $end=1346; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=3034; $end=3043; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 5.92s:
+1318:  const [hasRatedInSession, setHasRatedInSession] = useState(false);
+1319:  const [ratingSavingByItemId, setRatingSavingByItemId] = useState({});
+1320:
+1321:  // Partner fetch (id or slug) - MUST BE FIRST before any partner dependencies
+1322:  const { data: partner, isLoading: loadingPartner } = useQuery({
+1323:    queryKey: ["publicPartner", partnerParamRaw],
+1324:    enabled: !!partnerParamRaw,
+1325:    retry: shouldRetry,
+1326:    queryFn: async () => {
+1327:      const p = partnerParamRaw;
+1328:      if (!p) return null;
+1329:
+1330:      const byIdFirst = looksLikePartnerId(p);
+1331:
+1332:      try {
+1333:        const res = await base44.entities.Partner.filter(byIdFirst ? { id: p } : { slug: p });
+1334:        if (res?.[0]) return res[0];
+1335:      } catch (e) {
+1336:        // Partner primary lookup failed â€” silent in prod
+1337:      }
+ succeeded in 5.95s:
+3184:          sortedCategories={sortedCategories}
+3185:          activeCategoryKey={activeCategoryKey}
+3186:          onCategoryClick={handleCategoryClick}
+3187:          getCategoryName={getCategoryName}
+3188:          chipRefs={chipRefs}
+3189:          t={t}
+3190:          activeColor="#B5543A"
+3191:        />
+3192:      )}
+3193:
+ succeeded in 6.00s:
+3034:    );
+3035:  }
+3036:
+3037:  if (!partner) {
+3038:    return (
+3039:      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+3040:        <Card className="w-full max-w-md text-center p-6">
+3041:          <p className="text-slate-500">{t('error.partner_not_found')}</p>
+3042:        </Card>
+3043:      </div>
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $ranges=@(@(742,774),@(1018,1026),@(1149,1159),@(3418,3472)); foreach($r in $ranges){ $start=$r[0]; $end=$r[1]; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }; '"'---' }" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.00s:
+742:            </p>
+743:          )}
+744:        </CardContent>
+745:      </Card>
+746:
+747:      {/* Action buttons */}
+748:      <div className="space-y-3">
+749:        <Button
+750:          className="w-full h-12 text-white"
+751:          style={{backgroundColor:'#B5543A'}}
+752:          onClick={onBackToMenu}
+753:        >
+754:          {tr("confirmation.back_to_menu", "Ð’ÐµÑ€Ð½ÑƒÑ‚ÑŒÑÑ Ð² Ð¼ÐµÐ½ÑŽ")}
+755:        </Button>
+756:
+757:        <Button
+758:          variant="outline"
+759:          className="w-full h-12"
+760:          onClick={onOpenOrders}
+761:        >
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=1536; $end=1572; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.12s:
+1536:
+1537:  // Set language from URL param or partner default
+1538:  useEffect(() => {
+1539:    if (!partner) return;
+1540:    
+1541:    const partnerDefault = partner.default_language || "RU";
+1542:    const enabledLangs = Array.isArray(partner.enabled_languages) && partner.enabled_languages.length > 0
+1543:      ? partner.enabled_languages
+1544:      : [partnerDefault];
+1545:    
+1546:    if (langParam && enabledLangs.includes(langParam)) {
+1547:      if (lang !== langParam) setLang(langParam);
+1548:    } else if (!enabledLangs.includes(lang)) {
+1549:      setLang(partnerDefault);
+1550:    }
+1551:  }, [partner?.id, partner?.default_language, langParam]);
+1552:  // P0-7: Removed hallTableSelectEnabled - no dropdown
+1553:
+1554:  // P0-1: Table verified ONLY when actually resolved or verified by code input
+1555:  // Removed hasTableInUrl from condition - URL param alone doesn't mean verified
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'const \\{ t, lang, setLang \\}|const tr =|useI18n\\(' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.60s:
+618:const tr = (key, fallback) => {
+1225:const { lang, setLang, t: rawT } = useI18n();
+1229:const tr = (key, fallback) => {
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=612; $end=626; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=1218; $end=1236; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 5.67s:
+1218:  if (!ts) return "";
+1219:  const d = new Date(ts);
+1220:  if (Number.isNaN(d.getTime())) return "";
+1221:  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+1222:}
+1223:
+1224:export default function X() {
+1225:  const { lang, setLang, t: rawT } = useI18n();
+1226:  const t = makeSafeT(rawT);
+1227:
+1228:  // Safe translation with explicit fallback (kept for backward compat)
+1229:  const tr = (key, fallback) => {
+1230:    const val = t(key);
+1231:    return val || fallback;
+1232:  };
+1233:
+1234:  const location = useLocation();
+1235:  const queryClient = useQueryClient();
+1236:
+ succeeded in 5.66s:
+612:  onBackToMenu,
+613:  onOpenOrders,
+614:  onTrackOrder,
+615:  t,
+616:}) {
+617:  // Safe translation with fallback
+618:  const tr = (key, fallback) => {
+619:    const val = typeof t === "function" ? t(key) : "";
+620:    if (!val || typeof val !== "string") return fallback;
+621:    const norm = val.trim();
+622:    if (norm === key || norm.startsWith(key + ":")) return fallback;
+623:    return norm;
+624:  };
+625:
+626:  return (
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'function makeSafeT|const makeSafeT' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 5.14s:
+523:function makeSafeT(rawT) {
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=523; $end=560; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.41s:
+523:function makeSafeT(rawT) {
+524:  return (key, params) => {
+525:    // Try the real translation first
+526:    const val = typeof rawT === "function" ? rawT(key, params) : "";
+527:    if (val && typeof val === "string") {
+528:      const norm = val.trim();
+529:      // If t() returned something other than the raw key, use it
+530:      if (norm !== key && !norm.startsWith(key + ":")) return norm;
+531:    }
+532:    // Fallback from map
+533:    let fb = I18N_FALLBACKS[key];
+534:    if (!fb) return "";
+535:    // Simple {param} interpolation for fallbacks
+536:    if (params && typeof params === "object") {
+537:      Object.entries(params).forEach(([k, v]) => {
+538:        fb = fb.replace(new RegExp(`\\{${k}\\}`, "g"), String(v ?? ""));
+539:      });
+540:    }
+541:    return fb;
+542:  };
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=1128; $end=1158; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.27s:
+1128:                    </span>
+1129:                  </div>
+1130:                ))}
+1131:              </div>
+1132:              <div className="border-t border-slate-200 pt-3 mt-3">
+1133:                <div className="flex justify-between items-center">
+1134:                  <span className="font-medium text-slate-800">{t("order_status.total")}</span>
+1135:                  <span className="font-semibold text-slate-800 tabular-nums">{formatPrice(displayTotal)}</span>
+1136:                </div>
+1137:              </div>
+1138:              {order.discount_amount > 0 && (
+1139:                <p className="text-xs text-green-600 mt-2">
+1140:                  {t("order_status.discount")}: -{formatPrice(order.discount_amount)}
+1141:                </p>
+1142:              )}
+1143:            </CardContent>
+1144:          </Card>
+1145:        )}
+1146:
+1147:        {/* Contact restaurant */}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'phoneLink' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.12s:
+949:const phoneLink = useMemo(() => {
+1148:{phoneLink && (
+1153:href={phoneLink.url}
+1157:<span className="text-sm font-medium" style={{color:'#B5543A'}}>{phoneLink.url.replace("tel:", "")}</span>
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=944; $end=956; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 5.64s:
+944:    queryFn: async () => {
+945:      return await base44.entities.PartnerContactLink.filter({ partner: partnerId });
+946:    },
+947:  });
+948:
+949:  const phoneLink = useMemo(() => {
+950:    return contactLinks.find(
+951:      (link) => link.is_active !== false && typeof link.url === "string" && OS_SAFE_TEL_RE.test(link.url)
+952:    );
+953:  }, [contactLinks]);
+954:
+955:  // Polling for status updates
+956:  // Polling for status updates (closure variable instead of ref)
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $ranges=@(@(2078,2104),@(2218,2245),@(2600,2632)); foreach($r in $ranges){ $start=$r[0]; $end=$r[1]; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }; '"'---' }" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 4.28s:
+2078:  const showCartButton = isHallMode && (isTableVerified || (cart?.length || 0) > 0);
+2079:
+2080:  // After F5, table is verified from localStorage but session data is still loading from server
+2081:  // Time-bounded: after 3s assume no session exists (prevents permanent "loading" for new visits)
+2082:  const [sessionCheckTimedOut, setSessionCheckTimedOut] = useState(false);
+2083:  useEffect(() => {
+2084:    if (!isTableVerified || tableSession) return;
+2085:    const timer = setTimeout(() => setSessionCheckTimedOut(true), 3000);
+2086:    return () => clearTimeout(timer);
+2087:  }, [isTableVerified, tableSession]);
+2088:  const isSessionLoading = isTableVerified && !tableSession && !sessionCheckTimedOut;
+2089:
+2090:  // Just-in-time: auto-submit after table verification via confirmation sheet
+2091:  useEffect(() => {
+2092:    if (pendingSubmitRef.current && isTableVerified && currentTableId) {
+2093:      pendingSubmitRef.current = false;
+2094:      setShowTableConfirmSheet(false);
+2095:      // Slight delay to let state propagate
+2096:      setTimeout(() => handleSubmitOrder(), 100);
+2097:    }
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=2100; $end=2146; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 4.04s:
+2100:  // Hall StickyBar mode: Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÑÐµÐ¼ Ñ‡Ñ‚Ð¾ Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°Ñ‚ÑŒ
+2101:  const hallStickyMode =
+2102:    (cart?.length || 0) > 0
+2103:      ? "cart"
+2104:      : (myOrders?.length || 0) > 0
+2105:        ? "myBill"
+2106:        : (sessionOrders?.length || 0) > 0
+2107:          ? "tableOrders"
+2108:          : "cartEmpty";
+2109:
+2110:  // Hall StickyBar label: Ñ‚ÐµÐºÑÑ‚ ÐºÐ½Ð¾Ð¿ÐºÐ¸
+2111:  const hallStickyButtonLabel =
+2112:    hallStickyMode === "cart"
+2113:      ? tr("cart.checkout", "ÐžÑ„Ð¾Ñ€Ð¼Ð¸Ñ‚ÑŒ Ð·Ð°ÐºÐ°Ð·")
+2114:      : hallStickyMode === "myBill"
+2115:        ? tr("cart.my_bill", "ÐœÐ¾Ð¹ ÑÑ‡Ñ‘Ñ‚")
+2116:        : hallStickyMode === "tableOrders"
+2117:          ? tr("cart.table_orders", "Ð—Ð°ÐºÐ°Ð·Ñ‹ ÑÑ‚Ð¾Ð»Ð°")
+2118:          : isSessionLoading
+2119:            ? tr("common.loading", "Ð—Ð°Ð³Ñ€ÑƒÐ·ÐºÐ°...")
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=1888; $end=1902; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.06s:
+1888:          pickup: t('mode.pickup'),
+1889:          delivery: t('mode.delivery'),
+1890:        };
+1891:        setRedirectBanner({
+1892:          originalMode: modeLabels[originalMode] || originalMode,
+1893:          newMode: modeLabels[firstAvailable.id] || firstAvailable.id,
+1894:        });
+1895:
+1896:        const timerId = setTimeout(() => setRedirectBanner(null), 5000);
+1897:        return () => clearTimeout(timerId);
+1898:      }
+1899:    }
+1900:  }, [partner, loadingDishes, channels, orderMode, visibleModeTabs, t]);
+1901:
+1902:  const visibleDishes = useMemo(() => {
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'toast\\.(success|error|info|warning)\\(' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.85s:
+1495:toast.error(t('error.invalid_link'), { id: 'mm1' });
+2057:toast.success(t('review.thanks'), { id: 'mm1' });
+2067:toast.error(t('error.save_failed'), { id: 'mm1' });
+2260:toast.info(t('cart.items_removed_mode_switch', { count: removed }), { duration: 3000 });
+2288:toast.success(t('cart.item_added'), { id: 'cart-add', duration: 2000 });
+2446:toast.error(t('loyalty.insufficient_points'), { id: 'mm1' });
+2633:toast.error(tr('cart.empty', 'Корзина пуста'), { id: 'mm1' });
+2666:toast.error(t('error.session_expired'), { id: 'session-err' });
+2830:toast.error(t('loyalty.insufficient_points'), { id: 'mm1' });
+2974:toast.success(t('guest.name_saved'), { id: 'mm1' });
+2977:toast.error(t('error.save_failed'), { id: 'mm1' });
+2988:toast.info(tr('cart.bill_already_requested', 'Счёт уже запрошен'), { id: 'mm1' });
+3005:toast.success(tr('cart.bill_requested', 'Официант скоро принесёт счёт'), { id: 'mm1' });
+3008:toast.error(t('toast.error'), { id: 'mm1' });
+3564:toast.info(t('common.loading'), { id: 'mm1', duration: 1500 });
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'guest.name_saved|cart.items_removed_mode_switch|toast.error' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.10s:
+442:"guest.name_saved": "Имя сохранено",
+444:"toast.error": "Ошибка",
+509:"cart.items_removed_mode_switch": "Убрано {count} блюд, недоступных в этом режиме",
+1495:toast.error(t('error.invalid_link'), { id: 'mm1' });
+2067:toast.error(t('error.save_failed'), { id: 'mm1' });
+2260:toast.info(t('cart.items_removed_mode_switch', { count: removed }), { duration: 3000 });
+2446:toast.error(t('loyalty.insufficient_points'), { id: 'mm1' });
+2633:toast.error(tr('cart.empty', 'Корзина пуста'), { id: 'mm1' });
+2666:toast.error(t('error.session_expired'), { id: 'session-err' });
+2830:toast.error(t('loyalty.insufficient_points'), { id: 'mm1' });
+2974:toast.success(t('guest.name_saved'), { id: 'mm1' });
+2977:toast.error(t('error.save_failed'), { id: 'mm1' });
+3008:toast.error(t('toast.error'), { id: 'mm1' });
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern '<button|<Button' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 1.95s:
+749:<Button
+757:<Button
+767:<Button
+1011:<Button variant="outline" className="min-h-[44px]" onClick={onBackToMenu}>{t("order_status.back_to_menu")}</Button>
+1040:<Button variant="outline" className="min-h-[44px]" onClick={onBackToMenu}>{t("order_status.back_to_menu")}</Button>
+1057:<Button variant="outline" className="min-h-[44px] mt-4" onClick={onBackToMenu}>{t("order_status.back_to_menu")}</Button>
+1073:<button
+1173:<Button
+3458:<Button
+3474:<button
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $ranges=@(@(1068,1079),@(1168,1178),@(3472,3480)); foreach($r in $ranges){ $start=$r[0]; $end=$r[1]; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }; '"'---' }" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.32s:
+1068:
+1069:  return (
+1070:    <div className="fixed inset-0 z-[60] bg-slate-50 overflow-y-auto">
+1071:      <div className="max-w-md mx-auto px-4 py-6">
+1072:        {/* Back button */}
+1073:        <button
+1074:          className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-4 min-h-[44px]"
+1075:          onClick={onBackToMenu}
+1076:        >
+1077:          <ArrowLeft className="w-4 h-4" />
+1078:          {t("order_status.back_to_menu")}
+1079:        </button>
+---
+1168:            </p>
+1169:          </div>
+1170:        )}
+1171:        {!isTerminal && (
+1172:          <div className="text-center pt-2">
+1173:            <Button
+1174:              variant="ghost"
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=1173; $end=1184; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.25s:
+1173:            <Button
+1174:              variant="ghost"
+1175:              size="sm"
+1176:              className="text-slate-400 hover:text-slate-600"
+1177:              onClick={async () => {
+1178:                const result = await refetchOrder();
+1179:                if (result.data) setLastUpdated(new Date());
+1180:              }}
+1181:            >
+1182:              <RefreshCw className="w-4 h-4 mr-1" />
+1183:              {t("order_status.refresh")}
+1184:            </Button>
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'dishesError|categoriesError|loadingPartner|loadingDishes|error:' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.05s:
+893:error: orderError,
+1322:const { data: partner, isLoading: loadingPartner } = useQuery({
+1601:const { data: allDishes, isLoading: loadingDishes, error: dishesError } = useQuery({
+1608:const { data: allCategories, error: categoriesError } = useQuery({
+1871:if (!partner || loadingDishes) return;
+1900:}, [partner, loadingDishes, channels, orderMode, visibleModeTabs, t]);
+3029:if (loadingPartner) {
+3048:if ((dishesError || categoriesError) && !isRateLimitError(dishesError) && !isRateLimitError(categoriesError)) {
+3058:if (!loadingDishes && !channels.hasAnyContent) {
+3205:loadingDishes={loadingDishes}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=3044; $end=3060; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.03s:
+3044:    );
+3045:  }
+3046:
+3047:  // P1-5: Error UI for failed requests
+3048:  if ((dishesError || categoriesError) && !isRateLimitError(dishesError) && !isRateLimitError(categoriesError)) {
+3049:    return (
+3050:      <ErrorState
+3051:        onRetry={() => window.location.reload()}
+3052:        t={t}
+3053:      />
+3054:    );
+3055:  }
+3056:
+3057:  // Empty state: no content at all
+3058:  if (!loadingDishes && !channels.hasAnyContent) {
+3059:    return (
+3060:      <EmptyMenuState
+codex
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=886; $end=906; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.54s:
+886:function OrderStatusScreen({ token, partnerId: knownPartnerId, onBackToMenu, t }) {
+887:  const [lastUpdated, setLastUpdated] = useState(null);
+888:  const [secondsAgo, setSecondsAgo] = useState(0);
+889:
+890:  const {
+891:    data: orderData,
+892:    isLoading: loadingOrder,
+893:    error: orderError,
+894:    refetch: refetchOrder,
+895:  } = useQuery({
+896:    queryKey: ["orderByToken", token],
+897:    enabled: !!token && OS_TOKEN_RE.test(token),
+898:    retry: 1,
+899:    staleTime: OS_POLL_INTERVAL_MS,
+900:    queryFn: async () => {
+901:      const orders = await base44.entities.Order.filter({ public_token: token });
+902:      if (!orders || orders.length === 0) return null;
+903:      return orders[0];
+904:    },
+905:  });
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'orderError|not_found|expired|order_status.no_token' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 4.34s:
+60:isSessionExpired,
+341:"order_status.no_token": "Ссылка на заказ отсутствует",
+344:"order_status.not_found": "Заказ не найден",
+345:"order_status.expired": "Заказ устарел",
+380:"error.session_expired": "Сессия истекла",
+384:"error.partner_not_found": "Ресторан не найден",
+893:error: orderError,
+913:const isExpired = useMemo(() => {
+958:if (!token || !order || isTerminal || isExpired) return;
+966:}, [token, order?.id, isTerminal, isExpired, refetchOrder]);
+1009:<h2 className="text-lg font-semibold text-slate-800 mb-2">{t("order_status.no_token")}</h2>
+1031:if (orderError || !order) {
+1038:<h2 className="text-lg font-semibold text-slate-800 mb-2">{t("order_status.not_found")}</h2>
+1048:// Expired
+1049:if (isExpired) {
+1056:<h2 className="text-lg font-semibold text-slate-800 mb-2">{t("order_status.expired")}</h2>
+2437:total_expired: 0,
+2646:if (session && isSessionExpired(session)) {
+2647:// Session expired — close it in DB and force new one
+2650:status: 'expired',
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=1028; $end=1042; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.46s:
+1028:  }
+1029:
+1030:  // Error / not found
+1031:  if (orderError || !order) {
+1032:    return (
+1033:      <div className="fixed inset-0 z-[60] overflow-y-auto" style={{backgroundColor:'#faf9f7'}}>
+1034:        <div className="min-h-screen flex items-center justify-center p-4">
+1035:          <Card className="w-full max-w-md">
+1036:            <CardContent className="p-8 text-center">
+1037:              <XCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+1038:              <h2 className="text-lg font-semibold text-slate-800 mb-2">{t("order_status.not_found")}</h2>
+1039:              <p className="text-sm text-slate-500 mb-4">{t("order_status.check_link")}</p>
+1040:              <Button variant="outline" className="min-h-[44px]" onClick={onBackToMenu}>{t("order_status.back_to_menu")}</Button>
+1041:            </CardContent>
+1042:          </Card>
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'cart.confirm_table.dismissed|cart.confirm_table.title|cart.confirm_table.subtitle|cart.confirm_table.benefit_loyalty|cart.confirm_table.benefit_default|cart.confirm_table.submit|cart.confirm_table.change|cart.verify.enter_table_code' | ForEach-Object { \"{0}:{1}\" -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.48s:
+470:"cart.verify.enter_table_code": "Введите код стола",
+511:"cart.confirm_table.title": "Подтвердите стол",
+512:"cart.confirm_table.subtitle": "Чтобы отправить заказ официанту",
+513:"cart.confirm_table.benefit_loyalty": "По онлайн-заказу вы получите бонусы / скидку",
+514:"cart.confirm_table.benefit_default": "Так официант быстрее найдёт ваш заказ",
+515:"cart.confirm_table.submit": "Подтвердить и отправить",
+516:"cart.confirm_table.change": "Не тот стол? Изменить",
+3393:toast(tr('cart.confirm_table.dismissed', 'Для отправки заказа нужно подтвердить стол'), { id: 'table-dismiss' });
+3402:{tr('cart.confirm_table.title', 'Подтвердите стол')}
+3405:{tr('cart.confirm_table.subtitle', 'Чтобы отправить заказ официанту')}
+3409:? tr('cart.confirm_table.benefit_loyalty', 'По онлайн-заказу вы получите бонусы / скидку')
+3410:: tr('cart.confirm_table.benefit_default', 'Так официант быстрее найдёт ваш заказ')}
+3417:{tr('cart.verify.enter_table_code', 'Введите код стола')}
+3445:aria-label={tr('cart.verify.enter_table_code', 'Введите код стола')}
+3471:: tr('cart.confirm_table.submit', 'Подтвердить и отправить')}
+3481:{tr('cart.confirm_table.change', 'Не тот стол? Изменить')}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=2938; $end=2956; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.06s:
+2938:        // GAP-01: Show confirmation screen instead of toast + delayed transition
+2939:        showConfirmation({
+2940:          items: confirmedItems,
+2941:          totalAmount: confirmedTotal,
+2942:          guestLabel: null,
+2943:          orderMode,
+2944:          publicToken: order.public_token,
+2945:          clientName: savedClientName,
+2946:        });
+2947:
+2948:      }
+2949:    } catch (err) {
+2950:      console.error(err);
+2951:      setSubmitError(t('error.send.title'));
+2952:    } finally {
+2953:      submitLockRef.current = false;
+2954:      setIsSubmitting(false);
+2955:    }
+2956:  };
+codex
+I’ve narrowed the concrete findings. I’m writing the requested pipeline file now, and I’ll also drop the repo-required review copy and command log in `pages/PublicMenu/` without touching code.
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-22.log
+Get-ChildItem -Name pages/PublicMenu
+Get-Content pages/PublicMenu/README.md
+Get-Content pages/PublicMenu/BUGS.md
+Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
+Get-Content pages/PublicMenu/README.md -Raw
+Get-Content pages/PublicMenu/BUGS.md -Raw
+Get-Content pages/PublicMenu/x.jsx -Raw
+(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
+Select-String -Path pages/PublicMenu/x.jsx -Pattern '#B5543A','#9A4530','#F5E6E0','primary_color','partner_not_found','common.loading','restaurant not found','catch','aria-label','setTimeout','console.log','console.error' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'Partner.findById|Partner\\.|partnerId|useQuery\\(|queryFn|error\\.partner_not_found|return null' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=1318; $end=1346; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=3034; $end=3043; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=3184; $end=3193; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+$lines = Get-Content pages/PublicMenu/x.jsx; $ranges=@(@(742,774),@(1018,1026),@(1149,1159),@(3418,3472)); foreach($r in $ranges){ $start=$r[0]; $end=$r[1]; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }; '---' }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=1536; $end=1572; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'const \\{ t, lang, setLang \\}|const tr =|useI18n\\(' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=1218; $end=1236; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=612; $end=626; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'function makeSafeT|const makeSafeT' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=523; $end=560; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=1128; $end=1158; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'phoneLink' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=944; $end=956; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+$lines = Get-Content pages/PublicMenu/x.jsx; $ranges=@(@(2078,2104),@(2218,2245),@(2600,2632)); foreach($r in $ranges){ $start=$r[0]; $end=$r[1]; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }; '---' }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=2100; $end=2146; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=1888; $end=1902; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'toast\\.(success|error|info|warning)\\(' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'guest.name_saved|cart.items_removed_mode_switch|toast.error' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern '<button|<Button' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+$lines = Get-Content pages/PublicMenu/x.jsx; $ranges=@(@(1068,1079),@(1168,1178),@(3472,3480)); foreach($r in $ranges){ $start=$r[0]; $end=$r[1]; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }; '---' }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=1173; $end=1184; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'dishesError|categoriesError|loadingPartner|loadingDishes|error:' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=3044; $end=3060; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=886; $end=906; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'orderError|not_found|expired|order_status.no_token' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=1028; $end=1042; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=2938; $end=2956; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260322-090606-codex-findings.md
+# Codex Writer Findings — PublicMenu
+Chain: publicmenu-260322-090606
+
+## Findings
+1. [P1] Partner lookup collapses backend failures into “restaurant not found” — In `x.jsx:1322-1345`, both partner lookups swallow exceptions and return `null`; then `x.jsx:3037-3042` always renders `error.partner_not_found`. A transient Base44/network failure is misreported as a bad QR link, so guests get no retryable error state. FIX: keep lookup exceptions separate from a true empty result and render a retry-capable backend error UI instead of always showing `error.partner_not_found`.
+2. [P1] Order status screen also misreports fetch errors as “not found” — In `x.jsx:900-904`, the order query can fail, but `x.jsx:1031-1039` treats `orderError || !order` as the same branch and always shows `order_status.not_found`. That hides server/network failures and tells guests their link is invalid when the backend may just be unavailable. FIX: split `orderError` from `!order`, show a retryable fetch-error state for query failures, and reserve `order_status.not_found` for confirmed empty results.
+3. [P1] Hall StickyCartBar ignores visit lifecycle state — `x.jsx:2101-2144` derives the hall sticky bar from only four modes (`cart`, `myBill`, `tableOrders`, `cartEmpty`) based on cart/order counts. It never inspects visit lifecycle state such as closed/paid/draft-specific states, so CTA text, totals, and visibility are wrong once a visit moves past the basic “cart vs orders” cases. FIX: derive sticky-bar state from the full table session / bill lifecycle matrix and map label, amount, and visibility from that state instead of only from item counts.
+4. [P2] Dynamic primary color is not implemented in `x.jsx` — The file never reads `partner.primary_color`, and hardcoded terracotta is still present at `x.jsx:751`, `x.jsx:770`, `x.jsx:1024`, `x.jsx:1156-1157`, `x.jsx:3190`, `x.jsx:3426`, and `x.jsx:3460`. That means the page still ignores partner-selected branding and also keeps the old terracotta fallback instead of the required `#1A1A1A`. FIX: define `primaryColor`/derived variants from `partner?.primary_color || '#1A1A1A'` near the main component state and replace every remaining `#B5543A`-based accent in this file with dynamic inline styles/props.
+5. [P2] Auto-submit after table verification uses an untracked timeout — In `x.jsx:2091-2098`, the effect schedules `setTimeout(() => handleSubmitOrder(), 100)` with no cleanup and without tracking the timer handle. That is a React anti-pattern and can fire a stale submit if the component rerenders/unmounts or the user changes state during the 100 ms gap. FIX: store the timeout id in a ref, clear it in the effect cleanup, and invoke a stable submit callback only while the confirmation flow is still current.
+6. [P3] Table-code confirmation sheet has no real focus feedback on mobile — The visible digit cells at `x.jsx:3424-3428` use `focus-within:border-[#B5543A]`, but the actual `<Input>` is rendered separately at `x.jsx:3433-3445`, outside those cells. On mobile, focusing the input never highlights the code boxes, so the active typing target is unclear in the bottom sheet. FIX: drive the cell highlight from explicit input-focus state, or move the focusable input inside the visual wrapper that is supposed to react to focus.
+
+## Summary
+Total: 6 findings (0 P0, 3 P1, 2 P2, 1 P3)
+
+## Prompt Clarity
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): The request says `pages/PublicMenu/*.jsx` but also says “ONLY these 3 files”; in this folder `*.jsx` matches multiple files, so it was unclear whether the target JSX file was only `x.jsx` or every JSX file in `pages/PublicMenu/`.
+- Missing context (what info would have helped): An explicit filename list, e.g. `x.jsx + README.md + BUGS.md`, would remove the scope ambiguity.
+- Scope questions (anything you weren't sure if it's in scope): Whether already-documented active bugs in `BUGS.md` should still be re-reported if they are visibly still present in `x.jsx`.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-22.md
+# Codex Writer Findings — PublicMenu
+Chain: publicmenu-260322-090606
+
+## Findings
+1. [P1] Partner lookup collapses backend failures into “restaurant not found” — In `x.jsx:1322-1345`, both partner lookups swallow exceptions and return `null`; then `x.jsx:3037-3042` always renders `error.partner_not_found`. A transient Base44/network failure is misreported as a bad QR link, so guests get no retryable error state. FIX: keep lookup exceptions separate from a true empty result and render a retry-capable backend error UI instead of always showing `error.partner_not_found`.
+2. [P1] Order status screen also misreports fetch errors as “not found” — In `x.jsx:900-904`, the order query can fail, but `x.jsx:1031-1039` treats `orderError || !order` as the same branch and always shows `order_status.not_found`. That hides server/network failures and tells guests their link is invalid when the backend may just be unavailable. FIX: split `orderError` from `!order`, show a retryable fetch-error state for query failures, and reserve `order_status.not_found` for confirmed empty results.
+3. [P1] Hall StickyCartBar ignores visit lifecycle state — `x.jsx:2101-2144` derives the hall sticky bar from only four modes (`cart`, `myBill`, `tableOrders`, `cartEmpty`) based on cart/order counts. It never inspects visit lifecycle state such as closed/paid/draft-specific states, so CTA text, totals, and visibility are wrong once a visit moves past the basic “cart vs orders” cases. FIX: derive sticky-bar state from the full table session / bill lifecycle matrix and map label, amount, and visibility from that state instead of only from item counts.
+4. [P2] Dynamic primary color is not implemented in `x.jsx` — The file never reads `partner.primary_color`, and hardcoded terracotta is still present at `x.jsx:751`, `x.jsx:770`, `x.jsx:1024`, `x.jsx:1156-1157`, `x.jsx:3190`, `x.jsx:3426`, and `x.jsx:3460`. That means the page still ignores partner-selected branding and also keeps the old terracotta fallback instead of the required `#1A1A1A`. FIX: define `primaryColor`/derived variants from `partner?.primary_color || '#1A1A1A'` near the main component state and replace every remaining `#B5543A`-based accent in this file with dynamic inline styles/props.
+5. [P2] Auto-submit after table verification uses an untracked timeout — In `x.jsx:2091-2098`, the effect schedules `setTimeout(() => handleSubmitOrder(), 100)` with no cleanup and without tracking the timer handle. That is a React anti-pattern and can fire a stale submit if the component rerenders/unmounts or the user changes state during the 100 ms gap. FIX: store the timeout id in a ref, clear it in the effect cleanup, and invoke a stable submit callback only while the confirmation flow is still current.
+6. [P3] Table-code confirmation sheet has no real focus feedback on mobile — The visible digit cells at `x.jsx:3424-3428` use `focus-within:border-[#B5543A]`, but the actual `<Input>` is rendered separately at `x.jsx:3433-3445`, outside those cells. On mobile, focusing the input never highlights the code boxes, so the active typing target is unclear in the bottom sheet. FIX: drive the cell highlight from explicit input-focus state, or move the focusable input inside the visual wrapper that is supposed to react to focus.
+
+## Summary
+Total: 6 findings (0 P0, 3 P1, 2 P2, 1 P3)
+
+## Prompt Clarity
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): The request says `pages/PublicMenu/*.jsx` but also says “ONLY these 3 files”; in this folder `*.jsx` matches multiple files, so it was unclear whether the target JSX file was only `x.jsx` or every JSX file in `pages/PublicMenu/`.
+- Missing context (what info would have helped): An explicit filename list, e.g. `x.jsx + README.md + BUGS.md`, would remove the scope ambiguity.
+- Scope questions (anything you weren't sure if it's in scope): Whether already-documented active bugs in `BUGS.md` should still be re-reported if they are visibly still present in `x.jsx`.
+apply_patch(auto_approved=true) exited 0 in 765ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260322-090606-codex-findings.md
+A pages/PublicMenu/review_2026-03-22.md
+A pages/PublicMenu/commands_2026-03-22.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-22.log b/pages/PublicMenu/commands_2026-03-22.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..56a8f0c81000d2a241552f637d089999aea4eb83
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-22.log
+@@ -0,0 +1,37 @@
++Get-ChildItem -Name pages/PublicMenu
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
++Get-Content pages/PublicMenu/README.md -Raw
++Get-Content pages/PublicMenu/BUGS.md -Raw
++Get-Content pages/PublicMenu/x.jsx -Raw
++(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
++Select-String -Path pages/PublicMenu/x.jsx -Pattern '#B5543A','#9A4530','#F5E6E0','primary_color','partner_not_found','common.loading','restaurant not found','catch','aria-label','setTimeout','console.log','console.error' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'Partner.findById|Partner\\.|partnerId|useQuery\\(|queryFn|error\\.partner_not_found|return null' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1318; $end=1346; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3034; $end=3043; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3184; $end=3193; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $ranges=@(@(742,774),@(1018,1026),@(1149,1159),@(3418,3472)); foreach($r in $ranges){ $start=$r[0]; $end=$r[1]; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }; '---' }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1536; $end=1572; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'const \\{ t, lang, setLang \\}|const tr =|useI18n\\(' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1218; $end=1236; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=612; $end=626; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'function makeSafeT|const makeSafeT' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=523; $end=560; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1128; $end=1158; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'phoneLink' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=944; $end=956; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $ranges=@(@(2078,2104),@(2218,2245),@(2600,2632)); foreach($r in $ranges){ $start=$r[0]; $end=$r[1]; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }; '---' }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=2100; $end=2146; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1888; $end=1902; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'toast\\.(success|error|info|warning)\\(' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'guest.name_saved|cart.items_removed_mode_switch|toast.error' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern '<button|<Button' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $ranges=@(@(1068,1079),@(1168,1178),@(3472,3480)); foreach($r in $ranges){ $start=$r[0]; $end=$r[1]; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }; '---' }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1173; $end=1184; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'dishesError|categoriesError|loadingPartner|loadingDishes|error:' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3044; $end=3060; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=886; $end=906; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'orderError|not_found|expired|order_status.no_token' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1028; $end=1042; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=2938; $end=2956; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+diff --git a/pages/PublicMenu/review_2026-03-22.md b/pages/PublicMenu/review_2026-03-22.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..29d1d69fe4aad28614fb8420b632a2363488cd47
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-22.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-090606
++
++## Findings
++1. [P1] Partner lookup collapses backend failures into “restaurant not found” — In `x.jsx:1322-1345`, both partner lookups swallow exceptions and return `null`; then `x.jsx:3037-3042` always renders `error.partner_not_found`. A transient Base44/network failure is misreported as a bad QR link, so guests get no retryable error state. FIX: keep lookup exceptions separate from a true empty result and render a retry-capable backend error UI instead of always showing `error.partner_not_found`.
++2. [P1] Order status screen also misreports fetch errors as “not found” — In `x.jsx:900-904`, the order query can fail, but `x.jsx:1031-1039` treats `orderError || !order` as the same branch and always shows `order_status.not_found`. That hides server/network failures and tells guests their link is invalid when the backend may just be unavailable. FIX: split `orderError` from `!order`, show a retryable fetch-error state for query failures, and reserve `order_status.not_found` for confirmed empty results.
++3. [P1] Hall StickyCartBar ignores visit lifecycle state — `x.jsx:2101-2144` derives the hall sticky bar from only four modes (`cart`, `myBill`, `tableOrders`, `cartEmpty`) based on cart/order counts. It never inspects visit lifecycle state such as closed/paid/draft-specific states, so CTA text, totals, and visibility are wrong once a visit moves past the basic “cart vs orders” cases. FIX: derive sticky-bar state from the full table session / bill lifecycle matrix and map label, amount, and visibility from that state instead of only from item counts.
++4. [P2] Dynamic primary color is not implemented in `x.jsx` — The file never reads `partner.primary_color`, and hardcoded terracotta is still present at `x.jsx:751`, `x.jsx:770`, `x.jsx:1024`, `x.jsx:1156-1157`, `x.jsx:3190`, `x.jsx:3426`, and `x.jsx:3460`. That means the page still ignores partner-selected branding and also keeps the old terracotta fallback instead of the required `#1A1A1A`. FIX: define `primaryColor`/derived variants from `partner?.primary_color || '#1A1A1A'` near the main component state and replace every remaining `#B5543A`-based accent in this file with dynamic inline styles/props.
++5. [P2] Auto-submit after table verification uses an untracked timeout — In `x.jsx:2091-2098`, the effect schedules `setTimeout(() => handleSubmitOrder(), 100)` with no cleanup and without tracking the timer handle. That is a React anti-pattern and can fire a stale submit if the component rerenders/unmounts or the user changes state during the 100 ms gap. FIX: store the timeout id in a ref, clear it in the effect cleanup, and invoke a stable submit callback only while the confirmation flow is still current.
++6. [P3] Table-code confirmation sheet has no real focus feedback on mobile — The visible digit cells at `x.jsx:3424-3428` use `focus-within:border-[#B5543A]`, but the actual `<Input>` is rendered separately at `x.jsx:3433-3445`, outside those cells. On mobile, focusing the input never highlights the code boxes, so the active typing target is unclear in the bottom sheet. FIX: drive the cell highlight from explicit input-focus state, or move the focusable input inside the visual wrapper that is supposed to react to focus.
++
++## Summary
++Total: 6 findings (0 P0, 3 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): The request says `pages/PublicMenu/*.jsx` but also says “ONLY these 3 files”; in this folder `*.jsx` matches multiple files, so it was unclear whether the target JSX file was only `x.jsx` or every JSX file in `pages/PublicMenu/`.
++- Missing context (what info would have helped): An explicit filename list, e.g. `x.jsx + README.md + BUGS.md`, would remove the scope ambiguity.
++- Scope questions (anything you weren't sure if it's in scope): Whether already-documented active bugs in `BUGS.md` should still be re-reported if they are visibly still present in `x.jsx`.
+diff --git a/pipeline/chain-state/publicmenu-260322-090606-codex-findings.md b/pipeline/chain-state/publicmenu-260322-090606-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..29d1d69fe4aad28614fb8420b632a2363488cd47
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260322-090606-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-090606
++
++## Findings
++1. [P1] Partner lookup collapses backend failures into “restaurant not found” — In `x.jsx:1322-1345`, both partner lookups swallow exceptions and return `null`; then `x.jsx:3037-3042` always renders `error.partner_not_found`. A transient Base44/network failure is misreported as a bad QR link, so guests get no retryable error state. FIX: keep lookup exceptions separate from a true empty result and render a retry-capable backend error UI instead of always showing `error.partner_not_found`.
++2. [P1] Order status screen also misreports fetch errors as “not found” — In `x.jsx:900-904`, the order query can fail, but `x.jsx:1031-1039` treats `orderError || !order` as the same branch and always shows `order_status.not_found`. That hides server/network failures and tells guests their link is invalid when the backend may just be unavailable. FIX: split `orderError` from `!order`, show a retryable fetch-error state for query failures, and reserve `order_status.not_found` for confirmed empty results.
++3. [P1] Hall StickyCartBar ignores visit lifecycle state — `x.jsx:2101-2144` derives the hall sticky bar from only four modes (`cart`, `myBill`, `tableOrders`, `cartEmpty`) based on cart/order counts. It never inspects visit lifecycle state such as closed/paid/draft-specific states, so CTA text, totals, and visibility are wrong once a visit moves past the basic “cart vs orders” cases. FIX: derive sticky-bar state from the full table session / bill lifecycle matrix and map label, amount, and visibility from that state instead of only from item counts.
++4. [P2] Dynamic primary color is not implemented in `x.jsx` — The file never reads `partner.primary_color`, and hardcoded terracotta is still present at `x.jsx:751`, `x.jsx:770`, `x.jsx:1024`, `x.jsx:1156-1157`, `x.jsx:3190`, `x.jsx:3426`, and `x.jsx:3460`. That means the page still ignores partner-selected branding and also keeps the old terracotta fallback instead of the required `#1A1A1A`. FIX: define `primaryColor`/derived variants from `partner?.primary_color || '#1A1A1A'` near the main component state and replace every remaining `#B5543A`-based accent in this file with dynamic inline styles/props.
++5. [P2] Auto-submit after table verification uses an untracked timeout — In `x.jsx:2091-2098`, the effect schedules `setTimeout(() => handleSubmitOrder(), 100)` with no cleanup and without tracking the timer handle. That is a React anti-pattern and can fire a stale submit if the component rerenders/unmounts or the user changes state during the 100 ms gap. FIX: store the timeout id in a ref, clear it in the effect cleanup, and invoke a stable submit callback only while the confirmation flow is still current.
++6. [P3] Table-code confirmation sheet has no real focus feedback on mobile — The visible digit cells at `x.jsx:3424-3428` use `focus-within:border-[#B5543A]`, but the actual `<Input>` is rendered separately at `x.jsx:3433-3445`, outside those cells. On mobile, focusing the input never highlights the code boxes, so the active typing target is unclear in the bottom sheet. FIX: drive the cell highlight from explicit input-focus state, or move the focusable input inside the visual wrapper that is supposed to react to focus.
++
++## Summary
++Total: 6 findings (0 P0, 3 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): The request says `pages/PublicMenu/*.jsx` but also says “ONLY these 3 files”; in this folder `*.jsx` matches multiple files, so it was unclear whether the target JSX file was only `x.jsx` or every JSX file in `pages/PublicMenu/`.
++- Missing context (what info would have helped): An explicit filename list, e.g. `x.jsx + README.md + BUGS.md`, would remove the scope ambiguity.
++- Scope questions (anything you weren't sure if it's in scope): Whether already-documented active bugs in `BUGS.md` should still be re-reported if they are visibly still present in `x.jsx`.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-22.log b/pages/PublicMenu/commands_2026-03-22.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..56a8f0c81000d2a241552f637d089999aea4eb83
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-22.log
+@@ -0,0 +1,37 @@
++Get-ChildItem -Name pages/PublicMenu
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
++Get-Content pages/PublicMenu/README.md -Raw
++Get-Content pages/PublicMenu/BUGS.md -Raw
++Get-Content pages/PublicMenu/x.jsx -Raw
++(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
++Select-String -Path pages/PublicMenu/x.jsx -Pattern '#B5543A','#9A4530','#F5E6E0','primary_color','partner_not_found','common.loading','restaurant not found','catch','aria-label','setTimeout','console.log','console.error' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'Partner.findById|Partner\\.|partnerId|useQuery\\(|queryFn|error\\.partner_not_found|return null' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1318; $end=1346; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3034; $end=3043; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3184; $end=3193; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $ranges=@(@(742,774),@(1018,1026),@(1149,1159),@(3418,3472)); foreach($r in $ranges){ $start=$r[0]; $end=$r[1]; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }; '---' }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1536; $end=1572; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'const \\{ t, lang, setLang \\}|const tr =|useI18n\\(' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1218; $end=1236; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=612; $end=626; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'function makeSafeT|const makeSafeT' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=523; $end=560; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1128; $end=1158; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'phoneLink' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=944; $end=956; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $ranges=@(@(2078,2104),@(2218,2245),@(2600,2632)); foreach($r in $ranges){ $start=$r[0]; $end=$r[1]; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }; '---' }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=2100; $end=2146; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1888; $end=1902; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'toast\\.(success|error|info|warning)\\(' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'guest.name_saved|cart.items_removed_mode_switch|toast.error' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern '<button|<Button' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $ranges=@(@(1068,1079),@(1168,1178),@(3472,3480)); foreach($r in $ranges){ $start=$r[0]; $end=$r[1]; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }; '---' }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1173; $end=1184; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'dishesError|categoriesError|loadingPartner|loadingDishes|error:' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3044; $end=3060; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=886; $end=906; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'orderError|not_found|expired|order_status.no_token' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1028; $end=1042; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=2938; $end=2956; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+diff --git a/pages/PublicMenu/review_2026-03-22.md b/pages/PublicMenu/review_2026-03-22.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..29d1d69fe4aad28614fb8420b632a2363488cd47
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-22.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-090606
++
++## Findings
++1. [P1] Partner lookup collapses backend failures into “restaurant not found” — In `x.jsx:1322-1345`, both partner lookups swallow exceptions and return `null`; then `x.jsx:3037-3042` always renders `error.partner_not_found`. A transient Base44/network failure is misreported as a bad QR link, so guests get no retryable error state. FIX: keep lookup exceptions separate from a true empty result and render a retry-capable backend error UI instead of always showing `error.partner_not_found`.
++2. [P1] Order status screen also misreports fetch errors as “not found” — In `x.jsx:900-904`, the order query can fail, but `x.jsx:1031-1039` treats `orderError || !order` as the same branch and always shows `order_status.not_found`. That hides server/network failures and tells guests their link is invalid when the backend may just be unavailable. FIX: split `orderError` from `!order`, show a retryable fetch-error state for query failures, and reserve `order_status.not_found` for confirmed empty results.
++3. [P1] Hall StickyCartBar ignores visit lifecycle state — `x.jsx:2101-2144` derives the hall sticky bar from only four modes (`cart`, `myBill`, `tableOrders`, `cartEmpty`) based on cart/order counts. It never inspects visit lifecycle state such as closed/paid/draft-specific states, so CTA text, totals, and visibility are wrong once a visit moves past the basic “cart vs orders” cases. FIX: derive sticky-bar state from the full table session / bill lifecycle matrix and map label, amount, and visibility from that state instead of only from item counts.
++4. [P2] Dynamic primary color is not implemented in `x.jsx` — The file never reads `partner.primary_color`, and hardcoded terracotta is still present at `x.jsx:751`, `x.jsx:770`, `x.jsx:1024`, `x.jsx:1156-1157`, `x.jsx:3190`, `x.jsx:3426`, and `x.jsx:3460`. That means the page still ignores partner-selected branding and also keeps the old terracotta fallback instead of the required `#1A1A1A`. FIX: define `primaryColor`/derived variants from `partner?.primary_color || '#1A1A1A'` near the main component state and replace every remaining `#B5543A`-based accent in this file with dynamic inline styles/props.
++5. [P2] Auto-submit after table verification uses an untracked timeout — In `x.jsx:2091-2098`, the effect schedules `setTimeout(() => handleSubmitOrder(), 100)` with no cleanup and without tracking the timer handle. That is a React anti-pattern and can fire a stale submit if the component rerenders/unmounts or the user changes state during the 100 ms gap. FIX: store the timeout id in a ref, clear it in the effect cleanup, and invoke a stable submit callback only while the confirmation flow is still current.
++6. [P3] Table-code confirmation sheet has no real focus feedback on mobile — The visible digit cells at `x.jsx:3424-3428` use `focus-within:border-[#B5543A]`, but the actual `<Input>` is rendered separately at `x.jsx:3433-3445`, outside those cells. On mobile, focusing the input never highlights the code boxes, so the active typing target is unclear in the bottom sheet. FIX: drive the cell highlight from explicit input-focus state, or move the focusable input inside the visual wrapper that is supposed to react to focus.
++
++## Summary
++Total: 6 findings (0 P0, 3 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): The request says `pages/PublicMenu/*.jsx` but also says “ONLY these 3 files”; in this folder `*.jsx` matches multiple files, so it was unclear whether the target JSX file was only `x.jsx` or every JSX file in `pages/PublicMenu/`.
++- Missing context (what info would have helped): An explicit filename list, e.g. `x.jsx + README.md + BUGS.md`, would remove the scope ambiguity.
++- Scope questions (anything you weren't sure if it's in scope): Whether already-documented active bugs in `BUGS.md` should still be re-reported if they are visibly still present in `x.jsx`.
+diff --git a/pipeline/chain-state/publicmenu-260322-090606-codex-findings.md b/pipeline/chain-state/publicmenu-260322-090606-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..29d1d69fe4aad28614fb8420b632a2363488cd47
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260322-090606-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-090606
++
++## Findings
++1. [P1] Partner lookup collapses backend failures into “restaurant not found” — In `x.jsx:1322-1345`, both partner lookups swallow exceptions and return `null`; then `x.jsx:3037-3042` always renders `error.partner_not_found`. A transient Base44/network failure is misreported as a bad QR link, so guests get no retryable error state. FIX: keep lookup exceptions separate from a true empty result and render a retry-capable backend error UI instead of always showing `error.partner_not_found`.
++2. [P1] Order status screen also misreports fetch errors as “not found” — In `x.jsx:900-904`, the order query can fail, but `x.jsx:1031-1039` treats `orderError || !order` as the same branch and always shows `order_status.not_found`. That hides server/network failures and tells guests their link is invalid when the backend may just be unavailable. FIX: split `orderError` from `!order`, show a retryable fetch-error state for query failures, and reserve `order_status.not_found` for confirmed empty results.
++3. [P1] Hall StickyCartBar ignores visit lifecycle state — `x.jsx:2101-2144` derives the hall sticky bar from only four modes (`cart`, `myBill`, `tableOrders`, `cartEmpty`) based on cart/order counts. It never inspects visit lifecycle state such as closed/paid/draft-specific states, so CTA text, totals, and visibility are wrong once a visit moves past the basic “cart vs orders” cases. FIX: derive sticky-bar state from the full table session / bill lifecycle matrix and map label, amount, and visibility from that state instead of only from item counts.
++4. [P2] Dynamic primary color is not implemented in `x.jsx` — The file never reads `partner.primary_color`, and hardcoded terracotta is still present at `x.jsx:751`, `x.jsx:770`, `x.jsx:1024`, `x.jsx:1156-1157`, `x.jsx:3190`, `x.jsx:3426`, and `x.jsx:3460`. That means the page still ignores partner-selected branding and also keeps the old terracotta fallback instead of the required `#1A1A1A`. FIX: define `primaryColor`/derived variants from `partner?.primary_color || '#1A1A1A'` near the main component state and replace every remaining `#B5543A`-based accent in this file with dynamic inline styles/props.
++5. [P2] Auto-submit after table verification uses an untracked timeout — In `x.jsx:2091-2098`, the effect schedules `setTimeout(() => handleSubmitOrder(), 100)` with no cleanup and without tracking the timer handle. That is a React anti-pattern and can fire a stale submit if the component rerenders/unmounts or the user changes state during the 100 ms gap. FIX: store the timeout id in a ref, clear it in the effect cleanup, and invoke a stable submit callback only while the confirmation flow is still current.
++6. [P3] Table-code confirmation sheet has no real focus feedback on mobile — The visible digit cells at `x.jsx:3424-3428` use `focus-within:border-[#B5543A]`, but the actual `<Input>` is rendered separately at `x.jsx:3433-3445`, outside those cells. On mobile, focusing the input never highlights the code boxes, so the active typing target is unclear in the bottom sheet. FIX: drive the cell highlight from explicit input-focus state, or move the focusable input inside the visual wrapper that is supposed to react to focus.
++
++## Summary
++Total: 6 findings (0 P0, 3 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): The request says `pages/PublicMenu/*.jsx` but also says “ONLY these 3 files”; in this folder `*.jsx` matches multiple files, so it was unclear whether the target JSX file was only `x.jsx` or every JSX file in `pages/PublicMenu/`.
++- Missing context (what info would have helped): An explicit filename list, e.g. `x.jsx + README.md + BUGS.md`, would remove the scope ambiguity.
++- Scope questions (anything you weren't sure if it's in scope): Whether already-documented active bugs in `BUGS.md` should still be re-reported if they are visibly still present in `x.jsx`.
+
+codex
+Findings are saved in [publicmenu-260322-090606-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260322-090606-codex-findings.md). I kept scope to [x.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx), [README.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/README.md), and [BUGS.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md) only, since the prompt said “only these 3 files”.
+
+Summary: 6 findings total, with the main issues being partner fetch errors masked as “restaurant not found”, order-status fetch errors masked as “not found”, hall sticky-bar lifecycle logic still incomplete, and dynamic `primary_color` not implemented in `x.jsx`.
+
+Per repo instructions, I also wrote a review copy to [review_2026-03-22.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-22.md) and the executed command log to [commands_2026-03-22.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-22.log).
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-22.log b/pages/PublicMenu/commands_2026-03-22.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..56a8f0c81000d2a241552f637d089999aea4eb83
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-22.log
+@@ -0,0 +1,37 @@
++Get-ChildItem -Name pages/PublicMenu
++Get-Content pages/PublicMenu/README.md
++Get-Content pages/PublicMenu/BUGS.md
++Get-ChildItem pages/PublicMenu | Select-Object -ExpandProperty Name
++Get-Content pages/PublicMenu/README.md -Raw
++Get-Content pages/PublicMenu/BUGS.md -Raw
++Get-Content pages/PublicMenu/x.jsx -Raw
++(Get-Content pages/PublicMenu/x.jsx | Measure-Object -Line).Lines
++Select-String -Path pages/PublicMenu/x.jsx -Pattern '#B5543A','#9A4530','#F5E6E0','primary_color','partner_not_found','common.loading','restaurant not found','catch','aria-label','setTimeout','console.log','console.error' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'Partner.findById|Partner\\.|partnerId|useQuery\\(|queryFn|error\\.partner_not_found|return null' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1318; $end=1346; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3034; $end=3043; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3184; $end=3193; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $ranges=@(@(742,774),@(1018,1026),@(1149,1159),@(3418,3472)); foreach($r in $ranges){ $start=$r[0]; $end=$r[1]; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }; '---' }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1536; $end=1572; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'const \\{ t, lang, setLang \\}|const tr =|useI18n\\(' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1218; $end=1236; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=612; $end=626; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'function makeSafeT|const makeSafeT' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=523; $end=560; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1128; $end=1158; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'phoneLink' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=944; $end=956; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $ranges=@(@(2078,2104),@(2218,2245),@(2600,2632)); foreach($r in $ranges){ $start=$r[0]; $end=$r[1]; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }; '---' }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=2100; $end=2146; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1888; $end=1902; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'toast\\.(success|error|info|warning)\\(' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'guest.name_saved|cart.items_removed_mode_switch|toast.error' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern '<button|<Button' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $ranges=@(@(1068,1079),@(1168,1178),@(3472,3480)); foreach($r in $ranges){ $start=$r[0]; $end=$r[1]; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }; '---' }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1173; $end=1184; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'dishesError|categoriesError|loadingPartner|loadingDishes|error:' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3044; $end=3060; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=886; $end=906; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'orderError|not_found|expired|order_status.no_token' | ForEach-Object { "{0}:{1}" -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=1028; $end=1042; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=2938; $end=2956; for($i=$start;$i -le $end;$i++){ if($i -le $lines.Length){ "{0}:{1}" -f $i,$lines[$i-1] } }
+diff --git a/pages/PublicMenu/review_2026-03-22.md b/pages/PublicMenu/review_2026-03-22.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..29d1d69fe4aad28614fb8420b632a2363488cd47
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-22.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-090606
++
++## Findings
++1. [P1] Partner lookup collapses backend failures into “restaurant not found” — In `x.jsx:1322-1345`, both partner lookups swallow exceptions and return `null`; then `x.jsx:3037-3042` always renders `error.partner_not_found`. A transient Base44/network failure is misreported as a bad QR link, so guests get no retryable error state. FIX: keep lookup exceptions separate from a true empty result and render a retry-capable backend error UI instead of always showing `error.partner_not_found`.
++2. [P1] Order status screen also misreports fetch errors as “not found” — In `x.jsx:900-904`, the order query can fail, but `x.jsx:1031-1039` treats `orderError || !order` as the same branch and always shows `order_status.not_found`. That hides server/network failures and tells guests their link is invalid when the backend may just be unavailable. FIX: split `orderError` from `!order`, show a retryable fetch-error state for query failures, and reserve `order_status.not_found` for confirmed empty results.
++3. [P1] Hall StickyCartBar ignores visit lifecycle state — `x.jsx:2101-2144` derives the hall sticky bar from only four modes (`cart`, `myBill`, `tableOrders`, `cartEmpty`) based on cart/order counts. It never inspects visit lifecycle state such as closed/paid/draft-specific states, so CTA text, totals, and visibility are wrong once a visit moves past the basic “cart vs orders” cases. FIX: derive sticky-bar state from the full table session / bill lifecycle matrix and map label, amount, and visibility from that state instead of only from item counts.
++4. [P2] Dynamic primary color is not implemented in `x.jsx` — The file never reads `partner.primary_color`, and hardcoded terracotta is still present at `x.jsx:751`, `x.jsx:770`, `x.jsx:1024`, `x.jsx:1156-1157`, `x.jsx:3190`, `x.jsx:3426`, and `x.jsx:3460`. That means the page still ignores partner-selected branding and also keeps the old terracotta fallback instead of the required `#1A1A1A`. FIX: define `primaryColor`/derived variants from `partner?.primary_color || '#1A1A1A'` near the main component state and replace every remaining `#B5543A`-based accent in this file with dynamic inline styles/props.
++5. [P2] Auto-submit after table verification uses an untracked timeout — In `x.jsx:2091-2098`, the effect schedules `setTimeout(() => handleSubmitOrder(), 100)` with no cleanup and without tracking the timer handle. That is a React anti-pattern and can fire a stale submit if the component rerenders/unmounts or the user changes state during the 100 ms gap. FIX: store the timeout id in a ref, clear it in the effect cleanup, and invoke a stable submit callback only while the confirmation flow is still current.
++6. [P3] Table-code confirmation sheet has no real focus feedback on mobile — The visible digit cells at `x.jsx:3424-3428` use `focus-within:border-[#B5543A]`, but the actual `<Input>` is rendered separately at `x.jsx:3433-3445`, outside those cells. On mobile, focusing the input never highlights the code boxes, so the active typing target is unclear in the bottom sheet. FIX: drive the cell highlight from explicit input-focus state, or move the focusable input inside the visual wrapper that is supposed to react to focus.
++
++## Summary
++Total: 6 findings (0 P0, 3 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): The request says `pages/PublicMenu/*.jsx` but also says “ONLY these 3 files”; in this folder `*.jsx` matches multiple files, so it was unclear whether the target JSX file was only `x.jsx` or every JSX file in `pages/PublicMenu/`.
++- Missing context (what info would have helped): An explicit filename list, e.g. `x.jsx + README.md + BUGS.md`, would remove the scope ambiguity.
++- Scope questions (anything you weren't sure if it's in scope): Whether already-documented active bugs in `BUGS.md` should still be re-reported if they are visibly still present in `x.jsx`.
+diff --git a/pipeline/chain-state/publicmenu-260322-090606-codex-findings.md b/pipeline/chain-state/publicmenu-260322-090606-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..29d1d69fe4aad28614fb8420b632a2363488cd47
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260322-090606-codex-findings.md
+@@ -0,0 +1,19 @@
++# Codex Writer Findings — PublicMenu
++Chain: publicmenu-260322-090606
++
++## Findings
++1. [P1] Partner lookup collapses backend failures into “restaurant not found” — In `x.jsx:1322-1345`, both partner lookups swallow exceptions and return `null`; then `x.jsx:3037-3042` always renders `error.partner_not_found`. A transient Base44/network failure is misreported as a bad QR link, so guests get no retryable error state. FIX: keep lookup exceptions separate from a true empty result and render a retry-capable backend error UI instead of always showing `error.partner_not_found`.
++2. [P1] Order status screen also misreports fetch errors as “not found” — In `x.jsx:900-904`, the order query can fail, but `x.jsx:1031-1039` treats `orderError || !order` as the same branch and always shows `order_status.not_found`. That hides server/network failures and tells guests their link is invalid when the backend may just be unavailable. FIX: split `orderError` from `!order`, show a retryable fetch-error state for query failures, and reserve `order_status.not_found` for confirmed empty results.
++3. [P1] Hall StickyCartBar ignores visit lifecycle state — `x.jsx:2101-2144` derives the hall sticky bar from only four modes (`cart`, `myBill`, `tableOrders`, `cartEmpty`) based on cart/order counts. It never inspects visit lifecycle state such as closed/paid/draft-specific states, so CTA text, totals, and visibility are wrong once a visit moves past the basic “cart vs orders” cases. FIX: derive sticky-bar state from the full table session / bill lifecycle matrix and map label, amount, and visibility from that state instead of only from item counts.
++4. [P2] Dynamic primary color is not implemented in `x.jsx` — The file never reads `partner.primary_color`, and hardcoded terracotta is still present at `x.jsx:751`, `x.jsx:770`, `x.jsx:1024`, `x.jsx:1156-1157`, `x.jsx:3190`, `x.jsx:3426`, and `x.jsx:3460`. That means the page still ignores partner-selected branding and also keeps the old terracotta fallback instead of the required `#1A1A1A`. FIX: define `primaryColor`/derived variants from `partner?.primary_color || '#1A1A1A'` near the main component state and replace every remaining `#B5543A`-based accent in this file with dynamic inline styles/props.
++5. [P2] Auto-submit after table verification uses an untracked timeout — In `x.jsx:2091-2098`, the effect schedules `setTimeout(() => handleSubmitOrder(), 100)` with no cleanup and without tracking the timer handle. That is a React anti-pattern and can fire a stale submit if the component rerenders/unmounts or the user changes state during the 100 ms gap. FIX: store the timeout id in a ref, clear it in the effect cleanup, and invoke a stable submit callback only while the confirmation flow is still current.
++6. [P3] Table-code confirmation sheet has no real focus feedback on mobile — The visible digit cells at `x.jsx:3424-3428` use `focus-within:border-[#B5543A]`, but the actual `<Input>` is rendered separately at `x.jsx:3433-3445`, outside those cells. On mobile, focusing the input never highlights the code boxes, so the active typing target is unclear in the bottom sheet. FIX: drive the cell highlight from explicit input-focus state, or move the focusable input inside the visual wrapper that is supposed to react to focus.
++
++## Summary
++Total: 6 findings (0 P0, 3 P1, 2 P2, 1 P3)
++
++## Prompt Clarity
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): The request says `pages/PublicMenu/*.jsx` but also says “ONLY these 3 files”; in this folder `*.jsx` matches multiple files, so it was unclear whether the target JSX file was only `x.jsx` or every JSX file in `pages/PublicMenu/`.
++- Missing context (what info would have helped): An explicit filename list, e.g. `x.jsx + README.md + BUGS.md`, would remove the scope ambiguity.
++- Scope questions (anything you weren't sure if it's in scope): Whether already-documented active bugs in `BUGS.md` should still be re-reported if they are visibly still present in `x.jsx`.
+
+tokens used
+70 407
+Findings are saved in [publicmenu-260322-090606-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260322-090606-codex-findings.md). I kept scope to [x.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/x.jsx), [README.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/README.md), and [BUGS.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/BUGS.md) only, since the prompt said “only these 3 files”.
+
+Summary: 6 findings total, with the main issues being partner fetch errors masked as “restaurant not found”, order-status fetch errors masked as “not found”, hall sticky-bar lifecycle logic still incomplete, and dynamic `primary_color` not implemented in `x.jsx`.
+
+Per repo instructions, I also wrote a review copy to [review_2026-03-22.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-22.md) and the executed command log to [commands_2026-03-22.log](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-22.log).

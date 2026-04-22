@@ -1,0 +1,84 @@
+---
+task_id: fix-p1-bugs-s87
+status: pending
+page: PublicMenu, MenuDishes, Profile
+work_dir: C:/Users/ASUS/OneDrive/002 Menu/Claude AI Cowork/menuapp-code-review
+budget_usd: 12
+fallback_model: sonnet
+system_rules: C:/Users/ASUS/OneDrive/002 Menu/Claude AI Cowork/references/cc-system-rules.txt
+version: "4.0"
+---
+
+# Task: fix-p1-bugs-s87
+
+## Config (v4.0)
+- Budget: $12
+- Fallback model: sonnet
+- System rules: cc-system-rules.txt
+- Progress: per-task TG message via progress-monitor.sh
+
+## Prompt
+IMPORTANT: Your VERY FIRST action must be: echo "started $(date -Iseconds)" > "C:/Users/ASUS/OneDrive/002 Menu/Claude AI Cowork/pipeline/started-fix-p1-bugs-s87.md" — this confirms to Cowork that you started working.
+
+=== TASK SETUP ===
+Progress file: C:/Users/ASUS/OneDrive/002 Menu/Claude AI Cowork/pipeline/progress-fix-p1-bugs-s87.txt
+Task ID: fix-p1-bugs-s87
+=== END TASK SETUP ===
+
+---
+task: fix-p1-bugs-s87
+type: bugfix
+budget: "$12"
+priority: P1
+codex: yes
+---
+
+# Задача: P1 фиксы — PublicMenu, MenuDishes, Profile (S87)
+
+Починить 4 P1/P2 бага на 3 страницах. Все связаны с i18n ключами и :::ARCHIVED::: маркером.
+
+## Баги для починки
+
+### BUG-1: PM-S87-01 — `:::ARCHIVED:::` виден гостям в PublicMenu (P1)
+- **Файл:** `pages/PublicMenu/base/` (файл с маршрутом /x, вероятно x.jsx или publicmenu.jsx)
+- **Симптом:** В описании блюд виден raw маркер `:::ARCHIVED:::`. Пример: "пропрол :::ARCHIVED:::" — гость видит это в публичном меню.
+- **Причина:** Функция `cleanDesc()` или аналогичная не применена при рендере описаний блюд в /x.
+- **Фикс:** Найти где рендерится `dish.description` или `item.description` и применить strip маркера: убрать `:::ARCHIVED:::` из текста перед отображением. Использовать тот же подход что в menumanage.jsx (BUG MM-S83-06 — уже починен, можно взять как образец).
+- **RELEASE:** в `pages/PublicMenu/`
+
+### BUG-2: PM-S87-02 — `CART.MY_BILL` и другие i18n ключи после отправки заказа (P1)
+- **Файл:** `pages/PublicMenu/base/` (тот же файл что BUG-1)
+- **Симптом:** После успешной отправки заказа появляется экран с raw i18n ключами вместо переводов. Видно: `CART.MY_BILL`, возможно другие ключи в том же экране.
+- **Фикс:** Найти компонент/состояние "заказ отправлен" и проверить все i18n ключи. Добавить отсутствующие переводы инлайн (fallback текст на русском) или добавить в i18n_pending.csv.
+- **i18n_pending.csv:** Добавить все новые ключи в `menuapp-code-review/i18n_pending.csv` (формат: `"key","page","description","ru","en","kk"`)
+- **RELEASE:** в `pages/PublicMenu/`
+
+### BUG-3: MD-S87-01 — `:::ARCHIVED:::` виден в MenuDishes (P2)
+- **Файл:** `pages/MenuDishes/base/menudishes.jsx`
+- **Симптом:** В описании блюд на /menudishes виден маркер `:::ARCHIVED:::`. Пример: "вофвд :::ARCHIVED:::" для блюда "вафл", "пропрол :::ARCHIVED:::" для "Бологнез".
+- **Причина:** cleanDesc() применён в menumanage.jsx (MM-S83-06 уже починен) но НЕ применён в menudishes.jsx.
+- **Фикс:** Найти рендер описания блюда в menudishes.jsx и добавить strip маркера — аналогично как в menumanage.jsx.
+- **RELEASE:** `260306-01 MenuDishes RELEASE.jsx` в `pages/MenuDishes/`
+
+### BUG-4: PR-S83-04 — `profile.full_name` сырой i18n ключ, РЕГРЕССИЯ (P1)
+- **Файл:** `pages/Profile/base/profile.jsx`
+- **Симптом:** Поле "Full Name" / "profile.full_name" показывает сырой i18n ключ вместо перевода "Полное имя". Баг был починен в 260306-00 Profile RELEASE, но регрессировал.
+- **Фикс:** Найти label/placeholder с ключом `profile.full_name` и добавить fallback на "Полное имя". Проверить все остальные поля профиля на предмет аналогичных проблем.
+- **i18n_pending.csv:** Добавить `profile.full_name` с русским переводом "Полное имя".
+- **RELEASE:** `260306-02 Profile RELEASE.jsx` в `pages/Profile/`
+
+## i18n_pending.csv
+Все новые i18n ключи добавить в файл:
+`menuapp-code-review/i18n_pending.csv`
+Формат: `"key","page","description","ru","en","kk"`
+
+## Git & RELEASE
+- git add / commit / push после КАЖДОГО фикса (по одному commit на баг)
+- Новые RELEASE файлы в соответствующих папках страниц
+- Обновить BUGS.md и README.md для каждой затронутой страницы
+- Номера RELEASE: PublicMenu — 260306-01, MenuDishes — 260306-01, Profile — 260306-02
+
+## Приоритет выполнения
+1. BUG-4 (Profile регрессия — P1)
+2. BUG-1 + BUG-2 (PublicMenu — P1, одна страница → один RELEASE)
+3. BUG-3 (MenuDishes — P2)

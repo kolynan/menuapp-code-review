@@ -1,0 +1,425 @@
+// Version: 1.0 | Updated: 2026-02-16 | Session: 8 | Source: Base44 export
+
+import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { base44 } from "@/api/base44Client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Home, Utensils, Table2, Users, GitBranch, Settings, Menu, LogOut, User, Loader2, AlertTriangle, RefreshCcw, Gift } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Card, CardContent } from "@/components/ui/card";
+import { useI18n } from "@/components/i18n";
+
+/**
+ * PartnerShell - Shared layout for partner cabinet pages
+ * 
+ * Tabs: home | menu | tables | staff | process | settings (LOCKED NAV-006, NAV-009)
+ * 
+ * Access Control (LOCKED STAFF-015..020):
+ * - owner: User.partner === partnerId (full access)
+ * - director: StaffAccessLink.staff_role === 'director' (cabinet access, can invite MD + staff)
+ * - managing_director: StaffAccessLink.staff_role === 'managing_director' (cabinet access, can invite staff only)
+ * 
+ * Usage:
+ * ```jsx
+ * import PartnerShell, { usePartnerAccess } from "@/components/PartnerShell";
+ * 
+ * // IMPORTANT: Use wrapper pattern!
+ * function PageContent() {
+ *   const { userRole, partnerId } = usePartnerAccess(); // Works inside PartnerShell
+ *   return <div>...</div>;
+ * }
+ * 
+ * export default function Page() {
+ *   return (
+ *     <PartnerShell activeTab="settings">
+ *       <PageContent />
+ *     </PartnerShell>
+ *   );
+ * }
+ * ```
+ */
+
+// ============================================================
+// CONSTANTS
+// ============================================================
+
+const CACHE_TIME = 5 * 60 * 1000; // 5 minutes
+
+// Language labels are not translated (English is always "English")
+const LANGUAGES = [
+  { code: "ru", label: "Русский" },
+  { code: "kk", label: "Қазақша" },
+  { code: "en", label: "English" },
+];
+
+// Roles with cabinet access (can view partner cabinet)
+const CABINET_ACCESS_ROLES = ['director', 'managing_director'];
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function isRateLimitError(error) {
+  if (!error) return false;
+  const msg = (error.message || error.toString() || "").toLowerCase();
+  return msg.includes("rate limit") || msg.includes("429");
+}
+
+function shouldRetry(failureCount, error) {
+  if (isRateLimitError(error)) return false;
+  return failureCount < 1;
+}
+
+function getTabs(t) {
+  return [
+    { id: "home", label: t("nav.home"), Icon: Home, path: "/partnerhome" },
+    { id: "menu", label: t("nav.menu"), Icon: Utensils, path: "/menumanage" },
+    { id: "tables", label: t("nav.tables"), Icon: Table2, path: "/partnertables" },
+    { id: "staff", label: t("nav.staff"), Icon: Users, path: "/partnerstaffaccess" },
+    { id: "process", label: t("nav.process"), Icon: GitBranch, path: "/partnerorderprocess" },
+    { id: "loyalty", label: t("nav.loyalty"), Icon: Gift, path: "/partnerloyalty" },
+    { id: "clients", label: t("nav.clients"), Icon: Users, path: "/partnerclients" },
+    { id: "settings", label: t("nav.settings"), Icon: Settings, path: "/partnersettings" },
+  ];
+}
+
+// ============================================================
+// PARTNER ACCESS CONTEXT (STAFF-015..020)
+// ============================================================
+
+const PartnerAccessContext = createContext({
+  userRole: null,       // 'owner' | 'director' | 'managing_director' | null
+  partnerId: null,
+  partner: null,
+  currentUser: null,
+  isLoading: true,
+  error: null,
+});
+
+export function usePartnerAccess() {
+  return useContext(PartnerAccessContext);
+}
+
+// ============================================================
+// HELPER COMPONENTS
+// ============================================================
+
+function RateLimitScreen({ t, onRetry }) {
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <Card className="max-w-md w-full border-amber-200 bg-amber-50">
+        <CardContent className="py-8 text-center">
+          <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-slate-900 mb-2">
+            {t('error.rate_limit')}
+          </h1>
+          <p className="text-slate-600 mb-4">
+            {t('acceptinvite.rate_limit.message')}
+          </p>
+          <Button onClick={onRetry} className="bg-amber-600 hover:bg-amber-700">
+            <RefreshCcw className="w-4 h-4 mr-2" />
+            {t('common.retry')}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function AccessDenied({ t, onLogout }) {
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <Card className="max-w-md w-full">
+        <CardContent className="py-8 text-center">
+          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <Users className="w-8 h-8 text-red-600" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 mb-2">
+            {t('error.access_denied')}
+          </h1>
+          <p className="text-slate-500 mb-6">
+            {t('partnershell.error.no_cabinet_access')}
+          </p>
+          <Button variant="outline" onClick={onLogout}>
+            <LogOut className="w-4 h-4 mr-2" />
+            {t('nav.logout')}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function LoadingScreen({ t }) {
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin text-indigo-600" aria-label={t('common.loading')} />
+    </div>
+  );
+}
+
+// ============================================================
+// MAIN COMPONENT
+// ============================================================
+
+export default function PartnerShell({ activeTab, children }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { lang, setLang, t } = useI18n();
+  const TABS = getTabs(t);
+  
+  // Rate limit state
+  const [rateLimitHit, setRateLimitHit] = useState(false);
+
+  // ============================================================
+  // AUTH & ACCESS CONTROL (STAFF-015..020)
+  // ============================================================
+  
+  // 1. Get current user
+  const { 
+    data: currentUser, 
+    isLoading: loadingUser,
+    error: userError,
+  } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me(),
+    retry: shouldRetry,
+    staleTime: CACHE_TIME,
+    enabled: !rateLimitHit,
+  });
+
+  // 2. Check if user is owner (has User.partner)
+  const isOwner = !!currentUser?.partner;
+  const ownerPartnerId = currentUser?.partner;
+
+  // 3. Check for cabinet access via StaffAccessLink
+  // FIX: Load ALWAYS (not just when !isOwner) to get accurate role
+  const { 
+    data: cabinetAccessLinks, 
+    isLoading: loadingAccess,
+    error: accessError,
+  } = useQuery({
+    queryKey: ['cabinetAccess', currentUser?.id],
+    queryFn: async () => {
+      const links = await base44.entities.StaffAccessLink.filter({
+        invited_user: currentUser.id,
+        is_active: true
+      });
+      return links?.filter(link => CABINET_ACCESS_ROLES.includes(link.staff_role)) || [];
+    },
+    enabled: !!currentUser?.id && !rateLimitHit,  // FIX: removed !isOwner
+    retry: shouldRetry,
+    staleTime: CACHE_TIME,
+  });
+
+  // 4. Determine effective role and partnerId (STAFF-015..020)
+  // FIX: Check StaffAccessLink FIRST for accurate role, then fallback to isOwner
+  const { userRole, effectivePartnerId } = useMemo(() => {
+    // First check StaffAccessLink (more accurate role)
+    if (cabinetAccessLinks && cabinetAccessLinks.length > 0) {
+      // Priority: director > managing_director
+      const directorLink = cabinetAccessLinks.find(l => l.staff_role === 'director');
+      const mdLink = cabinetAccessLinks.find(l => l.staff_role === 'managing_director');
+      const accessLink = directorLink || mdLink;
+      
+      if (accessLink) {
+        return { 
+          userRole: accessLink.staff_role, 
+          effectivePartnerId: accessLink.partner 
+        };
+      }
+    }
+    
+    // Fallback to User.partner (true owners without StaffAccessLink)
+    if (isOwner) {
+      return { userRole: 'owner', effectivePartnerId: ownerPartnerId };
+    }
+    
+    return { userRole: null, effectivePartnerId: null };
+  }, [isOwner, ownerPartnerId, cabinetAccessLinks]);
+
+  // 5. Load partner data
+  const { 
+    data: partner, 
+    isLoading: loadingPartner,
+    error: partnerError,
+  } = useQuery({
+    queryKey: ['partner', effectivePartnerId],
+    queryFn: () => base44.entities.Partner.get(effectivePartnerId),
+    enabled: !!effectivePartnerId && !rateLimitHit,
+    retry: shouldRetry,
+    staleTime: CACHE_TIME,
+  });
+
+  // ============================================================
+  // RATE LIMIT DETECTION
+  // ============================================================
+  
+  useEffect(() => {
+    const errors = [userError, accessError, partnerError].filter(Boolean);
+    const hasRateLimit = errors.some(isRateLimitError);
+    
+    if (hasRateLimit && !rateLimitHit) {
+      queryClient.cancelQueries();
+      setRateLimitHit(true);
+    }
+  }, [userError, accessError, partnerError, rateLimitHit, queryClient]);
+
+  // ============================================================
+  // HANDLERS
+  // ============================================================
+
+  const handleLangChange = (code) => {
+    setLang(code);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await base44.auth.logout();
+    } catch {}
+    window.location.href = "/";
+  };
+
+  const handleRetryAfterRateLimit = () => {
+    setRateLimitHit(false);
+    queryClient.invalidateQueries();
+  };
+
+  // ============================================================
+  // LOADING & ERROR STATES
+  // ============================================================
+
+  // Rate limit screen (check FIRST)
+  if (rateLimitHit) {
+    return <RateLimitScreen t={t} onRetry={handleRetryAfterRateLimit} />;
+  }
+
+  // Loading state
+  const isLoading = loadingUser || (currentUser?.id && loadingAccess) || (effectivePartnerId && loadingPartner);
+
+  if (isLoading) {
+    return <LoadingScreen t={t} />;
+  }
+
+  // No access (not owner and no cabinet access link)
+  if (!effectivePartnerId || !userRole) {
+    return <AccessDenied t={t} onLogout={handleLogout} />;
+  }
+
+  // ============================================================
+  // CONTEXT VALUE
+  // ============================================================
+
+  const contextValue = {
+    userRole,
+    partnerId: effectivePartnerId,
+    partner,
+    currentUser,
+    isLoading: false,
+    error: null,
+  };
+
+  // ============================================================
+  // RENDER
+  // ============================================================
+
+  return (
+    <PartnerAccessContext.Provider value={contextValue}>
+      <div className="min-h-screen bg-slate-50">
+        {/* Header */}
+        <header className="bg-white border-b border-slate-200">
+          <div className="max-w-[980px] mx-auto px-4 sm:px-6 py-4">
+            <div className="flex items-center justify-between">
+              {/* Restaurant name with CTA if empty */}
+              {partner?.name ? (
+                <h1 className="text-lg sm:text-xl font-bold text-slate-900 truncate">
+                  {partner.name}
+                </h1>
+              ) : (
+                <Link 
+                  to="/partnersettings" 
+                  className="text-lg font-medium text-amber-600 hover:text-amber-700 hover:underline"
+                >
+                  {t('partnershell.setup_name')}
+                </Link>
+              )}
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-9 w-9">
+                    <Menu className="h-5 w-5 text-slate-600" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => navigate("/profile")} className="gap-2">
+                    <User className="h-4 w-4" />
+                    {t("nav.profile")}
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  {LANGUAGES.map((l) => (
+                    <DropdownMenuItem
+                      key={l.code}
+                      onClick={() => handleLangChange(l.code)}
+                      className={`gap-2 ${lang === l.code ? "bg-indigo-50 text-indigo-700 font-medium" : ""}`}
+                    >
+                      {lang === l.code && <span className="text-indigo-600">●</span>}
+                      {l.label}
+                    </DropdownMenuItem>
+                  ))}
+                  
+                  <DropdownMenuSeparator />
+                  
+                  <DropdownMenuItem onClick={handleLogout} className="gap-2 text-red-600">
+                    <LogOut className="h-4 w-4" />
+                    {t("nav.logout")}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </header>
+
+        {/* Sticky tabs navigation */}
+        <nav className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
+          <div className="max-w-[980px] mx-auto px-4 sm:px-6">
+            <div className="flex gap-1 sm:gap-4 overflow-x-auto no-scrollbar">
+              {TABS.map((tab) => {
+                const Icon = tab.Icon;
+                const isActive = activeTab === tab.id;
+                
+                return (
+                  <Link
+                    key={tab.id}
+                    to={tab.path}
+                    className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-3 border-b-2 transition-colors whitespace-nowrap ${
+                      isActive
+                        ? "border-indigo-600 text-indigo-600 font-semibold"
+                        : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 font-medium"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="hidden sm:inline text-sm">{tab.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </nav>
+
+        {/* Page content */}
+        <main className="max-w-[980px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
+          {children}
+        </main>
+      </div>
+    </PartnerAccessContext.Provider>
+  );
+}

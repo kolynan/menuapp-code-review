@@ -1,0 +1,31 @@
+---
+page: partnersettings
+budget: 5.00
+type: fix
+phase: 1
+created: 2026-02-28
+session: 52
+---
+
+# Phase 1 Fix: PartnerSettings Page — Sticky Save & Touch Targets
+
+## Context
+UX discussion (CC+Codex) identified Phase 1 mobile fixes for the partner cabinet.
+Full discussion result: pipeline/result-discussion-partner-cabinet-ux.md
+
+## Problems to Fix
+
+### 1. Sticky Save/Discard bar
+Each settings tab (Profile, Hours, Channels, etc.) should have a sticky Save/Discard bar at the bottom of the viewport with an unsaved-changes indicator. Currently user has to scroll down to find Save.
+**Fix:** Make the Save button (and Discard if present) sticky at the bottom of the viewport, per-tab. Add visual indicator when there are unsaved changes.
+
+### 2. Touch targets
+Any icon buttons, toggles, time pickers, or small interactive elements should be at least 44x44px with 8px spacing between adjacent targets. The working hours grid has particularly small inputs.
+
+## Instructions
+1. git add -A && git commit -m "before phase1 partnersettings fixes" && git push
+2. Read the current partnersettings page code in pages/PartnerSettings/
+3. Fix sticky save and touch targets
+4. Create RELEASE
+5. Update BUGS.md and PartnerSettings README.md
+6. git add -A && git commit -m "Phase1 partnersettings: sticky save, touch targets" && git push

@@ -1,0 +1,46 @@
+CC Writer Analysis — StaffOrdersMobile B1 (Close Table + Rate Limit)
+Chain: staffordersmobile-260415-153619-4e93
+Task: task-260415-153651
+Date: 2026-04-15
+
+== FILES ANALYZED ==
+1. pages/StaffOrdersMobile/260414-02 StaffOrdersMobile RELEASE.jsx (4575 lines)
+2. components/sessionHelpers.js (214 lines)
+
+== FINDINGS SUMMARY ==
+Total: 7 findings (1 P0, 4 P1, 1 P2, 0 P3) across 4 fixes
+
+Fix 1 (P1) — Close Table -> Completed tab:
+  1a. activeOrders filter (line 3580) excludes closed orders -> they vanish from both tabs
+      FIX: Remove `o.status !== 'closed'` condition; shift cutoff already prevents historical leak
+  1b. closeSession (sessionHelpers.js:158-171) doesn't close ServiceRequests -> hasActiveRequest keeps table in Active
+      FIX: Add SR closure after order closure; note getLinkId not available in sessionHelpers
+  1c. confirmCloseTable (line 4148-4155) doesn't refetchRequests after close
+      FIX: Add `if (!isKitchen) refetchRequests();` after refetchOrders()
+
+Fix 2 (P0) — Promise.all -> sequential in closeSession:
+  sessionHelpers.js:166-170 fires N parallel PATCH requests -> 429 risk
+  FIX: Replace with for-loop + 120ms delay (inline, can't import runBatchSequential)
+
+Fix 3 (P1) — forEach -> runBatchSequential in collapsed card:
+  3a. Line 657 Accept All: forEach fires N parallel mutations
+  3b. Line 657 Serve All: same forEach pattern
+  3c. Line 1272: duplicate forEach in expanded-collapsed view
+  FIX: Use runBatchSequential + onBatchCloseRequestAsync (already a prop, line 1739)
+  Pattern already correct at line 2369 (expanded card)
+
+Fix 4 (P2) — __batch guard on updateStatusMutation:
+  Line 1606 onSettled always invalidates (no __batch check)
+  FIX: Add `if (vars?.__batch) return;` matching advanceMutation (line 1916-1919)
+
+== IMPLEMENTATION NOTES ==
+- Fix 1b: getLinkId() is in RELEASE.jsx only, not sessionHelpers.js. Need inline extraction or use sessionOrders[0].table
+- Fix 2: Must inline sequential loop (can't import runBatchSequential from RELEASE due to circular dep)
+- Fix 3: onBatchCloseRequestAsync prop already exists on OrderGroupCard (line 1739), passed from parent (line 4436)
+- Fix 4: Preventive — no current call-site passes __batch to updateStatusMutation
+
+== FINDINGS FILE ==
+pipeline/chain-state/staffordersmobile-260415-153619-4e93-cc-findings.md
+
+== PROMPT CLARITY ==
+Overall: 5/5 — excellent task spec with exact lines, code snippets, and scope restrictions.

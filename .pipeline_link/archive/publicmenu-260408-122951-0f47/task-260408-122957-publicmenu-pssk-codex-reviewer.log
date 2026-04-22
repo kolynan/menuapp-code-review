@@ -1,0 +1,821 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d6bff-8a9a-7441-a29e-260a281ae0a3
+--------
+user
+You are a Codex code reviewer evaluating the QUALITY of a КС implementation prompt (NOT executing it). A КС prompt is an instruction document for Claude Code + Codex pipeline to fix code in a React/Base44 app. Your role: find issues with the PROMPT DESIGN that could cause the execution to fail, produce wrong results, or require clarification. ⛔ DO NOT: run any commands, make any code changes, modify files. ✅ DO: analyze the prompt text AND read the target source file to verify code snippets, line numbers, function signatures, and field names. To verify the prompt's code references: 1. Read the RELEASE file named in the prompt (e.g. `pages/PublicMenu/260407-00 PublicMenu x RELEASE.jsx`) 2. Grep for specific function names, variable names, and line numbers mentioned in the prompt 3. Check that code snippets in the prompt match actual code (correct field names, function signatures, etc.) For each issue: [CRITICAL/MEDIUM/LOW] Title — Description. PROMPT FIX: what to change in the prompt. Focus on: - Incorrect code snippets in the prompt (wrong syntax, wrong function calls, wrong variable names) — verify against actual code - Missing edge cases the prompt doesn't cover - Ambiguous instructions Codex might misinterpret - Safety risks: will this cause unintended file changes? - Missing context: what info would help Codex execute without hesitation? - Fix order: are there dependencies between fixes that need explicit sequencing? - Validation: are the post-fix verification steps sufficient? - Line numbers: verify all ~line N references against the actual file Write your findings to: pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md FORMAT: # Codex Reviewer Findings — ПССК Prompt Quality Review Chain: publicmenu-260408-122951-0f47 ## Issues Found 1. [CRITICAL/MEDIUM/LOW] Title — Description. PROMPT FIX: ... 2. ... ## Summary Total: N issues (X CRITICAL, Y MEDIUM, Z LOW) ## Additional Risks Any risks the prompt author may not have considered. ## Prompt Clarity (MANDATORY — do NOT skip) - Overall clarity: [1-5] - What was most clear: - What was ambiguous or could cause hesitation: - Missing context: Do NOT apply any fixes to code files. Analysis only. === TASK CONTEXT === You are reviewing the quality of a КС implementation prompt for a React/Base44 app. DO NOT execute the changes. DO NOT read code files. Only review the prompt quality. Context: SOS Help Drawer v6.0 Part B - rewrite drawer JSX (6-button grid with in-place state) + cleanup dead helpers/state/refs. This runs AFTER Part A which added config constants, urgency helpers, and i18n keys. Find issues with the PROMPT DESIGN: 1. Incorrect code snippets (wrong syntax, variable names, line numbers) 2. Missing edge cases 3. Ambiguous instructions 4. Safety risks (unintended file changes) 5. Validation: are post-fix checks sufficient? # SOS Help Drawer v6.0 — Fix 3+5 (JSX Rewrite + Cleanup) — КС-B # Runs AFTER КС-A (chain de40, commit 0012e3f) — deployed and verified ## Prerequisites (all confirmed in RELEASE 260408-01, 5459 lines) КС-A (Fix 1+2+4) is ALREADY APPLIED. The file now has: - HELP_REQUEST_TYPES includes plate/utensils/clear_table (line 1835) - HELP_CARD_LABELS (line 1846), HELP_CARD_SHORT_LABELS (line 1856) — both exist - HELP_COOLDOWN_SECONDS updated (line 1841) - HELP_URGENCY_THRESHOLDS (line 1866), HELP_URGENCY_GROUP (line 1870) — exist - getHelpUrgency (line 1882), getHelpTimerStr (line 1892) — exist - nonOtherTypes includes plate/utensils/clear_table (line 2216) - I18N_FALLBACKS EN+RU have all help.* keys ⚠️ HELP_CHIPS (line 1874) and HELP_PREVIEW_LIMIT (line 1834) are STILL present (КС-A kept them because JSX refs existed). Fix 5 removes them and all JSX refs. ## Context File: pages/PublicMenu/x.jsx (TARGET — edit this file ONLY) RELEASE: `260408-01 PublicMenu x RELEASE.jsx` (5459 lines) Task: Rewrite DrawerContent children (JSX only) + cleanup removed state/refs/helpers. Weight: H | Budget: $15 | Chain: С5v2 ## UX Reference UX-документ: `ux-concepts/HelpDrawer/260407-00 HelpDrawer UX S234 FINAL.md` HTML mockup: `ux-concepts/HelpDrawer/260407-01 SOS HelpDrawer Mockup S235.html` Key decisions (DECISIONS_INDEX §12): in-place state change, 6 buttons 3×2, tap body=safe, ✕=cancel, urgency <8m/8-14m/15m+ ## FROZEN UX (DO NOT CHANGE) - StickyCartBar behavior and appearance - MenuView tile/list layout and stepper - CartView drawer (different DrawerContent at line 4763-4840) - Bottom Sheet drawer (different DrawerContent at line 4858-4951) - Bell icon badge display (line ~4965) - All code outside the Help Drawer region - handleCardTap logic (line 2370) — sends request correctly - handleUndo logic (line 2405) — undo toast works - openHelpDrawer/closeHelpDrawer base logic (lines 2349/2361) — only ADD resets --- ## Fix 3 — Rewrite drawer JSX [MUST-FIX] ### JSX Replacement Boundary (VERIFIED with RELEASE 260408-01) Keep: `<Drawer open={isHelpModalOpen}` tag (line 4974). Keep: `<DrawerContent>` opening tag (line 4975): className="max-h-[85vh] rounded-t-2xl flex flex-col". **D7 rule: do NOT add `relative` to DrawerContent**. REPLACE: ALL children INSIDE `<DrawerContent>`: - **Start**: `<div className="relative">` at line 4976 (first child after `<DrawerContent>`) - **End**: just before `</DrawerContent>` at **line 5282** - Strategy: replace the entire `<div className="relative">` element and ALL its children down to line 5281 - Includes: the "other" form block (lines 5222-5280) — this gets replaced by new textarea section Keep: `</DrawerContent>` at line 5282 and `</Drawer>` at line 5283 — do NOT replace these. Verification grep before edit: `grep -n "</DrawerContent>" pages/PublicMenu/x.jsx` → must show line ~5282 (third occurrence). ### STEP 1: Add cancelConfirmType state (~line 1913, after showOtherForm) ```js const [cancelConfirmType, setCancelConfirmType] = useState(null); // SOS v6.0 cancel confirm ``` ### STEP 2: Insert SOS_BUTTONS AFTER HELP_URGENCY_GROUP (from Fix 1, ends ~line 1879) ```js const SOS_BUTTONS = [ { id: 'call_waiter', emoji: '🙋', label: HELP_CARD_LABELS.call_waiter, shortLabel: HELP_CARD_SHORT_LABELS.call_waiter }, { id: 'bill', emoji: '🧾', label: HELP_CARD_LABELS.bill, shortLabel: HELP_CARD_SHORT_LABELS.bill }, { id: 'plate', emoji: '🍽️', label: HELP_CARD_LABELS.plate, shortLabel: HELP_CARD_SHORT_LABELS.plate }, { id: 'napkins', icon: 'layers', label: HELP_CARD_LABELS.napkins, shortLabel: HELP_CARD_SHORT_LABELS.napkins }, { id: 'utensils', emoji: '🍴', label: HELP_CARD_LABELS.utensils, shortLabel: HELP_CARD_SHORT_LABELS.utensils }, { id: 'clear_table', emoji: '🗑️', label: HELP_CARD_LABELS.clear_table, shortLabel: HELP_CARD_SHORT_LABELS.clear_table }, ]; ``` ### STEP 3: Insert handleSosCancel AFTER handleResolve definition Search: `handleResolve = useCallback` to find exact position (line ~2455). Insert AFTER that useCallback block closes (line ~2470): ```js const handleSosCancel = useCallback((type) => { const activeRow = activeRequests.find(r => r.type === type); if (!activeRow) return; const urgency = getHelpUrgency(type, activeRow.sentAt); if (urgency === 'red') { setCancelConfirmType(type); } else { handleResolve(type, type === 'other' ? activeRow.id : undefined); } }, [activeRequests, getHelpUrgency, handleResolve]); ``` ### STEP 4: Fix activeRequestCount to exclude legacy `menu` Find: `grep -n "activeRequestCount" pages/PublicMenu/x.jsx` → line ~2031. Current: `const activeRequestCount = useMemo(() => activeRequests.length, [activeRequests]);` Change to: ```js const activeRequestCount = useMemo(() => activeRequests.filter(r => r.type !== 'menu').length, [activeRequests]); ``` This prevents legacy `menu` requests from inflating the badge. ### STEP 5: State resets in open/close functions In `openHelpDrawer` (line ~2349): add `setCancelConfirmType(null);` after existing resets. In `closeHelpDrawer` (line ~2361): add `setCancelConfirmType(null);` after existing resets. KEEP all existing resets: `setIsTicketExpanded(false)`, `setShowOtherForm(false)`, `setHelpComment('')`. ### STEP 6: Replace DrawerContent children (lines 4976-5281) with new JSX ```jsx {/* SOS v6.0 Drag handle pill */} <div className="flex justify-center pt-2 pb-1"> <div className="w-10 h-1 rounded-full bg-gray-300" /> </div> {/* SOS v6.0 Header */} <div className="px-4 pt-2 pb-2 border-b border-slate-100"> <div className="flex items-center justify-between"> <span className="text-[17px] font-extrabold text-gray-900"> {tr('help.modal_title', 'Нужна помощь?')} </span> <span className="bg-orange-500 text-white rounded-xl px-3 py-0.5 text-[13px] font-bold"> {currentTable?.name || currentTable?.code || tr('help.table_default', 'Стол')} </span> </div> {activeRequestCount === 0 && ( <p className="text-[13px] text-gray-400 mt-0.5"> {tr('help.subtitle_choose', 'Выберите, что нужно')} </p> )} </div> {/* SOS v6.0 Button Grid — 3×2, in-place state */} <div className="grid grid-cols-2 gap-[9px] px-3.5 pt-2.5 pb-2"> {SOS_BUTTONS.map(btn => { const activeRow = activeRequests.find(r => r.type === btn.id); const isActive = Boolean(activeRow); const sentAt = activeRow?.sentAt; const urgency = isActive ? getHelpUrgency(btn.id, sentAt) : 'neutral'; const timerText = isActive ? getHelpTimerStr(sentAt) : ''; if (isActive) { const hasError = Boolean(activeRow.errorKind); if (hasError) { return ( <button key={btn.id} onClick={() => handleRetry(activeRow)} className="rounded-xl border-2 border-red-400 bg-red-50 p-[11px] min-h-[70px] flex flex-col justify-between select-none active:bg-red-100"> <span className="text-[13px] font-extrabold text-red-800">{btn.shortLabel}</span> <div className="text-[12px] font-bold text-red-600 flex items-center gap-[3px] mt-1"> <span className="text-[11px]">⚠</span>{tr('help.retry', 'Повторить')} </div> </button> ); } const activeBg = urgency === 'red' ? 'bg-red-50' : urgency === 'amber' ? 'bg-amber-50' : 'bg-orange-50'; const activeBorder = urgency === 'red' ? 'border-red-500' : urgency === 'amber' ? 'border-amber-500' : 'border-orange-500'; const labelColor = urgency === 'red' ? 'text-red-900' : urgency === 'amber' ? 'text-amber-900' : 'text-orange-800'; const timerColor = urgency === 'red' ? 'text-red-600' : urgency === 'amber' ? 'text-amber-600' : 'text-orange-500'; const xBg = urgency === 'red' ? 'bg-red-500/20' : urgency === 'amber' ? 'bg-amber-500/20' : 'bg-orange-500/15'; const xColor = urgency === 'red' ? 'text-red-800' : urgency === 'amber' ? 'text-amber-800' : 'text-orange-800'; return ( <div key={btn.id} className={`rounded-xl border-2 ${activeBorder} ${activeBg} p-[11px] min-h-[70px] flex flex-col justify-between select-none`}> <div className="flex items-start justify-between"> <span className={`text-[13px] font-extrabold ${labelColor}`}>{btn.shortLabel}</span> <button onClick={(e) => { e.stopPropagation(); handleSosCancel(btn.id); }} className={`w-[22px] h-[22px] rounded-full ${xBg} ${xColor} flex items-center justify-center text-[11px] font-extrabold -mt-0.5 flex-shrink-0`}>✕</button> </div> <div className={`text-[12px] font-bold ${timerColor} flex items-center gap-[3px] mt-1`}> <span className="text-[11px]">⏱</span>{timerText} </div> </div> ); } return ( <button key={btn.id} onClick={() => handleCardTap(btn.id)} className="rounded-xl border-2 border-gray-200 bg-gray-50 p-[11px] min-h-[70px] flex flex-row items-center gap-[9px] select-none active:bg-gray-100 active:scale-[0.97] transition-transform"> {btn.icon === 'layers' ? ( <Layers className="w-[22px] h-[22px] text-gray-500 flex-shrink-0" /> ) : ( <span className="text-xl leading-none flex-shrink-0">{btn.emoji}</span> )} <span className="text-[13px] font-bold text-gray-900 text-left leading-tight">{btn.label}</span> </button> ); })} </div> {/* Cancel confirm panel */} {cancelConfirmType && ( <div className="mx-3.5 mb-1.5 p-3 bg-red-50 border-[1.5px] border-red-200 rounded-xl"> <div className="text-sm font-extrabold text-red-900 mb-2.5"> {tr('help.cancel_confirm_q', 'Отменить запрос?')} </div> <div className="flex gap-2"> <button onClick={() => setCancelConfirmType(null)} className="flex-1 py-2 rounded-lg border-2 border-gray-200 bg-white text-sm font-bold text-gray-700"> {tr('help.cancel_keep', 'Оставить')} </button> <button onClick={() => { const row = activeRequests.find(r => r.type === cancelConfirmType); handleResolve(cancelConfirmType, cancelConfirmType === 'other' ? row?.id : undefined); setCancelConfirmType(null); }} className="flex-1 py-2 rounded-lg bg-red-500 text-white text-sm font-bold"> {tr('help.cancel_do', 'Отменить')} </button> </div> </div> )} {/* Active custom "other" requests */} {activeRequests.filter(r => r.type === 'other').map(row => ( <div key={row.id} className="mx-3.5 mb-2 px-3 py-2 bg-orange-50 border-[1.5px] border-orange-500 rounded-[10px] flex items-center justify-between gap-2"> <span className="text-[13px] text-orange-800 font-semibold flex-1 truncate"> «{row.message || tr('help.other_label', 'Другое')}» </span> <span className="text-[12px] font-bold text-orange-500 whitespace-nowrap">⏱ {getHelpTimerStr(row.sentAt)}</span> <button onClick={(e) => { e.stopPropagation(); handleResolve('other', row.id); }} className="w-[22px] h-[22px] rounded-full bg-orange-500/15 text-orange-800 flex items-center justify-center text-[11px] font-extrabold flex-shrink-0">✕</button> </div> ))} {/* "Другой запрос?" link */} {!activeRequests.some(r => r.type === 'other') && !showOtherForm && ( <div className="px-3.5 pb-3"> <button onClick={() => setShowOtherForm(true)} className="text-sm text-gray-400 underline underline-offset-2 bg-transparent border-none cursor-pointer"> {tr('help.other_request_link', 'Другой запрос?')} </button> </div> )} {/* Textarea form for "other" request — COPIED from existing block (lines 5222-5280) with styling changes: 1. outer wrapper → "mx-3.5 mb-3.5 p-2.5 bg-gray-50 border-[1.5px] border-gray-200 rounded-xl flex flex-col gap-2" 2. textarea: maxLength 100→120, add autoFocus, placeholder=tr('help.other_placeholder','Напишите, что нужно…') 3. send button: className="flex-1 py-[7px] rounded-lg bg-orange-500 text-white text-[13px] font-bold", text=tr('help.send_btn','Отправить') 4. counter: change 100→120 DO NOT change: undo logic, setRequestStates, Array.isArray check, pendingQuickSendRef, handlePresetSelect call, cancel button logic — copy EXACTLY from existing lines 5222-5280 */} {showOtherForm && ( <div className="mx-3.5 mb-3.5 p-2.5 bg-gray-50 border-[1.5px] border-gray-200 rounded-xl flex flex-col gap-2"> <textarea autoFocus value={helpComment} onChange={(e) => setHelpComment(e.target.value.slice(0, 120))} placeholder={tr('help.other_placeholder', 'Напишите, что нужно…')} maxLength={120} className="w-full rounded-lg border border-gray-200 p-2 text-sm resize-none h-[70px] focus:border-orange-400 focus:ring-1 focus:ring-orange-400 outline-none" /> <div className="flex items-center justify-between"> <span className="text-xs text-gray-400">{helpComment.length}/120</span> <div className="flex gap-2"> <button onClick={() => { setShowOtherForm(false); setHelpComment(''); }} className="px-3 py-[7px] rounded-lg border border-gray-200 bg-white text-[13px] font-bold text-gray-700"> {tr('common.cancel', 'Отмена')} </button> <button disabled={!helpComment.trim()} onClick={() => { if (!helpComment.trim()) return; const msg = helpComment.trim(); if (undoToast?.timeoutId) clearTimeout(undoToast.timeoutId); const entryId = `other-${Date.now()}`; const timeoutId = setTimeout(() => { if (currentTableIdRef.current !== currentTableId) return; const now = Date.now(); setRequestStates(prev => { const otherArr = Array.isArray(prev.other) ? prev.other : (prev.other ? [prev.other] : []); return { ...prev, other: [ ...otherArr, { id: entryId, status: 'sending', sentAt: now, lastReminderAt: null, reminderCount: 0, remindCooldownUntil: null, message: msg, pendingAction: 'send', errorKind: null, errorMessage: '', terminalHideAt: null, syncSource: 'local', }, ], }; }); setHelpComment(msg); pendingQuickSendRef.current = { type: 'other', action: 'send', rowId: entryId, message: msg }; handlePresetSelect('other'); setPendingHelpActionTick((value) => value + 1); setUndoToast(prev => (prev?.timeoutId === timeoutId ? null : prev)); }, 5000); setUndoToast({ type: 'other', rowId: entryId, tableId: currentTableId, message: msg, expiresAt: Date.now() + 5000, timeoutId }); setShowOtherForm(false); setHelpComment(''); }} className="flex-1 py-[7px] rounded-lg bg-orange-500 text-white text-[13px] font-bold disabled:opacity-50"> {tr('help.send_btn', 'Отправить')} </button> </div> </div> </div> )} {/* Undo toast */} {undoToast && ( <div className="mx-3.5 mb-3 rounded-lg bg-slate-800 text-white px-4 py-3 flex items-center justify-between text-sm"> <span>{HELP_CARD_LABELS[undoToast.type] || undoToast.type} {tr('help.sent_suffix', 'отправлено')}</span> <button onClick={handleUndo} className="text-amber-300 font-medium ml-2 min-h-[44px] min-w-[44px] flex items-center justify-center"> {tr('help.undo', 'Отмена')} ({Math.max(0, Math.ceil((undoToast.expiresAt - Date.now()) / 1000))}) </button> </div> )} {/* Generic error fallback */} {helpSubmitError && !activeRequests.some(r => r.errorKind) && ( <div className="mx-3.5 mb-3 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700"> {helpSubmitError} </div> )} ``` --- ## Fix 5 — Cleanup removed state, refs, helpers [MUST-FIX] ### HELP_CHIPS and HELP_PREVIEW_LIMIT — REMOVE These were kept by КС-A because JSX still referenced them. After Fix 3 replaces all JSX, they have 0 call sites. - `HELP_PREVIEW_LIMIT` (line 1834): REMOVE entire line - `HELP_CHIPS` (line 1874-1879): REMOVE entire useMemo block - Verification: `grep -n "HELP_CHIPS\|HELP_PREVIEW_LIMIT" pages/PublicMenu/x.jsx` → 0 occurrences AFTER Fix 3 is applied ### State: keep with comments (hook order safety) - `isTicketExpanded` (line 1912): keep declaration, add comment `// SOS v6.0 — kept for hook order, no longer used in JSX` - `highlightedTicket` (line 1911): keep declaration, add comment `// SOS v6.0 — kept for hook order, no longer used in JSX` ### Refs: remove ticketBoardRef - `ticketBoardRef = useRef(null)` (line 1910): REMOVE - Clean up post-send callback (~line 2568): remove `ticketBoardRef.current?.scrollIntoView(...)`, `setHighlightedTicket(...)`, `setTimeout(() => setHighlightedTicket(...))`. KEEP `setIsTicketExpanded(false)` and `setShowOtherForm(false)`. ### focusHelpRow — REMOVE ENTIRELY `grep -n "focusHelpRow" pages/PublicMenu/x.jsx` → definition at line ~2784. focusHelpRow references HELP_PREVIEW_LIMIT (being removed) and ticketBoardRef (being removed). All call sites are in replaced JSX block → safe to remove. ### Dead helpers — REMOVE ALL (all call sites are in replaced block 4976-5281) Remove definitions for: - `getHelpWaitLabel` (line 2639) - `getHelpReminderLabel` (line 2646) - `getHelpResolvedLabel` (line 2657) - `getHelpErrorCopy` (line 2668) - `getHelpFreshnessLabel` (line 2684) Verification: grep each name → 0 occurrences after Fix 3. ### handleRetry — KEEP (used in error-state tiles in new grid) ### Import cleanup ⚠️ DrawerHeader, DrawerTitle — **DO NOT REMOVE** from imports! They are used in CartView drawer (line 4764-4766) and Bottom Sheet drawer (line 4868-4876), OUTSIDE the help drawer. - `ArrowLeft` — used at line 1273 outside help drawer → KEEP - `ChevronDown` — used at line 4866 outside help drawer → KEEP - `MapPin` — used at line 161 outside help drawer → KEEP - `Layers` — KEEP (used in new napkins button) ### Verification After both Fix 3 and Fix 5: - `grep -c "ticketBoardRef" pages/PublicMenu/x.jsx` → 0 - `grep -c "focusHelpRow" pages/PublicMenu/x.jsx` → 0 - `grep -c "HELP_CHIPS" pages/PublicMenu/x.jsx` → 0 - `grep -c "HELP_PREVIEW_LIMIT" pages/PublicMenu/x.jsx` → 0 - `grep -c "getHelpWaitLabel\|getHelpReminderLabel\|getHelpResolvedLabel\|getHelpErrorCopy\|getHelpFreshnessLabel" pages/PublicMenu/x.jsx` → 0 - `grep -c "isTicketExpanded" pages/PublicMenu/x.jsx` → only useState line + setIsTicketExpanded(false) in open/close/post-send (NOT in JSX return) - `grep -c "DrawerHeader\|DrawerTitle" pages/PublicMenu/x.jsx` → ≥ 4 (CartView + BS drawers, NOT zero!) --- ## ⛔ SCOPE LOCK Edit ONLY `pages/PublicMenu/x.jsx`. Allowed regions: - DrawerContent children (4976-5281) — REPLACE - cancelConfirmType state (ADD after line 1913) - SOS_BUTTONS (ADD after line 1879) - handleSosCancel (ADD after handleResolve ~line 2470) - activeRequestCount (MODIFY line 2031) - openHelpDrawer/closeHelpDrawer (ADD resets at lines 2349/2361) - post-send callback (MODIFY ~line 2568: remove ticketBoardRef refs) - HELP_PREVIEW_LIMIT (REMOVE line 1834) - HELP_CHIPS (REMOVE lines 1874-1879) - ticketBoardRef (REMOVE line 1910) - focusHelpRow (REMOVE ~line 2784) - 5 dead helpers (REMOVE lines 2639-2697) - isTicketExpanded, highlightedTicket (ADD comments only) DO NOT change any other part of the file. i18n exception: new tr() calls in JSX use keys already added by КС-A. No new i18n keys needed. ## POST-IMPLEMENTATION CHECKS - 6-button grid renders (call_waiter, bill, plate, napkins, utensils, clear_table) - tap sends request, ✕ cancels (non-red = instant, red = confirm panel) - textarea form for "other" sends correctly - undo toast 5s with countdown - error tile shows retry button - `wc -l pages/PublicMenu/x.jsx` — expected ~5350 ± 150 (replacing ~305 lines old JSX, adding ~170 lines new grid, removing ~80 lines dead helpers/constants). If < 5100 → ABORT (KB-095). - `grep -c "HELP_CHIPS\|HELP_PREVIEW_LIMIT\|ticketBoardRef\|focusHelpRow\|getHelpWaitLabel" pages/PublicMenu/x.jsx` → must be 0 - git commit -m "SOS v6.0 Part B: drawer JSX rewrite + cleanup" === END ===
+mcp startup: no servers
+codex
+I’m reviewing the prompt text against the referenced `PublicMenu` release file and will only produce a findings report. I will not execute the implementation steps or change any code files; the only output will be the requested review file.
+Plan update
+Reviewing the implementation prompt for accuracy against the target release file, then writing only the requested findings report.
+  → Locate the referenced prompt context and target PublicMenu release file
+  • Verify cited line numbers, identifiers, and snippets against the release source
+  • Draft prompt-quality findings and save the markdown report in pipeline/chain-state
+codex
+I’m checking the actual release file for the exact identifiers and boundaries named in the prompt. The focus is whether the prompt’s references are accurate enough for another agent to execute safely without hesitation.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Path 'pages/PublicMenu' -Force | Select-Object Name,Length,LastWriteTime" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Path 'pipeline/chain-state' -Force | Select-Object Name,Length,LastWriteTime" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 21.70s:
+
+ exited 124 in 21.19s:
+
+codex
+The first directory reads timed out, likely due to large folders. I’m switching to narrower file lookups so I can verify the exact release artifact and avoid broad scans.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg --files 'pages/PublicMenu'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg --files 'pipeline/chain-state'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 28.30s:
+pipeline/chain-state\partnersettings-260321-235750-codex-findings.md
+pipeline/chain-state\partnersettings-260321-235750-cc-findings.md
+pipeline/chain-state\partnerorderprocess-260404-204226-0133-merge-report.md
+pipeline/chain-state\partnerorderprocess-260404-204226-0133-codex-findings.md
+pipeline/chain-state\partnersettings-260321-235750-merge-report.md
+pipeline/chain-state\partnersettings-260321-235750-discussion.md
+pipeline/chain-state\partnersettings-260321-235750-comparison.md
+pipeline/chain-state\partnerorderprocess-260404-204226-0133-cc-findings.md
+pipeline/chain-state\partnersettings-260323-142203-51fa-codex-findings.md
+pipeline/chain-state\partnerorderprocess-260404-060141-d4ba-codex-findings.md
+pipeline/chain-state\partnersettings-260323-142203-51fa-cc-findings.md
+pipeline/chain-state\partnersettings-260323-142203-51fa-comparison.md
+pipeline/chain-state\partnersettings-260323-185103-86f9-codex-findings.md
+pipeline/chain-state\partnersettings-260323-185103-86f9-cc-findings.md
+pipeline/chain-state\partnersettings-260323-142203-51fa-merge-report.md
+pipeline/chain-state\partnersettings-260323-142203-51fa-discussion.md
+pipeline/chain-state\partnersettings-260323-185103-86f9-discussion.md
+pipeline/chain-state\partnersettings-260323-185103-86f9-comparison.md
+pipeline/chain-state\partnersettings-260323-185103-86f9-merge-report.md
+pipeline/chain-state\partnersettings-260329-143238-493b-codex-findings.md
+ succeeded in 28.56s:
+pages/PublicMenu\260321-02 CartView RELEASE.jsx
+pages/PublicMenu\260320-01 useTableSession RELEASE.jsx
+pages/PublicMenu\260321-02 x RELEASE.jsx
+pages/PublicMenu\260323-02 MenuView RELEASE.jsx
+pages/PublicMenu\260323-02 CartView RELEASE.jsx
+pages/PublicMenu\260329-01 StickyCartBar RELEASE.jsx
+pages/PublicMenu\260327-01 ModeTabs RELEASE.jsx
+pages/PublicMenu\260329-01 MenuView RELEASE.jsx
+pages/PublicMenu\260323-03 CheckoutView RELEASE.jsx
+pages/PublicMenu\260328-01 x RELEASE.jsx
+pages/PublicMenu\260323-02 x RELEASE.jsx
+pages/PublicMenu\260328-01 CartView RELEASE.jsx
+pages/PublicMenu\260403-00 PublicMenu x RELEASE.jsx
+pages/PublicMenu\260331-01 PublicMenu x RELEASE.jsx
+pages/PublicMenu\260330-09 PublicMenu x RELEASE.jsx
+pages/PublicMenu\260330-02 CartView RELEASE.jsx
+pages/PublicMenu\260404-00 PublicMenu x RELEASE.jsx
+pages/PublicMenu\260403-ROLLBACK PublicMenu x.jsx
+pages/PublicMenu\260404-01 PublicMenu x RELEASE.jsx
+pages/PublicMenu\260406-00 PublicMenu x RELEASE.jsx
+codex
+I found the referenced release artifact. Next I’m verifying whether the prompt’s claimed line anchors and symbol names actually exist there, and whether they still line up with the editable `x.jsx` target the prompt names.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"<Drawer open=\\{isHelpModalOpen\\}|<DrawerContent>|</DrawerContent>|handleCardTap|handleUndo|DrawerHeader|DrawerTitle|ArrowLeft|ChevronDown|MapPin|Layers\" \"pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx\"" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n "cancelConfirmType|showOtherForm|ticketBoardRef|highlightedTicket|isTicketExpanded|activeRequestCount|openHelpDrawer|closeHelpDrawer|handleResolve|handleRetry|focusHelpRow|getHelpWaitLabel|getHelpReminderLabel|getHelpResolvedLabel|getHelpErrorCopy|getHelpFreshnessLabel" "pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx"' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n "HELP_REQUEST_TYPES|HELP_PREVIEW_LIMIT|HELP_COOLDOWN_SECONDS|HELP_CARD_LABELS|HELP_CARD_SHORT_LABELS|HELP_URGENCY_THRESHOLDS|HELP_URGENCY_GROUP|HELP_CHIPS|getHelpUrgency|getHelpTimerStr|nonOtherTypes" "pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx"' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 22.09s:
+24:  ArrowLeft,
+29:  ChevronDown,
+33:  MapPin,
+49:  Layers,
+93:import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+161:    map: MapPin,
+1273:          <ArrowLeft className="w-4 h-4" />
+2370:  const handleCardTap = useCallback((type) => {
+2405:  const handleUndo = useCallback(() => {
+4764:          <DrawerHeader className="sr-only">
+4765:            <DrawerTitle>{t('cart.title')}</DrawerTitle>
+4766:          </DrawerHeader>
+4840:        </DrawerContent>
+4866:              <ChevronDown className="w-6 h-6" />
+4868:            <DrawerHeader className="text-center pb-2">
+4870:              <DrawerTitle className="text-lg font-semibold text-slate-900">
+4872:              </DrawerTitle>
+4876:            </DrawerHeader>
+4951:        </DrawerContent>
+4974:      <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
+ succeeded in 22.62s:
+1903:  const [showOtherForm, setShowOtherForm] = useState(false);
+1910:  const ticketBoardRef = useRef(null);
+1911:  const [highlightedTicket, setHighlightedTicket] = useState(null);
+1912:  const [isTicketExpanded, setIsTicketExpanded] = useState(false);
+2031:  const activeRequestCount = useMemo(() => activeRequests.length, [activeRequests]);
+2349:  const openHelpDrawer = useCallback(() => {
+2361:  const closeHelpDrawer = useCallback(() => {
+2455:  const handleResolve = useCallback((type, otherId) => {
+2568:        ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+2639:  const getHelpWaitLabel = useCallback((row) => {
+2646:  const getHelpReminderLabel = useCallback((row) => {
+2657:  const getHelpResolvedLabel = useCallback((type) => {
+2668:  const getHelpErrorCopy = useCallback((row) => {
+2684:  const getHelpFreshnessLabel = useCallback(() => {
+2697:  const handleRetry = useCallback((row) => {
+2784:  const focusHelpRow = useCallback((rowId) => {
+2788:    ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+2856:      openHelpDrawer();
+2858:  }, [popOverlay, openHelpDrawer]);
+4961:            onOpen={openHelpDrawer}
+ succeeded in 22.97s:
+1834:  const HELP_PREVIEW_LIMIT = 2; // TODO: remove in v6.0 Part B
+1835:  const HELP_REQUEST_TYPES = useMemo(() => new Set([
+1841:  const HELP_COOLDOWN_SECONDS = useMemo(() => ({
+1846:  const HELP_CARD_LABELS = useMemo(() => ({
+1856:  const HELP_CARD_SHORT_LABELS = useMemo(() => ({
+1866:  const HELP_URGENCY_THRESHOLDS = useMemo(() => ({
+1870:  const HELP_URGENCY_GROUP = useMemo(() => ({
+1874:  const HELP_CHIPS = useMemo(() => [ // TODO: remove in v6.0 Part B
+1882:  const getHelpUrgency = useCallback((type, sentAt) => {
+1885:    const group = HELP_URGENCY_GROUP[type] || 'std';
+1886:    const thr = HELP_URGENCY_THRESHOLDS[group];
+1890:  }, [HELP_URGENCY_GROUP, HELP_URGENCY_THRESHOLDS]);
+1892:  const getHelpTimerStr = useCallback((sentAt) => {
+1930:    return (HELP_COOLDOWN_SECONDS[type] || HELP_COOLDOWN_SECONDS.other || 120) * 1000;
+1931:  }, [HELP_COOLDOWN_SECONDS]);
+2138:      return Array.isArray(rows) ? rows.filter((row) => HELP_REQUEST_TYPES.has(row?.request_type)) : [];
+2146:        if (!HELP_REQUEST_TYPES.has(type)) return null;
+2157:  }, [HELP_REQUEST_TYPES, helpRequestFeed, normalizeHelpMessage, parseHelpTimestamp]);
+2215:      const nonOtherTypes = ['call_waiter', 'bill', 'plate', 'napkins', 'utensils', 'clear_table', 'menu'];
+2217:      nonOtherTypes.forEach((type) => {
+codex
+The release-file anchors mostly exist where the prompt claims. I’m now checking whether the editable `pages/PublicMenu/x.jsx` file actually matches that snapshot, because a prompt that targets one file but verifies another can mislead the implementation agent.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"HELP_PREVIEW_LIMIT|HELP_CHIPS|cancelConfirmType|ticketBoardRef|focusHelpRow|handleResolve|<Drawer open=\\{isHelpModalOpen\\}|</DrawerContent>|activeRequestCount|openHelpDrawer|closeHelpDrawer\" \"pages/PublicMenu/x.jsx\"" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "(Get-Content 'pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx').Count; (Get-Content 'pages/PublicMenu/x.jsx').Count" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 21.08s:
+1834:  const HELP_PREVIEW_LIMIT = 2; // TODO: remove in v6.0 Part B
+1874:  const HELP_CHIPS = useMemo(() => [ // TODO: remove in v6.0 Part B
+1910:  const ticketBoardRef = useRef(null);
+2031:  const activeRequestCount = useMemo(() => activeRequests.length, [activeRequests]);
+2349:  const openHelpDrawer = useCallback(() => {
+2361:  const closeHelpDrawer = useCallback(() => {
+2455:  const handleResolve = useCallback((type, otherId) => {
+2568:        ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+2784:  const focusHelpRow = useCallback((rowId) => {
+2786:    setIsTicketExpanded(rowIndex >= HELP_PREVIEW_LIMIT);
+2788:    ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+2856:      openHelpDrawer();
+2858:  }, [popOverlay, openHelpDrawer]);
+4840:        </DrawerContent>
+4951:        </DrawerContent>
+4961:            onOpen={openHelpDrawer}
+4965:          {activeRequestCount > 0 && (
+4967:              {activeRequestCount}
+4974:      <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
+4987:              onClick={closeHelpDrawer}
+ succeeded in 21.98s:
+5458
+5460
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx'; "'$lines=Get-Content $p; $start=2208; $end=2225; for($i=$start; $i -le $end; $i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx'; "'$lines=Get-Content $p; $start=1828; $end=1900; for($i=$start; $i -le $end; $i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx'; "'$lines=Get-Content $p; $start=1901; $end=1935; for($i=$start; $i -le $end; $i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 20.29s:
+2208:    if (!helpSyncUpdatedAt) return;
+2209:
+2210:    setIsHelpRestoring(false);
+2211:
+2212:    setRequestStates((prev) => {
+2213:      const now = Date.now();
+2214:      const next = {};
+2215:      const nonOtherTypes = ['call_waiter', 'bill', 'plate', 'napkins', 'utensils', 'clear_table', 'menu'];
+2216:
+2217:      nonOtherTypes.forEach((type) => {
+2218:        const current = prev[type];
+2219:        const relevantEntries = normalizedHelpRequests.filter((entry) => (
+2220:          entry.type === type &&
+2221:          (!current?.sentAt || entry.createdAt >= (current.sentAt - HELP_MATCH_GRACE_MS))
+2222:        ));
+2223:        const activeEntries = relevantEntries.filter((entry) => HELP_ACTIVE_SERVER_STATUSES.has(entry.status));
+2224:        const doneEntries = relevantEntries.filter((entry) => HELP_DONE_SERVER_STATUSES.has(entry.status));
+2225:
+ succeeded in 20.99s:
+1828:  const HELP_SYNC_INTERVAL_MS = 5000;
+1829:  const HELP_STALE_AFTER_MS = HELP_SYNC_INTERVAL_MS * 3;
+1830:  const HELP_RESTORE_TTL_MS = 6 * 60 * 60 * 1000;
+1831:  const HELP_MATCH_GRACE_MS = 2 * 60 * 1000;
+1832:  const HELP_RESOLVED_HIDE_MS = 4000;
+1833:  const HELP_CLOSED_HIDE_MS = 2000;
+1834:  const HELP_PREVIEW_LIMIT = 2; // TODO: remove in v6.0 Part B
+1835:  const HELP_REQUEST_TYPES = useMemo(() => new Set([
+1836:    'call_waiter', 'bill', 'plate', 'napkins', 'utensils', 'clear_table', 'other',
+1837:    'menu', // legacy â€” keep readable for backward compat; NOT shown in SOS grid
+1838:  ]), []);
+1839:  const HELP_ACTIVE_SERVER_STATUSES = useMemo(() => new Set(['new', 'in_progress']), []);
+1840:  const HELP_DONE_SERVER_STATUSES = useMemo(() => new Set(['done']), []);
+1841:  const HELP_COOLDOWN_SECONDS = useMemo(() => ({
+1842:    call_waiter: 90, bill: 150, plate: 120, napkins: 120,
+1843:    utensils: 120, clear_table: 120, other: 120,
+1844:    menu: 240, // legacy
+1845:  }), []);
+1846:  const HELP_CARD_LABELS = useMemo(() => ({
+1847:    call_waiter: tr('help.call_waiter', 'Call a waiter'),
+ succeeded in 20.91s:
+1901:  const hasLoadedHelpStatesRef = useRef(false);
+1902:  const [undoToast, setUndoToast] = useState(null); // { type, rowId, message?, tableId, expiresAt, timeoutId }
+1903:  const [showOtherForm, setShowOtherForm] = useState(false);
+1904:  const [timerTick, setTimerTick] = useState(0);
+1905:  const pendingQuickSendRef = useRef(null); // { type, action, rowId, message }
+1906:  const [pendingHelpActionTick, setPendingHelpActionTick] = useState(0);
+1907:  const currentTableIdRef = useRef(currentTableId);
+1908:  const [isHelpRestoring, setIsHelpRestoring] = useState(false);
+1909:  const [isHelpOnline, setIsHelpOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
+1910:  const ticketBoardRef = useRef(null);
+1911:  const [highlightedTicket, setHighlightedTicket] = useState(null);
+1912:  const [isTicketExpanded, setIsTicketExpanded] = useState(false);
+1913:
+1914:  useEffect(() => {
+1915:    currentTableIdRef.current = currentTableId;
+1916:  }, [currentTableId]);
+1917:
+1918:  useEffect(() => {
+1919:    const handleOnline = () => setIsHelpOnline(true);
+1920:    const handleOffline = () => setIsHelpOnline(false);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx'; "'$lines=Get-Content $p; $start=2555; $end=2585; for($i=$start; $i -le $end; $i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx'; "'$lines=Get-Content $p; $start=2338; $end=2475; for($i=$start; $i -le $end; $i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx'; "'$lines=Get-Content $p; $start=2635; $end=2715; for($i=$start; $i -le $end; $i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 26.13s:
+2555:            terminalHideAt: null,
+2556:            syncSource: 'local',
+2557:          },
+2558:        };
+2559:      });
+2560:
+2561:      if (action.type === 'other') {
+2562:        setHelpComment('');
+2563:      }
+2564:
+2565:      if (action.action === 'send') {
+2566:        setIsTicketExpanded(false);
+2567:        setShowOtherForm(false);
+2568:        ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+2569:        setHighlightedTicket(action.rowId || action.type);
+2570:        setTimeout(() => setHighlightedTicket((prev) => (prev === (action.rowId || action.type) ? null : prev)), 1500);
+2571:      }
+2572:
+2573:      if (action.action === 'remind') {
+2574:        toast({ description: tr('help.reminder_sent', 'Reminder sent'), duration: 2000 });
+ succeeded in 26.30s:
+2635:  const getMinutesAgo = useCallback((timestamp) => {
+2636:    return Math.max(1, Math.floor((Date.now() - timestamp) / 60000));
+2637:  }, [timerTick]);
+2638:
+2639:  const getHelpWaitLabel = useCallback((row) => {
+2640:    if (!row?.sentAt) return '';
+2641:    const seconds = Math.max(0, Math.floor((Date.now() - row.sentAt) / 1000));
+2642:    if (seconds < 60) return tr('help.just_sent', 'Just sent');
+2643:    return `${tr('help.waiting_prefix', 'Waiting')} ${getMinutesAgo(row.sentAt)} ${tr('help.minutes_short', 'min')}`;
+2644:  }, [getMinutesAgo, tr]);
+2645:
+2646:  const getHelpReminderLabel = useCallback((row) => {
+2647:    if (!row?.lastReminderAt || !row?.reminderCount) return '';
+2648:    const minutesAgo = getMinutesAgo(row.lastReminderAt);
+2649:    const latestLabel = minutesAgo <= 1
+2650:      ? tr('help.reminded_just_now', 'Just reminded')
+2651:      : `${tr('help.reminded_prefix', 'Reminded')} ${minutesAgo} ${tr('help.minutes_short', 'min')} ${tr('help.ago', 'ago')}`;
+2652:
+2653:    if (row.reminderCount === 1) return latestLabel;
+2654:    return `${row.reminderCount} ${getHelpReminderWord(row.reminderCount)} Â· ${tr('help.last_reminder_prefix', 'Last')} ${minutesAgo} ${tr('help.minutes_short', 'min')} ${tr('help.ago', 'ago')}`;
+ succeeded in 26.34s:
+2338:
+2339:      if (nextOtherRows.length > 0) {
+2340:        next.other = nextOtherRows.sort((a, b) => (a.sentAt || 0) - (b.sentAt || 0));
+2341:      }
+2342:
+2343:      return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+2344:    });
+2345:  }, [findMatchingOtherLocalIndex, getHelpCooldownMs, groupOtherServerEntries, helpSyncUpdatedAt, normalizedHelpRequests, HELP_ACTIVE_SERVER_STATUSES, HELP_DONE_SERVER_STATUSES]);
+2346:
+2347:  // PM-126/PM-125: Help drawer open/close with overlay stack integration
+2348:  // PM-133: Guard for null currentTableId Ã¢â‚¬" redirect to table code entry
+2349:  const openHelpDrawer = useCallback(() => {
+2350:    if (!currentTableId) {
+2351:      setShowTableConfirmSheet(true);
+2352:      return;
+2353:    }
+2354:    setShowOtherForm(false);
+2355:    setHelpComment('');
+2356:    setIsTicketExpanded(false);
+2357:    setIsHelpModalOpen(true);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx'; "'$lines=Get-Content $p; $start=2780; $end=2792; for($i=$start; $i -le $end; $i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx'; "'$lines=Get-Content $p; $start=4970; $end=5285; for($i=$start; $i -le $end; $i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 23.59s:
+2780:    handlePresetSelect(row.type);
+2781:    setPendingHelpActionTick((value) => value + 1);
+2782:  }, [handlePresetSelect, setHelpComment]);
+2783:
+2784:  const focusHelpRow = useCallback((rowId) => {
+2785:    const rowIndex = activeRequests.findIndex((row) => row.id === rowId);
+2786:    setIsTicketExpanded(rowIndex >= HELP_PREVIEW_LIMIT);
+2787:    setShowOtherForm(false);
+2788:    ticketBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+2789:    setHighlightedTicket(rowId);
+2790:    setTimeout(() => setHighlightedTicket((prev) => (prev === rowId ? null : prev)), 1500);
+2791:  }, [activeRequests, setShowOtherForm]);
+2792:
+ succeeded in 23.08s:
+4970:        </div>
+4971:      )}
+4972:
+4973:      {/* PM-125: Help as Bottom Drawer (replaces HelpModal Dialog) */}
+4974:      <Drawer open={isHelpModalOpen} onOpenChange={(open) => { if (!open) closeHelpDrawer(); }}>
+4975:        <DrawerContent className="max-h-[85vh] rounded-t-2xl flex flex-col">
+4976:          <div className="relative">
+4977:            {isTicketExpanded && (
+4978:              <button
+4979:                onClick={() => { setIsTicketExpanded(false); }}
+4980:                className="absolute top-3 left-3 min-h-[44px] px-3 flex items-center gap-1 rounded-full bg-slate-100 text-slate-700 z-10 text-sm font-medium"
+4981:              >
+4982:                <ArrowLeft className="w-4 h-4" />
+4983:                <span>{t('help.back_to_help')}</span>
+4984:              </button>
+4985:            )}
+4986:            <button
+4987:              onClick={closeHelpDrawer}
+4988:              className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 z-10"
+4989:              aria-label={t('common.close', 'Ð—Ð°ÐºÑ€Ñ‹Ñ‚ÑŒ')}
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx'; "'$lines=Get-Content $p; $start=2455; $end=2505; for($i=$start; $i -le $end; $i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 25.64s:
+2455:  const handleResolve = useCallback((type, otherId) => {
+2456:    const now = Date.now();
+2457:
+2458:    setRequestStates((prev) => {
+2459:      if (type === 'other') {
+2460:        const otherRows = Array.isArray(prev.other) ? prev.other : [];
+2461:        return {
+2462:          ...prev,
+2463:          other: otherRows.map((entry) => (
+2464:            entry.id === otherId
+2465:              ? {
+2466:                  ...entry,
+2467:                  status: 'closed_by_guest',
+2468:                  pendingAction: null,
+2469:                  errorKind: null,
+2470:                  errorMessage: '',
+2471:                  terminalHideAt: now + HELP_CLOSED_HIDE_MS,
+2472:                  syncSource: 'local',
+2473:                }
+2474:              : entry
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"const \\{ t \\}|const t =|const tr =|useI18n|tr\\('help|t\\('help\" \"pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx\" | Select-Object -First 80" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 19.46s:
+19:import { useI18n } from "@/components/i18n";
+803:  const tr = (key, fallback) => {
+1421:  const { lang, setLang, t: rawT } = useI18n();
+1422:  const t = makeSafeT(rawT, lang);
+1425:  const tr = (key, fallback) => {
+1847:    call_waiter: tr('help.call_waiter', 'Call a waiter'),
+1848:    bill: tr('help.get_bill', 'Bill'),
+1849:    plate: tr('help.plate', 'Extra plate'),
+1850:    napkins: tr('help.napkins', 'Napkins'),
+1851:    utensils: tr('help.utensils', 'Utensils'),
+1852:    clear_table: tr('help.clear_table', 'Clear the table'),
+1853:    other: tr('help.other_label', 'Other'),
+1854:    menu: tr('help.menu', 'Paper menu'), // legacy
+1857:    call_waiter: tr('help.call_waiter_short', 'Call'),
+1858:    bill: tr('help.get_bill_short', 'Bill'),
+1859:    plate: tr('help.plate_short', 'Plate'),
+1860:    napkins: tr('help.napkins_short', 'Napkins'),
+1861:    utensils: tr('help.utensils_short', 'Utensils'),
+1862:    clear_table: tr('help.clear_table_short', 'Clear'),
+1863:    other: tr('help.other_label', 'Other'),
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx'; "'$lines=Get-Content $p; $start=1418; $end=1432; for($i=$start; $i -le $end; $i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.42s:
+1418:}
+1419:
+1420:export default function X() {
+1421:  const { lang, setLang, t: rawT } = useI18n();
+1422:  const t = makeSafeT(rawT, lang);
+1423:
+1424:  // Safe translation with explicit fallback (kept for backward compat)
+1425:  const tr = (key, fallback) => {
+1426:    const val = t(key);
+1427:    return val || fallback;
+1428:  };
+1429:
+1430:  const location = useLocation();
+1431:  const queryClient = useQueryClient();
+1432:
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff --no-index --unified=0 -- "pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx" "pages/PublicMenu/x.jsx" | Select-Object -First 120' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 1 in 8.58s:
+diff --git a/pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx b/pages/PublicMenu/x.jsx
+index a6884b4..3bea0c3 100644
+--- a/pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx	
++++ b/pages/PublicMenu/x.jsx
+@@ -5458 +5458,3 @@ export default function X() {
+-}
+\ No newline at end of file
++}
++
++                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+\ No newline at end of file
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"const currentTable|currentTable\\?|currentTableId\" \"pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx\" | Select-Object -First 40" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 15.34s:
+1805:  // P0-2: currentTableId only from resolved table or code verification
+1806:  const currentTableId = resolvedTable?.id || verifiedTableId || null;
+1809:  const currentTable = resolvedTable || verifiedTable || null;
+1825:  } = useHelpRequests({ partner, currentTableId, t, toast, isRateLimitError, saveTableSelection });
+1907:  const currentTableIdRef = useRef(currentTableId);
+1915:    currentTableIdRef.current = currentTableId;
+1916:  }, [currentTableId]);
+2035:    if (!currentTableId) {
+2049:      const key = `helpdrawer_${currentTableId}`;
+2112:  }, [currentTableId, normalizeHelpMessage, parseHelpTimestamp]);
+2129:  const helpSyncEnabled = Boolean(partner?.id && currentTableId && (isHelpModalOpen || hasAnyHelpState || isHelpRestoring));
+2131:    queryKey: ['helpDrawerRequests', partner?.id, currentTableId],
+2137:      const rows = await base44.entities.ServiceRequest.filter({ partner: partner.id, table: currentTableId });
+2348:  // PM-133: Guard for null currentTableId â€" redirect to table code entry
+2350:    if (!currentTableId) {
+2359:  }, [currentTableId, pushOverlay, setHelpComment, setShowTableConfirmSheet]);
+2371:    if (!currentTableId) return;
+2372:    if (undoToast?.type === type && undoToast?.tableId === currentTableId) return;
+2376:      if (currentTableIdRef.current !== currentTableId) return;
+2401:    setUndoToast({ type, rowId: type, tableId: currentTableId, expiresAt: Date.now() + 5000, timeoutId });
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n "const activeRequests|activeRequests =|ticketRows =|normalizedHelpState" "pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx" | Select-Object -First 40' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 20.60s:
+2002:  const ticketRows = useMemo(() => {
+2030:  const activeRequests = useMemo(() => ticketRows.filter((row) => row.isActive), [ticketRows]);
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx'; "'$lines=Get-Content $p; $start=2002; $end=2034; for($i=$start; $i -le $end; $i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.89s:
+2002:  const ticketRows = useMemo(() => {
+2003:    const now = Date.now();
+2004:    const list = [];
+2005:
+2006:    Object.entries(requestStates).forEach(([type, state]) => {
+2007:      if (type === 'other') {
+2008:        const rows = Array.isArray(state) ? state : [state].filter(Boolean);
+2009:        rows.forEach((entry) => {
+2010:          const normalized = getNormalizedHelpState('other', entry, now);
+2011:          if (normalized && (normalized.isVisible || normalized.isActive)) {
+2012:            list.push({ ...normalized, type: 'other', id: normalized.id });
+2013:          }
+2014:        });
+2015:        return;
+2016:      }
+2017:
+2018:      const normalized = getNormalizedHelpState(type, state, now);
+2019:      if (normalized && (normalized.isVisible || normalized.isActive)) {
+2020:        list.push({ ...normalized, type, id: normalized.id || type });
+2021:      }
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n "isActive|errorKind|pendingAction|getNormalizedHelpState" "pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx" | Select-Object -First 120' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 17.43s:
+1941:  const getNormalizedHelpState = useCallback((type, state, now = Date.now()) => {
+1964:        isActive: false,
+1978:        isActive: true,
+1997:      isActive: true,
+2010:          const normalized = getNormalizedHelpState('other', entry, now);
+2011:          if (normalized && (normalized.isVisible || normalized.isActive)) {
+2018:      const normalized = getNormalizedHelpState(type, state, now);
+2019:      if (normalized && (normalized.isVisible || normalized.isActive)) {
+2025:      if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+2028:  }, [getNormalizedHelpState, requestStates, timerTick]);
+2030:  const activeRequests = useMemo(() => ticketRows.filter((row) => row.isActive), [ticketRows]);
+2083:          pendingAction: null,
+2084:          errorKind: null,
+2120:          const normalized = getNormalizedHelpState('other', entry, now);
+2121:          return normalized && (normalized.isActive || normalized.isVisible || normalized.pendingAction || normalized.errorKind);
+2124:      const normalized = getNormalizedHelpState(type, state, now);
+2125:      return normalized && (normalized.isActive || normalized.isVisible || normalized.pendingAction || normalized.errorKind);
+2127:  }, [getNormalizedHelpState, requestStates, timerTick]);
+2243:              current?.pendingAction === 'remind'
+2246:            pendingAction: null,
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$p='"'pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx'; "'$lines=Get-Content $p; $start=1941; $end=2000; for($i=$start; $i -le $end; $i++){ '"'{0}:{1}' -f "'$i,$lines[$i-1] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 15.94s:
+1941:  const getNormalizedHelpState = useCallback((type, state, now = Date.now()) => {
+1942:    if (!state) return null;
+1943:
+1944:    const message = normalizeHelpMessage(state.message || state.comment);
+1945:    const sentAt = Number(state.sentAt) || parseHelpTimestamp(state.sentAt) || null;
+1946:    const reminderCount = Math.max(0, Number(state.reminderCount) || 0);
+1947:    const lastReminderAt = Number(state.lastReminderAt) || parseHelpTimestamp(state.lastReminderAt) || null;
+1948:    const remindCooldownUntil =
+1949:      Number(state.remindCooldownUntil) ||
+1950:      parseHelpTimestamp(state.remindCooldownUntil) ||
+1951:      ((lastReminderAt || sentAt) ? (lastReminderAt || sentAt) + getHelpCooldownMs(type) : null);
+1952:
+1953:    if (!sentAt && state.status !== 'closed_by_guest' && state.status !== 'resolved') return null;
+1954:
+1955:    if (state.status === 'closed_by_guest' || state.status === 'resolved') {
+1956:      return {
+1957:        ...state,
+1958:        id: state.id || (type === 'other' ? `other-${sentAt || now}` : type),
+1959:        message,
+1960:        sentAt: sentAt || now,
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"help\\.send_btn|help\\.other_request_link|help\\.other_placeholder|help\\.cancel_confirm_q|help\\.cancel_keep|help\\.cancel_do|help\\.subtitle_choose|help\\.table_default\" \"pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx\"" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 20.10s:
+589:  "help.subtitle_choose": "Choose what you need",
+590:  "help.table_default": "Table",
+591:  "help.cancel_confirm_q": "Cancel request?",
+592:  "help.cancel_keep": "Keep",
+593:  "help.cancel_do": "Cancel",
+594:  "help.other_request_link": "Something else?",
+595:  "help.other_placeholder": "Describe what you need…",
+596:  "help.send_btn": "Send",
+664:  "help.subtitle_choose": "Выберите, что нужно",
+665:  "help.table_default": "Стол",
+666:  "help.cancel_confirm_q": "Отменить запрос?",
+667:  "help.cancel_keep": "Оставить",
+668:  "help.cancel_do": "Отменить",
+669:  "help.other_request_link": "Другой запрос?",
+670:  "help.other_placeholder": "Напишите, что нужно…",
+671:  "help.send_btn": "Отправить",
+codex
+I’ve confirmed several anchors, and there are a few prompt-level problems rather than code-level bugs: some line references are materially wrong, the target file and verified snapshot diverge, and the proposed cancel-confirm design does not handle multiple `other` requests safely. I’m drafting the report now in the requested format.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pipeline/chain-state/publicmenu-260408-072228-de40-codex-findings.md' -TotalCount 120" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 16.85s:
+# Codex Writer Findings â€” publicmenu
+Chain: publicmenu-260408-072228-de40
+
+## Findings
+1. [P1] New SOS request types are still filtered out of help-sync state â€” `HELP_REQUEST_TYPES` still allows only `call_waiter`, `bill`, `napkins`, `menu`, and `other` at `pages/PublicMenu/x.jsx:1796`, and the same old subset is used by ServiceRequest filtering/normalization at `pages/PublicMenu/x.jsx:2053-2061` and `nonOtherTypes` at `pages/PublicMenu/x.jsx:2130`. `plate`, `utensils`, and `clear_table` requests will be ignored on fetch/restore, while legacy `menu` still behaves like an active preset. FIX: expand `HELP_REQUEST_TYPES` and `nonOtherTypes` to include the three new types, keep `menu` legacy-only, and align the request whitelist with the v6.0 button set.
+2. [P2] Help drawer config constants are still on the legacy card model â€” `HELP_COOLDOWN_SECONDS` and `HELP_CARD_LABELS` at `pages/PublicMenu/x.jsx:1799-1806` still cover only waiter/bill/napkins/menu/other, still use `help.bill` and `help.menu`, and there is no `HELP_CARD_SHORT_LABELS`. `HELP_CHIPS` and `HELP_PREVIEW_LIMIT` also remain defined at `pages/PublicMenu/x.jsx:1795-1813` and are still referenced at `pages/PublicMenu/x.jsx:2701`, `pages/PublicMenu/x.jsx:4935`, `pages/PublicMenu/x.jsx:5027`, and `pages/PublicMenu/x.jsx:5102`, so the deprecated v5 constants were not removed. FIX: replace the label/cooldown maps with the v6.0 six-button config, add `HELP_CARD_SHORT_LABELS`, and remove the deprecated chip/preview constants once the remaining call sites are handled.
+3. [P2] Urgency threshold plumbing is missing â€” there are no `HELP_URGENCY_THRESHOLDS`, `HELP_URGENCY_GROUP`, `getHelpUrgency`, or `getHelpTimerStr` definitions anywhere in `pages/PublicMenu/x.jsx` (file-wide search returned no matches). The safe constants/helper layer for amber/red aging and minute timer strings is absent, so the v6.0 drawer still has no urgency model to consume in the next step. FIX: add the two `useMemo` threshold/group maps immediately after `HELP_COOLDOWN_SECONDS` and add both `useCallback` helpers before the component return.
+4. [P1] The fallback dictionaries are incomplete and still mix old help keys/copy â€” the EN block at `pages/PublicMenu/x.jsx:525-584` still lacks the new v6.0 keys such as `help.plate`, `help.utensils`, `help.clear_table`, all six `*_short` keys, `help.subtitle_choose`, `help.table_default`, `help.cancel_confirm_q`, `help.cancel_keep`, `help.cancel_do`, `help.other_request_link`, `help.other_placeholder`, and `help.send_btn`. The RU block at `pages/PublicMenu/x.jsx:588-636` lacks the same additions plus `help.sent_suffix` and `help.undo`, and its existing `help.get_bill` entry at `pages/PublicMenu/x.jsx:596` still uses the older verbose copy `"ÐŸÑ€Ð¸Ð½ÐµÑÑ‚Ð¸ ÑÑ‡Ñ‘Ñ‚"` instead of the required short `"Ð¡Ñ‡Ñ‘Ñ‚"`. Once Fix 1 switches labels to the new keys, RU/EN will fall back to raw keys or wrong copy. FIX: add the missing `help.*` entries to both fallback maps and replace RU `help.get_bill` with the shorter v6.0 label.
+
+## Summary
+Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
+
+## Prompt Clarity
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 says `HELP_CHIPS` and `HELP_PREVIEW_LIMIT` must have 0 occurrences, but the same prompt also forbids JSX changes while those symbols still have live references at `pages/PublicMenu/x.jsx:2701`, `pages/PublicMenu/x.jsx:4935`, `pages/PublicMenu/x.jsx:5027`, and `pages/PublicMenu/x.jsx:5102`. It is unclear whether Part A is allowed to leave temporary shims or whether Part B is expected to remove those usages.
+- Missing context (what info would have helped): The prompt would be clearer if it stated whether this review is meant to validate an already-applied Part A patch or to assess the current unpatched baseline against the Part A spec, and whether the legacy `help.bill` key should remain alongside `help.get_bill` during the split.
+- Scope questions (anything you weren't sure if it's in scope): The only scope uncertainty was whether touching the existing `HELP_CHIPS` / `HELP_PREVIEW_LIMIT` call sites is permitted to satisfy the "0 occurrences" verification without violating the "NO JSX CHANGES" rule.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"<Button|\\bButton\\b\" \"pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx\" | Select-Object -First 80" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 22.04s:
+74:import { Button } from "@/components/ui/button";
+923:        <Button
+929:        </Button>
+931:        <Button
+937:        </Button>
+941:          <Button
+950:          </Button>
+1187:              <Button variant="outline" className="min-h-[44px]" onClick={onBackToMenu}>{t("order_status.back_to_menu")}</Button>
+1216:              <Button variant="outline" className="min-h-[44px]" onClick={() => refetchOrder()}>
+1218:              </Button>
+1236:              <Button variant="outline" className="min-h-[44px]" onClick={onBackToMenu}>{t("order_status.back_to_menu")}</Button>
+1253:              <Button variant="outline" className="min-h-[44px] mt-4" onClick={onBackToMenu}>{t("order_status.back_to_menu")}</Button>
+1369:            <Button
+1380:            </Button>
+4484:          <Button variant="outline" className="mt-4 min-h-[44px]" onClick={() => refetchPartner()}>
+4486:          </Button>
+4935:            <Button
+4949:            </Button>
+4954:      {/* Floating Help Button - only when table verified in Hall */}
+5224:              <Button
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$bytes=[System.IO.File]::ReadAllBytes('"'pages/PublicMenu/x.jsx'); "'$nulCount=($bytes | Where-Object { $_ -eq 0 }).Count; "nul_bytes=$nulCount"' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 27.49s:
+nul_bytes=1672
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$bytes=[System.IO.File]::ReadAllBytes('"'pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx'); "'$nulCount=($bytes | Where-Object { $_ -eq 0 }).Count; "release_nul_bytes=$nulCount"' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 12.36s:
+release_nul_bytes=0
+codex
+I’ve identified one more prompt-level risk unrelated to the JSX itself: the prompt’s validation commands assume Unix-style tooling, but this workspace is PowerShell on Windows. I’m confirming whether those checks are portable enough, then I’ll save the report.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Command wc | Format-Table -HideTableHeaders Name,CommandType,Source' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Command grep | Format-Table -HideTableHeaders Name,CommandType,Source' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 14.72s:
+
+wc.exe Application C:\Program Files\Git\usr\bin\wc.exe
+
+
+ succeeded in 14.88s:
+
+grep.exe Application C:\Program Files\Git\usr\bin\grep.exe
+
+
+codex
+I have the findings and I’m writing only the requested markdown report under `pipeline/chain-state`. No source files will be modified.
+Plan update
+  ✓ Locate the referenced prompt context and target PublicMenu release file
+  ✓ Verify cited line numbers, identifiers, and snippets against the release source
+  → Draft prompt-quality findings and save the markdown report in pipeline/chain-state
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md
+# Codex Reviewer Findings — ПССК Prompt Quality Review
+Chain: publicmenu-260408-122951-0f47
+
+## Issues Found
+1. [CRITICAL] Cancel-confirm design is not safe for `other` requests — The prompt introduces `cancelConfirmType` as a single type string and `handleSosCancel(type)` looks up `activeRequests.find(r => r.type === type)`. That is not enough for `other`, because the actual source supports multiple active `other` rows at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:2007-2014`, and the proposed JSX also renders multiple `other` rows. If confirm is ever routed through this handler, it can pick the wrong row. The prompt also bypasses the confirm flow for `other` entirely by wiring the `other` row close button straight to `handleResolve('other', row.id)`, which conflicts with its own rule `non-red = instant, red = confirm panel`. PROMPT FIX: replace `cancelConfirmType` with an object such as `{ type, rowId }`, make `handleSosCancel(type, rowId)` resolve the exact row, wire `other` row cancel buttons through the same handler, and guard the confirm button so it no-ops if the target row no longer exists.
+2. [CRITICAL] The prompt validates one file but tells the agent to edit a different one — All “verified” anchors are taken from `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, but the prompt tells the implementation agent to edit only `pages/PublicMenu/x.jsx`. In this workspace those files are not byte-identical: the release snapshot is 5458 lines, while `pages/PublicMenu/x.jsx` is 5460 lines and contains trailing NUL padding that is not present in the release file. That creates a real safety risk for line-based editing, exact-copy instructions, and post-fix diff review. PROMPT FIX: either target the release file directly, or add an explicit first step to normalize `pages/PublicMenu/x.jsx` to the validated release snapshot and confirm the target file has no binary padding before any edits.
+3. [MEDIUM] Some “verified” anchors are materially wrong — The drawer boundary anchors are mostly correct, but several important references are not. `handleResolve` starts at line 2455 and its `useCallback` closes at line 2493, not “~2470”. `HELP_URGENCY_GROUP` ends at line 1873, not “~1879”. `nonOtherTypes` is defined at line 2215, not 2216. The prompt also says the release file has 5459 lines, while the actual release snapshot has 5458. These are small individually, but the prompt relies heavily on exact placement. PROMPT FIX: correct the specific anchors above and prefer symbol-based anchors (“insert after the `handleResolve` callback closing `}, []);`”) over approximate line numbers wherever possible.
+4. [MEDIUM] Legacy `menu` requests are still synchronized but become invisible in the new UI — The actual source still treats `menu` as a valid legacy help type in `HELP_REQUEST_TYPES` at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:1835-1838` and in `nonOtherTypes` at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:2215-2217`. The prompt only changes `activeRequestCount` to exclude `menu`, but the replacement JSX renders only the six new buttons plus `other`. That leaves a live edge case where an existing legacy `menu` request can remain in state but have no visible tile or cancel path in the new drawer. PROMPT FIX: explicitly decide the migration behavior for legacy `menu` requests: either filter and retire them before rendering, or render a temporary legacy row with cancel/retry behavior until old requests age out.
+5. [MEDIUM] The proposed JSX violates the repo’s “no dynamic Tailwind classes” rule — The prompt tells the implementation agent to build `activeBg`, `activeBorder`, `labelColor`, `timerColor`, `xBg`, and `xColor` strings and interpolate them into `className`. That conflicts with the project rule to avoid dynamic Tailwind classes, and it invites style-review churn or missing styles if class extraction is strict. PROMPT FIX: instruct the agent to use an explicit urgency-to-class map with complete static class strings, e.g. `const SOS_URGENCY_STYLES = { red: '...', amber: '...', neutral: '...' }`, and reference those named variants directly.
+6. [LOW] The cleanup instructions leave dead hooks behind for a reason that is technically inaccurate — The prompt says to keep `highlightedTicket` and `isTicketExpanded` “for hook order safety” while also removing their real consumers: old drawer JSX, `focusHelpRow`, and the post-send highlighting block. After those removals, both hooks become dead state. Keeping them does not protect React hook order across code versions, but it can create unused-variable noise and muddle the cleanup scope. PROMPT FIX: either remove those hooks entirely, or explicitly state that they are temporary compatibility shims and rename/comment them in a way that will not trip lint or confuse the next reviewer.
+7. [MEDIUM] Post-fix validation is too weak for a 300-line JSX replacement — The prompt’s checks are mostly `grep` and line-count heuristics plus manual UI assertions. Those checks will not catch malformed JSX, a misplaced insertion after `handleResolve`, stale references like `setHighlightedTicket`, or a partially updated `x.jsx` that still contains binary garbage. PROMPT FIX: add at least one deterministic syntax-level validation step for the edited file, plus targeted symbol checks for `SOS_BUTTONS`, `handleSosCancel`, `cancelConfirmType`, and the absence of the removed helpers/refs after the rewrite.
+
+## Summary
+Total: 7 issues (2 CRITICAL, 4 MEDIUM, 1 LOW)
+
+## Additional Risks
+- The prompt marks the bell badge as “FROZEN UX” but also changes `activeRequestCount`, which directly feeds that badge at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:4965-4967`. That should be clarified as “visual treatment frozen, count logic intentionally changes”.
+- The target file already contains trailing binary padding. Without an explicit normalization step, a clean-looking patch can still leave `pages/PublicMenu/x.jsx` in a corrupted state.
+- The prompt depends on Part A being present but does not require a strict baseline check against the actual target file before edits. If another chain touched `x.jsx`, symbol-based instructions are safer than line-based ones.
+
+## Prompt Clarity (MANDATORY — do NOT skip)
+- Overall clarity: 3
+- What was most clear: The DrawerContent replacement boundary is well specified, and the keep/remove lists for helper symbols are mostly concrete.
+- What was ambiguous or could cause hesitation: The prompt mixes a validated release snapshot with a different editable file, misstates some insertion anchors, does not define how legacy `menu` should behave in the new UI, and under-specifies cancel-confirm behavior for multiple `other` requests.
+- Missing context: The prompt should say whether `pages/PublicMenu/x.jsx` must first be synced to `260408-01 PublicMenu x RELEASE.jsx`, what to do with existing legacy `menu` requests, and what exact non-runtime validation is expected before reporting success.
+apply_patch(auto_approved=true) exited 0 in 1.09s:
+Success. Updated the following files:
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md b/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..32f2a1d8104d3a040b8bb48d18d751fb03694b5a
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md
+@@ -0,0 +1,25 @@
++# Codex Reviewer Findings — ПССК Prompt Quality Review
++Chain: publicmenu-260408-122951-0f47
++
++## Issues Found
++1. [CRITICAL] Cancel-confirm design is not safe for `other` requests — The prompt introduces `cancelConfirmType` as a single type string and `handleSosCancel(type)` looks up `activeRequests.find(r => r.type === type)`. That is not enough for `other`, because the actual source supports multiple active `other` rows at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:2007-2014`, and the proposed JSX also renders multiple `other` rows. If confirm is ever routed through this handler, it can pick the wrong row. The prompt also bypasses the confirm flow for `other` entirely by wiring the `other` row close button straight to `handleResolve('other', row.id)`, which conflicts with its own rule `non-red = instant, red = confirm panel`. PROMPT FIX: replace `cancelConfirmType` with an object such as `{ type, rowId }`, make `handleSosCancel(type, rowId)` resolve the exact row, wire `other` row cancel buttons through the same handler, and guard the confirm button so it no-ops if the target row no longer exists.
++2. [CRITICAL] The prompt validates one file but tells the agent to edit a different one — All “verified” anchors are taken from `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, but the prompt tells the implementation agent to edit only `pages/PublicMenu/x.jsx`. In this workspace those files are not byte-identical: the release snapshot is 5458 lines, while `pages/PublicMenu/x.jsx` is 5460 lines and contains trailing NUL padding that is not present in the release file. That creates a real safety risk for line-based editing, exact-copy instructions, and post-fix diff review. PROMPT FIX: either target the release file directly, or add an explicit first step to normalize `pages/PublicMenu/x.jsx` to the validated release snapshot and confirm the target file has no binary padding before any edits.
++3. [MEDIUM] Some “verified” anchors are materially wrong — The drawer boundary anchors are mostly correct, but several important references are not. `handleResolve` starts at line 2455 and its `useCallback` closes at line 2493, not “~2470”. `HELP_URGENCY_GROUP` ends at line 1873, not “~1879”. `nonOtherTypes` is defined at line 2215, not 2216. The prompt also says the release file has 5459 lines, while the actual release snapshot has 5458. These are small individually, but the prompt relies heavily on exact placement. PROMPT FIX: correct the specific anchors above and prefer symbol-based anchors (“insert after the `handleResolve` callback closing `}, []);`”) over approximate line numbers wherever possible.
++4. [MEDIUM] Legacy `menu` requests are still synchronized but become invisible in the new UI — The actual source still treats `menu` as a valid legacy help type in `HELP_REQUEST_TYPES` at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:1835-1838` and in `nonOtherTypes` at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:2215-2217`. The prompt only changes `activeRequestCount` to exclude `menu`, but the replacement JSX renders only the six new buttons plus `other`. That leaves a live edge case where an existing legacy `menu` request can remain in state but have no visible tile or cancel path in the new drawer. PROMPT FIX: explicitly decide the migration behavior for legacy `menu` requests: either filter and retire them before rendering, or render a temporary legacy row with cancel/retry behavior until old requests age out.
++5. [MEDIUM] The proposed JSX violates the repo’s “no dynamic Tailwind classes” rule — The prompt tells the implementation agent to build `activeBg`, `activeBorder`, `labelColor`, `timerColor`, `xBg`, and `xColor` strings and interpolate them into `className`. That conflicts with the project rule to avoid dynamic Tailwind classes, and it invites style-review churn or missing styles if class extraction is strict. PROMPT FIX: instruct the agent to use an explicit urgency-to-class map with complete static class strings, e.g. `const SOS_URGENCY_STYLES = { red: '...', amber: '...', neutral: '...' }`, and reference those named variants directly.
++6. [LOW] The cleanup instructions leave dead hooks behind for a reason that is technically inaccurate — The prompt says to keep `highlightedTicket` and `isTicketExpanded` “for hook order safety” while also removing their real consumers: old drawer JSX, `focusHelpRow`, and the post-send highlighting block. After those removals, both hooks become dead state. Keeping them does not protect React hook order across code versions, but it can create unused-variable noise and muddle the cleanup scope. PROMPT FIX: either remove those hooks entirely, or explicitly state that they are temporary compatibility shims and rename/comment them in a way that will not trip lint or confuse the next reviewer.
++7. [MEDIUM] Post-fix validation is too weak for a 300-line JSX replacement — The prompt’s checks are mostly `grep` and line-count heuristics plus manual UI assertions. Those checks will not catch malformed JSX, a misplaced insertion after `handleResolve`, stale references like `setHighlightedTicket`, or a partially updated `x.jsx` that still contains binary garbage. PROMPT FIX: add at least one deterministic syntax-level validation step for the edited file, plus targeted symbol checks for `SOS_BUTTONS`, `handleSosCancel`, `cancelConfirmType`, and the absence of the removed helpers/refs after the rewrite.
++
++## Summary
++Total: 7 issues (2 CRITICAL, 4 MEDIUM, 1 LOW)
++
++## Additional Risks
++- The prompt marks the bell badge as “FROZEN UX” but also changes `activeRequestCount`, which directly feeds that badge at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:4965-4967`. That should be clarified as “visual treatment frozen, count logic intentionally changes”.
++- The target file already contains trailing binary padding. Without an explicit normalization step, a clean-looking patch can still leave `pages/PublicMenu/x.jsx` in a corrupted state.
++- The prompt depends on Part A being present but does not require a strict baseline check against the actual target file before edits. If another chain touched `x.jsx`, symbol-based instructions are safer than line-based ones.
++
++## Prompt Clarity (MANDATORY — do NOT skip)
++- Overall clarity: 3
++- What was most clear: The DrawerContent replacement boundary is well specified, and the keep/remove lists for helper symbols are mostly concrete.
++- What was ambiguous or could cause hesitation: The prompt mixes a validated release snapshot with a different editable file, misstates some insertion anchors, does not define how legacy `menu` should behave in the new UI, and under-specifies cancel-confirm behavior for multiple `other` requests.
++- Missing context: The prompt should say whether `pages/PublicMenu/x.jsx` must first be synced to `260408-01 PublicMenu x RELEASE.jsx`, what to do with existing legacy `menu` requests, and what exact non-runtime validation is expected before reporting success.
+
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md b/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..32f2a1d8104d3a040b8bb48d18d751fb03694b5a
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md
+@@ -0,0 +1,25 @@
++# Codex Reviewer Findings — ПССК Prompt Quality Review
++Chain: publicmenu-260408-122951-0f47
++
++## Issues Found
++1. [CRITICAL] Cancel-confirm design is not safe for `other` requests — The prompt introduces `cancelConfirmType` as a single type string and `handleSosCancel(type)` looks up `activeRequests.find(r => r.type === type)`. That is not enough for `other`, because the actual source supports multiple active `other` rows at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:2007-2014`, and the proposed JSX also renders multiple `other` rows. If confirm is ever routed through this handler, it can pick the wrong row. The prompt also bypasses the confirm flow for `other` entirely by wiring the `other` row close button straight to `handleResolve('other', row.id)`, which conflicts with its own rule `non-red = instant, red = confirm panel`. PROMPT FIX: replace `cancelConfirmType` with an object such as `{ type, rowId }`, make `handleSosCancel(type, rowId)` resolve the exact row, wire `other` row cancel buttons through the same handler, and guard the confirm button so it no-ops if the target row no longer exists.
++2. [CRITICAL] The prompt validates one file but tells the agent to edit a different one — All “verified” anchors are taken from `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, but the prompt tells the implementation agent to edit only `pages/PublicMenu/x.jsx`. In this workspace those files are not byte-identical: the release snapshot is 5458 lines, while `pages/PublicMenu/x.jsx` is 5460 lines and contains trailing NUL padding that is not present in the release file. That creates a real safety risk for line-based editing, exact-copy instructions, and post-fix diff review. PROMPT FIX: either target the release file directly, or add an explicit first step to normalize `pages/PublicMenu/x.jsx` to the validated release snapshot and confirm the target file has no binary padding before any edits.
++3. [MEDIUM] Some “verified” anchors are materially wrong — The drawer boundary anchors are mostly correct, but several important references are not. `handleResolve` starts at line 2455 and its `useCallback` closes at line 2493, not “~2470”. `HELP_URGENCY_GROUP` ends at line 1873, not “~1879”. `nonOtherTypes` is defined at line 2215, not 2216. The prompt also says the release file has 5459 lines, while the actual release snapshot has 5458. These are small individually, but the prompt relies heavily on exact placement. PROMPT FIX: correct the specific anchors above and prefer symbol-based anchors (“insert after the `handleResolve` callback closing `}, []);`”) over approximate line numbers wherever possible.
++4. [MEDIUM] Legacy `menu` requests are still synchronized but become invisible in the new UI — The actual source still treats `menu` as a valid legacy help type in `HELP_REQUEST_TYPES` at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:1835-1838` and in `nonOtherTypes` at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:2215-2217`. The prompt only changes `activeRequestCount` to exclude `menu`, but the replacement JSX renders only the six new buttons plus `other`. That leaves a live edge case where an existing legacy `menu` request can remain in state but have no visible tile or cancel path in the new drawer. PROMPT FIX: explicitly decide the migration behavior for legacy `menu` requests: either filter and retire them before rendering, or render a temporary legacy row with cancel/retry behavior until old requests age out.
++5. [MEDIUM] The proposed JSX violates the repo’s “no dynamic Tailwind classes” rule — The prompt tells the implementation agent to build `activeBg`, `activeBorder`, `labelColor`, `timerColor`, `xBg`, and `xColor` strings and interpolate them into `className`. That conflicts with the project rule to avoid dynamic Tailwind classes, and it invites style-review churn or missing styles if class extraction is strict. PROMPT FIX: instruct the agent to use an explicit urgency-to-class map with complete static class strings, e.g. `const SOS_URGENCY_STYLES = { red: '...', amber: '...', neutral: '...' }`, and reference those named variants directly.
++6. [LOW] The cleanup instructions leave dead hooks behind for a reason that is technically inaccurate — The prompt says to keep `highlightedTicket` and `isTicketExpanded` “for hook order safety” while also removing their real consumers: old drawer JSX, `focusHelpRow`, and the post-send highlighting block. After those removals, both hooks become dead state. Keeping them does not protect React hook order across code versions, but it can create unused-variable noise and muddle the cleanup scope. PROMPT FIX: either remove those hooks entirely, or explicitly state that they are temporary compatibility shims and rename/comment them in a way that will not trip lint or confuse the next reviewer.
++7. [MEDIUM] Post-fix validation is too weak for a 300-line JSX replacement — The prompt’s checks are mostly `grep` and line-count heuristics plus manual UI assertions. Those checks will not catch malformed JSX, a misplaced insertion after `handleResolve`, stale references like `setHighlightedTicket`, or a partially updated `x.jsx` that still contains binary garbage. PROMPT FIX: add at least one deterministic syntax-level validation step for the edited file, plus targeted symbol checks for `SOS_BUTTONS`, `handleSosCancel`, `cancelConfirmType`, and the absence of the removed helpers/refs after the rewrite.
++
++## Summary
++Total: 7 issues (2 CRITICAL, 4 MEDIUM, 1 LOW)
++
++## Additional Risks
++- The prompt marks the bell badge as “FROZEN UX” but also changes `activeRequestCount`, which directly feeds that badge at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:4965-4967`. That should be clarified as “visual treatment frozen, count logic intentionally changes”.
++- The target file already contains trailing binary padding. Without an explicit normalization step, a clean-looking patch can still leave `pages/PublicMenu/x.jsx` in a corrupted state.
++- The prompt depends on Part A being present but does not require a strict baseline check against the actual target file before edits. If another chain touched `x.jsx`, symbol-based instructions are safer than line-based ones.
++
++## Prompt Clarity (MANDATORY — do NOT skip)
++- Overall clarity: 3
++- What was most clear: The DrawerContent replacement boundary is well specified, and the keep/remove lists for helper symbols are mostly concrete.
++- What was ambiguous or could cause hesitation: The prompt mixes a validated release snapshot with a different editable file, misstates some insertion anchors, does not define how legacy `menu` should behave in the new UI, and under-specifies cancel-confirm behavior for multiple `other` requests.
++- Missing context: The prompt should say whether `pages/PublicMenu/x.jsx` must first be synced to `260408-01 PublicMenu x RELEASE.jsx`, what to do with existing legacy `menu` requests, and what exact non-runtime validation is expected before reporting success.
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 6.42s:
+# Codex Reviewer Findings â€” ÐŸÐ¡Ð¡Ðš Prompt Quality Review
+Chain: publicmenu-260408-122951-0f47
+
+## Issues Found
+1. [CRITICAL] Cancel-confirm design is not safe for `other` requests â€” The prompt introduces `cancelConfirmType` as a single type string and `handleSosCancel(type)` looks up `activeRequests.find(r => r.type === type)`. That is not enough for `other`, because the actual source supports multiple active `other` rows at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:2007-2014`, and the proposed JSX also renders multiple `other` rows. If confirm is ever routed through this handler, it can pick the wrong row. The prompt also bypasses the confirm flow for `other` entirely by wiring the `other` row close button straight to `handleResolve('other', row.id)`, which conflicts with its own rule `non-red = instant, red = confirm panel`. PROMPT FIX: replace `cancelConfirmType` with an object such as `{ type, rowId }`, make `handleSosCancel(type, rowId)` resolve the exact row, wire `other` row cancel buttons through the same handler, and guard the confirm button so it no-ops if the target row no longer exists.
+2. [CRITICAL] The prompt validates one file but tells the agent to edit a different one â€” All â€œverifiedâ€ anchors are taken from `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, but the prompt tells the implementation agent to edit only `pages/PublicMenu/x.jsx`. In this workspace those files are not byte-identical: the release snapshot is 5458 lines, while `pages/PublicMenu/x.jsx` is 5460 lines and contains trailing NUL padding that is not present in the release file. That creates a real safety risk for line-based editing, exact-copy instructions, and post-fix diff review. PROMPT FIX: either target the release file directly, or add an explicit first step to normalize `pages/PublicMenu/x.jsx` to the validated release snapshot and confirm the target file has no binary padding before any edits.
+3. [MEDIUM] Some â€œverifiedâ€ anchors are materially wrong â€” The drawer boundary anchors are mostly correct, but several important references are not. `handleResolve` starts at line 2455 and its `useCallback` closes at line 2493, not â€œ~2470â€. `HELP_URGENCY_GROUP` ends at line 1873, not â€œ~1879â€. `nonOtherTypes` is defined at line 2215, not 2216. The prompt also says the release file has 5459 lines, while the actual release snapshot has 5458. These are small individually, but the prompt relies heavily on exact placement. PROMPT FIX: correct the specific anchors above and prefer symbol-based anchors (â€œinsert after the `handleResolve` callback closing `}, []);`â€) over approximate line numbers wherever possible.
+4. [MEDIUM] Legacy `menu` requests are still synchronized but become invisible in the new UI â€” The actual source still treats `menu` as a valid legacy help type in `HELP_REQUEST_TYPES` at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:1835-1838` and in `nonOtherTypes` at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:2215-2217`. The prompt only changes `activeRequestCount` to exclude `menu`, but the replacement JSX renders only the six new buttons plus `other`. That leaves a live edge case where an existing legacy `menu` request can remain in state but have no visible tile or cancel path in the new drawer. PROMPT FIX: explicitly decide the migration behavior for legacy `menu` requests: either filter and retire them before rendering, or render a temporary legacy row with cancel/retry behavior until old requests age out.
+5. [MEDIUM] The proposed JSX violates the repoâ€™s â€œno dynamic Tailwind classesâ€ rule â€” The prompt tells the implementation agent to build `activeBg`, `activeBorder`, `labelColor`, `timerColor`, `xBg`, and `xColor` strings and interpolate them into `className`. That conflicts with the project rule to avoid dynamic Tailwind classes, and it invites style-review churn or missing styles if class extraction is strict. PROMPT FIX: instruct the agent to use an explicit urgency-to-class map with complete static class strings, e.g. `const SOS_URGENCY_STYLES = { red: '...', amber: '...', neutral: '...' }`, and reference those named variants directly.
+6. [LOW] The cleanup instructions leave dead hooks behind for a reason that is technically inaccurate â€” The prompt says to keep `highlightedTicket` and `isTicketExpanded` â€œfor hook order safetyâ€ while also removing their real consumers: old drawer JSX, `focusHelpRow`, and the post-send highlighting block. After those removals, both hooks become dead state. Keeping them does not protect React hook order across code versions, but it can create unused-variable noise and muddle the cleanup scope. PROMPT FIX: either remove those hooks entirely, or explicitly state that they are temporary compatibility shims and rename/comment them in a way that will not trip lint or confuse the next reviewer.
+7. [MEDIUM] Post-fix validation is too weak for a 300-line JSX replacement â€” The promptâ€™s checks are mostly `grep` and line-count heuristics plus manual UI assertions. Those checks will not catch malformed JSX, a misplaced insertion after `handleResolve`, stale references like `setHighlightedTicket`, or a partially updated `x.jsx` that still contains binary garbage. PROMPT FIX: add at least one deterministic syntax-level validation step for the edited file, plus targeted symbol checks for `SOS_BUTTONS`, `handleSosCancel`, `cancelConfirmType`, and the absence of the removed helpers/refs after the rewrite.
+
+## Summary
+Total: 7 issues (2 CRITICAL, 4 MEDIUM, 1 LOW)
+
+## Additional Risks
+- The prompt marks the bell badge as â€œFROZEN UXâ€ but also changes `activeRequestCount`, which directly feeds that badge at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:4965-4967`. That should be clarified as â€œvisual treatment frozen, count logic intentionally changesâ€.
+- The target file already contains trailing binary padding. Without an explicit normalization step, a clean-looking patch can still leave `pages/PublicMenu/x.jsx` in a corrupted state.
+- The prompt depends on Part A being present but does not require a strict baseline check against the actual target file before edits. If another chain touched `x.jsx`, symbol-based instructions are safer than line-based ones.
+
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md b/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..32f2a1d8104d3a040b8bb48d18d751fb03694b5a
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md
+@@ -0,0 +1,25 @@
++# Codex Reviewer Findings — ПССК Prompt Quality Review
++Chain: publicmenu-260408-122951-0f47
++
++## Issues Found
++1. [CRITICAL] Cancel-confirm design is not safe for `other` requests — The prompt introduces `cancelConfirmType` as a single type string and `handleSosCancel(type)` looks up `activeRequests.find(r => r.type === type)`. That is not enough for `other`, because the actual source supports multiple active `other` rows at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:2007-2014`, and the proposed JSX also renders multiple `other` rows. If confirm is ever routed through this handler, it can pick the wrong row. The prompt also bypasses the confirm flow for `other` entirely by wiring the `other` row close button straight to `handleResolve('other', row.id)`, which conflicts with its own rule `non-red = instant, red = confirm panel`. PROMPT FIX: replace `cancelConfirmType` with an object such as `{ type, rowId }`, make `handleSosCancel(type, rowId)` resolve the exact row, wire `other` row cancel buttons through the same handler, and guard the confirm button so it no-ops if the target row no longer exists.
++2. [CRITICAL] The prompt validates one file but tells the agent to edit a different one — All “verified” anchors are taken from `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, but the prompt tells the implementation agent to edit only `pages/PublicMenu/x.jsx`. In this workspace those files are not byte-identical: the release snapshot is 5458 lines, while `pages/PublicMenu/x.jsx` is 5460 lines and contains trailing NUL padding that is not present in the release file. That creates a real safety risk for line-based editing, exact-copy instructions, and post-fix diff review. PROMPT FIX: either target the release file directly, or add an explicit first step to normalize `pages/PublicMenu/x.jsx` to the validated release snapshot and confirm the target file has no binary padding before any edits.
++3. [MEDIUM] Some “verified” anchors are materially wrong — The drawer boundary anchors are mostly correct, but several important references are not. `handleResolve` starts at line 2455 and its `useCallback` closes at line 2493, not “~2470”. `HELP_URGENCY_GROUP` ends at line 1873, not “~1879”. `nonOtherTypes` is defined at line 2215, not 2216. The prompt also says the release file has 5459 lines, while the actual release snapshot has 5458. These are small individually, but the prompt relies heavily on exact placement. PROMPT FIX: correct the specific anchors above and prefer symbol-based anchors (“insert after the `handleResolve` callback closing `}, []);`”) over approximate line numbers wherever possible.
++4. [MEDIUM] Legacy `menu` requests are still synchronized but become invisible in the new UI — The actual source still treats `menu` as a valid legacy help type in `HELP_REQUEST_TYPES` at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:1835-1838` and in `nonOtherTypes` at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:2215-2217`. The prompt only changes `activeRequestCount` to exclude `menu`, but the replacement JSX renders only the six new buttons plus `other`. That leaves a live edge case where an existing legacy `menu` request can remain in state but have no visible tile or cancel path in the new drawer. PROMPT FIX: explicitly decide the migration behavior for legacy `menu` requests: either filter and retire them before rendering, or render a temporary legacy row with cancel/retry behavior until old requests age out.
++5. [MEDIUM] The proposed JSX violates the repo’s “no dynamic Tailwind classes” rule — The prompt tells the implementation agent to build `activeBg`, `activeBorder`, `labelColor`, `timerColor`, `xBg`, and `xColor` strings and interpolate them into `className`. That conflicts with the project rule to avoid dynamic Tailwind classes, and it invites style-review churn or missing styles if class extraction is strict. PROMPT FIX: instruct the agent to use an explicit urgency-to-class map with complete static class strings, e.g. `const SOS_URGENCY_STYLES = { red: '...', amber: '...', neutral: '...' }`, and reference those named variants directly.
++6. [LOW] The cleanup instructions leave dead hooks behind for a reason that is technically inaccurate — The prompt says to keep `highlightedTicket` and `isTicketExpanded` “for hook order safety” while also removing their real consumers: old drawer JSX, `focusHelpRow`, and the post-send highlighting block. After those removals, both hooks become dead state. Keeping them does not protect React hook order across code versions, but it can create unused-variable noise and muddle the cleanup scope. PROMPT FIX: either remove those hooks entirely, or explicitly state that they are temporary compatibility shims and rename/comment them in a way that will not trip lint or confuse the next reviewer.
++7. [MEDIUM] Post-fix validation is too weak for a 300-line JSX replacement — The prompt’s checks are mostly `grep` and line-count heuristics plus manual UI assertions. Those checks will not catch malformed JSX, a misplaced insertion after `handleResolve`, stale references like `setHighlightedTicket`, or a partially updated `x.jsx` that still contains binary garbage. PROMPT FIX: add at least one deterministic syntax-level validation step for the edited file, plus targeted symbol checks for `SOS_BUTTONS`, `handleSosCancel`, `cancelConfirmType`, and the absence of the removed helpers/refs after the rewrite.
++
++## Summary
++Total: 7 issues (2 CRITICAL, 4 MEDIUM, 1 LOW)
++
++## Additional Risks
++- The prompt marks the bell badge as “FROZEN UX” but also changes `activeRequestCount`, which directly feeds that badge at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:4965-4967`. That should be clarified as “visual treatment frozen, count logic intentionally changes”.
++- The target file already contains trailing binary padding. Without an explicit normalization step, a clean-looking patch can still leave `pages/PublicMenu/x.jsx` in a corrupted state.
++- The prompt depends on Part A being present but does not require a strict baseline check against the actual target file before edits. If another chain touched `x.jsx`, symbol-based instructions are safer than line-based ones.
++
++## Prompt Clarity (MANDATORY — do NOT skip)
++- Overall clarity: 3
++- What was most clear: The DrawerContent replacement boundary is well specified, and the keep/remove lists for helper symbols are mostly concrete.
++- What was ambiguous or could cause hesitation: The prompt mixes a validated release snapshot with a different editable file, misstates some insertion anchors, does not define how legacy `menu` should behave in the new UI, and under-specifies cancel-confirm behavior for multiple `other` requests.
++- Missing context: The prompt should say whether `pages/PublicMenu/x.jsx` must first be synced to `260408-01 PublicMenu x RELEASE.jsx`, what to do with existing legacy `menu` requests, and what exact non-runtime validation is expected before reporting success.
+
+Plan update
+  ✓ Locate the referenced prompt context and target PublicMenu release file
+  ✓ Verify cited line numbers, identifiers, and snippets against the release source
+  ✓ Draft prompt-quality findings and save the markdown report in pipeline/chain-state
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md b/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..32f2a1d8104d3a040b8bb48d18d751fb03694b5a
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md
+@@ -0,0 +1,25 @@
++# Codex Reviewer Findings — ПССК Prompt Quality Review
++Chain: publicmenu-260408-122951-0f47
++
++## Issues Found
++1. [CRITICAL] Cancel-confirm design is not safe for `other` requests — The prompt introduces `cancelConfirmType` as a single type string and `handleSosCancel(type)` looks up `activeRequests.find(r => r.type === type)`. That is not enough for `other`, because the actual source supports multiple active `other` rows at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:2007-2014`, and the proposed JSX also renders multiple `other` rows. If confirm is ever routed through this handler, it can pick the wrong row. The prompt also bypasses the confirm flow for `other` entirely by wiring the `other` row close button straight to `handleResolve('other', row.id)`, which conflicts with its own rule `non-red = instant, red = confirm panel`. PROMPT FIX: replace `cancelConfirmType` with an object such as `{ type, rowId }`, make `handleSosCancel(type, rowId)` resolve the exact row, wire `other` row cancel buttons through the same handler, and guard the confirm button so it no-ops if the target row no longer exists.
++2. [CRITICAL] The prompt validates one file but tells the agent to edit a different one — All “verified” anchors are taken from `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, but the prompt tells the implementation agent to edit only `pages/PublicMenu/x.jsx`. In this workspace those files are not byte-identical: the release snapshot is 5458 lines, while `pages/PublicMenu/x.jsx` is 5460 lines and contains trailing NUL padding that is not present in the release file. That creates a real safety risk for line-based editing, exact-copy instructions, and post-fix diff review. PROMPT FIX: either target the release file directly, or add an explicit first step to normalize `pages/PublicMenu/x.jsx` to the validated release snapshot and confirm the target file has no binary padding before any edits.
++3. [MEDIUM] Some “verified” anchors are materially wrong — The drawer boundary anchors are mostly correct, but several important references are not. `handleResolve` starts at line 2455 and its `useCallback` closes at line 2493, not “~2470”. `HELP_URGENCY_GROUP` ends at line 1873, not “~1879”. `nonOtherTypes` is defined at line 2215, not 2216. The prompt also says the release file has 5459 lines, while the actual release snapshot has 5458. These are small individually, but the prompt relies heavily on exact placement. PROMPT FIX: correct the specific anchors above and prefer symbol-based anchors (“insert after the `handleResolve` callback closing `}, []);`”) over approximate line numbers wherever possible.
++4. [MEDIUM] Legacy `menu` requests are still synchronized but become invisible in the new UI — The actual source still treats `menu` as a valid legacy help type in `HELP_REQUEST_TYPES` at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:1835-1838` and in `nonOtherTypes` at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:2215-2217`. The prompt only changes `activeRequestCount` to exclude `menu`, but the replacement JSX renders only the six new buttons plus `other`. That leaves a live edge case where an existing legacy `menu` request can remain in state but have no visible tile or cancel path in the new drawer. PROMPT FIX: explicitly decide the migration behavior for legacy `menu` requests: either filter and retire them before rendering, or render a temporary legacy row with cancel/retry behavior until old requests age out.
++5. [MEDIUM] The proposed JSX violates the repo’s “no dynamic Tailwind classes” rule — The prompt tells the implementation agent to build `activeBg`, `activeBorder`, `labelColor`, `timerColor`, `xBg`, and `xColor` strings and interpolate them into `className`. That conflicts with the project rule to avoid dynamic Tailwind classes, and it invites style-review churn or missing styles if class extraction is strict. PROMPT FIX: instruct the agent to use an explicit urgency-to-class map with complete static class strings, e.g. `const SOS_URGENCY_STYLES = { red: '...', amber: '...', neutral: '...' }`, and reference those named variants directly.
++6. [LOW] The cleanup instructions leave dead hooks behind for a reason that is technically inaccurate — The prompt says to keep `highlightedTicket` and `isTicketExpanded` “for hook order safety” while also removing their real consumers: old drawer JSX, `focusHelpRow`, and the post-send highlighting block. After those removals, both hooks become dead state. Keeping them does not protect React hook order across code versions, but it can create unused-variable noise and muddle the cleanup scope. PROMPT FIX: either remove those hooks entirely, or explicitly state that they are temporary compatibility shims and rename/comment them in a way that will not trip lint or confuse the next reviewer.
++7. [MEDIUM] Post-fix validation is too weak for a 300-line JSX replacement — The prompt’s checks are mostly `grep` and line-count heuristics plus manual UI assertions. Those checks will not catch malformed JSX, a misplaced insertion after `handleResolve`, stale references like `setHighlightedTicket`, or a partially updated `x.jsx` that still contains binary garbage. PROMPT FIX: add at least one deterministic syntax-level validation step for the edited file, plus targeted symbol checks for `SOS_BUTTONS`, `handleSosCancel`, `cancelConfirmType`, and the absence of the removed helpers/refs after the rewrite.
++
++## Summary
++Total: 7 issues (2 CRITICAL, 4 MEDIUM, 1 LOW)
++
++## Additional Risks
++- The prompt marks the bell badge as “FROZEN UX” but also changes `activeRequestCount`, which directly feeds that badge at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:4965-4967`. That should be clarified as “visual treatment frozen, count logic intentionally changes”.
++- The target file already contains trailing binary padding. Without an explicit normalization step, a clean-looking patch can still leave `pages/PublicMenu/x.jsx` in a corrupted state.
++- The prompt depends on Part A being present but does not require a strict baseline check against the actual target file before edits. If another chain touched `x.jsx`, symbol-based instructions are safer than line-based ones.
++
++## Prompt Clarity (MANDATORY — do NOT skip)
++- Overall clarity: 3
++- What was most clear: The DrawerContent replacement boundary is well specified, and the keep/remove lists for helper symbols are mostly concrete.
++- What was ambiguous or could cause hesitation: The prompt mixes a validated release snapshot with a different editable file, misstates some insertion anchors, does not define how legacy `menu` should behave in the new UI, and under-specifies cancel-confirm behavior for multiple `other` requests.
++- Missing context: The prompt should say whether `pages/PublicMenu/x.jsx` must first be synced to `260408-01 PublicMenu x RELEASE.jsx`, what to do with existing legacy `menu` requests, and what exact non-runtime validation is expected before reporting success.
+
+codex
+Findings were written to [publicmenu-260408-122951-0f47-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md).
+
+Summary: 7 prompt-design issues found: 2 critical, 4 medium, 1 low. The main problems are the unsafe cancel-confirm design for multiple `other` requests, the mismatch between the validated release snapshot and the actual editable `x.jsx` target, inaccurate “verified” anchors, hidden legacy `menu` behavior, and weak validation for such a large JSX rewrite. No code files were changed.
+file update:
+diff --git a/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md b/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..32f2a1d8104d3a040b8bb48d18d751fb03694b5a
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md
+@@ -0,0 +1,25 @@
++# Codex Reviewer Findings — ПССК Prompt Quality Review
++Chain: publicmenu-260408-122951-0f47
++
++## Issues Found
++1. [CRITICAL] Cancel-confirm design is not safe for `other` requests — The prompt introduces `cancelConfirmType` as a single type string and `handleSosCancel(type)` looks up `activeRequests.find(r => r.type === type)`. That is not enough for `other`, because the actual source supports multiple active `other` rows at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:2007-2014`, and the proposed JSX also renders multiple `other` rows. If confirm is ever routed through this handler, it can pick the wrong row. The prompt also bypasses the confirm flow for `other` entirely by wiring the `other` row close button straight to `handleResolve('other', row.id)`, which conflicts with its own rule `non-red = instant, red = confirm panel`. PROMPT FIX: replace `cancelConfirmType` with an object such as `{ type, rowId }`, make `handleSosCancel(type, rowId)` resolve the exact row, wire `other` row cancel buttons through the same handler, and guard the confirm button so it no-ops if the target row no longer exists.
++2. [CRITICAL] The prompt validates one file but tells the agent to edit a different one — All “verified” anchors are taken from `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx`, but the prompt tells the implementation agent to edit only `pages/PublicMenu/x.jsx`. In this workspace those files are not byte-identical: the release snapshot is 5458 lines, while `pages/PublicMenu/x.jsx` is 5460 lines and contains trailing NUL padding that is not present in the release file. That creates a real safety risk for line-based editing, exact-copy instructions, and post-fix diff review. PROMPT FIX: either target the release file directly, or add an explicit first step to normalize `pages/PublicMenu/x.jsx` to the validated release snapshot and confirm the target file has no binary padding before any edits.
++3. [MEDIUM] Some “verified” anchors are materially wrong — The drawer boundary anchors are mostly correct, but several important references are not. `handleResolve` starts at line 2455 and its `useCallback` closes at line 2493, not “~2470”. `HELP_URGENCY_GROUP` ends at line 1873, not “~1879”. `nonOtherTypes` is defined at line 2215, not 2216. The prompt also says the release file has 5459 lines, while the actual release snapshot has 5458. These are small individually, but the prompt relies heavily on exact placement. PROMPT FIX: correct the specific anchors above and prefer symbol-based anchors (“insert after the `handleResolve` callback closing `}, []);`”) over approximate line numbers wherever possible.
++4. [MEDIUM] Legacy `menu` requests are still synchronized but become invisible in the new UI — The actual source still treats `menu` as a valid legacy help type in `HELP_REQUEST_TYPES` at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:1835-1838` and in `nonOtherTypes` at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:2215-2217`. The prompt only changes `activeRequestCount` to exclude `menu`, but the replacement JSX renders only the six new buttons plus `other`. That leaves a live edge case where an existing legacy `menu` request can remain in state but have no visible tile or cancel path in the new drawer. PROMPT FIX: explicitly decide the migration behavior for legacy `menu` requests: either filter and retire them before rendering, or render a temporary legacy row with cancel/retry behavior until old requests age out.
++5. [MEDIUM] The proposed JSX violates the repo’s “no dynamic Tailwind classes” rule — The prompt tells the implementation agent to build `activeBg`, `activeBorder`, `labelColor`, `timerColor`, `xBg`, and `xColor` strings and interpolate them into `className`. That conflicts with the project rule to avoid dynamic Tailwind classes, and it invites style-review churn or missing styles if class extraction is strict. PROMPT FIX: instruct the agent to use an explicit urgency-to-class map with complete static class strings, e.g. `const SOS_URGENCY_STYLES = { red: '...', amber: '...', neutral: '...' }`, and reference those named variants directly.
++6. [LOW] The cleanup instructions leave dead hooks behind for a reason that is technically inaccurate — The prompt says to keep `highlightedTicket` and `isTicketExpanded` “for hook order safety” while also removing their real consumers: old drawer JSX, `focusHelpRow`, and the post-send highlighting block. After those removals, both hooks become dead state. Keeping them does not protect React hook order across code versions, but it can create unused-variable noise and muddle the cleanup scope. PROMPT FIX: either remove those hooks entirely, or explicitly state that they are temporary compatibility shims and rename/comment them in a way that will not trip lint or confuse the next reviewer.
++7. [MEDIUM] Post-fix validation is too weak for a 300-line JSX replacement — The prompt’s checks are mostly `grep` and line-count heuristics plus manual UI assertions. Those checks will not catch malformed JSX, a misplaced insertion after `handleResolve`, stale references like `setHighlightedTicket`, or a partially updated `x.jsx` that still contains binary garbage. PROMPT FIX: add at least one deterministic syntax-level validation step for the edited file, plus targeted symbol checks for `SOS_BUTTONS`, `handleSosCancel`, `cancelConfirmType`, and the absence of the removed helpers/refs after the rewrite.
++
++## Summary
++Total: 7 issues (2 CRITICAL, 4 MEDIUM, 1 LOW)
++
++## Additional Risks
++- The prompt marks the bell badge as “FROZEN UX” but also changes `activeRequestCount`, which directly feeds that badge at `pages/PublicMenu/260408-01 PublicMenu x RELEASE.jsx:4965-4967`. That should be clarified as “visual treatment frozen, count logic intentionally changes”.
++- The target file already contains trailing binary padding. Without an explicit normalization step, a clean-looking patch can still leave `pages/PublicMenu/x.jsx` in a corrupted state.
++- The prompt depends on Part A being present but does not require a strict baseline check against the actual target file before edits. If another chain touched `x.jsx`, symbol-based instructions are safer than line-based ones.
++
++## Prompt Clarity (MANDATORY — do NOT skip)
++- Overall clarity: 3
++- What was most clear: The DrawerContent replacement boundary is well specified, and the keep/remove lists for helper symbols are mostly concrete.
++- What was ambiguous or could cause hesitation: The prompt mixes a validated release snapshot with a different editable file, misstates some insertion anchors, does not define how legacy `menu` should behave in the new UI, and under-specifies cancel-confirm behavior for multiple `other` requests.
++- Missing context: The prompt should say whether `pages/PublicMenu/x.jsx` must first be synced to `260408-01 PublicMenu x RELEASE.jsx`, what to do with existing legacy `menu` requests, and what exact non-runtime validation is expected before reporting success.
+
+tokens used
+500 013
+Findings were written to [publicmenu-260408-122951-0f47-codex-findings.md](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260408-122951-0f47-codex-findings.md).
+
+Summary: 7 prompt-design issues found: 2 critical, 4 medium, 1 low. The main problems are the unsafe cancel-confirm design for multiple `other` requests, the mismatch between the validated release snapshot and the actual editable `x.jsx` target, inaccurate “verified” anchors, hidden legacy `menu` behavior, and weak validation for such a large JSX rewrite. No code files were changed.

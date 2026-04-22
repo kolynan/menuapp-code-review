@@ -1,0 +1,52 @@
+CC Analysis — pssk-cv-b2-v12 prompt quality review
+Task: task-260416-224525-026
+Chain: pssk-cv-b2-260416-v12-260416-223438-91ae
+Date: 2026-04-16
+
+=== VERDICT ===
+NEEDS REVISION (Fix 2: 2/5 — CRITICAL TDZ bug; Fix 3: 3/5 — unverified prop assumptions).
+
+=== CRITICAL FINDING ===
+Fix 2 Step 2.1 references `isCancelledOrder(o)` inside `statusBuckets` useMemo at line ~456.
+`isCancelledOrder` is declared by Fix 1 Step 1.1 at line ~524 (BELOW `statusBuckets`).
+On first render with `todayMyOrders.length > 0`, React synchronously invokes the useMemo
+factory at line 456 — but `isCancelledOrder` is still in Temporal Dead Zone → ReferenceError
+crash. Prompt comment "defined in Fix 1 above, in scope after Fix 1 applied" is incorrect —
+in-scope ≠ initialized. v11 addressed identical TDZ for `tableIsClosed` in Fix 3 but v12
+re-introduced the same pattern in Fix 2.
+
+FIX: Move `isCancelledOrder` helper to BEFORE `statusBuckets` (line <456), or extract
+to module scope (takes getOrderStatus as arg), or revert v12 change #1 and keep inline
+predicate duplicated.
+
+=== MEDIUM FINDINGS ===
+- `onClose` / `setView` props not grep-verified (Fix 3 Step 3.3)
+- Line 114 in Fix 3 Step 3.1 used without grep fallback (inconsistent with v11 rule)
+- Fix 1 Step 1.3 deletion target (lines 525-531) drifts after Step 1.1 insertion
+- `isCancelledOrder` missing from useMemo dependency arrays (eslint exhaustive-deps)
+- `^  return (` grep in Fix 3 Step 3.3 may match multiple IIFE returns after Fix 1
+
+=== LOW FINDINGS ===
+- Inline `style={{backgroundColor: primaryColor}}` violates "no inline styles" rule (exception not flagged)
+- `.working` cleanup instruction is soft ("можно удалить") — hygiene risk
+- R4 `{tableId}` surrogate assumes name uniqueness per partner (duplicate-name edge case)
+- Missing AC for useState-initializer vs useEffect overlap in Fix 3
+- `currentTable` prop destructuring not grep-verified
+- Fix 2 Step 2.4b `isV8` grep uses rigid whitespace — won't match formatting variants
+
+=== FIX RATINGS ===
+Fix 1: 4/5 Minor (line-drift in Step 1.3)
+Fix 2: 2/5 Major (CRITICAL TDZ)
+Fix 3: 3/5 Needs clarification (unverified props)
+Fix 4: 5/5 Clear
+
+=== RECOMMENDATION ===
+v13 required. Minimum changes:
+1. Relocate `isCancelledOrder` to top of hooks section (before `statusBuckets` at ~456).
+   Fix 1 three rendered-table useMemos stay at ~524 — they'll reference the hoisted helper.
+2. Add grep verifications for `onClose`, `setView`, `currentTable`, `primaryColor` props.
+3. Replace hard-coded line 114 in Fix 3 Step 3.1 with grep for `showPostRatingEmailSheet`.
+4. Rephrase Fix 1 Step 1.3 to anchor deletion on grep-matched content, not line numbers.
+5. Add AC covering useState-initializer vs useEffect-sync boundary behavior.
+
+Findings file: pipeline/chain-state/pssk-cv-b2-260416-v12-260416-223438-91ae-cc-findings.md

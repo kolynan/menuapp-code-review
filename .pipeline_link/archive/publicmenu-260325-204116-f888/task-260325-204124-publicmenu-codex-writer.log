@@ -1,0 +1,694 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d25a8-9913-7ef3-8275-e3ff3f220da8
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260325-204116-f888 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Batch 12: Guest Name Save + Empty State CTA + Star Size Reference: `BUGS_MASTER.md` (PM-139, PM-140, PM-141), `pages/PublicMenu/CartView.jsx`, `pages/PublicMenu/x.jsx`. Production page. Mobile-first restaurant app (target device: Android phone, 375px width). --- ## TARGET FILES (modify) - `pages/PublicMenu/CartView.jsx` - `pages/PublicMenu/x.jsx` ## CONTEXT FILES (read-only) - `BUGS_MASTER.md` --- ## Fix 1 — PM-139 (P1) [MUST-FIX]: Guest name ✓ button does nothing + name not persisted ### Сейчас (current behaviour) The user opens the cart drawer, sees a name input field ("Вы: [name]") in the table card at the top, types a name, taps the ✓ button — nothing happens. No toast, no visual feedback. After closing and reopening the drawer, the name is gone. Root cause to investigate: `handleUpdateGuestName` in `pages/PublicMenu/x.jsx` (~line 3142) has an early return: `if (!currentGuest?.id || !guestNameInput.trim()) return;`. If `currentGuest` is null or has no `id`, the function exits silently. The ✓ button in CartView.jsx (~line 458) calls this function but appears unresponsive. ### Должно быть (expected) 1. When user types a name and taps ✓: - If `currentGuest?.id` exists → call `base44.entities.SessionGuest.update()` (existing logic) - In ALL cases → save name to `localStorage` under key `"menuapp_guest_name"` so it persists across sessions - Show `toast.success(...)` confirmation - Switch field to read-only display: show name as text + pencil icon for edit 2. On next page load → pre-fill `guestNameInput` from `localStorage.getItem("menuapp_guest_name")` if available ### НЕ должно быть - Silent failure when ✓ is tapped (no feedback = broken UX) - Name disappearing after page reload - Removing the ✕ (cancel) button at ~line 459 — it must stay - NOTE: The ✕ at ~line 459 is a name-cancel button, NOT a drawer close — do NOT remove it ### Файл и локация - Logic: `pages/PublicMenu/x.jsx`, function `handleUpdateGuestName` ~line 3142–3160 - UI: `pages/PublicMenu/CartView.jsx`, name input block ~line 444–465 - ✓ button: `<button onClick={handleUpdateGuestName} disabled={!guestNameInput.trim()} ...>` - State: `guestNameInput` (line 1356), `isEditingName` (line 1357) in `x.jsx` ### Проверка 1. Open cart drawer → type a name → tap ✓ → toast appears, field switches to read-only text 2. Close and reopen the app → name field pre-filled from localStorage --- ## Fix 2 — PM-140 (P2) [MUST-FIX]: Empty white area after order submit — no CTA ### Сейчас (current behaviour) After user submits an order (cart is cleared), the cart drawer shows "Ваши заказы (1)" section with order items and star ratings. Below that section: large empty white area (half a screen of blank space). No action available — user does not know what to do next. Root cause: SECTION 2 ("Новый заказ", ~line 779) is wrapped in `{cart.length > 0 && (...)}`. After submit, `cart.length === 0`, so Section 2 and the sticky submit button disappear, leaving only the orders section and empty space. ### Должно быть When `cart.length === 0` AND `myOrders.length > 0` (after submit): show a simple CTA block below the orders section: ``` ┌─────────────────────────────────────┐ │ [+ Добавить к заказу] │ ← calls onClose() to return to menu └─────────────────────────────────────┘ ``` - Button text: use i18n key `'cart.add_more'` with fallback `'Добавить к заказу'` - Style: outlined button (border, transparent bg) with primary color, full width - Placement: below `{/* SECTION 3: YOUR ORDERS */}` block (~line 663), inside a `<div className="mt-4">` wrapper - `onClose` prop already exists in CartView.jsx (~line 476) — use it ### НЕ должно быть - Adding this CTA when cart is NOT empty (only show when `cart.length === 0 && myOrders.length > 0`) - Removing or changing the existing sticky submit button logic (it stays for when cart.length > 0) - Changing "Ваши заказы" section layout or collapse behaviour ### Файл и локация `pages/PublicMenu/CartView.jsx`, after SECTION 3 (~line 760–778), before SECTION 2 (~line 779) ### Проверка 1. Add items → submit order → cart clears → see "Добавить к заказу" button below orders 2. Tap button → drawer closes → user is back in menu --- ## Fix 3 — PM-141 (P2) [MUST-FIX]: Star rating touch targets too small on mobile ### Сейчас (current behaviour) Star rating in "Ваши заказы" section uses `<Rating size="sm" />` (~line 723–741 in CartView.jsx). On mobile (375px), the stars are too small to tap accurately — touch target < 44px. Users miss the correct star. ### Должно быть Increase star size to meet 44px touch target minimum. Options (pick best for the Rating component): - Change `size="sm"` → `size="md"` (if Rating component supports it) - OR wrap the `<Rating ...>` in `<div className="py-2">` to increase tap area vertically - The stars should be visually larger and easier to tap on mobile ### НЕ должно быть - Changing star layout in MenuView.jsx (tile/list mode stars) — only CartView order ratings - Removing star ratings entirely ### Файл и локация `pages/PublicMenu/CartView.jsx`, Rating component usage in orders section ~line 720–742: ```jsx <Rating value={draftRating} onChange={(val) => { ... }} size="sm" ← change this readonly={...} /> ``` ### Проверка 1. Submit an order → open cart → tap a star on the order item → correct star selected on first tap 2. Stars visually larger than before --- ## FROZEN UX (DO NOT CHANGE) — tested on Android S179 These elements are confirmed working after deploy. Do NOT modify: - **Help drawer one-tap cards** — categories shown as cards, "Другое" textarea hidden until tapped, autoFocus on "Другое", sticky submit button (PM-134 ✅) - **Help drawer state reset** — no green checkmark shown on open, `helpQuickSent` resets on `closeHelpDrawer` (PM-135 ✅) - **Bell button (🔔) behaviour** — visible in menu; if no tableCode → redirects to table code BS; if tableCode set → opens help drawer (PM-133 ✅) - **Table code BS** — opens correctly when no code; DrawerContent does NOT have `className="relative"` (PM-128 ✅). CRITICAL: do NOT add `relative` to DrawerContent anywhere — it breaks vaul drawer positioning. - **Android Back button** — closes open drawers instead of exiting browser (PM-126 ✅) - **Cart submit button** — sticky at bottom, shows loyalty motivation text, correct disabled states (PM-087 ✅) --- ## ⛔ SCOPE LOCK — modify ONLY what is described in Fix 1, 2, 3 above - Do NOT refactor unrelated components, state, or logic - Do NOT change routing, auth, or data model - Do NOT add `relative` to any DrawerContent (breaks vaul) - If you see another bug not listed here — skip it, do not fix --- ## Implementation Notes - TARGET files: `pages/PublicMenu/CartView.jsx`, `pages/PublicMenu/x.jsx` - git add these exact files only (no `git add .`) - Commit message format: `Fix PM-139/140/141: name save + empty state CTA + star size` --- ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Verify at 375px width: - [ ] ✓ button tap target >= 44x44px (already `min-w-[44px] min-h-[44px]` — preserve this) - [ ] "Добавить к заказу" button full width, adequate height (min 44px) - [ ] Star touch targets >= 44px after size increase - [ ] No excessive whitespace on small screens after Fix 2 - [ ] Name input and ✓/✕ buttons remain properly aligned on 375px --- ## Regression Check (MANDATORY after implementation) Verify these existing features still work after changes: - [ ] Submitting a new order when cart has items (Section 2 logic unchanged) - [ ] Table code BS opens when tapping submit without table code - [ ] Help drawer opens from bell button (PM-133/134/135 flow intact) - [ ] Android Back closes drawers (PM-126 intact) - [ ] Name field shows edit mode when tapped (isEditingName toggle works) --- ## E3: FROZEN UX grep verification (run before commit) ```bash grep -n "helpQuickSent" pages/PublicMenu/x.jsx # must exist (PM-135) grep -n "relative" pages/PublicMenu/x.jsx | grep "DrawerContent" # must return 0 results grep -n "isHallMode\|hallMode" pages/PublicMenu/x.jsx # bell condition must use isHallMode (PM-129) ``` === END ===
+mcp startup: no servers
+codex
+Reviewing only the `PublicMenu` page folder and the two target files, plus local `README.md`/`BUGS.md` if present. I’ll check Fix 1-3 only, then write the findings file in the requested pipeline path.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw pages/PublicMenu/CartView.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw pages/PublicMenu/x.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 14.59s:
+
+ exited 124 in 15.53s:
+
+ exited 124 in 16.07s:
+
+codex
+The raw file reads timed out because `x.jsx` is large. I’m switching to targeted line windows around the three fix areas and checking whether `README.md` / `BUGS.md` exist in `pages/PublicMenu`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=430; $i -le 490; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem pages/PublicMenu -Name' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=3128; $i -le 3175; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=1338; $i -le 1385; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=660; $i -le 810; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 21.23s:
+ 3128:           clientName: savedClientName,
+ 3129:         });
+ 3130: 
+ 3131:       }
+ 3132:     } catch (err) {
+ 3133:       // silent
+ 3134:       setSubmitError(t('error.send.title'));
+ 3135:     } finally {
+ 3136:       submitLockRef.current = false;
+ 3137:       setIsSubmitting(false);
+ 3138:     }
+ 3139:   };
+ 3140: 
+ 3141:   // Update guest name (inline on cart page)
+ 3142:   const handleUpdateGuestName = async () => {
+ 3143:     if (!currentGuest?.id || !guestNameInput.trim()) return;
+ 3144:     
+ 3145:     try {
+ 3146:       await base44.entities.SessionGuest.update(currentGuest.id, {
+ 3147:         name: guestNameInput.trim()
+ succeeded in 21.31s:
+components
+versions
+260320-01 useTableSession RELEASE.jsx
+260323-03 CheckoutView RELEASE.jsx
+260324-04 MenuView RELEASE.jsx
+260324-06 CartView RELEASE.jsx
+260325-04 MenuView RELEASE.jsx
+260325-05 x RELEASE.jsx
+ACCEPTANCE_CRITERIA_PHASE1.md
+BUGS.md
+CartView.jsx
+CheckoutView.jsx
+COPY_SPEC.md
+i18n_DrawerUX_S79.csv
+i18n_WorkingHours_S79.csv
+MenuView.jsx
+ModeTabs.jsx
+PublicMenu README.md
+PublicMenu_BASE.txt
+README.md
+ succeeded in 22.00s:
+  660:         </Card>
+  661:       )}
+  662: 
+  663:       {/* SECTION 3: YOUR ORDERS (submitted) - COLLAPSIBLE */}
+  664:       {myOrders.length > 0 && (
+  665:         <Card className="mb-4">
+  666:           <CardContent className="p-4">
+  667:             <button
+  668:               type="button"
+  669:               className="w-full flex items-center justify-between text-left"
+  670:               onClick={() => setMyOrdersExpanded(!myOrdersExpanded)}
+  671:             >
+  672:               <div className="flex items-center gap-2">
+  673:                 <ShoppingBag className="w-4 h-4 text-green-600" />
+  674:                 <span className="text-base font-semibold text-slate-800">
+  675:                   {tr('cart.your_orders', 'Ð’Ð°ÑˆÐ¸ Ð·Ð°ÐºÐ°Ð·Ñ‹')} ({myOrders.length})
+  676:                 </span>
+  677:               </div>
+  678:               <div className="flex items-center gap-2">
+  679:                 <span className="font-bold text-slate-700">{formatPrice(myBill.total)}</span>
+ succeeded in 23.27s:
+  430:             <button
+  431:               onClick={onCallWaiter}
+  432:               className="min-w-[44px] min-h-[44px] p-2 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center"
+  433:               aria-label={tr('help.call_waiter', 'ÐŸÐ¾Ð·Ð²Ð°Ñ‚ÑŒ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ð°')}
+  434:             >
+  435:               <Bell className="w-5 h-5" />
+  436:             </button>
+  437:           )}
+  438: 
+  439:           {/* Center: Table & Guest */}
+  440:           <div className="text-center flex-1 mx-2">
+  441:             <div className="text-sm font-medium text-slate-700">{tableLabel}</div>
+  442:             <div className="flex items-center justify-center gap-1 text-xs">
+  443:               <span className="text-slate-500">{tr('cart.you', 'Ð’Ñ‹')}:</span>
+  444:               {isEditingName ? (
+  445:                 <span className="inline-flex items-center gap-1">
+  446:                   <input
+  447:                     type="text"
+  448:                     value={guestNameInput}
+  449:                     onChange={(e) => setGuestNameInput(e.target.value)}
+ succeeded in 25.18s:
+ 1338:   const [detailDish, setDetailDish] = useState(null);
+ 1339: 
+ 1340:   // Form
+ 1341:   const [clientName, setClientName] = useState("");
+ 1342:   const [clientPhone, setClientPhone] = useState("");
+ 1343:   const [deliveryAddress, setDeliveryAddress] = useState("");
+ 1344:   const [comment, setComment] = useState("");
+ 1345:   const [errors, setErrors] = useState({});
+ 1346: 
+ 1347:   const [isSubmitting, setIsSubmitting] = useState(false);
+ 1348:   const [submitError, setSubmitError] = useState(null);
+ 1349: 
+ 1350:   // Guest code (4-digit code for showing to waiter)
+ 1351:   const [guestCode, setGuestCode] = useState(null);
+ 1352: 
+ 1353:   // Hall UI state (not in session hook)
+ 1354:   const [splitType, setSplitType] = useState('single'); // 'single' | 'all'
+ 1355:   const [otherGuestsExpanded, setOtherGuestsExpanded] = useState(false);
+ 1356:   const [guestNameInput, setGuestNameInput] = useState('');
+ 1357:   const [isEditingName, setIsEditingName] = useState(false);
+codex
+I have the exact code windows for the three fix areas. Next I’m reading `pages/PublicMenu/README.md` and `pages/PublicMenu/BUGS.md` for page-local context only, then I’ll write a scoped findings file with just Fix 1-3.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw pages/PublicMenu/BUGS.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw pages/PublicMenu/README.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 16.45s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 16.88s:
+---
+version: "35.0"
+updated: "2026-03-23"
+session: 168
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*9 active bugs remaining (0x P0, 4x P1, 4x P2, 0x P3, 1x suggestion).*
+
+### BUG-PM-132: List mode stepper buttons use w-9 h-9 (36px) instead of w-11 h-11 (44px) (P2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P2
+- **ÐšÐ¾Ð³Ð´Ð°:** S177 (found by Codex in chain 74b9, confirmed by CC)
+codex
+The page-local docs confirm this is the production `/x` page and that prior cart/session fixes rely heavily on local state persistence. I’m now checking just the target files for existing guest-name persistence and the exact empty-state / rating code paths so the findings stay specific.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern \"menuapp_guest_name|guestNameInput|isEditingName|currentGuest|localStorage\" | ForEach-Object { '{0,5}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/CartView.jsx -Pattern \"function CartView|const CartView|onClose|handleUpdateGuestName|Rating|cart.add_more|SECTION 3|SECTION 2\" | ForEach-Object { '{0,5}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 10.27s:
+  174: localStorage.removeItem(key);
+  177: localStorage.setItem(key, JSON.stringify({ items: cartData, ts: Date.now() }));
+  185: const raw = localStorage.getItem(key);
+  191: localStorage.setItem(key, JSON.stringify({ items: data, ts: Date.now() }));
+  198: localStorage.removeItem(key);
+  211: localStorage.removeItem(key);
+  286: const timestamp = localStorage.getItem(key);
+  295: localStorage.setItem(key, String(Date.now()));
+ 1356: const [guestNameInput, setGuestNameInput] = useState('');
+ 1357: const [isEditingName, setIsEditingName] = useState(false);
+ 1411: // Load mobile layout preference from localStorage
+ 1420: const saved = localStorage.getItem(storageKey);
+ 1435: // Save mobile layout preference to localStorage
+ 1446: localStorage.setItem(storageKey, layout);
+ 1452: // Save cart to localStorage on every change
+ 1460: // Restore cart from localStorage on page load (once)
+ 1585: localStorage.setItem(
+ 1590: /* silent — localStorage save is best-effort */
+ 2098: currentGuest,
+ 2099: setCurrentGuest,
+ succeeded in 10.04s:
+    6: import Rating from "@/components/Rating";
+   16: export default function CartView({
+   25: handleUpdateGuestName,
+   34: showLoginPromptAfterRating,
+   55: draftRatings,
+   56: updateDraftRating,
+   69: ratingSavingByItemId,
+   71: onClose,
+   87: const safeDraftRatings = draftRatings || {};
+  399: const hasAnyRating = React.useMemo(() => {
+  401: const draftCount = safeDraftRatings ? Object.values(safeDraftRatings).filter(v => Number(v) > 0).length : 0;
+  403: }, [reviewedItems, draftRatings]);
+  414: const shouldShowReviewRewardNudge = isReviewRewardActive && hasAnyRating && !isCustomerIdentified;
+  454: if (e.key === 'Enter' && guestNameInput.trim()) handleUpdateGuestName();
+  458: <button onClick={handleUpdateGuestName} disabled={!guestNameInput.trim()} className="text-green-600 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label={tr('common.save', 'Сохранить')}>✓</button>
+  476: onClick={() => { if (isSubmitting) return; onClose ? onClose() : setView("menu"); }}
+  500: ✅ {tr('loyalty.thanks_for_rating', 'Спасибо за оценку!')}
+  663: {/* SECTION 3: YOUR ORDERS (submitted) - COLLAPSIBLE */}
+  705: {/* Order items with draft rating stars */}
+  711: const draftRating = safeDraftRatings[itemId] || 0;
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=2848; $i -le 2962; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=3498; $i -le 3525; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 20.72s:
+ 3498: 
+ 3499:       {/* TASK-260203-01: Cart as Bottom Drawer */}
+ 3500:       <Drawer
+ 3501:         open={drawerMode === 'cart'}
+ 3502:         dismissible={!isSubmitting}
+ 3503:         onOpenChange={(open) => { if (!open && !isSubmitting) { popOverlay('cart'); setDrawerMode(null); } }}
+ 3504:       >
+ 3505:         <DrawerContent className="max-h-[85vh] overflow-hidden">
+ 3506:           <DrawerHeader className="sr-only">
+ 3507:             <DrawerTitle>{t('cart.title')}</DrawerTitle>
+ 3508:           </DrawerHeader>
+ 3509:           <div className="overflow-y-auto max-h-[calc(85vh-2rem)]">
+ 3510:             <CartView
+ 3511:               partner={partner}
+ 3512:               currentTable={currentTable}
+ 3513:               currentGuest={currentGuest}
+ 3514:               t={t}
+ 3515:               setView={setView}
+ 3516:               isEditingName={isEditingName}
+ 3517:               guestNameInput={guestNameInput}
+ succeeded in 21.52s:
+ 2848:         if (!session?.id) {
+ 2849:           toast.error(t('error.session_expired'), { id: 'session-err' });
+ 2850:           submitLockRef.current = false;
+ 2851:           setIsSubmitting(false);
+ 2852:           return;
+ 2853:         }
+ 2854: 
+ 2855:         // ============================================================
+ 2856:         // FIX-260131-07 FINAL: SAFEGUARD â€” try restore guest before creating new
+ 2857:         // This prevents "submit races restore" bug where guest is created
+ 2858:         // because currentGuest hasn't been set yet
+ 2859:         // ============================================================
+ 2860:         let guest = currentGuest;
+ 2861:         const normalizeId = (g) => String(g?.id ?? g?._id ?? "");
+ 2862: 
+ 2863:         if (!guest) {
+ 2864:           try {
+ 2865:             
+ 2866:             // 1) Try device-based lookup (all known device keys)
+ 2867:             const deviceIds = Array.from(new Set(
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=1; $i -le 120; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/CartView.jsx -Pattern \"guestDisplay|tableLabel|tr\\(|const tr\" | ForEach-Object { '{0,5}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 9.49s:
+    1: import React from "react";
+    2: import { Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, Minus, Plus } from "lucide-react";
+    3: import { Card, CardContent } from "@/components/ui/card";
+    4: import { Button } from "@/components/ui/button";
+    5: import { Input } from "@/components/ui/input";
+    6: import Rating from "@/components/Rating";
+    7: 
+    8: function lightenColor(hex, amount) {
+    9:   const num = parseInt(hex.replace('#', ''), 16);
+   10:   const r = Math.min(255, (num >> 16) + Math.round((255 - (num >> 16)) * amount));
+   11:   const g = Math.min(255, ((num >> 8) & 0x00FF) + Math.round((255 - ((num >> 8) & 0x00FF)) * amount));
+   12:   const b = Math.min(255, (num & 0x0000FF) + Math.round((255 - (num & 0x0000FF)) * amount));
+   13:   return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
+   14: }
+   15: 
+   16: export default function CartView({
+   17:   partner,
+   18:   currentTable,
+   19:   currentGuest,
+   20:   t,
+ succeeded in 9.45s:
+   27: getGuestDisplayName,
+  232: const tr = (key, fallback) => {
+  241: const trFormat = (key, params, fallback) => {
+  252: return { icon: '🔵', label: tr('status.new', 'Заказано'), color: '#3B82F6' };
+  265: 'new': tr('status.new', 'Заказано'),
+  266: 'start': tr('status.cooking', 'Готовится'),
+  267: 'cook': tr('status.cooking', 'Готовится'),
+  268: 'cooking': tr('status.cooking', 'Готовится'),
+  269: 'finish': tr('status.ready', 'Готово'),
+  270: 'ready': tr('status.ready', 'Готово'),
+  271: 'done': tr('status.ready', 'Готово'),
+  272: 'accepted': tr('status.accepted', 'Принят'),
+  273: 'cancel': tr('status.cancelled', 'Отменён'),
+  274: 'cancelled': tr('status.cancelled', 'Отменён'),
+  277: label = fallbacks[code] || tr('status.new', 'Заказано');
+  303: ? (currentGuest.name || getGuestDisplayName(currentGuest))
+  304: : tr("cart.guest", "Гость");
+  306: const guestDisplay = effectiveGuestCode
+  311: const tablePrefix = tr("form.table", "Стол");
+  312: const rawTableLabel = currentTable?.name || currentTable?.code || "—";
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=296; $i -le 310; $i++) { if ($i -le $lines.Length) { '"'{0,5}: {1}' -f "'$i, $lines[$i-1] } }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 4.25s:
+  296:   }, []);
+  297: 
+  298:   // Effective guest code: prop takes priority, fallback to localStorage (only if hall guest codes enabled)
+  299:   const effectiveGuestCode = guestCode || (hallGuestCodeEnabled ? guestCodeFromStorage : null);
+  300: 
+  301:   // Guest display: "Ð˜Ð¼Ñ #6475" or "Ð“Ð¾ÑÑ‚ÑŒ #6475"
+  302:   const guestBaseName = currentGuest
+  303:     ? (currentGuest.name || getGuestDisplayName(currentGuest))
+  304:     : tr("cart.guest", "Ð“Ð¾ÑÑ‚ÑŒ");
+  305: 
+  306:   const guestDisplay = effectiveGuestCode 
+  307:     ? `${guestBaseName} #${effectiveGuestCode}` 
+  308:     : guestBaseName;
+  309: 
+  310:   // Table label: avoid "Ð¡Ñ‚Ð¾Ð» Ð¡Ñ‚Ð¾Ð» 3"
+codex
+I have enough context to write the report. I’m saving three scoped findings files now: the requested pipeline output, the page-local review copy required by this repo, and the shell command log.
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-25.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-204116-f888
+
+## Findings
+1. [P1] Fix 1 — Guest name save silently no-ops when no current guest ID — In [x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3142) the save handler exits on `if (!currentGuest?.id || !guestNameInput.trim()) return;`, so the ✓ button wired at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L458) becomes a no-op whenever the guest has not been restored/created yet. That matches the reported UX: no toast, no state transition back to read-only, and no feedback despite the button being enabled. FIX: change `handleUpdateGuestName` so it only guards on empty input, conditionally calls `base44.entities.SessionGuest.update()` when `currentGuest?.id` exists, and in all cases saves the trimmed name locally, updates visible state, shows `toast.success(...)`, and exits edit mode instead of returning silently.
+2. [P1] Fix 1 — Guest name has no persistence or restore path — The page initializes `guestNameInput` as `useState('')` at [x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1356), but there is no `menuapp_guest_name` read/write anywhere in the file. The current save path only updates Base44 when `currentGuest.id` exists and then clears the input at [x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3154), so a refresh loses the name whenever the backend guest record is missing or has not been restored yet. FIX: write the trimmed name to `localStorage.setItem('menuapp_guest_name', ...)` during save, read it on page load to prefill guest-name state, and hydrate the non-editing display from that stored value when no persisted guest name is available from `currentGuest`.
+3. [P2] Fix 2 — Post-submit cart state leaves the drawer without a next action — The submitted-orders block ends at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L777), and the next section is gated by `cart.length > 0` at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L780). When the order is sent and the cart is cleared, Section 2 disappears and nothing replaces it, so the user is left with a dead-end white area below "Ваши заказы". FIX: insert a dedicated CTA block between Section 3 and Section 2 that renders only for `cart.length === 0 && myOrders.length > 0`, uses `tr('cart.add_more', 'Добавить к заказу')`, spans full width with a 44px+ tap target, and calls the existing `onClose` prop to return the user to the menu.
+4. [P2] Fix 3 — Order rating control is rendered in the compact size with no added hit area — In the cart orders section, the only rating control is still `<Rating ... size="sm" />` at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L723), inside a plain flex row with no extra touch padding at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L722). On a 375px mobile target, this keeps the order-rating affordance in its smallest variant exactly where accurate tapping matters most. FIX: increase the cart-order rating control to the next supported size (`md` if available) or wrap it in additional vertical padding such as `py-2` so each star meets the required mobile touch target without changing MenuView ratings.
+
+## Summary
+Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — the expected restore behavior says to pre-fill `guestNameInput` from `localStorage`, but the non-editing UI displays `currentGuest.name` / `guestDisplay`; it is not explicit whether the saved local name must also appear immediately in read-only mode when no backend guest exists yet.
+- Missing context (what info would have helped): The task references `BUGS_MASTER.md` in the batch header, but the speed rules also say not to read outside the page folder. A clear statement on whether root-level references are intentionally out of scope would remove that conflict.
+- Scope questions (anything you weren't sure if it's in scope): Whether the requested review should also produce the repo-level `review_*.md` / `commands_*.log` artifacts from `AGENTS.md`, since the user-facing task only names the pipeline findings file.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-25.log
+Get-ChildItem -Name pages/PublicMenu
+Get-Content -Raw pages/PublicMenu/CartView.jsx
+Get-Content -Raw pages/PublicMenu/x.jsx
+Get-ChildItem pages/PublicMenu -Name
+$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=430; $i -le 490; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=660; $i -le 810; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=1338; $i -le 1385; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=3128; $i -le 3175; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+Get-Content -Raw pages/PublicMenu/README.md
+Get-Content -Raw pages/PublicMenu/BUGS.md
+Select-String -Path pages/PublicMenu/x.jsx -Pattern "menuapp_guest_name|guestNameInput|isEditingName|currentGuest|localStorage" | ForEach-Object { '{0,5}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+Select-String -Path pages/PublicMenu/CartView.jsx -Pattern "function CartView|const CartView|onClose|handleUpdateGuestName|Rating|cart.add_more|SECTION 3|SECTION 2" | ForEach-Object { '{0,5}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=2848; $i -le 2962; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=3498; $i -le 3525; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=1; $i -le 120; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+Select-String -Path pages/PublicMenu/CartView.jsx -Pattern "guestDisplay|tableLabel|tr\\(|const tr" | ForEach-Object { '{0,5}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=296; $i -le 310; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-204116-f888
+
+## Findings
+1. [P1] Fix 1 — Guest name save silently no-ops when no current guest ID — In [pages/PublicMenu/x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3142) the save handler exits on `if (!currentGuest?.id || !guestNameInput.trim()) return;`, so the ✓ button wired at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L458) becomes a no-op whenever the guest has not been restored/created yet. That matches the reported UX: no toast, no state transition back to read-only, and no feedback despite the button being enabled. FIX: change `handleUpdateGuestName` so it only guards on empty input, conditionally calls `base44.entities.SessionGuest.update()` when `currentGuest?.id` exists, and in all cases saves the trimmed name locally, updates visible state, shows `toast.success(...)`, and exits edit mode instead of returning silently.
+2. [P1] Fix 1 — Guest name has no persistence or restore path — The page initializes `guestNameInput` as `useState('')` at [pages/PublicMenu/x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1356), but there is no `menuapp_guest_name` read/write anywhere in the file. The current save path only updates Base44 when `currentGuest.id` exists and then clears the input at [pages/PublicMenu/x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3154), so a refresh loses the name whenever the backend guest record is missing or has not been restored yet. FIX: write the trimmed name to `localStorage.setItem('menuapp_guest_name', ...)` during save, read it on page load to prefill guest-name state, and hydrate the non-editing display from that stored value when no persisted guest name is available from `currentGuest`.
+3. [P2] Fix 2 — Post-submit cart state leaves the drawer without a next action — The submitted-orders block ends at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L777), and the next section is gated by `cart.length > 0` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L780). When the order is sent and the cart is cleared, Section 2 disappears and nothing replaces it, so the user is left with a dead-end white area below "Ваши заказы". FIX: insert a dedicated CTA block between Section 3 and Section 2 that renders only for `cart.length === 0 && myOrders.length > 0`, uses `tr('cart.add_more', 'Добавить к заказу')`, spans full width with a 44px+ tap target, and calls the existing `onClose` prop to return the user to the menu.
+4. [P2] Fix 3 — Order rating control is rendered in the compact size with no added hit area — In the cart orders section, the only rating control is still `<Rating ... size="sm" />` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L723), inside a plain flex row with no extra touch padding at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L722). On a 375px mobile target, this keeps the order-rating affordance in its smallest variant exactly where accurate tapping matters most. FIX: increase the cart-order rating control to the next supported size (`md` if available) or wrap it in additional vertical padding such as `py-2` so each star meets the required mobile touch target without changing MenuView ratings.
+
+## Summary
+Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 3
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — the expected restore behavior says to pre-fill `guestNameInput` from `localStorage`, but the non-editing UI displays `currentGuest.name` / `guestDisplay`; it is not explicit whether the saved local name must also appear immediately in read-only mode when no backend guest exists yet.
+- Missing context (what info would have helped): The task references `BUGS_MASTER.md` in the batch header, but the speed rules also say not to read outside the page folder. A clear statement on whether root-level references are intentionally out of scope would remove that conflict.
+- Scope questions (anything you weren't sure if it's in scope): Whether the requested review should also produce the repo-level `review_*.md` / `commands_*.log` artifacts from `AGENTS.md`, since the user-facing task only names the pipeline findings file.
+apply_patch(auto_approved=true) exited 0 in 1.09s:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md
+A pages/PublicMenu/review_2026-03-25.md
+A pages/PublicMenu/commands_2026-03-25.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-25.log b/pages/PublicMenu/commands_2026-03-25.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..a80150ebc73ebaa18ef5e0cb77a4491ce9a782ec
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-25.log
+@@ -0,0 +1,17 @@
++Get-ChildItem -Name pages/PublicMenu
++Get-Content -Raw pages/PublicMenu/CartView.jsx
++Get-Content -Raw pages/PublicMenu/x.jsx
++Get-ChildItem pages/PublicMenu -Name
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=430; $i -le 490; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=660; $i -le 810; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=1338; $i -le 1385; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=3128; $i -le 3175; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Get-Content -Raw pages/PublicMenu/README.md
++Get-Content -Raw pages/PublicMenu/BUGS.md
++Select-String -Path pages/PublicMenu/x.jsx -Pattern "menuapp_guest_name|guestNameInput|isEditingName|currentGuest|localStorage" | ForEach-Object { '{0,5}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern "function CartView|const CartView|onClose|handleUpdateGuestName|Rating|cart.add_more|SECTION 3|SECTION 2" | ForEach-Object { '{0,5}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=2848; $i -le 2962; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=3498; $i -le 3525; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=1; $i -le 120; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern "guestDisplay|tableLabel|tr\\(|const tr" | ForEach-Object { '{0,5}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=296; $i -le 310; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+diff --git a/pages/PublicMenu/review_2026-03-25.md b/pages/PublicMenu/review_2026-03-25.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8137d6f50dd7b0fb3cf3d50a5e754a9172b9a07d
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-25.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-204116-f888
++
++## Findings
++1. [P1] Fix 1 — Guest name save silently no-ops when no current guest ID — In [x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3142) the save handler exits on `if (!currentGuest?.id || !guestNameInput.trim()) return;`, so the ✓ button wired at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L458) becomes a no-op whenever the guest has not been restored/created yet. That matches the reported UX: no toast, no state transition back to read-only, and no feedback despite the button being enabled. FIX: change `handleUpdateGuestName` so it only guards on empty input, conditionally calls `base44.entities.SessionGuest.update()` when `currentGuest?.id` exists, and in all cases saves the trimmed name locally, updates visible state, shows `toast.success(...)`, and exits edit mode instead of returning silently.
++2. [P1] Fix 1 — Guest name has no persistence or restore path — The page initializes `guestNameInput` as `useState('')` at [x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1356), but there is no `menuapp_guest_name` read/write anywhere in the file. The current save path only updates Base44 when `currentGuest.id` exists and then clears the input at [x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3154), so a refresh loses the name whenever the backend guest record is missing or has not been restored yet. FIX: write the trimmed name to `localStorage.setItem('menuapp_guest_name', ...)` during save, read it on page load to prefill guest-name state, and hydrate the non-editing display from that stored value when no persisted guest name is available from `currentGuest`.
++3. [P2] Fix 2 — Post-submit cart state leaves the drawer without a next action — The submitted-orders block ends at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L777), and the next section is gated by `cart.length > 0` at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L780). When the order is sent and the cart is cleared, Section 2 disappears and nothing replaces it, so the user is left with a dead-end white area below "Ваши заказы". FIX: insert a dedicated CTA block between Section 3 and Section 2 that renders only for `cart.length === 0 && myOrders.length > 0`, uses `tr('cart.add_more', 'Добавить к заказу')`, spans full width with a 44px+ tap target, and calls the existing `onClose` prop to return the user to the menu.
++4. [P2] Fix 3 — Order rating control is rendered in the compact size with no added hit area — In the cart orders section, the only rating control is still `<Rating ... size="sm" />` at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L723), inside a plain flex row with no extra touch padding at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L722). On a 375px mobile target, this keeps the order-rating affordance in its smallest variant exactly where accurate tapping matters most. FIX: increase the cart-order rating control to the next supported size (`md` if available) or wrap it in additional vertical padding such as `py-2` so each star meets the required mobile touch target without changing MenuView ratings.
++
++## Summary
++Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — the expected restore behavior says to pre-fill `guestNameInput` from `localStorage`, but the non-editing UI displays `currentGuest.name` / `guestDisplay`; it is not explicit whether the saved local name must also appear immediately in read-only mode when no backend guest exists yet.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` in the batch header, but the speed rules also say not to read outside the page folder. A clear statement on whether root-level references are intentionally out of scope would remove that conflict.
++- Scope questions (anything you weren't sure if it's in scope): Whether the requested review should also produce the repo-level `review_*.md` / `commands_*.log` artifacts from `AGENTS.md`, since the user-facing task only names the pipeline findings file.
+diff --git a/pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md b/pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b36980ecf0ed7fad0b0695358d424d8fd8ed1103
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-204116-f888
++
++## Findings
++1. [P1] Fix 1 — Guest name save silently no-ops when no current guest ID — In [pages/PublicMenu/x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3142) the save handler exits on `if (!currentGuest?.id || !guestNameInput.trim()) return;`, so the ✓ button wired at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L458) becomes a no-op whenever the guest has not been restored/created yet. That matches the reported UX: no toast, no state transition back to read-only, and no feedback despite the button being enabled. FIX: change `handleUpdateGuestName` so it only guards on empty input, conditionally calls `base44.entities.SessionGuest.update()` when `currentGuest?.id` exists, and in all cases saves the trimmed name locally, updates visible state, shows `toast.success(...)`, and exits edit mode instead of returning silently.
++2. [P1] Fix 1 — Guest name has no persistence or restore path — The page initializes `guestNameInput` as `useState('')` at [pages/PublicMenu/x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1356), but there is no `menuapp_guest_name` read/write anywhere in the file. The current save path only updates Base44 when `currentGuest.id` exists and then clears the input at [pages/PublicMenu/x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3154), so a refresh loses the name whenever the backend guest record is missing or has not been restored yet. FIX: write the trimmed name to `localStorage.setItem('menuapp_guest_name', ...)` during save, read it on page load to prefill guest-name state, and hydrate the non-editing display from that stored value when no persisted guest name is available from `currentGuest`.
++3. [P2] Fix 2 — Post-submit cart state leaves the drawer without a next action — The submitted-orders block ends at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L777), and the next section is gated by `cart.length > 0` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L780). When the order is sent and the cart is cleared, Section 2 disappears and nothing replaces it, so the user is left with a dead-end white area below "Ваши заказы". FIX: insert a dedicated CTA block between Section 3 and Section 2 that renders only for `cart.length === 0 && myOrders.length > 0`, uses `tr('cart.add_more', 'Добавить к заказу')`, spans full width with a 44px+ tap target, and calls the existing `onClose` prop to return the user to the menu.
++4. [P2] Fix 3 — Order rating control is rendered in the compact size with no added hit area — In the cart orders section, the only rating control is still `<Rating ... size="sm" />` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L723), inside a plain flex row with no extra touch padding at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L722). On a 375px mobile target, this keeps the order-rating affordance in its smallest variant exactly where accurate tapping matters most. FIX: increase the cart-order rating control to the next supported size (`md` if available) or wrap it in additional vertical padding such as `py-2` so each star meets the required mobile touch target without changing MenuView ratings.
++
++## Summary
++Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — the expected restore behavior says to pre-fill `guestNameInput` from `localStorage`, but the non-editing UI displays `currentGuest.name` / `guestDisplay`; it is not explicit whether the saved local name must also appear immediately in read-only mode when no backend guest exists yet.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` in the batch header, but the speed rules also say not to read outside the page folder. A clear statement on whether root-level references are intentionally out of scope would remove that conflict.
++- Scope questions (anything you weren't sure if it's in scope): Whether the requested review should also produce the repo-level `review_*.md` / `commands_*.log` artifacts from `AGENTS.md`, since the user-facing task only names the pipeline findings file.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-25.log b/pages/PublicMenu/commands_2026-03-25.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..a80150ebc73ebaa18ef5e0cb77a4491ce9a782ec
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-25.log
+@@ -0,0 +1,17 @@
++Get-ChildItem -Name pages/PublicMenu
++Get-Content -Raw pages/PublicMenu/CartView.jsx
++Get-Content -Raw pages/PublicMenu/x.jsx
++Get-ChildItem pages/PublicMenu -Name
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=430; $i -le 490; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=660; $i -le 810; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=1338; $i -le 1385; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=3128; $i -le 3175; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Get-Content -Raw pages/PublicMenu/README.md
++Get-Content -Raw pages/PublicMenu/BUGS.md
++Select-String -Path pages/PublicMenu/x.jsx -Pattern "menuapp_guest_name|guestNameInput|isEditingName|currentGuest|localStorage" | ForEach-Object { '{0,5}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern "function CartView|const CartView|onClose|handleUpdateGuestName|Rating|cart.add_more|SECTION 3|SECTION 2" | ForEach-Object { '{0,5}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=2848; $i -le 2962; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=3498; $i -le 3525; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=1; $i -le 120; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern "guestDisplay|tableLabel|tr\\(|const tr" | ForEach-Object { '{0,5}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=296; $i -le 310; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+diff --git a/pages/PublicMenu/review_2026-03-25.md b/pages/PublicMenu/review_2026-03-25.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8137d6f50dd7b0fb3cf3d50a5e754a9172b9a07d
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-25.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-204116-f888
++
++## Findings
++1. [P1] Fix 1 — Guest name save silently no-ops when no current guest ID — In [x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3142) the save handler exits on `if (!currentGuest?.id || !guestNameInput.trim()) return;`, so the ✓ button wired at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L458) becomes a no-op whenever the guest has not been restored/created yet. That matches the reported UX: no toast, no state transition back to read-only, and no feedback despite the button being enabled. FIX: change `handleUpdateGuestName` so it only guards on empty input, conditionally calls `base44.entities.SessionGuest.update()` when `currentGuest?.id` exists, and in all cases saves the trimmed name locally, updates visible state, shows `toast.success(...)`, and exits edit mode instead of returning silently.
++2. [P1] Fix 1 — Guest name has no persistence or restore path — The page initializes `guestNameInput` as `useState('')` at [x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1356), but there is no `menuapp_guest_name` read/write anywhere in the file. The current save path only updates Base44 when `currentGuest.id` exists and then clears the input at [x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3154), so a refresh loses the name whenever the backend guest record is missing or has not been restored yet. FIX: write the trimmed name to `localStorage.setItem('menuapp_guest_name', ...)` during save, read it on page load to prefill guest-name state, and hydrate the non-editing display from that stored value when no persisted guest name is available from `currentGuest`.
++3. [P2] Fix 2 — Post-submit cart state leaves the drawer without a next action — The submitted-orders block ends at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L777), and the next section is gated by `cart.length > 0` at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L780). When the order is sent and the cart is cleared, Section 2 disappears and nothing replaces it, so the user is left with a dead-end white area below "Ваши заказы". FIX: insert a dedicated CTA block between Section 3 and Section 2 that renders only for `cart.length === 0 && myOrders.length > 0`, uses `tr('cart.add_more', 'Добавить к заказу')`, spans full width with a 44px+ tap target, and calls the existing `onClose` prop to return the user to the menu.
++4. [P2] Fix 3 — Order rating control is rendered in the compact size with no added hit area — In the cart orders section, the only rating control is still `<Rating ... size="sm" />` at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L723), inside a plain flex row with no extra touch padding at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L722). On a 375px mobile target, this keeps the order-rating affordance in its smallest variant exactly where accurate tapping matters most. FIX: increase the cart-order rating control to the next supported size (`md` if available) or wrap it in additional vertical padding such as `py-2` so each star meets the required mobile touch target without changing MenuView ratings.
++
++## Summary
++Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — the expected restore behavior says to pre-fill `guestNameInput` from `localStorage`, but the non-editing UI displays `currentGuest.name` / `guestDisplay`; it is not explicit whether the saved local name must also appear immediately in read-only mode when no backend guest exists yet.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` in the batch header, but the speed rules also say not to read outside the page folder. A clear statement on whether root-level references are intentionally out of scope would remove that conflict.
++- Scope questions (anything you weren't sure if it's in scope): Whether the requested review should also produce the repo-level `review_*.md` / `commands_*.log` artifacts from `AGENTS.md`, since the user-facing task only names the pipeline findings file.
+diff --git a/pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md b/pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b36980ecf0ed7fad0b0695358d424d8fd8ed1103
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-204116-f888
++
++## Findings
++1. [P1] Fix 1 — Guest name save silently no-ops when no current guest ID — In [pages/PublicMenu/x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3142) the save handler exits on `if (!currentGuest?.id || !guestNameInput.trim()) return;`, so the ✓ button wired at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L458) becomes a no-op whenever the guest has not been restored/created yet. That matches the reported UX: no toast, no state transition back to read-only, and no feedback despite the button being enabled. FIX: change `handleUpdateGuestName` so it only guards on empty input, conditionally calls `base44.entities.SessionGuest.update()` when `currentGuest?.id` exists, and in all cases saves the trimmed name locally, updates visible state, shows `toast.success(...)`, and exits edit mode instead of returning silently.
++2. [P1] Fix 1 — Guest name has no persistence or restore path — The page initializes `guestNameInput` as `useState('')` at [pages/PublicMenu/x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1356), but there is no `menuapp_guest_name` read/write anywhere in the file. The current save path only updates Base44 when `currentGuest.id` exists and then clears the input at [pages/PublicMenu/x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3154), so a refresh loses the name whenever the backend guest record is missing or has not been restored yet. FIX: write the trimmed name to `localStorage.setItem('menuapp_guest_name', ...)` during save, read it on page load to prefill guest-name state, and hydrate the non-editing display from that stored value when no persisted guest name is available from `currentGuest`.
++3. [P2] Fix 2 — Post-submit cart state leaves the drawer without a next action — The submitted-orders block ends at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L777), and the next section is gated by `cart.length > 0` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L780). When the order is sent and the cart is cleared, Section 2 disappears and nothing replaces it, so the user is left with a dead-end white area below "Ваши заказы". FIX: insert a dedicated CTA block between Section 3 and Section 2 that renders only for `cart.length === 0 && myOrders.length > 0`, uses `tr('cart.add_more', 'Добавить к заказу')`, spans full width with a 44px+ tap target, and calls the existing `onClose` prop to return the user to the menu.
++4. [P2] Fix 3 — Order rating control is rendered in the compact size with no added hit area — In the cart orders section, the only rating control is still `<Rating ... size="sm" />` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L723), inside a plain flex row with no extra touch padding at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L722). On a 375px mobile target, this keeps the order-rating affordance in its smallest variant exactly where accurate tapping matters most. FIX: increase the cart-order rating control to the next supported size (`md` if available) or wrap it in additional vertical padding such as `py-2` so each star meets the required mobile touch target without changing MenuView ratings.
++
++## Summary
++Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — the expected restore behavior says to pre-fill `guestNameInput` from `localStorage`, but the non-editing UI displays `currentGuest.name` / `guestDisplay`; it is not explicit whether the saved local name must also appear immediately in read-only mode when no backend guest exists yet.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` in the batch header, but the speed rules also say not to read outside the page folder. A clear statement on whether root-level references are intentionally out of scope would remove that conflict.
++- Scope questions (anything you weren't sure if it's in scope): Whether the requested review should also produce the repo-level `review_*.md` / `commands_*.log` artifacts from `AGENTS.md`, since the user-facing task only names the pipeline findings file.
+
+codex
+The report files are written. I’m doing one quick existence check on the three saved outputs, then I’ll close with the scoped findings count.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Item pages/PublicMenu/commands_2026-03-25.log | Select-Object FullName,Length' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Item pages/PublicMenu/review_2026-03-25.md | Select-Object FullName,Length' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Item pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md | Select-Object FullName,Length' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 11.20s:
+
+ exited 124 in 11.64s:
+
+ exited 124 in 11.85s:
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-25.log b/pages/PublicMenu/commands_2026-03-25.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..a80150ebc73ebaa18ef5e0cb77a4491ce9a782ec
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-25.log
+@@ -0,0 +1,17 @@
++Get-ChildItem -Name pages/PublicMenu
++Get-Content -Raw pages/PublicMenu/CartView.jsx
++Get-Content -Raw pages/PublicMenu/x.jsx
++Get-ChildItem pages/PublicMenu -Name
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=430; $i -le 490; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=660; $i -le 810; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=1338; $i -le 1385; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=3128; $i -le 3175; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Get-Content -Raw pages/PublicMenu/README.md
++Get-Content -Raw pages/PublicMenu/BUGS.md
++Select-String -Path pages/PublicMenu/x.jsx -Pattern "menuapp_guest_name|guestNameInput|isEditingName|currentGuest|localStorage" | ForEach-Object { '{0,5}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern "function CartView|const CartView|onClose|handleUpdateGuestName|Rating|cart.add_more|SECTION 3|SECTION 2" | ForEach-Object { '{0,5}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=2848; $i -le 2962; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=3498; $i -le 3525; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=1; $i -le 120; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern "guestDisplay|tableLabel|tr\\(|const tr" | ForEach-Object { '{0,5}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=296; $i -le 310; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+diff --git a/pages/PublicMenu/review_2026-03-25.md b/pages/PublicMenu/review_2026-03-25.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8137d6f50dd7b0fb3cf3d50a5e754a9172b9a07d
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-25.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-204116-f888
++
++## Findings
++1. [P1] Fix 1 — Guest name save silently no-ops when no current guest ID — In [x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3142) the save handler exits on `if (!currentGuest?.id || !guestNameInput.trim()) return;`, so the ✓ button wired at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L458) becomes a no-op whenever the guest has not been restored/created yet. That matches the reported UX: no toast, no state transition back to read-only, and no feedback despite the button being enabled. FIX: change `handleUpdateGuestName` so it only guards on empty input, conditionally calls `base44.entities.SessionGuest.update()` when `currentGuest?.id` exists, and in all cases saves the trimmed name locally, updates visible state, shows `toast.success(...)`, and exits edit mode instead of returning silently.
++2. [P1] Fix 1 — Guest name has no persistence or restore path — The page initializes `guestNameInput` as `useState('')` at [x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1356), but there is no `menuapp_guest_name` read/write anywhere in the file. The current save path only updates Base44 when `currentGuest.id` exists and then clears the input at [x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3154), so a refresh loses the name whenever the backend guest record is missing or has not been restored yet. FIX: write the trimmed name to `localStorage.setItem('menuapp_guest_name', ...)` during save, read it on page load to prefill guest-name state, and hydrate the non-editing display from that stored value when no persisted guest name is available from `currentGuest`.
++3. [P2] Fix 2 — Post-submit cart state leaves the drawer without a next action — The submitted-orders block ends at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L777), and the next section is gated by `cart.length > 0` at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L780). When the order is sent and the cart is cleared, Section 2 disappears and nothing replaces it, so the user is left with a dead-end white area below "Ваши заказы". FIX: insert a dedicated CTA block between Section 3 and Section 2 that renders only for `cart.length === 0 && myOrders.length > 0`, uses `tr('cart.add_more', 'Добавить к заказу')`, spans full width with a 44px+ tap target, and calls the existing `onClose` prop to return the user to the menu.
++4. [P2] Fix 3 — Order rating control is rendered in the compact size with no added hit area — In the cart orders section, the only rating control is still `<Rating ... size="sm" />` at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L723), inside a plain flex row with no extra touch padding at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L722). On a 375px mobile target, this keeps the order-rating affordance in its smallest variant exactly where accurate tapping matters most. FIX: increase the cart-order rating control to the next supported size (`md` if available) or wrap it in additional vertical padding such as `py-2` so each star meets the required mobile touch target without changing MenuView ratings.
++
++## Summary
++Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — the expected restore behavior says to pre-fill `guestNameInput` from `localStorage`, but the non-editing UI displays `currentGuest.name` / `guestDisplay`; it is not explicit whether the saved local name must also appear immediately in read-only mode when no backend guest exists yet.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` in the batch header, but the speed rules also say not to read outside the page folder. A clear statement on whether root-level references are intentionally out of scope would remove that conflict.
++- Scope questions (anything you weren't sure if it's in scope): Whether the requested review should also produce the repo-level `review_*.md` / `commands_*.log` artifacts from `AGENTS.md`, since the user-facing task only names the pipeline findings file.
+diff --git a/pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md b/pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b36980ecf0ed7fad0b0695358d424d8fd8ed1103
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-204116-f888
++
++## Findings
++1. [P1] Fix 1 — Guest name save silently no-ops when no current guest ID — In [pages/PublicMenu/x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3142) the save handler exits on `if (!currentGuest?.id || !guestNameInput.trim()) return;`, so the ✓ button wired at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L458) becomes a no-op whenever the guest has not been restored/created yet. That matches the reported UX: no toast, no state transition back to read-only, and no feedback despite the button being enabled. FIX: change `handleUpdateGuestName` so it only guards on empty input, conditionally calls `base44.entities.SessionGuest.update()` when `currentGuest?.id` exists, and in all cases saves the trimmed name locally, updates visible state, shows `toast.success(...)`, and exits edit mode instead of returning silently.
++2. [P1] Fix 1 — Guest name has no persistence or restore path — The page initializes `guestNameInput` as `useState('')` at [pages/PublicMenu/x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1356), but there is no `menuapp_guest_name` read/write anywhere in the file. The current save path only updates Base44 when `currentGuest.id` exists and then clears the input at [pages/PublicMenu/x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3154), so a refresh loses the name whenever the backend guest record is missing or has not been restored yet. FIX: write the trimmed name to `localStorage.setItem('menuapp_guest_name', ...)` during save, read it on page load to prefill guest-name state, and hydrate the non-editing display from that stored value when no persisted guest name is available from `currentGuest`.
++3. [P2] Fix 2 — Post-submit cart state leaves the drawer without a next action — The submitted-orders block ends at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L777), and the next section is gated by `cart.length > 0` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L780). When the order is sent and the cart is cleared, Section 2 disappears and nothing replaces it, so the user is left with a dead-end white area below "Ваши заказы". FIX: insert a dedicated CTA block between Section 3 and Section 2 that renders only for `cart.length === 0 && myOrders.length > 0`, uses `tr('cart.add_more', 'Добавить к заказу')`, spans full width with a 44px+ tap target, and calls the existing `onClose` prop to return the user to the menu.
++4. [P2] Fix 3 — Order rating control is rendered in the compact size with no added hit area — In the cart orders section, the only rating control is still `<Rating ... size="sm" />` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L723), inside a plain flex row with no extra touch padding at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L722). On a 375px mobile target, this keeps the order-rating affordance in its smallest variant exactly where accurate tapping matters most. FIX: increase the cart-order rating control to the next supported size (`md` if available) or wrap it in additional vertical padding such as `py-2` so each star meets the required mobile touch target without changing MenuView ratings.
++
++## Summary
++Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — the expected restore behavior says to pre-fill `guestNameInput` from `localStorage`, but the non-editing UI displays `currentGuest.name` / `guestDisplay`; it is not explicit whether the saved local name must also appear immediately in read-only mode when no backend guest exists yet.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` in the batch header, but the speed rules also say not to read outside the page folder. A clear statement on whether root-level references are intentionally out of scope would remove that conflict.
++- Scope questions (anything you weren't sure if it's in scope): Whether the requested review should also produce the repo-level `review_*.md` / `commands_*.log` artifacts from `AGENTS.md`, since the user-facing task only names the pipeline findings file.
+
+codex
+Saved the scoped review to [publicmenu-260325-204116-f888-codex-findings.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md).
+
+I logged 4 findings total: 2 P1 for Fix 1 (silent guest-name save no-op, no localStorage persistence/restore), 1 P2 for Fix 2 (no post-submit CTA), and 1 P2 for Fix 3 (rating stars still use the compact touch target). I also saved the page-local copy at [review_2026-03-25.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-25.md) and the shell command log at [commands_2026-03-25.log](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-25.log).
+
+This was static review only; no fixes were applied.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-25.log b/pages/PublicMenu/commands_2026-03-25.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..a80150ebc73ebaa18ef5e0cb77a4491ce9a782ec
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-25.log
+@@ -0,0 +1,17 @@
++Get-ChildItem -Name pages/PublicMenu
++Get-Content -Raw pages/PublicMenu/CartView.jsx
++Get-Content -Raw pages/PublicMenu/x.jsx
++Get-ChildItem pages/PublicMenu -Name
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=430; $i -le 490; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=660; $i -le 810; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=1338; $i -le 1385; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=3128; $i -le 3175; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Get-Content -Raw pages/PublicMenu/README.md
++Get-Content -Raw pages/PublicMenu/BUGS.md
++Select-String -Path pages/PublicMenu/x.jsx -Pattern "menuapp_guest_name|guestNameInput|isEditingName|currentGuest|localStorage" | ForEach-Object { '{0,5}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern "function CartView|const CartView|onClose|handleUpdateGuestName|Rating|cart.add_more|SECTION 3|SECTION 2" | ForEach-Object { '{0,5}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=2848; $i -le 2962; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/x.jsx; for ($i=3498; $i -le 3525; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=1; $i -le 120; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
++Select-String -Path pages/PublicMenu/CartView.jsx -Pattern "guestDisplay|tableLabel|tr\\(|const tr" | ForEach-Object { '{0,5}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++$lines = Get-Content pages/PublicMenu/CartView.jsx; for ($i=296; $i -le 310; $i++) { if ($i -le $lines.Length) { '{0,5}: {1}' -f $i, $lines[$i-1] } }
+diff --git a/pages/PublicMenu/review_2026-03-25.md b/pages/PublicMenu/review_2026-03-25.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8137d6f50dd7b0fb3cf3d50a5e754a9172b9a07d
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-25.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-204116-f888
++
++## Findings
++1. [P1] Fix 1 — Guest name save silently no-ops when no current guest ID — In [x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3142) the save handler exits on `if (!currentGuest?.id || !guestNameInput.trim()) return;`, so the ✓ button wired at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L458) becomes a no-op whenever the guest has not been restored/created yet. That matches the reported UX: no toast, no state transition back to read-only, and no feedback despite the button being enabled. FIX: change `handleUpdateGuestName` so it only guards on empty input, conditionally calls `base44.entities.SessionGuest.update()` when `currentGuest?.id` exists, and in all cases saves the trimmed name locally, updates visible state, shows `toast.success(...)`, and exits edit mode instead of returning silently.
++2. [P1] Fix 1 — Guest name has no persistence or restore path — The page initializes `guestNameInput` as `useState('')` at [x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1356), but there is no `menuapp_guest_name` read/write anywhere in the file. The current save path only updates Base44 when `currentGuest.id` exists and then clears the input at [x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3154), so a refresh loses the name whenever the backend guest record is missing or has not been restored yet. FIX: write the trimmed name to `localStorage.setItem('menuapp_guest_name', ...)` during save, read it on page load to prefill guest-name state, and hydrate the non-editing display from that stored value when no persisted guest name is available from `currentGuest`.
++3. [P2] Fix 2 — Post-submit cart state leaves the drawer without a next action — The submitted-orders block ends at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L777), and the next section is gated by `cart.length > 0` at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L780). When the order is sent and the cart is cleared, Section 2 disappears and nothing replaces it, so the user is left with a dead-end white area below "Ваши заказы". FIX: insert a dedicated CTA block between Section 3 and Section 2 that renders only for `cart.length === 0 && myOrders.length > 0`, uses `tr('cart.add_more', 'Добавить к заказу')`, spans full width with a 44px+ tap target, and calls the existing `onClose` prop to return the user to the menu.
++4. [P2] Fix 3 — Order rating control is rendered in the compact size with no added hit area — In the cart orders section, the only rating control is still `<Rating ... size="sm" />` at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L723), inside a plain flex row with no extra touch padding at [CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L722). On a 375px mobile target, this keeps the order-rating affordance in its smallest variant exactly where accurate tapping matters most. FIX: increase the cart-order rating control to the next supported size (`md` if available) or wrap it in additional vertical padding such as `py-2` so each star meets the required mobile touch target without changing MenuView ratings.
++
++## Summary
++Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — the expected restore behavior says to pre-fill `guestNameInput` from `localStorage`, but the non-editing UI displays `currentGuest.name` / `guestDisplay`; it is not explicit whether the saved local name must also appear immediately in read-only mode when no backend guest exists yet.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` in the batch header, but the speed rules also say not to read outside the page folder. A clear statement on whether root-level references are intentionally out of scope would remove that conflict.
++- Scope questions (anything you weren't sure if it's in scope): Whether the requested review should also produce the repo-level `review_*.md` / `commands_*.log` artifacts from `AGENTS.md`, since the user-facing task only names the pipeline findings file.
+diff --git a/pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md b/pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b36980ecf0ed7fad0b0695358d424d8fd8ed1103
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md
+@@ -0,0 +1,16 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260325-204116-f888
++
++## Findings
++1. [P1] Fix 1 — Guest name save silently no-ops when no current guest ID — In [pages/PublicMenu/x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3142) the save handler exits on `if (!currentGuest?.id || !guestNameInput.trim()) return;`, so the ✓ button wired at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L458) becomes a no-op whenever the guest has not been restored/created yet. That matches the reported UX: no toast, no state transition back to read-only, and no feedback despite the button being enabled. FIX: change `handleUpdateGuestName` so it only guards on empty input, conditionally calls `base44.entities.SessionGuest.update()` when `currentGuest?.id` exists, and in all cases saves the trimmed name locally, updates visible state, shows `toast.success(...)`, and exits edit mode instead of returning silently.
++2. [P1] Fix 1 — Guest name has no persistence or restore path — The page initializes `guestNameInput` as `useState('')` at [pages/PublicMenu/x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L1356), but there is no `menuapp_guest_name` read/write anywhere in the file. The current save path only updates Base44 when `currentGuest.id` exists and then clears the input at [pages/PublicMenu/x.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/x.jsx#L3154), so a refresh loses the name whenever the backend guest record is missing or has not been restored yet. FIX: write the trimmed name to `localStorage.setItem('menuapp_guest_name', ...)` during save, read it on page load to prefill guest-name state, and hydrate the non-editing display from that stored value when no persisted guest name is available from `currentGuest`.
++3. [P2] Fix 2 — Post-submit cart state leaves the drawer without a next action — The submitted-orders block ends at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L777), and the next section is gated by `cart.length > 0` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L780). When the order is sent and the cart is cleared, Section 2 disappears and nothing replaces it, so the user is left with a dead-end white area below "Ваши заказы". FIX: insert a dedicated CTA block between Section 3 and Section 2 that renders only for `cart.length === 0 && myOrders.length > 0`, uses `tr('cart.add_more', 'Добавить к заказу')`, spans full width with a 44px+ tap target, and calls the existing `onClose` prop to return the user to the menu.
++4. [P2] Fix 3 — Order rating control is rendered in the compact size with no added hit area — In the cart orders section, the only rating control is still `<Rating ... size="sm" />` at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L723), inside a plain flex row with no extra touch padding at [pages/PublicMenu/CartView.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L722). On a 375px mobile target, this keeps the order-rating affordance in its smallest variant exactly where accurate tapping matters most. FIX: increase the cart-order rating control to the next supported size (`md` if available) or wrap it in additional vertical padding such as `py-2` so each star meets the required mobile touch target without changing MenuView ratings.
++
++## Summary
++Total: 4 findings (0 P0, 2 P1, 2 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 3
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — the expected restore behavior says to pre-fill `guestNameInput` from `localStorage`, but the non-editing UI displays `currentGuest.name` / `guestDisplay`; it is not explicit whether the saved local name must also appear immediately in read-only mode when no backend guest exists yet.
++- Missing context (what info would have helped): The task references `BUGS_MASTER.md` in the batch header, but the speed rules also say not to read outside the page folder. A clear statement on whether root-level references are intentionally out of scope would remove that conflict.
++- Scope questions (anything you weren't sure if it's in scope): Whether the requested review should also produce the repo-level `review_*.md` / `commands_*.log` artifacts from `AGENTS.md`, since the user-facing task only names the pipeline findings file.
+
+tokens used
+107 937
+Saved the scoped review to [publicmenu-260325-204116-f888-codex-findings.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260325-204116-f888-codex-findings.md).
+
+I logged 4 findings total: 2 P1 for Fix 1 (silent guest-name save no-op, no localStorage persistence/restore), 1 P2 for Fix 2 (no post-submit CTA), and 1 P2 for Fix 3 (rating stars still use the compact touch target). I also saved the page-local copy at [review_2026-03-25.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-25.md) and the shell command log at [commands_2026-03-25.log](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-25.log).
+
+This was static review only; no fixes were applied.

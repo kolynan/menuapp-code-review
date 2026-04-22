@@ -1,0 +1,243 @@
+---
+chain: cartview-260415-105013-e600
+chain_step: 1
+chain_total: 4
+chain_step_name: cc-writer
+chain_group: writers
+chain_group_size: 2
+page: CartView
+budget: 12.00
+runner: cc
+type: chain-step
+---
+=== CHAIN STEP: CC Writer (1/4) ===
+Chain: cartview-260415-105013-e600
+Page: CartView
+
+You are the CC Writer in a modular consensus pipeline.
+Your job: independently analyze the code and produce findings.
+
+INSTRUCTIONS:
+1. Read the file(s) specified in TASK CONTEXT below for CartView
+2. Also read README.md and BUGS.md in the same folder for context (read-only, do NOT modify)
+3. Do your OWN independent analysis
+4. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns
+5. For each finding: [P0/P1/P2/P3] Title - Description. FIX: description of code change needed.
+6. Write your findings to: pipeline/chain-state/cartview-260415-105013-e600-cc-findings.md
+   - **KB-158 write-fallback:** before writing, test-touch the path. If `pipeline/chain-state/` is read-only (worktree sandbox), write to `pages/CartView/cartview-260415-105013-e600-cc-findings.md` AS A FALLBACK — comparator will find it there. Record fallback location in cc-analysis-*.txt.
+   - ⚠️ NEVER write findings with generic name like `review_YYYY-MM-DD.md` — always include `cartview-260415-105013-e600` in filename so comparator can locate.
+7. Do NOT apply any fixes yet — only document findings
+
+⛔ SCOPE RESTRICTION (MANDATORY):
+If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.):
+- Do NOT report ANY issues outside the numbered Fix list.
+- If you see other bugs — IGNORE them completely.
+- Your output must contain ONLY findings for Fix 1, Fix 2, etc.
+- Extra findings outside the Fix list = task FAILURE.
+- BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG.
+- GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else.
+
+If there is NO numbered Fix list → find ALL bugs.
+
+FORMAT for findings file:
+# CC Writer Findings — CartView
+Chain: cartview-260415-105013-e600
+
+## Findings
+1. [P0/P1/P2/P3] Title — Description. FIX: ...
+2. ...
+
+## Summary
+Total: N findings (X P0, Y P1, Z P2, W P3)
+
+⛔ Prompt Clarity (MANDATORY — findings without this section are INCOMPLETE and will be REJECTED):
+Rate the task description quality (1-5). For any score below 4, explain what was unclear:
+- Overall clarity: [1-5]
+- Ambiguous Fix descriptions (list Fix # and what was unclear): ...
+- Missing context (what info would have helped): ...
+- Scope questions (anything you weren't sure if it's in scope): ...
+YOU MUST FILL IN ALL FIELDS ABOVE. Do NOT skip this section.
+
+=== TASK CONTEXT ===
+# CartView Batch CV-B1-Core — КС Prompt v2
+
+**Batch scope:** CV-BUG-05 (P0) + CV-14 + CV-56 + CV-15 + CV-BUG-03 (refinement, DEFERRED).
+**Recipe:** С5v2 (CC-only discussion). Budget $12.
+**История:**
+- v1 (`cartview-260415-092055-289b`) провалилась (0/3 applied, 38m, $4.79): worktree isolation — findings записаны в `pages/PublicMenu/` вместо `pipeline/chain-state/`, comparator увидел пусто → merge «применил» 0 фиксов, git без коммита. KB-158 + PQ-111.
+- Pipeline hardening S279: `comparator.md` + `merge-v2.md` + `cc-writer.md` + `codex-writer-v2.md` обновлены (findings fallback `pages/**/cartview-260415-105013-e600-*.md` + abort-on-empty + verify-commit HEAD_BEFORE/AFTER).
+- v2: тот же скоуп, та же формулировка (Codex findings v1 подтвердили корректность плана). Если снова провал — искать причину в инфре, не в промпте.
+- Салваж Д3: findings — `ux-concepts/CartView/CV-B1-Core_findings_S278.md`.
+
+## Context
+
+- Файл: `pages/PublicMenu/CartView.jsx` (1194 строк, RELEASE `260414-03 CartView RELEASE.jsx`).
+- Дополнительный файл: `pages/PublicMenu/useTableSession.jsx` (для Fix 1).
+- Предыдущий батч CV-A задеплоен (S273 commit `ae7a217`).
+- HO: `outputs/HO_CV-B1-Core_S276.md`.
+
+⚠️ Integrity check перед стартом: `wc -l pages/PublicMenu/CartView.jsx` должно быть ≈1194. Если меньше 1100 — восстановить: `cp "260414-03 CartView RELEASE.jsx" CartView.jsx`.
+
+## FROZEN UX (не трогать)
+- Rating flow (State C/C2/C3/D) — CV-A сделан, не менять.
+- «В работе/Выдано/В корзине» группировка (CV-A) — НЕ рефакторить, только Fix 1 меняет источник истины.
+- Guest name editing, Help drawer, Loyalty, Table verification, Close drawer — as is.
+- `x.jsx`, `StickyCartBar` — не трогать.
+
+---
+
+## Fix 1 — CV-BUG-05 [P0, H]: statusBuckets читает `o.status` вместо `stage_id.internal_code`
+
+### Проблема
+При смене статуса заказа на «Выдано» (через официанта / SOM) — UI CartView **не перемещает** заказ из таба «В работе» в «Выдано». Причина: `statusBuckets` (CartView.jsx:427-436) группирует по `o.status` (`'served'`/`'completed'`), но реальный terminal-статус хранится в `OrderStages.internal_code === 'finish'` через `Order.stage_id`.
+
+### Текущий код (CartView.jsx:427-436)
+```js
+const statusBuckets = React.useMemo(() => {
+  const groups = { served: [], in_progress: [] };
+  todayMyOrders.forEach(o => {
+    const s = (o.status || 'new').toLowerCase();
+    if (s === 'served' || s === 'completed') groups.served.push(o);
+    else if (s !== 'cancelled') groups.in_progress.push(o);
+  });
+  return groups;
+}, [todayMyOrders]);
+```
+
+### getOrderStatus (useTableSession.jsx:797-813) сейчас
+Возвращает `{icon, label, color}` — **БЕЗ `internal_code`**. Нужно расширить.
+
+### План
+**Шаг 1.1** — расширить `getOrderStatus` в `useTableSession.jsx` (строки 797-813):
+```js
+const getOrderStatus = (order) => {
+  const stageId = typeof order.stage_id === 'object'
+    ? (order.stage_id?.id ?? order.stage_id?._id)
+    : order.stage_id;
+  const stageIdStr = stageId ? String(stageId) : null;
+  const stage = stageIdStr ? stagesMap.get(stageIdStr) : null;
+
+  if (stage) {
+    const icon = stage.internal_code === 'finish' ? '✅'
+               : stage.internal_code === 'start' ? '🔵' : '🟠';
+    return {
+      icon,
+      label: stage.name,
+      color: stage.color || '#3b82f6',
+      internal_code: stage.internal_code || null, // ← NEW
+    };
+  }
+
+  return { icon: '🔵', label: t('status.new'), color: '#3b82f6', internal_code: null };
+};
+```
+
+**Шаг 1.2** — переписать `statusBuckets` в `CartView.jsx:427-436` (hybrid: stage-first, o.status fallback для legacy):
+```js
+const statusBuckets = React.useMemo(() => {
+  const groups = { served: [], in_progress: [] };
+  todayMyOrders.forEach(o => {
+    const stageInfo = getOrderStatus(o);
+    const isServed = stageInfo?.internal_code === 'finish'
+      || (!stageInfo?.internal_code && ['served', 'completed'].includes((o.status || '').toLowerCase()));
+    const isCancelled = !stageInfo?.internal_code && (o.status || '').toLowerCase() === 'cancelled';
+    if (isServed) groups.served.push(o);
+    else if (!isCancelled) groups.in_progress.push(o);
+  });
+  return groups;
+}, [todayMyOrders, getOrderStatus]);
+```
+
+### Верификация
+- grep `statusBuckets.served` в CartView.jsx → везде работает как было (не переписывать callers).
+- Ручной: в SOM перевести заказ в «Выдано» → CartView обновляется в реальном времени, заказ уезжает из «В работе» в «Выдано».
+- `cancelled` не должен попадать ни в одну группу.
+
+### BACKLOG spillover
+- **CV-BUG-06** (не в этом батче): `o.status === 'cancelled'` также используется в CartView.jsx:418 для фильтра. Зафиксировать в BACKLOG, пока не менять.
+
+---
+
+## Fix 2 — CV-14 + CV-56 [P1, M]: Таб «Стол» внутри CartView
+
+### Проблема
+Сейчас CartView показывает заказы текущего гостя (SECTION 3/4) + «Заказы стола» как collapsable card (SECTION 5:777). Нужны **shadcn/ui Tabs** (`Мои` / `Стол`) — стандартный UX pattern для разделения.
+
+### Паттерн (из `TranslationAdmin`)
+`import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";`
+
+### План
+**Шаг 2.1** — обернуть SECTION 3 + SECTION 4 + SECTION 5 в `<Tabs defaultValue="my">`:
+- TabsList: `[TabsTrigger value="my"] Мои    [TabsTrigger value="table"] Стол`
+- TabsContent value="my" → current SECTION 3 (cart items) + SECTION 4 (my orders: В работе/Выдано/В корзине).
+- TabsContent value="table" → SECTION 5 (other guests orders) + **счёт стола** (общий total со всех гостей).
+
+**Шаг 2.2** — «Счёт стола» дублируется в оба таба:
+- В табе «Мои» — текущий блок со **счётом только гостя** + мини-строка «Счёт стола: XXX ₸» (клик → переключает на таб «Стол»).
+- В табе «Стол» — полный разбивка по гостям + grand total.
+
+**Шаг 2.3** — `defaultValue="my"`, **не controlled** (без useState).
+
+### Верификация
+- grep `<Tabs` в CartView.jsx → ровно 1 occurrence (не вложенный).
+- grep `TabsContent` → 2 occurrences (my + table).
+- Визуально: переключение между табами моментальное, без скроллов.
+
+---
+
+## Fix 3 — CV-15 [P2, S]: Скрыть табы при 1 госте
+
+### Проблема
+Если в сессии стола только 1 гость (нет `otherGuestIdsFromOrders`), таб «Стол» пуст и бессмыслен.
+
+### План
+Обернуть `<Tabs>` (из Fix 2) в условие `showTableOrdersSection` (CartView.jsx:501):
+```jsx
+{showTableOrdersSection ? (
+  <Tabs defaultValue="my">...</Tabs>
+) : (
+  <>{/* SECTION 3 + SECTION 4 без табов, как сейчас */}</>
+)}
+```
+
+### Верификация
+- Ручной: зайти в стол одним гостем → табов нет, сразу контент «Мои».
+- Второй гость присоединяется → появляются табы, default = «Мои».
+
+---
+
+## Fix 4 — CV-BUG-03 refinement [P2] — DEFERRED (не делать в этом батче)
+
+### Причина отсрочки
+Scroll-to-order auto-open logic из S273 **не существует в текущем кодбазе** (findings §4). CartView не знает, через какой триггер был открыт (SOM уведомление / sticky-bar / вручную). Нужен prop `openReason` от parent (x.jsx) — out of scope этого батча.
+
+**Не фиксить. Зафиксировать в BACKLOG #324** с планом: добавить prop `openReason="order-status-change"` в `CartView`, если он есть — скроллить к измененному заказу через `ref`.
+
+---
+
+## Fix 5 — Debug tab (nice-to-have) — SKIP
+
+`import.meta.env.DEV` ненадёжно на Base44. Дебажить через React DevTools.
+
+---
+
+## Deliverables
+1. `pages/PublicMenu/CartView.jsx` (≈1220-1260 строк после Fix 2/3).
+2. `pages/PublicMenu/useTableSession.jsx` (мини-правка getOrderStatus).
+3. RELEASE файл: `260415-XX CartView RELEASE.jsx` (создать копию).
+4. Tests plan секция в финальном merge-report.
+
+## Success criteria
+- [ ] `wc -l CartView.jsx` ≥ 1194 (+ new code for tabs).
+- [ ] Fix 1: SOM-переход «Выдано» обновляет CartView в real-time.
+- [ ] Fix 2: табы работают, «Счёт стола» в обоих.
+- [ ] Fix 3: при 1 госте табов нет.
+- [ ] Линт чист, no console warnings.
+- [ ] Все FROZEN UX блоки не тронуты.
+
+## Prompt Clarity self-check
+- Fix 1: полные снипы + line refs — OK.
+- Fix 2: high-level план без построчного кода (Tabs — стандартный shadcn pattern, CC+Codex сами решат разметку) — **приемлемо** для С5v2 discussion.
+- Fix 3: условие и существующая переменная указаны — OK.
+- Fix 4/5: явно deferred/skip — OK.
+=== END ===

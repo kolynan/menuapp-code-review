@@ -1,0 +1,261 @@
+---
+page: StaffOrdersMobile
+code_file: pages/StaffOrdersMobile/staffordersmobile.jsx
+also_edits: components/sessionHelpers.js
+budget: 10
+agent: cc+codex
+chain_template: consensus-with-discussion-v2
+ws: WS-SOM
+session: S267
+---
+
+# SOM Batch A v3: Android Quick-Fix (#293 + #296 + #297)
+
+Reference: `ux-concepts/StaffOrdersMobile/260406-00 StaffOrdersMobile UX S225 FINAL.md` v2.7.
+Scope: 3 fixes (Fix1 + Fix2 + Fix3). **#271 Fix4 удалён — live B6 render уже без wrapper.**
+
+Source file: `pages/StaffOrdersMobile/staffordersmobile.jsx` (**4524 строк**).
+Also edits: `components/sessionHelpers.js` (Fix2 only).
+
+**⚠️ File disambiguation:** НЕ ОТКРЫВАТЬ файлы с именем `*RELEASE.jsx` (архивные). Только `staffordersmobile.jsx`.
+
+**⚠️ Block comments:** файл содержит два `/* */` блока — 546-785 и 1148-1414. НЕ редактировать target lines из этих диапазонов. Все Fix ниже работают ТОЛЬКО с live кодом вне этих блоков.
+
+---
+
+## ⚠️ APPLICATION ORDER
+
+1. **Fix1** — helper + 4 live targets (B6 lines).
+2. **Fix2** — closeSession + filter + useMemo.
+3. **Fix3** — minimal stopPropagation (2 места).
+
+---
+
+## Fix 1 — SOM-S256-02 / #293 (P2) [MUST-FIX]: Guest counter shows dish count
+
+### Сейчас
+Section headers (Новые / в prog-sections / Готово / Выдано) показывают `N ГОСТЕЙ · N БЛЮД`. Guest count = number of orders, not unique guests. Пример: 1 guest с 2 dishes → "2 ГОСТЯ · 2 БЛЮДА".
+
+### Должно быть
+Guest count = unique `guest_id` values. Helper `uniqueGuests(orders)` — REQUIRED.
+Ref: UX decision #19.
+
+### Helper — REQUIRED at component top
+
+Добавить BEFORE `getAssignee` (~line 786, после block comment `*/` at 785):
+
+```javascript
+// SOM-S256-02 (#293): Counts unique guests across orders.
+// null/undefined guest collapses into one bucket via Set semantics.
+const uniqueGuests = (orders) => new Set(orders.map(o => getLinkId(o.guest))).size;
+```
+
+Helper **MUST be used** at all 4 live sites (не inline `new Set(...)`).
+
+### НЕ должно быть
+- Do NOT count orders as guests (`.length` в guest slot).
+- Do NOT change `countRows(...)` calls — dish count корректен.
+- Do NOT inline `new Set(...)`.
+- **Do NOT edit dead code** inside block comments 546-785 или 1148-1414.
+
+### Файл и локация — 4 LIVE places
+
+**Line 2331 — new section header:**
+
+BEFORE:
+```
+{`${HALL_UI_TEXT.new} (${newOrders.length} ${pluralRu(newOrders.length, "гость", "гостя", "гостей")} · ${countRows(newRows, newOrders.length)} ${pluralRu(countRows(newRows, newOrders.length), "блюдо", "блюда", "блюд")})`}
+```
+AFTER — первые два `newOrders.length` → `uniqueGuests(newOrders)`, `countRows(newRows, newOrders.length)` НЕ ТРОГАТЬ:
+```
+{`${HALL_UI_TEXT.new} (${uniqueGuests(newOrders)} ${pluralRu(uniqueGuests(newOrders), "гость", "гостя", "гостей")} · ${countRows(newRows, newOrders.length)} ${pluralRu(countRows(newRows, newOrders.length), "блюдо", "блюда", "блюд")})`}
+```
+
+**Line 2333 — inProgressSections.map per-section header:**
+
+BEFORE:
+```
+{`· ${section.orders.length} ${pluralRu(section.orders.length, "гость", "гостя", "гостей")} · ${section.rowCount} ...`}
+```
+AFTER — оба `section.orders.length` → `uniqueGuests(section.orders)`:
+```
+{`· ${uniqueGuests(section.orders)} ${pluralRu(uniqueGuests(section.orders), "гость", "гостя", "гостей")} · ${section.rowCount} ...`}
+```
+
+**Line 2335 — ready section header:**
+Первые два `readyOrders.length` → `uniqueGuests(readyOrders)`. `countRows(readyRows, readyOrders.length)` — не трогать.
+
+**Line 2337 — served section header:**
+Первые два `servedOrders.length` → `uniqueGuests(servedOrders)`. `countRows(servedRows, servedOrders.length)` — не трогать.
+
+### Grep verification (перед commit)
+
+```bash
+grep -n "const uniqueGuests" staffordersmobile.jsx   # expect: 1 hit
+sed -n '2300,2340p' staffordersmobile.jsx | grep -oE "(newOrders|readyOrders|servedOrders|section\.orders)\.length.*pluralRu.*гост"
+# expect: 0 совпадений
+```
+
+### Проверка
+1 guest, 2 dishes → section header "1 ГОСТЬ · 2 БЛЮДА" (не "2 ГОСТЯ").
+
+---
+
+## Fix 2 — SOM-S256-04 / #296 (P1) [MUST-FIX]: Table card disappears after "Выдать все (N)"
+
+### Root cause (verified 2026-04-14)
+`activeOrders` filter (line 3540) исключает `served` → orders исчезают → orderGroups не создаёт группу → карточка стола пропадает.
+
+### closeSession callers — verified (не «ONLY in SOM»)
+- `pages/StaffOrdersMobile/staffordersmobile.jsx` — multiple
+- `pages/PartnerTables/260301-00 partnertables RELEASE.js`:
+  - Line 61 — import
+  - Line 1981 — `await closeSession(id)` в `handleCloseSession` (1972-1991)
+
+### Change 1 — `components/sessionHelpers.js`
+
+```javascript
+export async function closeSession(sessionId) {
+  // UNCHANGED — existing TableSession close
+  await base44.entities.TableSession.update(sessionId, {
+    status: "closed",
+    closed_at: new Date().toISOString()
+  });
+
+  // NEW (S267) — Bulk-close all non-cancelled orders in this session.
+  const sessionOrders = await base44.entities.Order.filter({ table_session: sessionId });
+  await Promise.all(
+    sessionOrders
+      .filter(o => o.status !== 'cancelled')
+      .map(o => base44.entities.Order.update(o.id, { status: 'closed' }))
+  );
+}
+```
+
+**Do NOT:** change function signature, remove `closed_at`, add try/catch.
+
+### Change 2 — line 3540 (activeOrders useMemo)
+
+```javascript
+// BEFORE
+if (stage.internal_code === 'finish') {
+  return o.status !== 'served' && o.status !== 'closed' && o.status !== 'cancelled';
+}
+// AFTER
+if (stage.internal_code === 'finish') {
+  return o.status !== 'closed' && o.status !== 'cancelled';
+}
+```
+
+### Change 3 — filteredGroups (3789-3802) + tabCounts (3804-3819)
+
+⚠️ **Не трогать useMemo wrappers** (строки 3789, 3802, 3804, 3819). Заменить только inner callback bodies.
+
+**filteredGroups inner body (3792-3801) — replace:**
+```javascript
+  return orderGroups.filter(group => {
+    const hasActiveOrder = group.orders.some(o => {
+      const config = getStatusConfig(o);
+      return !config.isFinishStage && o.status !== 'cancelled';
+    });
+    const hasActiveRequest = group.type === 'table' && activeRequests.some(r => getLinkId(r.table) === group.id);
+    // NEW: served-but-not-closed → stay in Active until closeSession
+    const hasServedButNotClosed = group.orders.some(o => {
+      const config = getStatusConfig(o);
+      return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+    });
+    return activeTab === 'active'
+      ? (hasActiveOrder || hasActiveRequest || hasServedButNotClosed)
+      : (!hasActiveOrder && !hasActiveRequest && !hasServedButNotClosed);
+  });
+```
+Dep array (3802) `[orderGroups, activeTab, getStatusConfig, activeRequests]` — **не трогать**.
+
+**tabCounts — внутри existing forEach (match forEach + mutable style, NOT reduce):**
+```javascript
+// Добавить после hasActiveRequest:
+const hasServedButNotClosed = group.orders.some(o => {
+  const config = getStatusConfig(o);
+  return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+});
+// Изменить if:
+// BEFORE: if (hasActiveOrder || hasActiveRequest) active++; else completed++;
+// AFTER:  if (hasActiveOrder || hasActiveRequest || hasServedButNotClosed) active++; else completed++;
+```
+Dep array `[orderGroups, getStatusConfig, activeRequests]` — **не трогать**.
+
+### НЕ должно быть
+- Do NOT load TableSession entity в SOM.
+- Do NOT remove useMemo wrappers (3789, 3804).
+- Do NOT break PartnerTables `handleCloseSession` (1972-1991).
+
+### Проверка
+1. SOM: 2 dishes → Принять → "Выдать все" → карточка **остаётся в Active** (green "ОБСЛУЖЕНО"). "Закрыть стол" → Completed.
+2. PartnerTables: Admin close → orders `closed`, sessions refetch, toast.
+
+---
+
+## Fix 3 — SOM-S256-05 / #297 (P2) [MUST-FIX]: Tap on ★ ownership badge expands card
+
+### Сейчас
+★ и ☆ — plain `<div>` без stopPropagation → parent `onToggleExpand` срабатывает.
+
+### Должно быть
+Add `onClick={(e) => e.stopPropagation()}` to both divs. 🔒 badge уже имеет — не трогать.
+
+### Line 2250 — ★ badge div (line 2249 = JSX condition guard, НЕ div)
+
+BEFORE: `<div style={{...}} aria-label={"Мой стол"}>`
+AFTER:  `<div style={{...}} aria-label={"Мой стол"} onClick={(e) => e.stopPropagation()}>`
+
+### Line 2260 — ☆ badge div (line 2257 = `</button>` closing 🔒, НЕ div)
+
+BEFORE: `<div style={{...}} aria-label={"Свободный стол"}>`
+AFTER:  `<div style={{...}} aria-label={"Свободный стол"} onClick={(e) => e.stopPropagation()}>`
+
+### НЕ должно быть
+- Do NOT touch 🔒 `<button>` at ~line 2255.
+- Do NOT изменять style / aria-label.
+
+### Проверка
+Тап на ★ → карточка НЕ expand. Тап на area → expand работает. ☆ — аналогично.
+
+---
+
+## ⛔ SCOPE LOCK
+
+- Только Fix 1-3 + `closeSession`.
+- Fix4 (#271) — ОТМЕНЁН.
+- Dead code 546-785, 1148-1414 — **НЕ РЕДАКТИРОВАТЬ**.
+- PublicMenu / CartView / OrdersList / PartnerTables page — НЕ ТРОГАТЬ.
+
+## FROZEN UX (locked GPT S250)
+- Collapsed card 78×54px, urgency colors, badges
+- Ownership filter bar R3, urgency 3 levels R6
+
+## CONTEXT FILES
+- `ux-concepts/StaffOrdersMobile/260406-00 StaffOrdersMobile Mockup S225 FINAL.html`
+- `ux-concepts/StaffOrdersMobile/260406-00 StaffOrdersMobile UX S225 FINAL.md` v2.7
+
+## Commit
+```bash
+git add pages/StaffOrdersMobile/staffordersmobile.jsx components/sessionHelpers.js
+git commit -m "SOM Batch A v3: #293 guest count + #296 served visibility + #297 star badge"
+git push
+```
+
+## Block-comment integrity check (MANDATORY before commit)
+
+```bash
+grep -n "^/\*$\|^/\* function\|^\*/$" staffordersmobile.jsx
+# expected: 546 /*, 785 */, 1148 /* function RateLimitScreen..., 1414 */
+```
+
+## Regression Check (MANDATORY)
+
+- [ ] Guest count headers: "N ГОСТЬ · N БЛЮД" с unique guest count
+- [ ] After "Выдать все" — карточка остаётся в Active (ОБСЛУЖЕНО badge)
+- [ ] After "Закрыть стол" — карточка → Completed, orders `closed` в entity inspector
+- [ ] PartnerTables admin close: toast + sessions refetch, no regression
+- [ ] ★ tap → НЕ expand | ☆ tap → НЕ expand | area tap → expand работает
+- [ ] 🔒 tap → hint (не сломано)

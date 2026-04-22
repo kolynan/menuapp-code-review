@@ -1,0 +1,30 @@
+CC Writer Analysis — scripts (task-watcher-multi.py v5.0 chain_template port)
+Chain: scripts-260413-232717-abee
+Completed: 2026-04-13
+
+## Key Finding: Port is STRUCTURALLY INCOMPLETE
+
+The expansion/creation side works (chain detection, step file creation, TG init, lock files).
+But the LIFECYCLE side is missing — chains will hang after step 1.
+
+## Critical Missing Functions (not ported from v3.py):
+
+1. update_chain_after_step (v3.py:2556) — marks steps completed, advances chain state,
+   handles group completion, chain finish, lock cleanup. WITHOUT THIS: chains hang forever
+   because completed_step stays at 0 and can_run_chain_step blocks all step 2+ tasks.
+
+2. build_codex_direct_command (v3.py:802) + resolve_codex_path + resolve_codex_node_command —
+   launches Codex CLI for runner:codex steps. WITHOUT THIS: Codex steps get sent to CC instead.
+
+3. check_cc_auth / check_codex_auth (v3.py:1968/2002) — auth pre-checks before expansion.
+
+4. _find_git_bash (v3.py:1422) — CLAUDE_CODE_GIT_BASH_PATH env setup for Windows.
+
+## Bug in Current Code:
+
+- run_task() line 2048: send_initial_telegram called for chain steps too (should be skipped,
+  chain steps use consolidated TG message via mark_chain_step_running).
+
+## 12 Findings Total: 2 P0, 5 P1, 5 P2
+
+See full findings: pipeline/chain-state/scripts-260413-232717-abee-cc-findings.md

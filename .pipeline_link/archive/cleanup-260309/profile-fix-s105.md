@@ -1,0 +1,59 @@
+---
+task_id: profile-fix-s105
+page: Profile
+budget: 10
+session: S105
+purpose: "Fix 5 new bugs (PR-S104-01..05) in profile.jsx. Smoke test for run-vsc-task.sh v6.0 + CC+Codex parallel."
+---
+
+# Task: Fix 5 new bugs in Profile page (S104 findings)
+
+## Context
+In S104, Codex manually reviewed `pages/Profile/base/profile.jsx` and found 5 new bugs.
+The previous 12 bugs (S100 CC analysis) were already fixed and released.
+This task fixes the 5 remaining open bugs: 2×P2, 3×P3.
+
+## File to fix
+`pages/Profile/base/profile.jsx`
+
+Also update: `pages/Profile/BUGS.md`
+
+## Bugs to fix
+
+### P2 (should fix — important):
+
+**PR-S104-01** — `handleSave()` без unmount guard
+- Problem: If user navigates away during save, the promise resolves and calls `setInitialFullName`, `setSaveStatus`, `toast` on an unmounted component → potential memory leak and React warning.
+- Fix: Add `isMountedRef` using `useRef(true)` and set it to `false` in cleanup. Guard all state updates in handleSave with `if (!isMountedRef.current) return;`
+
+**PR-S104-02** — `Partner.get()` blocks full screen
+- Problem: `isLoading=true` while partner data loads, even though user data is already available. Full screen spinner is shown unnecessarily.
+- Fix: Separate loading states: `isUserLoading` and `isPartnerLoading`. Show skeleton/spinner only for the partner-specific section, not the entire page.
+
+### P3 (should fix — minor):
+
+**PR-S104-03** — Orphaned `<Label>` for static text
+- Problem: `<Label>` is used for role and restaurant name which are static text (no associated input). This creates invalid markup for screen readers.
+- Fix: Replace `<Label>` with `<p className="text-sm font-medium">` or similar semantic element for static display fields.
+
+**PR-S104-04** — No `<form>` wrapper
+- Problem: Pressing Enter in the name input does not submit the form. On mobile, the IME "Go" button does not trigger save.
+- Fix: Wrap the editable fields in `<form onSubmit={handleSave}>`. Add `type="submit"` to the Save button (or `type="button"` to non-submit buttons to be explicit).
+
+**PR-S104-05** — Loading state without `role="status"` / `aria-live`
+- Problem: Screen readers are not notified when the page is loading.
+- Fix: Add `role="status"` and `aria-live="polite"` to the loading container element.
+
+## Important rules
+- Do NOT use `git add .` or `git add -A`. Only add specific files.
+- Do NOT change any logic beyond what the bugs require.
+- Keep all existing business logic intact.
+- After fixing, update `pages/Profile/BUGS.md`:
+  - Move PR-S104-01..05 to "Fixed Bugs" section with RELEASE reference (to be filled).
+
+## Git commit (REQUIRED):
+```bash
+git add pages/Profile/base/profile.jsx pages/Profile/BUGS.md
+git commit -m "fix: Profile PR-S104-01..05 (unmount guard, loading states, a11y fixes)"
+git push
+```

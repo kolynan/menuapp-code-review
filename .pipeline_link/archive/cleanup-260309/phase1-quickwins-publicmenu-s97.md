@@ -1,0 +1,67 @@
+---
+task: phase1-quickwins-publicmenu-s97
+type: bugfix
+budget: "$12"
+priority: P1
+page: PublicMenu
+---
+
+# Задача: Phase 1 Quick Wins — PublicMenu (/x)
+
+## Контекст
+
+PublicMenu (`/x`) нуждается в стабилизации перед показом клиентам. Phase 1 = починка критических проблем, не новые фичи.
+
+**Полная спецификация:** `ux-concepts/ACCEPTANCE_CRITERIA_PHASE1.md` v1.0 (13 acceptance criteria).
+**Визуальные стандарты:** `ux-concepts/STYLE_GUIDE.md` v3.1.
+**Тексты:** `ux-concepts/COPY_SPEC.md` v1.0.
+
+## Что нужно сделать (ТОП-5 quick wins)
+
+### 1. Sticky CTA — убедиться что StickyCartBar не уходит за fold
+**AC-02.** Проверить что StickyCartBar имеет `sticky bottom-0` + `safe-area-bottom`. Если нет — добавить.
+
+### 2. Draft total ≠ savings
+**AC-03.** Draft total должен показывать РЕАЛЬНУЮ стоимость блюд. Loyalty скидка — ОТДЕЛЬНАЯ строка "Ожидаемая выгода", НЕ вычитается из total. Проверить логику расчёта.
+
+### 3. Hide Bill/Orders before first send
+**AC-04.** В drawer: секции "Мои заказы" и "Счёт" скрыты если 0 отправленных заказов. Показывать только черновик. Добавить условие `if (sentOrders.length > 0)` или аналог.
+
+### 4. Disabled CTA при отправке
+**AC-07.** При нажатии "Отправить":
+- Кнопка → disabled (серая `bg-slate-100 text-slate-400 cursor-not-allowed`)
+- Текст → "Отправляем..." (i18n key: `cta.sending`)
+- Повторное нажатие невозможно
+- При ошибке → кнопка обратно active + текст "Повторить отправку"
+
+### 5. Error state на submit
+**AC-08.** При ошибке сети:
+- Сообщение "Не удалось отправить" (i18n key: `error.send.title`)
+- Подпись "Ваш заказ сохранён. Попробуйте снова" (key: `error.send.subtitle`)
+- CTA "Повторить отправку" (key: `cta.retry`)
+- Черновик НЕ теряется
+
+### Бонус: Toast "Добавлено"
+**AC-09.** Если легко реализуемо — добавить toast/snackbar "Добавлено" после нажатия "+". Исчезает через 2-3 сек. Не блокирует UI.
+
+## Acceptance criteria
+
+- [ ] StickyCartBar sticky + safe-area-bottom (AC-02)
+- [ ] Draft total = чистая сумма, скидка отдельно (AC-03)
+- [ ] Bill/Orders скрыты до первой отправки (AC-04)
+- [ ] CTA disabled при sending + текст "Отправляем..." (AC-07)
+- [ ] Error state с retry + черновик сохранён (AC-08)
+- [ ] (Бонус) Toast "Добавлено" после "+" (AC-09)
+- [ ] Нет регрессий в core flow: добавить → drawer → отправить → confirmation
+
+## Файлы
+
+- **Основной:** `pages/PublicMenu/base/x.jsx`
+- **Стиль:** `ux-concepts/STYLE_GUIDE.md` (Sticky CTA шаблон, disabled style)
+- **Тексты:** `ux-concepts/COPY_SPEC.md` (i18n keys + переводы)
+
+## Git
+
+```bash
+git add -A && git commit -m "fix: Phase 1 quick wins for PublicMenu (S97)" && git push
+```

@@ -1,0 +1,107 @@
+---
+chain: infra-260415-001013-0b6c
+chain_step: 1
+chain_total: 2
+chain_step_name: discussion-writer-codex
+chain_group: writers
+chain_group_size: 2
+page: INFRA
+budget: 10.00
+runner: codex
+type: chain-step
+---
+**MANDATORY FIRST STEP — run this before anything else:**
+```
+git fetch origin 2>/dev/null; git reset --hard origin/main
+```
+This ensures your working copy is in sync with the remote repository.
+
+---
+
+You are the Codex Discussion Writer in a modular discussion pipeline.
+Your job: independently analyze each question from the TASK CONTEXT and write your position.
+You work in PARALLEL with a CC Discussion Writer — do NOT read CC findings.
+
+SPEED RULES — this is a time-sensitive pipeline step (KB-142 guard):
+- The full source file (if applicable) is INLINED below under === SOURCE CODE ===.
+  Use that inline content as the authoritative source. Do NOT read the same file from disk.
+- Do NOT run ripgrep, Get-ChildItem, Select-String, rg, cat, head, tail, or any other
+  filesystem scan on the target page file. This burns your entire time budget on I/O
+  and leaves you with no time for analysis (KB-142 pattern seen on files >2000 lines).
+- Do NOT dump raw grep / ripgrep output as your answer. Those are not findings.
+- You MAY read small auxiliary files explicitly named in the TASK CONTEXT (BUGS.md,
+  README.md in the same page folder, UX docs) — but do so with narrow commands, not
+  recursive scans.
+- Be concise but thorough in your analysis.
+
+INSTRUCTIONS:
+1. Read the TASK CONTEXT below — it contains questions for discussion.
+2. Use the inline SOURCE CODE block below as the source of truth (if provided).
+3. If small auxiliary reference files are mentioned (BUGS.md, UX docs, screenshots) — read them for context with narrow commands.
+4. For EACH question: write your analysis with a recommended answer and reasoning.
+5. Focus on: mobile-first UX, restaurant app context, real-world user behavior, best practices.
+6. When reviewing a code-review prompt (ПССК): verify line numbers against the inline source AND check whether each referenced line sits inside a block comment (`/* ... */`) or a commented-out JSX snapshot. Call out dead-code false positives explicitly.
+7. Write your position to (ABSOLUTE PATH — required, see KB-139): C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/chain-state/infra-260415-001013-0b6c-codex-position.md
+8. Do NOT read or reference any CC output.
+
+FORMAT for position file:
+# Codex Discussion Position — INFRA
+Chain: infra-260415-001013-0b6c
+Topic: [title from task]
+
+## Questions Analyzed
+
+### Q1: [question title]
+**Recommendation:** [your recommended option]
+**Reasoning:** [why this is the best approach]
+**Trade-offs:** [what you sacrifice with this choice]
+**Mobile UX:** [specific mobile considerations if relevant]
+
+### Q2: [question title]
+...
+
+## Summary Table
+| # | Question | Codex Recommendation | Confidence |
+|---|----------|----------------------|------------|
+| 1 | ...      | ...                  | high/medium/low |
+
+## Prompt Clarity
+Rate the task description quality (1-5). For any score below 4, explain what was unclear:
+- Overall clarity: [1-5]
+- Ambiguous questions (list # and what was unclear): ...
+- Missing context (what info would have helped): ...
+
+Do NOT apply any code changes.
+
+=== SOURCE CODE (with line numbers) ===
+(source file not found — reviewer may need to read from disk)
+=== END SOURCE CODE ===
+
+=== TASK CONTEXT ===
+# Smoke-test v2: ВЧР v5.4 chain expansion + auth CLI fix (S274)
+
+**Цель:** после фикса порядка аргументов в `check_cc_auth` проверить что Д3 chain раскрывается в CC+Codex и доходит до synthesizer.
+
+## Тривиальный вопрос для дискуссии
+
+Какой из двух подходов лучше для логирования race conditions в Python ThreadPoolExecutor:
+
+**Вариант A:** thread-local logger с дополнительным префиксом `[thread:<name>]` в каждом сообщении.
+**Вариант B:** один глобальный logger с `%(threadName)s` в форматтере (стандартный logging).
+
+Опишите коротко (3-5 предложений каждый): когда какой подход уместнее, какие подводные камни.
+
+## Ожидаемая работа ВЧР v5.4
+
+- В TG приходит стартовое сообщение chain.
+- Лог: `Chain task detected: template=discussion-cc-codex, page=INFRA`.
+- Лог: `CC auth check OK` (или просто отсутствие warning — значит auth прошёл).
+- Chain раскрылся в 3 step-файла (CC writer + Codex writer параллельно → synthesizer).
+- Время ~8-15 минут total.
+- В pipeline/: `cc-findings-*.md`, `codex-findings-*.md`.
+- В .debug: `Mode: task-watcher-multi.py v5.4 direct Popen`.
+
+## Если провалится снова
+
+Напишите точное сообщение лога + что вы видите в TG в finding-файле.
+=== END ===

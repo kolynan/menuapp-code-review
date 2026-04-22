@@ -1,0 +1,41 @@
+You are Codex. Analyze the SOM (StaffOrdersMobile) code independently and produce findings. This is a **review/analysis task only** — do not modify code. Output your findings in Markdown with grep-backed line numbers.
+
+## Context
+
+**Workstream:** WS-SOM (waiter interface).
+
+**Batch B1 scope:**
+
+1. **SOM-BUG-S270-02 (P1):** "Close table" action in SOM does not move the table to the "Completed" tab. Hypothesis: `closeSession()` in `components/sessionHelpers.js` (lines 155-171) updates `TableSession.status = "closed"` and bulk-closes Orders, but does NOT touch `Table.status`. The Table entity has a new `status` field (added in S271 per `B44_Entity_Schemas.md v3.0`). The Completed tab likely filters by `Table.status`.
+
+2. **SOM-BUG-S270-01 re-check (P0):** Rate limit 429 on single mutations. The `__batch` flag pattern prevents `invalidateQueries` storms for bulk ops, but single-click handlers may not set `__batch`, causing 429.
+
+**Main file:** `pages/StaffOrdersMobile/260414-02 StaffOrdersMobile RELEASE.jsx` (~4500 lines).
+**Helper:** `components/sessionHelpers.js` (closeSession at line 155).
+
+## Your deliverable
+
+### Section 1 — SOM-BUG-S270-02 (close table -> Completed)
+1. Quote `closeSession()` verbatim with line numbers. Confirm: does it touch `Table.status`?
+2. Grep the RELEASE file for the Completed tab filter logic (status === "closed" / completed / archived). Return every hit with line + 2 lines context.
+3. Recommend fix: (A) add `Table.update` inside `closeSession` — but sessionId != tableId, need resolution; (B) update Table.status at the call-site (line 4148) where tableId is already in scope. Choose which is safer and why.
+4. Regression risks: list 3.
+5. Manual test plan: 3 steps.
+
+### Section 2 — SOM-BUG-S270-01 re-check (rate limit)
+1. Grep RELEASE file for all single-mutation handlers without `__batch`. Return line numbers + handler names.
+2. For each mutation wrapper (advanceMutation, updateRequestMutation, direct base44.entities.*.update) — check its onSuccess -> does it always invalidateQueries?
+3. Propose minimal fix pattern (pseudo-code, 5-10 lines). Safest approach.
+4. Do NOT design the actual fix — just diagnose.
+
+### Section 3 — Prompt Clarity rating (1-5)
+Rate how clearly B1 scope was communicated. List ambiguities if <5.
+
+### Section 4 — Out-of-scope risks
+Max 5 items noticed while grepping that look broken/risky for B1. 1 line each.
+
+## Scope lock
+- No code modifications.
+- Output only the findings Markdown, nothing else.
+
+Begin analysis. Use Read/Grep for every claim.

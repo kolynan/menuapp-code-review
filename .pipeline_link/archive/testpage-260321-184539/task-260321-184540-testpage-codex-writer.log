@@ -1,0 +1,331 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Dev/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d10a5-1458-76f2-9f0b-29223b24da00
+--------
+user
+Review the file pages/TestPage/base/*.jsx for bugs in a React restaurant QR-menu app on Base44 platform. Also check pages/TestPage/README.md and pages/TestPage/BUGS.md for context (ONLY these 3 files, nothing else). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the 3 files above. Do NOT search the repo, do NOT read old findings, do NOT read files outside pages/TestPage/. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. Find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/testpage-260321-184539-codex-findings.md FORMAT: # Codex Writer Findings — TestPage Chain: testpage-260321-184539 ## Findings 1. [P0] Title — Description. FIX: ... 2. [P1] Title — Description. FIX: ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... Do NOT apply fixes — only document findings. === TASK CONTEXT === # Smoke Test S155B — CC CLI v2.1.81 verification Goal: verify CC-writer works after update from 2.1.77 → 2.1.81. ## Task Quick review of `pages/TestPage/base/testpage.jsx`. Find any issues. Produce findings and commit. ```bash git add . git commit -m "test: smoke CC v2.1.81 check S155B" git push ``` Budget: $2/step. Goal: confirm CC-writer completes OK. === END ===
+mcp startup: no servers
+codex
+Reviewing only the requested `pages/TestPage` files and nothing else. I’ll read the JSX, `README.md`, and `BUGS.md`, then write a concise findings report to the exact pipeline path you specified.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/TestPage/BUGS.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/TestPage/README.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Path 'pages/TestPage/base/*.jsx' | Select-Object -ExpandProperty FullName" in C:/Dev/menuapp-code-review exited 124 in 11.14s:
+
+ exited 124 in 11.35s:
+
+ exited 124 in 11.48s:
+
+codex
+The first reads timed out, likely on file size rather than scope. Retrying the same three paths with a longer timeout so I can keep the review bounded to the requested files.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/TestPage/BUGS.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/TestPage/README.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -Path 'pages/TestPage/base/*.jsx' | Select-Object -ExpandProperty FullName" in C:/Dev/menuapp-code-review succeeded in 11.91s:
+# TestPage â€” Known Bugs
+
+## Review 2026-03-21 (`testpage-260321-090140`)
+All 5 actionable bugs fixed via consensus merge. See Fixed section below.
+
+## Review 2026-03-21 (`testpage-260321-083311`)
+- **[P1] Unvalidated API payload can crash the page** (lines 18-19, 40-43) - `setItems(data)` accepts any JSON, but render assumes `items` is an array of objects with primitive `id` and renderable `name`. `null`, objects, or rows with object `name` values can break `items.length`, `items.map`, or React child rendering. Suggested fix: validate `Array.isArray(data)` and normalize each row before `setItems`, rejecting malformed payloads into the error path.
+- **[P1] Error handling bypasses i18n and leaks raw transport text** (lines 14-16, 21-23, 38) - The fetch path throws `HTTP ${res.status}` and stores `err.message`, so users see raw English/browser messages that do not translate and do not update on language change. Suggested fix: store error keys or structured error codes, map transport failures to translation keys, and render via `t(...)`.
+- **[P1] Translation keys do not follow Base44 naming rules** (lines 37, 39) - `test_page.title` and `test_page.no_items` do not use the required `page.section.element` key format. Suggested fix: rename them to structured names such as `testpage.header.title` and `testpage.state.noItems`, then update translations together.
+- **[P2] Fetch effect has no abort or stale-request cleanup** (lines 12-24) - If the component unmounts or React 18 StrictMode replays the effect, the pending request can still call state setters after disposal and can duplicate network traffic. Suggested fix: add `AbortController` cleanup and ignore stale completions before setting state.
+- **[P2] Failed fetch leaves users with no recovery action** (lines 36-43) - After a transient mobile/network failure, the page only shows an error string and requires a full refresh to try again. Suggested fix: add a retry action that clears the error, restores loading, and reruns the fetch.
+- **[P3] Error message is not exposed as an accessible alert** (line 38) - The error is rendered as a plain paragraph, so assistive tech is less likely to announce failures promptly. Suggested fix: render the error inside an element with `role="alert"` or equivalent live-region semantics.
+
+## Review 2026-03-21 (`testpage-260321-081342`)
+- **[P1] Shallow payload validation can still crash rendering** (lines 24, 86) - Filtering only by truthy `id` still allows object or array `name` values and non-primitive ids into state, so React can throw while rendering the row. Suggested fix: normalize payload rows before `setItems` and reject malformed records.
+- **[P1] i18n keys still violate Base44 naming format** (lines 29, 64, 82, 86, 89) - Keys like `test_page.title` and `test_page.error` are translated but do not follow the required `page.section.element` convention. Suggested fix: rename them to structured keys and update translations together.
+- **[P2] Async success path is not fully unmount-safe** (lines 22-25, 34-45) - Abort cleanup exists, but resolved promise callbacks still update state with no mounted or request-token guard. Suggested fix: ignore stale completions before calling state setters.
+- **[P2] Delete action is UI-only** (lines 48-50) - The button removes local state only, so data reappears after the next fetch and there is no failure handling. Suggested fix: add a real DELETE request with rollback/error handling, or remove the persistent delete affordance.
+- **[P2] Malformed payload can appear as empty state** (lines 24, 82) - Bad rows are dropped silently, so a fully invalid response can render `no_items` instead of surfacing a backend problem. Suggested fix: treat discarded rows as an error or warning path.
+- **[P3] Delete has no confirmation or undo** (lines 87-90) - One tap removes a row immediately, which is fragile on mobile. Suggested fix: add confirmation or undo.
+ succeeded in 10.50s:
+C:\Dev\menuapp-code-review\pages\TestPage\base\testpage.jsx
+ succeeded in 11.01s:
+# TestPage
+
+Fake page for pipeline smoke testing. Contains intentional bugs.
+Not a real MenuApp page â€” safe to modify/delete.
+Review update 2026-03-20 (`testpage-260320-200136`): consensus chain found 4 issues (1 P1, 1 P2, 2 P3). Applied 2 fixes (abort controller cleanup, semantic list markup). 2 P3 notes only.
+Review update 2026-03-20 (`testpage-260320-203824`): writer review found 5 open issues (2 P1, 1 P2, 2 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+Review update 2026-03-21 (`testpage-260321-081342`): writer review found 6 open issues (2 P1, 3 P2, 1 P3). No code fixes applied in this step; findings were documented for the pipeline chain.
+Review update 2026-03-21 (`testpage-260321-083311`): consensus chain merge â€” 7 fixes applied (2 P1, 3 P2, 2 P3). All agreed, 0 disputes. Pre-fix tag: TestPage-pre-testpage-260321-083311.
+Review update 2026-03-21 (`testpage-260321-090140`): consensus chain merge â€” 5 fixes applied (3 P1, 2 P2). All agreed, 0 unresolved disputes. Pre-fix tag: TestPage-pre-testpage-260321-090140.
+<!-- smoke-parallel-v3-testpage -->
+<!-- smoke-parallel-v3-testpage-b -->
+<!-- smoke-d-tp -->
+<!-- smoke-e-tp -->
+<!-- smoke-f-tp -->
+
+codex
+I have the local context notes now. Reading the target JSX next and then I’ll synthesize only issues that still exist in the current file, without pulling in anything else from the repo.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'pages/TestPage/base/testpage.jsx'" in C:/Dev/menuapp-code-review succeeded in 3.60s:
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useI18n } from "@/components/i18n";
+import { Loader2 } from "lucide-react";
+
+// TestPage â€” minimal fake page for pipeline smoke testing
+
+function normalizeItems(data) {
+  if (!Array.isArray(data)) return null;
+  const valid = data.filter(
+    (row) =>
+      row != null &&
+      typeof row === "object" &&
+      !Array.isArray(row) &&
+      (typeof row.id === "string" || typeof row.id === "number") &&
+      (row.name == null || typeof row.name !== "object")
+  );
+  const discarded = data.length - valid.length;
+  if (valid.length === 0 && data.length > 0) {
+    return { items: [], discarded, allInvalid: true };
+  }
+codex
+The file is narrow enough now to pin down concrete issues. I’m writing a short report with only still-open findings from the current JSX, not restating old context notes that no longer apply.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=0; Get-Content '"'pages/TestPage/base/testpage.jsx' | ForEach-Object { "'$i++; '"'{0,4}: {1}' -f "'$i, $_ }' in C:/Dev/menuapp-code-review succeeded in 1.49s:
+   1: import React, { useState, useEffect, useCallback, useRef } from "react";
+   2: import { useI18n } from "@/components/i18n";
+   3: import { Loader2 } from "lucide-react";
+   4: 
+   5: // TestPage â€” minimal fake page for pipeline smoke testing
+   6: 
+   7: function normalizeItems(data) {
+   8:   if (!Array.isArray(data)) return null;
+   9:   const valid = data.filter(
+  10:     (row) =>
+  11:       row != null &&
+  12:       typeof row === "object" &&
+  13:       !Array.isArray(row) &&
+  14:       (typeof row.id === "string" || typeof row.id === "number") &&
+  15:       (row.name == null || typeof row.name !== "object")
+  16:   );
+  17:   const discarded = data.length - valid.length;
+  18:   if (valid.length === 0 && data.length > 0) {
+  19:     return { items: [], discarded, allInvalid: true };
+  20:   }
+codex
+I’m creating the requested chain-state markdown now. It will include only current-file findings, a compact summary, and the prompt-clarity note.
+file update
+A C:/Dev/menuapp-code-review/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+# Codex Writer Findings — TestPage
+Chain: testpage-260321-184539
+
+## Findings
+1. [P1] Partially malformed API payload is silently treated as success — In `normalizeItems()` (`pages/TestPage/base/testpage.jsx:7-27`), the page only enters the error path when every row is invalid. A mixed payload silently drops bad rows and renders the rest as if the response were healthy, so menu items can disappear with no operator or user signal. FIX: tighten the success criteria so any discarded row triggers a translated warning/error state, or reject the whole payload instead of showing a silent partial list.
+2. [P2] List rows are not mobile-safe for long item names — The item UI (`pages/TestPage/base/testpage.jsx:125-129`) renders raw text in a bare `<li>` with no wrapping or overflow handling. On narrow QR-menu screens, long dish names or unbroken strings can overflow or force horizontal scrolling. FIX: wrap the label in a mobile-safe container or add classes such as `min-w-0 break-words whitespace-normal` so long names stay readable on small screens.
+
+## Summary
+Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
+
+## Prompt Clarity
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None needed for a bounded file review.
+- Scope questions (anything you weren't sure if it's in scope): The task context says "produce findings and commit," while the top-level instruction only explicitly requires writing the findings file.
+apply_patch(auto_approved=true) exited 0 in 220ms:
+Success. Updated the following files:
+A C:/Dev/menuapp-code-review/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+file update:
+diff --git a/pipeline/chain-state/testpage-260321-184539-codex-findings.md b/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3248b8c7591ebfd9686764e483a7e3b4f56cd00e
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-184539
++
++## Findings
++1. [P1] Partially malformed API payload is silently treated as success — In `normalizeItems()` (`pages/TestPage/base/testpage.jsx:7-27`), the page only enters the error path when every row is invalid. A mixed payload silently drops bad rows and renders the rest as if the response were healthy, so menu items can disappear with no operator or user signal. FIX: tighten the success criteria so any discarded row triggers a translated warning/error state, or reject the whole payload instead of showing a silent partial list.
++2. [P2] List rows are not mobile-safe for long item names — The item UI (`pages/TestPage/base/testpage.jsx:125-129`) renders raw text in a bare `<li>` with no wrapping or overflow handling. On narrow QR-menu screens, long dish names or unbroken strings can overflow or force horizontal scrolling. FIX: wrap the label in a mobile-safe container or add classes such as `min-w-0 break-words whitespace-normal` so long names stay readable on small screens.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None needed for a bounded file review.
++- Scope questions (anything you weren't sure if it's in scope): The task context says "produce findings and commit," while the top-level instruction only explicitly requires writing the findings file.
+
+file update:
+diff --git a/pipeline/chain-state/testpage-260321-184539-codex-findings.md b/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3248b8c7591ebfd9686764e483a7e3b4f56cd00e
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-184539
++
++## Findings
++1. [P1] Partially malformed API payload is silently treated as success — In `normalizeItems()` (`pages/TestPage/base/testpage.jsx:7-27`), the page only enters the error path when every row is invalid. A mixed payload silently drops bad rows and renders the rest as if the response were healthy, so menu items can disappear with no operator or user signal. FIX: tighten the success criteria so any discarded row triggers a translated warning/error state, or reject the whole payload instead of showing a silent partial list.
++2. [P2] List rows are not mobile-safe for long item names — The item UI (`pages/TestPage/base/testpage.jsx:125-129`) renders raw text in a bare `<li>` with no wrapping or overflow handling. On narrow QR-menu screens, long dish names or unbroken strings can overflow or force horizontal scrolling. FIX: wrap the label in a mobile-safe container or add classes such as `min-w-0 break-words whitespace-normal` so long names stay readable on small screens.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None needed for a bounded file review.
++- Scope questions (anything you weren't sure if it's in scope): The task context says "produce findings and commit," while the top-level instruction only explicitly requires writing the findings file.
+
+codex
+The report file is written. I’m checking the git state narrowly enough to avoid bundling unrelated work before I make the requested smoke-test commit.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "git status --short -- 'pipeline/chain-state/testpage-260321-184539-codex-findings.md'" in C:/Dev/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff --cached --name-only' in C:/Dev/menuapp-code-review succeeded in 1.81s:
+?? pipeline/chain-state/testpage-260321-184539-codex-findings.md
+ succeeded in 1.82s:
+
+file update:
+diff --git a/pipeline/chain-state/testpage-260321-184539-codex-findings.md b/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3248b8c7591ebfd9686764e483a7e3b4f56cd00e
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-184539
++
++## Findings
++1. [P1] Partially malformed API payload is silently treated as success — In `normalizeItems()` (`pages/TestPage/base/testpage.jsx:7-27`), the page only enters the error path when every row is invalid. A mixed payload silently drops bad rows and renders the rest as if the response were healthy, so menu items can disappear with no operator or user signal. FIX: tighten the success criteria so any discarded row triggers a translated warning/error state, or reject the whole payload instead of showing a silent partial list.
++2. [P2] List rows are not mobile-safe for long item names — The item UI (`pages/TestPage/base/testpage.jsx:125-129`) renders raw text in a bare `<li>` with no wrapping or overflow handling. On narrow QR-menu screens, long dish names or unbroken strings can overflow or force horizontal scrolling. FIX: wrap the label in a mobile-safe container or add classes such as `min-w-0 break-words whitespace-normal` so long names stay readable on small screens.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None needed for a bounded file review.
++- Scope questions (anything you weren't sure if it's in scope): The task context says "produce findings and commit," while the top-level instruction only explicitly requires writing the findings file.
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "git add -- 'pipeline/chain-state/testpage-260321-184539-codex-findings.md'" in C:/Dev/menuapp-code-review succeeded in 3.06s:
+
+file update:
+diff --git a/pipeline/chain-state/testpage-260321-184539-codex-findings.md b/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3248b8c7591ebfd9686764e483a7e3b4f56cd00e
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-184539
++
++## Findings
++1. [P1] Partially malformed API payload is silently treated as success — In `normalizeItems()` (`pages/TestPage/base/testpage.jsx:7-27`), the page only enters the error path when every row is invalid. A mixed payload silently drops bad rows and renders the rest as if the response were healthy, so menu items can disappear with no operator or user signal. FIX: tighten the success criteria so any discarded row triggers a translated warning/error state, or reject the whole payload instead of showing a silent partial list.
++2. [P2] List rows are not mobile-safe for long item names — The item UI (`pages/TestPage/base/testpage.jsx:125-129`) renders raw text in a bare `<li>` with no wrapping or overflow handling. On narrow QR-menu screens, long dish names or unbroken strings can overflow or force horizontal scrolling. FIX: wrap the label in a mobile-safe container or add classes such as `min-w-0 break-words whitespace-normal` so long names stay readable on small screens.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None needed for a bounded file review.
++- Scope questions (anything you weren't sure if it's in scope): The task context says "produce findings and commit," while the top-level instruction only explicitly requires writing the findings file.
+
+codex
+The findings file is staged cleanly on its own. Committing just that artifact now with the smoke-test message from the task context, then I’ll attempt the push.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "git commit -m \"test: smoke CC v2.1.81 check S155B\" --only -- 'pipeline/chain-state/testpage-260321-184539-codex-findings.md'" in C:/Dev/menuapp-code-review succeeded in 3.04s:
+[main cbaa2d1] test: smoke CC v2.1.81 check S155B
+ 1 file changed, 15 insertions(+)
+ create mode 100644 pipeline/chain-state/testpage-260321-184539-codex-findings.md
+file update:
+diff --git a/pipeline/chain-state/testpage-260321-184539-codex-findings.md b/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3248b8c7591ebfd9686764e483a7e3b4f56cd00e
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-184539
++
++## Findings
++1. [P1] Partially malformed API payload is silently treated as success — In `normalizeItems()` (`pages/TestPage/base/testpage.jsx:7-27`), the page only enters the error path when every row is invalid. A mixed payload silently drops bad rows and renders the rest as if the response were healthy, so menu items can disappear with no operator or user signal. FIX: tighten the success criteria so any discarded row triggers a translated warning/error state, or reject the whole payload instead of showing a silent partial list.
++2. [P2] List rows are not mobile-safe for long item names — The item UI (`pages/TestPage/base/testpage.jsx:125-129`) renders raw text in a bare `<li>` with no wrapping or overflow handling. On narrow QR-menu screens, long dish names or unbroken strings can overflow or force horizontal scrolling. FIX: wrap the label in a mobile-safe container or add classes such as `min-w-0 break-words whitespace-normal` so long names stay readable on small screens.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None needed for a bounded file review.
++- Scope questions (anything you weren't sure if it's in scope): The task context says "produce findings and commit," while the top-level instruction only explicitly requires writing the findings file.
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git push' in C:/Dev/menuapp-code-review succeeded in 5.37s:
+To https://github.com/kolynan/menuapp-code-review.git
+   7aa339b..cbaa2d1  main -> main
+file update:
+diff --git a/pipeline/chain-state/testpage-260321-184539-codex-findings.md b/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3248b8c7591ebfd9686764e483a7e3b4f56cd00e
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-184539
++
++## Findings
++1. [P1] Partially malformed API payload is silently treated as success — In `normalizeItems()` (`pages/TestPage/base/testpage.jsx:7-27`), the page only enters the error path when every row is invalid. A mixed payload silently drops bad rows and renders the rest as if the response were healthy, so menu items can disappear with no operator or user signal. FIX: tighten the success criteria so any discarded row triggers a translated warning/error state, or reject the whole payload instead of showing a silent partial list.
++2. [P2] List rows are not mobile-safe for long item names — The item UI (`pages/TestPage/base/testpage.jsx:125-129`) renders raw text in a bare `<li>` with no wrapping or overflow handling. On narrow QR-menu screens, long dish names or unbroken strings can overflow or force horizontal scrolling. FIX: wrap the label in a mobile-safe container or add classes such as `min-w-0 break-words whitespace-normal` so long names stay readable on small screens.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None needed for a bounded file review.
++- Scope questions (anything you weren't sure if it's in scope): The task context says "produce findings and commit," while the top-level instruction only explicitly requires writing the findings file.
+
+codex
+Saved the findings to [testpage-260321-184539-codex-findings.md](C:/Dev/menuapp-code-review/pipeline/chain-state/testpage-260321-184539-codex-findings.md), based only on [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx), [README.md](C:/Dev/menuapp-code-review/pages/TestPage/README.md), and [BUGS.md](C:/Dev/menuapp-code-review/pages/TestPage/BUGS.md).
+
+The current review found 2 open issues: a P1 where mixed valid/invalid API rows are silently treated as a successful load, and a P2 mobile UI issue where long item names can overflow because list rows have no wrapping/overflow handling. The report is committed and pushed as `cbaa2d1` with message `test: smoke CC v2.1.81 check S155B`.
+file update:
+diff --git a/pipeline/chain-state/testpage-260321-184539-codex-findings.md b/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3248b8c7591ebfd9686764e483a7e3b4f56cd00e
+--- /dev/null
++++ b/pipeline/chain-state/testpage-260321-184539-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — TestPage
++Chain: testpage-260321-184539
++
++## Findings
++1. [P1] Partially malformed API payload is silently treated as success — In `normalizeItems()` (`pages/TestPage/base/testpage.jsx:7-27`), the page only enters the error path when every row is invalid. A mixed payload silently drops bad rows and renders the rest as if the response were healthy, so menu items can disappear with no operator or user signal. FIX: tighten the success criteria so any discarded row triggers a translated warning/error state, or reject the whole payload instead of showing a silent partial list.
++2. [P2] List rows are not mobile-safe for long item names — The item UI (`pages/TestPage/base/testpage.jsx:125-129`) renders raw text in a bare `<li>` with no wrapping or overflow handling. On narrow QR-menu screens, long dish names or unbroken strings can overflow or force horizontal scrolling. FIX: wrap the label in a mobile-safe container or add classes such as `min-w-0 break-words whitespace-normal` so long names stay readable on small screens.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None needed for a bounded file review.
++- Scope questions (anything you weren't sure if it's in scope): The task context says "produce findings and commit," while the top-level instruction only explicitly requires writing the findings file.
+
+tokens used
+24 397
+Saved the findings to [testpage-260321-184539-codex-findings.md](C:/Dev/menuapp-code-review/pipeline/chain-state/testpage-260321-184539-codex-findings.md), based only on [testpage.jsx](C:/Dev/menuapp-code-review/pages/TestPage/base/testpage.jsx), [README.md](C:/Dev/menuapp-code-review/pages/TestPage/README.md), and [BUGS.md](C:/Dev/menuapp-code-review/pages/TestPage/BUGS.md).
+
+The current review found 2 open issues: a P1 where mixed valid/invalid API rows are silently treated as a successful load, and a P2 mobile UI issue where long item names can overflow because list rows have no wrapping/overflow handling. The report is committed and pushed as `cbaa2d1` with message `test: smoke CC v2.1.81 check S155B`.

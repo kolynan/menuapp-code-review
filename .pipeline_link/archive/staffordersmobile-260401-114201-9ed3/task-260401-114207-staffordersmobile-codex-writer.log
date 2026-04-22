@@ -1,0 +1,577 @@
+2026-04-01T06:42:29.169072Z ERROR codex_core::models_manager::manager: failed to refresh available models: timeout waiting for child process to exit
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d47c7-7cc1-7963-ab8b-9013cca45d85
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/staffordersmobile-260401-114201-9ed3-codex-findings.md FORMAT: # Codex Writer Findings — StaffOrdersMobile Chain: staffordersmobile-260401-114201-9ed3 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # SOM Batch: Undo toast fix + ВЫДАНО section (#219 + #220) Reference: `ux-concepts/StaffOrdersMobile/staff-orders-mobile.md`, `BUGS_MASTER.md`. Production page: https://menu-app-mvp-49a4f5b2.base44.app (waiter login required). **Context:** StaffOrdersMobile is the waiter interface. Orders are grouped by table. Each table card expands to show sections: active orders (Section 1), orders ready to serve / completedOrders (Section 2 — "Готово к выдаче"), in-progress sub-groups. When waiter presses "Выдать всё" — all ready orders become status=`served` and the table card disappears from the active list. Two fixes needed in `OrderGroupCard` component and one new section. **File:** `pages/StaffOrdersMobile/staffordersmobile.jsx` (4450 lines) **Component to modify:** `OrderGroupCard` (defined around line 1280, receives props including `setUndoToast`, `advanceMutation`) --- ## Fix 1 — SOM-S213-01 (P1) [MUST-FIX]: Batch "Выдать всё" button does not trigger undo toast ### Сейчас Waiter presses "Выдать всё" (batch button in Section 2 "Готово к выдаче") → all ready orders become `served` → table card disappears from list. No undo toast appears. The waiter cannot undo an accidental "serve all". ### Должно быть After pressing "Выдать всё": 1. All ready orders are advanced to `served` (existing behavior — keep it) 2. An undo toast appears at the bottom of the screen: "Выдан гостю · Отменить" 3. Toast stays for 5 seconds, then auto-dismisses 4. If waiter presses "Отменить" — all served orders revert to their previous status/stage_id 5. The undo toast renders at `fixed bottom-4 left-4 right-4 z-50` position (already fixed in commit c27604a) ### НЕ должно быть - Do NOT change the individual per-order "Выдать" buttons (they already set undoToast correctly) - Do NOT change the toast JSX render position (already at fixed bottom-4, outside the ternary — commit c27604a) - Do NOT touch Section 1 buttons (for newOrders/inProgressOrders) ### Файл и локация File: `pages/StaffOrdersMobile/staffordersmobile.jsx` Component: `OrderGroupCard` Target: Section 2 batch button ~line 1903–1910: ```jsx <button type="button" onClick={() => handleBatchAction(completedOrders)} ``` Search for: `onClick={() => handleBatchAction(completedOrders)}` — this is the batch button WITHOUT undoToast. The fix: replace the `onClick` with a handler that: 1. Builds `snapshots` array from `completedOrders` (same pattern as individual order buttons ~line 1952–1966) 2. Calls `handleBatchAction(completedOrders)` 3. Creates `timerId = setTimeout(() => setUndoToast(null), 5000)` 4. Calls `setUndoToast({ snapshots, timerId, onUndo: () => { snapshots.forEach(...revert each order...) } })` Reference pattern: individual order button ~lines 1951–1966 (same file, same component, same section). `setUndoToast` is already available as a prop in `OrderGroupCard` (~line 1321). `advanceMutation` is already available in `OrderGroupCard`. `getLinkId` is already available in `OrderGroupCard`. ### Уже пробовали - S211 chain 401b: fixed verb-first labels, attempted undoToast but toast was in wrong component (OrderGroupCard state — unmounted after serve) - S212 ССП commit b00521d: lifted `undoToast` state to parent `StaffOrdersMobile`. Correct approach. But toast still didn't show. - S213 ССП commit c27604a: moved toast JSX outside ternary to `fixed bottom-4`. Correct. But toast STILL didn't show. - Root cause now confirmed: the batch "Выдать всё" button (~line 1905) calls `handleBatchAction(completedOrders)` WITHOUT ever calling `setUndoToast`. All previous fixes were correct but targeted wrong places. This is the actual fix needed. ### Проверка 1. Open a table with orders in "Готово к выдаче" section 2. Press "Выдать всё" → table disappears from active list 3. A toast "Выдан гостю · Отменить" appears at bottom of screen 4. Press "Отменить" → orders revert, table reappears in active list --- ## Fix 2 — SOM-UX-24 (P2) [MUST-FIX]: No "ВЫДАНО" section — waiter cannot see served orders ### Сейчас Once all orders at a table are served (status=`served`), they are excluded from `activeOrders` filter (~line 3486: `o.status !== 'served'`). The table card disappears completely. Waiter has no way to see which orders were already delivered during the current visit. ### Должно быть Inside the expanded table card (`OrderGroupCard`), add a new **collapsed** section "ВЫДАНО (N)" at the bottom: - Position: AFTER all active sections (after completedOrders section, after in-progress subgroups), BEFORE bill summary / close table block - Default state: **collapsed** (not expanded) - Header: "ВЫДАНО (N)" in slate-400 color (muted — it's history, not actionable) - Toggle: "Показать ▸" / "Скрыть ▴" button on the right of the header - Content when expanded: list of served orders — each row: `[guestName] · [time]` (no action buttons, read-only) - Only shown when `servedOrders.length > 0` - Section is only loaded when card is `isExpanded` (lazy loading) ASCII mockup (approved by Arman): ``` ├ ВЫДАНО (3) ──────────── [Показать ▸] ← collapsed default ``` When expanded: ``` ┌ ВЫДАНО (3) ─────────── [Скрыть ▴] ──┐ │ Гость 1 · 19:48 │ │ Гость 2 · 19:55 │ │ Гость 1 · 20:05 │ └──────────────────────────────────────┘ ``` ### НЕ должно быть - Do NOT include action buttons in ВЫДАНО rows (read-only history) - Do NOT add ВЫДАНО section to pickup/delivery groups (only for `group.type === 'table'`) - Do NOT change the global `activeOrders` filter that excludes `served` orders (it's used elsewhere) - Do NOT load served orders items via extra queries — show only guest name + time for simplicity ### Файл и локация File: `pages/StaffOrdersMobile/staffordersmobile.jsx` Component: `OrderGroupCard` Implementation: 1. Add state: `const [servedExpanded, setServedExpanded] = useState(false);` inside `OrderGroupCard` 2. Add query for served orders (inside `OrderGroupCard`, after existing `itemResults` query ~line 1368): ```jsx const { data: servedOrders = [] } = useQuery({ queryKey: ['servedOrders', group.id], queryFn: () => base44.entities.Order.filter({ table: group.id, status: 'served' }), enabled: isExpanded && group.type === 'table', staleTime: 30000, retry: shouldRetry, }); ``` `base44`, `shouldRetry`, `useQuery` are already imported/available in `OrderGroupCard`. 3. Add the section AFTER the completedOrders section (after ~line 1894 `</div>`) and BEFORE the bill summary / close table block. Search for: `{/* ═══ Section` or find the `completedOrders` section closing `</div>`. 4. For guest name in served orders: use the existing `guestName(order)` helper (already available in `OrderGroupCard`). For time: `new Date(safeParseDate(order.created_date)).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })` — same pattern as completedOrders rows ~line 1917. ### Проверка 1. Expand a table card that has served orders from current session 2. See "ВЫДАНО (N)" section collapsed at the bottom 3. Tap "Показать ▸" → rows appear with guest names and times 4. Tap "Скрыть ▴" → rows hide --- ## ⛔ FROZEN UX — НЕ ТРОГАТЬ (tested and locked) These are working and tested — do NOT change: - Collapsed card format: `[count] [stage_name] · [age мин]` per-stage lines (SOM-UX-23, ✅ Tested S212, commit 3d6f5cf) - Verb-first buttons: «Принять всё (N)» / «Выдать всё (N)» / «[stage] всё (N)» (SOM-S210-01, ✅ Tested S211) - Auto-expand first sub-group in В РАБОТЕ (SOM-S208-01, ✅ Tested S210) - Undo toast JSX position: `fixed bottom-4 left-4 right-4 z-50` outside ternary (commit c27604a — correct, keep as-is) - Tab switching (active/completed tabs) - BannerNotification component - Polling interval logic - `setUndoToast` prop passing from parent to `OrderGroupCard` (~line 4313) - `handleUndoGlobal` in parent StaffOrdersMobile (~line 3116) ## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано выше - Modify ONLY: `OrderGroupCard` component in `staffordersmobile.jsx` - Do NOT modify: parent `StaffOrdersMobile` component state or logic - Do NOT modify: `StaffOrdersMobile` render tree outside of `OrderGroupCard` props - Do NOT modify: any other component (OrderCard, kitchen view, etc.) - Do NOT add new imports unless strictly required (base44, useQuery, useState are already available) - If you see an issue outside Fix 1 and Fix 2 scope — skip it, do not fix ## Implementation Notes - File: `pages/StaffOrdersMobile/staffordersmobile.jsx` (4450 lines) — ONLY this file - `getLinkId` helper: already in scope at OrderGroupCard (~line 1265 area, used throughout) - `guestName(order)` helper: already in scope at OrderGroupCard - `safeParseDate(order.created_date)` helper: already in scope - String encoding: use Unicode escape sequences for Cyrillic strings (existing pattern in file), e.g. `'\u0412\u044B\u0434\u0430\u043D\u043E'` for «Выдано», `'\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C'` for «Показать», `'\u0421\u043A\u0440\u044B\u0442\u044C'` for «Скрыть» - Do NOT use `node --check` for validation — it fails on JSX/ESM files (KB-111). Use grep verification instead. - After changes: verify with `grep -c "setUndoToast" pages/StaffOrdersMobile/staffordersmobile.jsx` — should be 6+ matches (existing + new Fix 1 call) - After changes: verify with `grep -c "servedOrders" pages/StaffOrdersMobile/staffordersmobile.jsx` — should be 3+ matches (query + condition + render) ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Primary usage: waiter phone on the floor. Before committing, verify ALL changes at 375px viewport width: - [ ] ВЫДАНО section header and toggle: touch target ≥ 44×44px - [ ] ВЫДАНО rows: readable text-sm, no overflow - [ ] Undo toast (fixed bottom-4): fully visible, not obscured by keyboard or nav bar - [ ] "Выдать всё" button: still min-h-[44px], no layout changes - [ ] No duplicate visual indicators introduced ## Regression Check (MANDATORY after implementation) After implementing, verify these existing behaviors still work: - [ ] Individual "Выдать" button on each order in Section 2 still works AND sets undo toast - [ ] "Принять всё (N)" button in Section 1 still works (NOT affected by Fix 1) - [ ] Collapsed card shows per-stage lines correctly (SOM-UX-23 intact) - [ ] Tab switching active/completed still works - [ ] Expanding/collapsing table cards still works === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/StaffOrdersMobile/staffordersmobile.jsx` with only the page-local context files, then I’ll write the findings file in `pipeline/chain-state` and save the required review artifacts in the page folder.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'if (Test-Path README.md) { Get-Content -Raw README.md }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'if (Test-Path BUGS.md) { Get-Content -Raw BUGS.md }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw staffordersmobile.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile exited 124 in 13.50s:
+
+ exited 124 in 13.52s:
+
+ exited 124 in 11.87s:
+
+ exited 124 in 12.21s:
+
+codex
+The first reads timed out on this workspace. I’m rerunning with longer timeouts and narrower commands, still confined to the `StaffOrdersMobile` folder.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "if (Test-Path BUGS.md) { Get-Content -Raw BUGS.md } else { '' }" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "if (Test-Path README.md) { Get-Content -Raw README.md } else { '' }" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile succeeded in 11.97s:
+
+ succeeded in 12.41s:
+# StaffOrdersMobile Bug Tracker
+
+**Page:** `pages/StaffOrdersMobile/260331-04 StaffOrdersMobile RELEASE.jsx`
+**Last updated:** 2026-03-31 (Session 212 â€” #219 undoToast lifted to parent)
+
+---
+
+## Fixed Bugs
+
+### SOM-UX-23 (P1) -- Collapsed card Row 3: replace Ð¡Ð•Ð™Ð§ÐÐ¡/Ð•Ð©Ð with per-stage lines
+- **Function:** TableCard collapsed view, Row 3
+- **Root cause:** Old Row 3 showed hardcoded Â«Ð¡Ð•Ð™Ð§ÐÐ¡/Ð•Ð©ÐÂ» labels with static stage names and total sum â€” noise for waiter, no urgency info
+- **Fix:** Added `summaryLines` useMemo grouping activeOrders by stage via `getStatusConfig`, with per-line age from `stage_entered_at || created_date`. Color coding: red >15min / amber 5-15min / neutral <5min (requests: red â‰¥3min). Forward-compatible `show_in_summary` filter for #218.
+- **Chain:** staffordersmobile-260331-225506-fac7
+- **Status:** âœ… TESTED S212 (collapsed card shows per-stage lines with urgency color)
+
+### BUG-S66-01 (P1) -- Detail view doesn't open on card tap (Sprint B broken)
+- **Function:** TableDetailScreen render / CSS animation
+- **Root cause:** CSS `translate-x-full` â†’ `translate-x-0` transition with `requestAnimationFrame` timing was unreliable in Base44 platform container. Detail screen mounted but stayed off-screen.
+- **Fix:** Removed slide-in animation entirely. Detail view now shows instantly with `z-50` (above all other content). Swipe-right to close gesture retained.
+ succeeded in 12.89s:
+versions
+260331-04 StaffOrdersMobile RELEASE.jsx
+260401-00 StaffOrdersMobile RELEASE.jsx
+Audit_FunctionalMap_S70.md
+BUGS.md
+DeepAnalysis_S70.md
+StaffOrdersMobile README.md
+staffordersmobile.jsx
+staffordersmobile_v1.0_BASE.jsx
+TEST_PLAN.md
+TEST_PLAN_PM158_S197.md
+TEST_PLAN_SOM_S211.md
+codex
+I have the bug tracker context. Next I’m reading only the `OrderGroupCard` slices around the two requested fixes, plus the page README, so the review stays inside the scoped areas.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw 'StaffOrdersMobile README.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$c = Get-Content staffordersmobile.jsx; $c[1240..2025]' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path staffordersmobile.jsx -Pattern 'setUndoToast|handleBatchAction|servedOrders|OrderGroupCard|guestName\\(|safeParseDate\\(|base44\\.entities\\.Order\\.filter|useQuery\\(' -Context 3,6" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile succeeded in 10.85s:
+---
+version: "4.0.1"
+updated: "2026-03-06"
+session: 90
+deployed: "2026-03-02 S69"
+---
+
+# StaffOrdersMobile â€” ÐœÐ¾Ð±Ð¸Ð»ÑŒÐ½Ñ‹Ð¹ Ð¸Ð½Ñ‚ÐµÑ€Ñ„ÐµÐ¹Ñ Ð¿ÐµÑ€ÑÐ¾Ð½Ð°Ð»Ð°
+
+## ÐžÐ¿Ð¸ÑÐ°Ð½Ð¸Ðµ
+ÐœÐ¾Ð±Ð¸Ð»ÑŒÐ½Ñ‹Ð¹ Ð¸Ð½Ñ‚ÐµÑ€Ñ„ÐµÐ¹Ñ Ð´Ð»Ñ Ð¿ÐµÑ€ÑÐ¾Ð½Ð°Ð»Ð° Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð°. ÐŸÑ€Ð¸Ñ‘Ð¼ Ð·Ð°ÐºÐ°Ð·Ð¾Ð², ÑÐ¼ÐµÐ½Ð° ÑÑ‚Ð°Ñ‚ÑƒÑÐ¾Ð², Ð·Ð°Ð¿Ñ€Ð¾ÑÑ‹ Ð¿Ð¾Ð¼Ð¾Ñ‰Ð¸, Ð³Ñ€ÑƒÐ¿Ð¿Ð¸Ñ€Ð¾Ð²ÐºÐ° Ð¿Ð¾ ÑÑ‚Ð¾Ð»Ð°Ð¼. Ð¡Ð°Ð¼Ñ‹Ð¹ ÑÐ»Ð¾Ð¶Ð½Ñ‹Ð¹ Ñ„Ð°Ð¹Ð» Ð¿Ñ€Ð¾ÐµÐºÑ‚Ð° (v3.6.0 â€” stale data + close table confirm S74).
+
+**Route:** `/staffordersmobile`
+**Roles:** partner_manager, partner_staff, kitchen
+**Ð Ð°Ð·Ð¼ÐµÑ€:** ~3940 ÑÑ‚Ñ€Ð¾Ðº (v3.2.0)
+
+## ÐÑ€Ñ…Ð¸Ñ‚ÐµÐºÑ‚ÑƒÑ€Ð°
+
+### ÐšÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚Ñ‹ (14)
+- `StaffOrdersMobile` â€” Ð³Ð»Ð°Ð²Ð½Ñ‹Ð¹
+ succeeded in 11.04s:
+              ÐÐ°Ð¶Ð¼Ð¸Ñ‚Ðµ Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð¿Ð¾ÐºÐ°Ð·Ð°Ñ‚ÑŒ Ð¿Ð¾Ð·Ð¸Ñ†Ð¸Ð¸
+            </div>
+          )}
+        </div>
+
+        {displayComment && (
+          <div className="mb-3 text-xs bg-yellow-50 text-yellow-800 p-2 rounded border border-yellow-100">
+            <span className="font-semibold">ÐšÐ¾Ð¼Ð¼ÐµÐ½Ñ‚Ð°Ñ€Ð¸Ð¹:</span> {displayComment}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 gap-2">
+          <Badge 
+            variant="outline" 
+            className={`text-xs px-2 py-0.5 ${statusConfig.badgeClass || ''}`}
+            style={badgeStyle}
+          >
+            {statusConfig.label}
+          </Badge>
+          
+ succeeded in 12.60s:
+
+  staffordersmobile.jsx:88:   - Added "Закрыть стол" button when all orders ready
+  staffordersmobile.jsx:89:   
+  staffordersmobile.jsx:90:   CHANGES in v2.7.0 (grouping):
+> staffordersmobile.jsx:91:   - OrderGroupCard: hall grouped by table, pickup/delivery individual
+  staffordersmobile.jsx:92:   - Favorites format: plain IDs → prefixed keys (table:id)
+  staffordersmobile.jsx:93:   - Sorted by oldest unaccepted order
+  staffordersmobile.jsx:94:   - Auto-expand first 5 + favorites
+  staffordersmobile.jsx:95:   - Kitchen unchanged (flat list)
+  staffordersmobile.jsx:96:   
+  staffordersmobile.jsx:97:   CHANGES in v2.6.6 (hardening):
+  staffordersmobile.jsx:449:  return assigneeId === effectiveUserId;
+  staffordersmobile.jsx:450:}
+  staffordersmobile.jsx:451:
+> staffordersmobile.jsx:452:function safeParseDate(dateStr) {
+  staffordersmobile.jsx:453:  if (!dateStr) return new Date();
+  staffordersmobile.jsx:454:  try {
+  staffordersmobile.jsx:455:    const safe = !String(dateStr).endsWith("Z") ? `${dateStr}Z` : dateStr;
+  staffordersmobile.jsx:456:    const d = new Date(safe);
+  staffordersmobile.jsx:457:    if (isNaN(d.getTime())) return new Date();
+codex
+I’ve confirmed the Fix 1 gap at the batch `Выдать всё` handler. I’m checking the lower part of `OrderGroupCard` once more to verify Fix 2 is still entirely absent before I write the scoped findings.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$c = Get-Content staffordersmobile.jsx; $c[2180..2315]' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path staffordersmobile.jsx -Pattern 'servedExpanded|servedOrders|\\u0412\\u042b\\u0414\\u0410\\u041d\\u041e|\\u041f\\u043e\\u043a\\u0430\\u0437\\u0430\\u0442\\u044c|\\u0421\\u043a\\u0440\\u044b\\u0442\\u044c' -Context 2,4" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile succeeded in 2.71s:
+                                      >
+                                        {advanceMutation.isPending
+                                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                                          : n > 0
+                                            ? config.isFinishStage
+                                              ? `\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0451 (${n})`
+                                              : `${(config.actionLabel || '').replace(/^\u2192\s*/, '')} \u0432\u0441\u0451 (${n})`
+                                            : (config.isFinishStage ? '\u0412\u044B\u0434\u0430\u0442\u044C' : (config.actionLabel || '\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435').replace(/^\u2192\s*/, ''))
+                                        }
+                                      </button>
+                                    </div>
+                                  )}
+                                  {order.order_number && (
+                                    <div className="text-[10px] text-slate-400 mt-1 text-right">{order.order_number}</div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+ succeeded in 2.81s:
+
+  staffordersmobile.jsx:1239:          ) : (
+  staffordersmobile.jsx:1240:            <div className="text-xs text-slate-400">
+> staffordersmobile.jsx:1241:              Нажмите чтобы показать позиции
+  staffordersmobile.jsx:1242:            </div>
+  staffordersmobile.jsx:1243:          )}
+  staffordersmobile.jsx:1244:        </div>
+  staffordersmobile.jsx:1245:
+  staffordersmobile.jsx:1289:
+  staffordersmobile.jsx:1290:        {disableServe && isServeStep && (
+> staffordersmobile.jsx:1291:          <div className="text-[10px] text-slate-400 mt-1">Кухня не отмечает 
+«Выдано»</div>
+  staffordersmobile.jsx:1292:        )}
+  staffordersmobile.jsx:1293:      </CardContent>
+  staffordersmobile.jsx:1294:    </Card>
+  staffordersmobile.jsx:1295:  );
+
+
+codex
+I’ve verified Fix 2 is not present: there’s no `servedOrders`/`servedExpanded` state or query, and the card drops straight from the active sections to bill summary. I’m pulling exact line numbers now, then I’ll write the scoped report files.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$c = Get-Content staffordersmobile.jsx; for ($i=1898; $i -le 2235; $i++) { '"'{0,5}: {1}' -f ("'$i + 1), $c[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$c = Get-Content staffordersmobile.jsx; for ($i=1300; $i -le 1565; $i++) { '"'{0,5}: {1}' -f ("'$i + 1), $c[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobileexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path staffordersmobile.jsx -Pattern 'servedOrders|servedExpanded'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile succeeded in 10.90s:
+ 1301: function OrderGroupCard({
+ 1302:   group,
+ 1303:   isExpanded,
+ 1304:   onToggleExpand,
+ 1305:   isHighlighted,
+ 1306:   isFavorite,
+ 1307:   onToggleFavorite,
+ 1308:   getStatusConfig,
+ 1309:   guestsMap,
+ 1310:   effectiveUserId,
+ 1311:   onMutate,
+ 1312:   onCloseTable,
+ 1313:   overdueMinutes,
+ 1314:   notifiedOrderIds,
+ 1315:   onClearNotified,
+ 1316:   tableMap,
+ 1317:   activeRequests,
+ 1318:   onCloseAllOrders,
+ 1319:   onCloseRequest,
+ 1320:   orderStages = [],
+ succeeded in 11.15s:
+ 1899:               <div className="flex items-center justify-between mb-2">
+ 1900:                 <p className="text-[11px] font-bold text-green-600 uppercase tracking-wider">
+ 1901:                   {`\u0413\u043E\u0442\u043E\u0432\u043E \u043A \u0432\u044B\u0434\u0430\u0447\u0435 (${completedOrders.length})`}
+ 1902:                 </p>
+ 1903:                 <button
+ 1904:                   type="button"
+ 1905:                   onClick={() => handleBatchAction(completedOrders)}
+ 1906:                   disabled={advanceMutation.isPending}
+ 1907:                   className="text-xs font-semibold text-green-600 bg-green-50 border border-green-200 px-3 py-1 rounded min-h-[44px] active:scale-95 disabled:opacity-60"
+ 1908:                 >
+ 1909:                   {'\u0412\u044B\u0434\u0430\u0442\u044C \u0432\u0441\u0435'}
+ 1910:                 </button>
+ 1911:               </div>
+ 1912:               <div className="space-y-2">
+ 1913:                 {completedOrders.map(order => {
+ 1914:                   const config = getStatusConfig(order);
+ 1915:                   const isSelected = selectedOrder?.id === order.id;
+ 1916:                   const orderItems = itemsByOrder[order.id] || [];
+ 1917:                   const orderTime = new Date(safeParseDate(order.created_date)).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
+ 1918:                   const badgeStyle = config.color ? { backgroundColor: `${config.color}20`, borderColor: config.color, color: config.color } : undefined;
+ succeeded in 11.04s:
+
+codex
+I’ve finished the analysis and I’m writing four artifacts now: the requested pipeline findings file, plus the page-local review report, command log, and round record required by this repo.
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/StaffOrdersMobile/round1_2026-04-01.md
+# Round 1 — StaffOrdersMobile Review
+
+Scoped review limited to Fix 1 and Fix 2 in `OrderGroupCard`, using only `staffordersmobile.jsx` plus page-local README/BUGS context.
+
+## Findings
+1. [P1] Batch `Выдать всё` still bypasses undo toast — The Section 2 batch button still calls `handleBatchAction(completedOrders)` directly at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1905), while the individual finish button already wires `setUndoToast` at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1951). FIX: mirror the per-order snapshot + timer + `setUndoToast` flow in the batch button handler.
+2. [P2] `ВЫДАНО` section is not implemented — `OrderGroupCard` has no `servedExpanded` state, no `servedOrders` query, and no served-history render block before the bill summary at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2213). FIX: add the lazy served-orders query/state and render the collapsed history section between the active sections and bill summary.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/StaffOrdersMobile/commands_2026-04-01.log
+[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
+Get-ChildItem -Name
+Get-Content -Raw staffordersmobile.jsx
+if (Test-Path README.md) { Get-Content -Raw README.md }
+if (Test-Path BUGS.md) { Get-Content -Raw BUGS.md }
+
+[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
+Get-ChildItem -Name
+if (Test-Path README.md) { Get-Content -Raw README.md } else { '' }
+if (Test-Path BUGS.md) { Get-Content -Raw BUGS.md } else { '' }
+
+[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
+Get-Content -Raw 'StaffOrdersMobile README.md'
+$c = Get-Content staffordersmobile.jsx; $c[1240..2025]
+Select-String -Path staffordersmobile.jsx -Pattern 'setUndoToast|handleBatchAction|servedOrders|OrderGroupCard|guestName\(|safeParseDate\(|base44\.entities\.Order\.filter|useQuery\(' -Context 3,6
+
+[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
+$c = Get-Content staffordersmobile.jsx; $c[2180..2315]
+Select-String -Path staffordersmobile.jsx -Pattern 'servedExpanded|servedOrders|\u0412\u042b\u0414\u0410\u041d\u041e|\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c|\u0421\u043a\u0440\u044b\u0442\u044c' -Context 2,4
+
+[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
+$c = Get-Content staffordersmobile.jsx; for ($i=1300; $i -le 1565; $i++) { '{0,5}: {1}' -f ($i + 1), $c[$i] }
+$c = Get-Content staffordersmobile.jsx; for ($i=1898; $i -le 2235; $i++) { '{0,5}: {1}' -f ($i + 1), $c[$i] }
+Select-String -Path staffordersmobile.jsx -Pattern 'servedOrders|servedExpanded'
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/StaffOrdersMobile/review_2026-04-01.md
+# Codex Writer Findings — StaffOrdersMobile
+Chain: staffordersmobile-260401-114201-9ed3
+
+## Findings
+1. [P1] Batch `Выдать всё` still bypasses undo toast — In `OrderGroupCard`, the Section 2 batch button still calls `handleBatchAction(completedOrders)` directly at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1905). The per-order finish action in the same section already captures snapshots and calls `setUndoToast(...)` at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1951). Because serving all ready orders removes the table card from the active list immediately, the waiter still gets no parent-level undo toast and cannot revert an accidental batch serve. FIX: replace the batch button handler with the same snapshot/timer/`setUndoToast` flow used by the individual finish-stage button, wrapping `handleBatchAction(completedOrders)` with snapshot capture and undo restore via `advanceMutation`.
+2. [P2] `ВЫДАНО` history section is still missing from `OrderGroupCard` — The `OrderGroupCard` setup contains no `servedExpanded` state and no lazy `servedOrders` query in the state/query region at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1368) and [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1476); `servedOrders`/`servedExpanded` do not appear in the file at all. After the in-progress section closes, the render jumps straight to the bill summary at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2213), so served orders remain invisible once they drop out of `activeOrders`. FIX: add `const [servedExpanded, setServedExpanded] = useState(false)`, add the lazy `servedOrders` `useQuery` enabled only for expanded table cards, and render a collapsed-by-default `ВЫДАНО (N)` section between the active sections and the bill summary with read-only `guestName(order)` + time rows.
+
+## Summary
+Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None for this scoped review.
+- Scope questions (anything you weren't sure if it's in scope): The task mentions `ux-concepts/StaffOrdersMobile/staff-orders-mobile.md` and `BUGS_MASTER.md`, but the speed rules also forbid reading outside the page folder. I treated those external references as informational only and kept the review limited to `staffordersmobile.jsx` plus the page-local README/BUGS files.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/staffordersmobile-260401-114201-9ed3-codex-findings.md
+# Codex Writer Findings — StaffOrdersMobile
+Chain: staffordersmobile-260401-114201-9ed3
+
+## Findings
+1. [P1] Batch `Выдать всё` still bypasses undo toast — In `OrderGroupCard`, the Section 2 batch button still calls `handleBatchAction(completedOrders)` directly at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1905). The per-order finish action in the same section already captures snapshots and calls `setUndoToast(...)` at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1951). Because serving all ready orders removes the table card from the active list immediately, the waiter still gets no parent-level undo toast and cannot revert an accidental batch serve. FIX: replace the batch button handler with the same snapshot/timer/`setUndoToast` flow used by the individual finish-stage button, wrapping `handleBatchAction(completedOrders)` with snapshot capture and undo restore via `advanceMutation`.
+2. [P2] `ВЫДАНО` history section is still missing from `OrderGroupCard` — The `OrderGroupCard` setup contains no `servedExpanded` state and no lazy `servedOrders` query in the state/query region at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1368) and [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1476); `servedOrders`/`servedExpanded` do not appear in the file at all. After the in-progress section closes, the render jumps straight to the bill summary at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2213), so served orders remain invisible once they drop out of `activeOrders`. FIX: add `const [servedExpanded, setServedExpanded] = useState(false)`, add the lazy `servedOrders` `useQuery` enabled only for expanded table cards, and render a collapsed-by-default `ВЫДАНО (N)` section between the active sections and the bill summary with read-only `guestName(order)` + time rows.
+
+## Summary
+Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
+- Missing context (what info would have helped): None for this scoped review.
+- Scope questions (anything you weren't sure if it's in scope): The task mentions `ux-concepts/StaffOrdersMobile/staff-orders-mobile.md` and `BUGS_MASTER.md`, but the speed rules also forbid reading outside the page folder. I treated those external references as informational only and kept the review limited to `staffordersmobile.jsx` plus the page-local README/BUGS files.
+apply_patch(auto_approved=true) exited 0 in 1.02s:
+Success. Updated the following files:
+A pipeline/chain-state/staffordersmobile-260401-114201-9ed3-codex-findings.md
+A pages/StaffOrdersMobile/review_2026-04-01.md
+A pages/StaffOrdersMobile/round1_2026-04-01.md
+A pages/StaffOrdersMobile/commands_2026-04-01.log
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-04-01.log b/pages/StaffOrdersMobile/commands_2026-04-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e6607d489c8961860472bf00fbc33508e0a8d42
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-04-01.log
+@@ -0,0 +1,24 @@
++[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
++Get-ChildItem -Name
++Get-Content -Raw staffordersmobile.jsx
++if (Test-Path README.md) { Get-Content -Raw README.md }
++if (Test-Path BUGS.md) { Get-Content -Raw BUGS.md }
++
++[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
++Get-ChildItem -Name
++if (Test-Path README.md) { Get-Content -Raw README.md } else { '' }
++if (Test-Path BUGS.md) { Get-Content -Raw BUGS.md } else { '' }
++
++[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
++Get-Content -Raw 'StaffOrdersMobile README.md'
++$c = Get-Content staffordersmobile.jsx; $c[1240..2025]
++Select-String -Path staffordersmobile.jsx -Pattern 'setUndoToast|handleBatchAction|servedOrders|OrderGroupCard|guestName\(|safeParseDate\(|base44\.entities\.Order\.filter|useQuery\(' -Context 3,6
++
++[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
++$c = Get-Content staffordersmobile.jsx; $c[2180..2315]
++Select-String -Path staffordersmobile.jsx -Pattern 'servedExpanded|servedOrders|\u0412\u042b\u0414\u0410\u041d\u041e|\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c|\u0421\u043a\u0440\u044b\u0442\u044c' -Context 2,4
++
++[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
++$c = Get-Content staffordersmobile.jsx; for ($i=1300; $i -le 1565; $i++) { '{0,5}: {1}' -f ($i + 1), $c[$i] }
++$c = Get-Content staffordersmobile.jsx; for ($i=1898; $i -le 2235; $i++) { '{0,5}: {1}' -f ($i + 1), $c[$i] }
++Select-String -Path staffordersmobile.jsx -Pattern 'servedOrders|servedExpanded'
+diff --git a/pages/StaffOrdersMobile/review_2026-04-01.md b/pages/StaffOrdersMobile/review_2026-04-01.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4222aa5a9afd507caeb8946a7c6caa940c6f95e3
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-04-01.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260401-114201-9ed3
++
++## Findings
++1. [P1] Batch `Выдать всё` still bypasses undo toast — In `OrderGroupCard`, the Section 2 batch button still calls `handleBatchAction(completedOrders)` directly at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1905). The per-order finish action in the same section already captures snapshots and calls `setUndoToast(...)` at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1951). Because serving all ready orders removes the table card from the active list immediately, the waiter still gets no parent-level undo toast and cannot revert an accidental batch serve. FIX: replace the batch button handler with the same snapshot/timer/`setUndoToast` flow used by the individual finish-stage button, wrapping `handleBatchAction(completedOrders)` with snapshot capture and undo restore via `advanceMutation`.
++2. [P2] `ВЫДАНО` history section is still missing from `OrderGroupCard` — The `OrderGroupCard` setup contains no `servedExpanded` state and no lazy `servedOrders` query in the state/query region at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1368) and [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1476); `servedOrders`/`servedExpanded` do not appear in the file at all. After the in-progress section closes, the render jumps straight to the bill summary at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2213), so served orders remain invisible once they drop out of `activeOrders`. FIX: add `const [servedExpanded, setServedExpanded] = useState(false)`, add the lazy `servedOrders` `useQuery` enabled only for expanded table cards, and render a collapsed-by-default `ВЫДАНО (N)` section between the active sections and the bill summary with read-only `guestName(order)` + time rows.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None for this scoped review.
++- Scope questions (anything you weren't sure if it's in scope): The task mentions `ux-concepts/StaffOrdersMobile/staff-orders-mobile.md` and `BUGS_MASTER.md`, but the speed rules also forbid reading outside the page folder. I treated those external references as informational only and kept the review limited to `staffordersmobile.jsx` plus the page-local README/BUGS files.
+diff --git a/pages/StaffOrdersMobile/round1_2026-04-01.md b/pages/StaffOrdersMobile/round1_2026-04-01.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..febd7701697302dd20c00a30e3cd078063016977
+--- /dev/null
++++ b/pages/StaffOrdersMobile/round1_2026-04-01.md
+@@ -0,0 +1,7 @@
++# Round 1 — StaffOrdersMobile Review
++
++Scoped review limited to Fix 1 and Fix 2 in `OrderGroupCard`, using only `staffordersmobile.jsx` plus page-local README/BUGS context.
++
++## Findings
++1. [P1] Batch `Выдать всё` still bypasses undo toast — The Section 2 batch button still calls `handleBatchAction(completedOrders)` directly at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1905), while the individual finish button already wires `setUndoToast` at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1951). FIX: mirror the per-order snapshot + timer + `setUndoToast` flow in the batch button handler.
++2. [P2] `ВЫДАНО` section is not implemented — `OrderGroupCard` has no `servedExpanded` state, no `servedOrders` query, and no served-history render block before the bill summary at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2213). FIX: add the lazy served-orders query/state and render the collapsed history section between the active sections and bill summary.
+diff --git a/pipeline/chain-state/staffordersmobile-260401-114201-9ed3-codex-findings.md b/pipeline/chain-state/staffordersmobile-260401-114201-9ed3-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4222aa5a9afd507caeb8946a7c6caa940c6f95e3
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260401-114201-9ed3-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260401-114201-9ed3
++
++## Findings
++1. [P1] Batch `Выдать всё` still bypasses undo toast — In `OrderGroupCard`, the Section 2 batch button still calls `handleBatchAction(completedOrders)` directly at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1905). The per-order finish action in the same section already captures snapshots and calls `setUndoToast(...)` at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1951). Because serving all ready orders removes the table card from the active list immediately, the waiter still gets no parent-level undo toast and cannot revert an accidental batch serve. FIX: replace the batch button handler with the same snapshot/timer/`setUndoToast` flow used by the individual finish-stage button, wrapping `handleBatchAction(completedOrders)` with snapshot capture and undo restore via `advanceMutation`.
++2. [P2] `ВЫДАНО` history section is still missing from `OrderGroupCard` — The `OrderGroupCard` setup contains no `servedExpanded` state and no lazy `servedOrders` query in the state/query region at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1368) and [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1476); `servedOrders`/`servedExpanded` do not appear in the file at all. After the in-progress section closes, the render jumps straight to the bill summary at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2213), so served orders remain invisible once they drop out of `activeOrders`. FIX: add `const [servedExpanded, setServedExpanded] = useState(false)`, add the lazy `servedOrders` `useQuery` enabled only for expanded table cards, and render a collapsed-by-default `ВЫДАНО (N)` section between the active sections and the bill summary with read-only `guestName(order)` + time rows.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None for this scoped review.
++- Scope questions (anything you weren't sure if it's in scope): The task mentions `ux-concepts/StaffOrdersMobile/staff-orders-mobile.md` and `BUGS_MASTER.md`, but the speed rules also forbid reading outside the page folder. I treated those external references as informational only and kept the review limited to `staffordersmobile.jsx` plus the page-local README/BUGS files.
+
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-04-01.log b/pages/StaffOrdersMobile/commands_2026-04-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e6607d489c8961860472bf00fbc33508e0a8d42
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-04-01.log
+@@ -0,0 +1,24 @@
++[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
++Get-ChildItem -Name
++Get-Content -Raw staffordersmobile.jsx
++if (Test-Path README.md) { Get-Content -Raw README.md }
++if (Test-Path BUGS.md) { Get-Content -Raw BUGS.md }
++
++[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
++Get-ChildItem -Name
++if (Test-Path README.md) { Get-Content -Raw README.md } else { '' }
++if (Test-Path BUGS.md) { Get-Content -Raw BUGS.md } else { '' }
++
++[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
++Get-Content -Raw 'StaffOrdersMobile README.md'
++$c = Get-Content staffordersmobile.jsx; $c[1240..2025]
++Select-String -Path staffordersmobile.jsx -Pattern 'setUndoToast|handleBatchAction|servedOrders|OrderGroupCard|guestName\(|safeParseDate\(|base44\.entities\.Order\.filter|useQuery\(' -Context 3,6
++
++[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
++$c = Get-Content staffordersmobile.jsx; $c[2180..2315]
++Select-String -Path staffordersmobile.jsx -Pattern 'servedExpanded|servedOrders|\u0412\u042b\u0414\u0410\u041d\u041e|\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c|\u0421\u043a\u0440\u044b\u0442\u044c' -Context 2,4
++
++[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
++$c = Get-Content staffordersmobile.jsx; for ($i=1300; $i -le 1565; $i++) { '{0,5}: {1}' -f ($i + 1), $c[$i] }
++$c = Get-Content staffordersmobile.jsx; for ($i=1898; $i -le 2235; $i++) { '{0,5}: {1}' -f ($i + 1), $c[$i] }
++Select-String -Path staffordersmobile.jsx -Pattern 'servedOrders|servedExpanded'
+diff --git a/pages/StaffOrdersMobile/review_2026-04-01.md b/pages/StaffOrdersMobile/review_2026-04-01.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4222aa5a9afd507caeb8946a7c6caa940c6f95e3
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-04-01.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260401-114201-9ed3
++
++## Findings
++1. [P1] Batch `Выдать всё` still bypasses undo toast — In `OrderGroupCard`, the Section 2 batch button still calls `handleBatchAction(completedOrders)` directly at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1905). The per-order finish action in the same section already captures snapshots and calls `setUndoToast(...)` at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1951). Because serving all ready orders removes the table card from the active list immediately, the waiter still gets no parent-level undo toast and cannot revert an accidental batch serve. FIX: replace the batch button handler with the same snapshot/timer/`setUndoToast` flow used by the individual finish-stage button, wrapping `handleBatchAction(completedOrders)` with snapshot capture and undo restore via `advanceMutation`.
++2. [P2] `ВЫДАНО` history section is still missing from `OrderGroupCard` — The `OrderGroupCard` setup contains no `servedExpanded` state and no lazy `servedOrders` query in the state/query region at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1368) and [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1476); `servedOrders`/`servedExpanded` do not appear in the file at all. After the in-progress section closes, the render jumps straight to the bill summary at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2213), so served orders remain invisible once they drop out of `activeOrders`. FIX: add `const [servedExpanded, setServedExpanded] = useState(false)`, add the lazy `servedOrders` `useQuery` enabled only for expanded table cards, and render a collapsed-by-default `ВЫДАНО (N)` section between the active sections and the bill summary with read-only `guestName(order)` + time rows.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None for this scoped review.
++- Scope questions (anything you weren't sure if it's in scope): The task mentions `ux-concepts/StaffOrdersMobile/staff-orders-mobile.md` and `BUGS_MASTER.md`, but the speed rules also forbid reading outside the page folder. I treated those external references as informational only and kept the review limited to `staffordersmobile.jsx` plus the page-local README/BUGS files.
+diff --git a/pages/StaffOrdersMobile/round1_2026-04-01.md b/pages/StaffOrdersMobile/round1_2026-04-01.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..febd7701697302dd20c00a30e3cd078063016977
+--- /dev/null
++++ b/pages/StaffOrdersMobile/round1_2026-04-01.md
+@@ -0,0 +1,7 @@
++# Round 1 — StaffOrdersMobile Review
++
++Scoped review limited to Fix 1 and Fix 2 in `OrderGroupCard`, using only `staffordersmobile.jsx` plus page-local README/BUGS context.
++
++## Findings
++1. [P1] Batch `Выдать всё` still bypasses undo toast — The Section 2 batch button still calls `handleBatchAction(completedOrders)` directly at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1905), while the individual finish button already wires `setUndoToast` at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1951). FIX: mirror the per-order snapshot + timer + `setUndoToast` flow in the batch button handler.
++2. [P2] `ВЫДАНО` section is not implemented — `OrderGroupCard` has no `servedExpanded` state, no `servedOrders` query, and no served-history render block before the bill summary at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2213). FIX: add the lazy served-orders query/state and render the collapsed history section between the active sections and bill summary.
+diff --git a/pipeline/chain-state/staffordersmobile-260401-114201-9ed3-codex-findings.md b/pipeline/chain-state/staffordersmobile-260401-114201-9ed3-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4222aa5a9afd507caeb8946a7c6caa940c6f95e3
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260401-114201-9ed3-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260401-114201-9ed3
++
++## Findings
++1. [P1] Batch `Выдать всё` still bypasses undo toast — In `OrderGroupCard`, the Section 2 batch button still calls `handleBatchAction(completedOrders)` directly at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1905). The per-order finish action in the same section already captures snapshots and calls `setUndoToast(...)` at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1951). Because serving all ready orders removes the table card from the active list immediately, the waiter still gets no parent-level undo toast and cannot revert an accidental batch serve. FIX: replace the batch button handler with the same snapshot/timer/`setUndoToast` flow used by the individual finish-stage button, wrapping `handleBatchAction(completedOrders)` with snapshot capture and undo restore via `advanceMutation`.
++2. [P2] `ВЫДАНО` history section is still missing from `OrderGroupCard` — The `OrderGroupCard` setup contains no `servedExpanded` state and no lazy `servedOrders` query in the state/query region at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1368) and [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1476); `servedOrders`/`servedExpanded` do not appear in the file at all. After the in-progress section closes, the render jumps straight to the bill summary at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2213), so served orders remain invisible once they drop out of `activeOrders`. FIX: add `const [servedExpanded, setServedExpanded] = useState(false)`, add the lazy `servedOrders` `useQuery` enabled only for expanded table cards, and render a collapsed-by-default `ВЫДАНО (N)` section between the active sections and the bill summary with read-only `guestName(order)` + time rows.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None for this scoped review.
++- Scope questions (anything you weren't sure if it's in scope): The task mentions `ux-concepts/StaffOrdersMobile/staff-orders-mobile.md` and `BUGS_MASTER.md`, but the speed rules also forbid reading outside the page folder. I treated those external references as informational only and kept the review limited to `staffordersmobile.jsx` plus the page-local README/BUGS files.
+
+codex
+1. [P1] Batch `Выдать всё` still bypasses undo toast. The Section 2 batch button at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1905) only calls `handleBatchAction(completedOrders)`, while the per-order serve action at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1951) already captures snapshots and calls `setUndoToast(...)`. Result: the table disappears with no undo path after batch serve.
+2. [P2] `ВЫДАНО` history section is not implemented. `OrderGroupCard` has no `servedExpanded` state or `servedOrders` query in its setup around [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1368) and [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1476), and the render jumps directly from the active sections to bill summary at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2213).
+
+Saved the requested findings to [staffordersmobile-260401-114201-9ed3-codex-findings.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/staffordersmobile-260401-114201-9ed3-codex-findings.md). Repo-required artifacts are also saved in the page folder: [review_2026-04-01.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/review_2026-04-01.md), [commands_2026-04-01.log](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/commands_2026-04-01.log), and [round1_2026-04-01.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/round1_2026-04-01.md).
+file update:
+diff --git a/pages/StaffOrdersMobile/commands_2026-04-01.log b/pages/StaffOrdersMobile/commands_2026-04-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e6607d489c8961860472bf00fbc33508e0a8d42
+--- /dev/null
++++ b/pages/StaffOrdersMobile/commands_2026-04-01.log
+@@ -0,0 +1,24 @@
++[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
++Get-ChildItem -Name
++Get-Content -Raw staffordersmobile.jsx
++if (Test-Path README.md) { Get-Content -Raw README.md }
++if (Test-Path BUGS.md) { Get-Content -Raw BUGS.md }
++
++[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
++Get-ChildItem -Name
++if (Test-Path README.md) { Get-Content -Raw README.md } else { '' }
++if (Test-Path BUGS.md) { Get-Content -Raw BUGS.md } else { '' }
++
++[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
++Get-Content -Raw 'StaffOrdersMobile README.md'
++$c = Get-Content staffordersmobile.jsx; $c[1240..2025]
++Select-String -Path staffordersmobile.jsx -Pattern 'setUndoToast|handleBatchAction|servedOrders|OrderGroupCard|guestName\(|safeParseDate\(|base44\.entities\.Order\.filter|useQuery\(' -Context 3,6
++
++[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
++$c = Get-Content staffordersmobile.jsx; $c[2180..2315]
++Select-String -Path staffordersmobile.jsx -Pattern 'servedExpanded|servedOrders|\u0412\u042b\u0414\u0410\u041d\u041e|\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c|\u0421\u043a\u0440\u044b\u0442\u044c' -Context 2,4
++
++[workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile]
++$c = Get-Content staffordersmobile.jsx; for ($i=1300; $i -le 1565; $i++) { '{0,5}: {1}' -f ($i + 1), $c[$i] }
++$c = Get-Content staffordersmobile.jsx; for ($i=1898; $i -le 2235; $i++) { '{0,5}: {1}' -f ($i + 1), $c[$i] }
++Select-String -Path staffordersmobile.jsx -Pattern 'servedOrders|servedExpanded'
+diff --git a/pages/StaffOrdersMobile/review_2026-04-01.md b/pages/StaffOrdersMobile/review_2026-04-01.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4222aa5a9afd507caeb8946a7c6caa940c6f95e3
+--- /dev/null
++++ b/pages/StaffOrdersMobile/review_2026-04-01.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260401-114201-9ed3
++
++## Findings
++1. [P1] Batch `Выдать всё` still bypasses undo toast — In `OrderGroupCard`, the Section 2 batch button still calls `handleBatchAction(completedOrders)` directly at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1905). The per-order finish action in the same section already captures snapshots and calls `setUndoToast(...)` at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1951). Because serving all ready orders removes the table card from the active list immediately, the waiter still gets no parent-level undo toast and cannot revert an accidental batch serve. FIX: replace the batch button handler with the same snapshot/timer/`setUndoToast` flow used by the individual finish-stage button, wrapping `handleBatchAction(completedOrders)` with snapshot capture and undo restore via `advanceMutation`.
++2. [P2] `ВЫДАНО` history section is still missing from `OrderGroupCard` — The `OrderGroupCard` setup contains no `servedExpanded` state and no lazy `servedOrders` query in the state/query region at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1368) and [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1476); `servedOrders`/`servedExpanded` do not appear in the file at all. After the in-progress section closes, the render jumps straight to the bill summary at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2213), so served orders remain invisible once they drop out of `activeOrders`. FIX: add `const [servedExpanded, setServedExpanded] = useState(false)`, add the lazy `servedOrders` `useQuery` enabled only for expanded table cards, and render a collapsed-by-default `ВЫДАНО (N)` section between the active sections and the bill summary with read-only `guestName(order)` + time rows.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None for this scoped review.
++- Scope questions (anything you weren't sure if it's in scope): The task mentions `ux-concepts/StaffOrdersMobile/staff-orders-mobile.md` and `BUGS_MASTER.md`, but the speed rules also forbid reading outside the page folder. I treated those external references as informational only and kept the review limited to `staffordersmobile.jsx` plus the page-local README/BUGS files.
+diff --git a/pages/StaffOrdersMobile/round1_2026-04-01.md b/pages/StaffOrdersMobile/round1_2026-04-01.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..febd7701697302dd20c00a30e3cd078063016977
+--- /dev/null
++++ b/pages/StaffOrdersMobile/round1_2026-04-01.md
+@@ -0,0 +1,7 @@
++# Round 1 — StaffOrdersMobile Review
++
++Scoped review limited to Fix 1 and Fix 2 in `OrderGroupCard`, using only `staffordersmobile.jsx` plus page-local README/BUGS context.
++
++## Findings
++1. [P1] Batch `Выдать всё` still bypasses undo toast — The Section 2 batch button still calls `handleBatchAction(completedOrders)` directly at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1905), while the individual finish button already wires `setUndoToast` at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1951). FIX: mirror the per-order snapshot + timer + `setUndoToast` flow in the batch button handler.
++2. [P2] `ВЫДАНО` section is not implemented — `OrderGroupCard` has no `servedExpanded` state, no `servedOrders` query, and no served-history render block before the bill summary at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2213). FIX: add the lazy served-orders query/state and render the collapsed history section between the active sections and bill summary.
+diff --git a/pipeline/chain-state/staffordersmobile-260401-114201-9ed3-codex-findings.md b/pipeline/chain-state/staffordersmobile-260401-114201-9ed3-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4222aa5a9afd507caeb8946a7c6caa940c6f95e3
+--- /dev/null
++++ b/pipeline/chain-state/staffordersmobile-260401-114201-9ed3-codex-findings.md
+@@ -0,0 +1,15 @@
++# Codex Writer Findings — StaffOrdersMobile
++Chain: staffordersmobile-260401-114201-9ed3
++
++## Findings
++1. [P1] Batch `Выдать всё` still bypasses undo toast — In `OrderGroupCard`, the Section 2 batch button still calls `handleBatchAction(completedOrders)` directly at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1905). The per-order finish action in the same section already captures snapshots and calls `setUndoToast(...)` at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1951). Because serving all ready orders removes the table card from the active list immediately, the waiter still gets no parent-level undo toast and cannot revert an accidental batch serve. FIX: replace the batch button handler with the same snapshot/timer/`setUndoToast` flow used by the individual finish-stage button, wrapping `handleBatchAction(completedOrders)` with snapshot capture and undo restore via `advanceMutation`.
++2. [P2] `ВЫДАНО` history section is still missing from `OrderGroupCard` — The `OrderGroupCard` setup contains no `servedExpanded` state and no lazy `servedOrders` query in the state/query region at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1368) and [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1476); `servedOrders`/`servedExpanded` do not appear in the file at all. After the in-progress section closes, the render jumps straight to the bill summary at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu%20AI%20Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2213), so served orders remain invisible once they drop out of `activeOrders`. FIX: add `const [servedExpanded, setServedExpanded] = useState(false)`, add the lazy `servedOrders` `useQuery` enabled only for expanded table cards, and render a collapsed-by-default `ВЫДАНО (N)` section between the active sections and the bill summary with read-only `guestName(order)` + time rows.
++
++## Summary
++Total: 2 findings (0 P0, 1 P1, 1 P2, 0 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): None.
++- Missing context (what info would have helped): None for this scoped review.
++- Scope questions (anything you weren't sure if it's in scope): The task mentions `ux-concepts/StaffOrdersMobile/staff-orders-mobile.md` and `BUGS_MASTER.md`, but the speed rules also forbid reading outside the page folder. I treated those external references as informational only and kept the review limited to `staffordersmobile.jsx` plus the page-local README/BUGS files.
+
+tokens used
+183 491
+1. [P1] Batch `Выдать всё` still bypasses undo toast. The Section 2 batch button at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1905) only calls `handleBatchAction(completedOrders)`, while the per-order serve action at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1951) already captures snapshots and calls `setUndoToast(...)`. Result: the table disappears with no undo path after batch serve.
+2. [P2] `ВЫДАНО` history section is not implemented. `OrderGroupCard` has no `servedExpanded` state or `servedOrders` query in its setup around [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1368) and [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L1476), and the render jumps directly from the active sections to bill summary at [staffordersmobile.jsx](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/staffordersmobile.jsx#L2213).
+
+Saved the requested findings to [staffordersmobile-260401-114201-9ed3-codex-findings.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/staffordersmobile-260401-114201-9ed3-codex-findings.md). Repo-required artifacts are also saved in the page folder: [review_2026-04-01.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/review_2026-04-01.md), [commands_2026-04-01.log](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/commands_2026-04-01.log), and [round1_2026-04-01.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/StaffOrdersMobile/round1_2026-04-01.md).

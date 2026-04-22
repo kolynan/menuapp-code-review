@@ -1,0 +1,912 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d2b75-3dd3-7e93-b8e1-09baf203db71
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260326-234309-77f1 ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Small UX Fixes — x.jsx (#162) Reference: `BUGS_MASTER.md` (PM-148, PM-149). UX agreed S182. Production page: https://menu-app-mvp-49a4f5b2.base44.app **Context:** Two small guest-facing UX cleanups in x.jsx identified during S182 Android testing. TARGET FILES (modify): - `pages/PublicMenu/x.jsx` CONTEXT FILES (read-only): - `BUGS_MASTER.md` --- ## Fix 1 — PM-148 (P3) [MUST-FIX]: Remove table confirmation banner ### Сейчас After scanning QR and confirming the table, a green banner is displayed: `✓ Стол Стол 22 подтверждён` Two problems: (1) duplicate word "Стол Стол" (tech bug), (2) the banner adds no value — the guest just scanned their own QR code, they already know which table they're at. ### Должно быть Remove the green confirmation banner entirely. The table code confirmation flow (Bottom Sheet / input) remains unchanged — only the success banner that appears on the main menu screen should be removed. ### Файл и локация File: `pages/PublicMenu/x.jsx` Search for: `подтверждён` or `tableConfirmed` or `showTableConfirmSheet` or the green banner render block. The banner likely renders conditionally based on a state variable (e.g. `tableConfirmed`, `showSuccessBanner`) — set it to never render, or remove the state + render entirely. ### Уже пробовали No previous fix attempts. ### Проверка 1. Scan QR code → confirm table code → main menu shown 2. The green "Стол X подтверждён" banner should NOT appear 3. Menu, categories, mode tabs (В зале / Самовывоз / Доставка) all visible normally --- ## Fix 2 — PM-149 (P3) [MUST-FIX]: Remove guest ID suffix from guest name display ### Сейчас After saving a guest name, the cart header shows: `Вы: Timur #1313 ✏️` Before saving (default): `Гость 1 #1313` The `#1313` suffix is a system-generated guest ID — internal tech detail, not meaningful to the guest. Showing it is "tech leakage". ### Должно быть Show only the name without the suffix: - After saving name: `Вы: Timur ✏️` - Before saving (default): `Вы: Гость 1 ✏️` (or just `Гость 1`) The `#N` suffix should be HIDDEN in the guest-facing UI (x.jsx / CartView.jsx display). Note: In StaffOrdersMobile (waiter-facing UI) the suffix can remain for disambiguation — do NOT change StaffOrdersMobile. ### Файл и локация File: `pages/PublicMenu/x.jsx` Search for: `guestName` display, `currentGuest?.name`, `#${guestNumber}` or the pattern that produces "Timur #1313". The name is composed from guest name + suffix — strip the suffix from the rendered display string only. Keep the underlying data intact. ### Уже пробовали No previous fix attempts. ### Проверка 1. Open cart drawer → header shows `Вы: Гость 1 ✏️` (no `#1313`) 2. Tap ✏️ → enter "Timur" → save 3. Header shows `Вы: Timur ✏️` (no `#1313`) 4. Open StaffOrdersMobile as waiter → guest should still be identifiable (suffix can remain there) --- ## ⛔ SCOPE LOCK — менять ТОЛЬКО то, что указано выше - Do NOT change: table code input flow (Bottom Sheet), table confirmation logic - Do NOT change: guest name save/edit functionality - Do NOT change: StaffOrdersMobile (waiter-facing UI) - Do NOT change: any other part of x.jsx ## FROZEN UX (DO NOT CHANGE) - PM-133 ✅: help drawer — no table code → open table code sheet first - PM-139 ✅: guest name saved correctly (setCurrentGuest null guard) - PM-104 ✅: chevron in right part of table card, NOT sticky ## FROZEN UX grep verification Before commit, verify: ``` grep -n "closeHelpDrawer\|helpQuickSent" pages/PublicMenu/x.jsx | head -5 grep -n "setCurrentGuest\|trimmedName" pages/PublicMenu/x.jsx | head -5 ``` ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Primary usage: customer phone at the table. Before committing, verify ALL changes at 375px viewport width: - [ ] Close/chevron buttons: RIGHT-ALIGNED (not centered), sticky top - [ ] Touch targets ≥ 44×44px (h-11 w-11) - [ ] No excessive whitespace/gaps on small screens - [ ] Bottom sheet content scrollable without losing close/submit button - [ ] No duplicate visual indicators (e.g. two gray lines that look the same) - [ ] Text truncation: long item names don't overflow - [ ] Sticky footer buttons don't overlap content ## Regression Check (MANDATORY after implementation) - [ ] Table code input still works (Bottom Sheet opens, code accepted) - [ ] Guest name edit still saves correctly - [ ] Cart header shows correct name after save - [ ] Help drawer (bell 🔔) still works ## Implementation Notes - TARGET FILES: `pages/PublicMenu/x.jsx` - Do NOT use `git add .` — only: `git add pages/PublicMenu/x.jsx` - git commit -m "fix(PublicMenu): remove table confirm banner + strip guest ID suffix (PM-148, PM-149)" - git push ⚠️ Run AFTER #161 is DONE (Rule 26 — one chain at a time). === END ===
+mcp startup: no servers
+codex
+Reviewing `pages/PublicMenu/x.jsx` within the page-folder scope only. I’ll read the target file plus `README.md`/`BUGS.md` in `pages/PublicMenu`, validate only Fix 1 and Fix 2, then write the findings file and repo-required review artifacts.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Name pages/PublicMenu' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content pages/PublicMenu/x.jsx' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 11.64s:
+
+ exited 124 in 11.52s:
+
+ exited 124 in 11.29s:
+
+ exited 124 in 11.88s:
+
+codex
+The first read attempt timed out on `x.jsx`, likely due to file size. I’m narrowing to the relevant sections inside `pages/PublicMenu` only: file list, file size, and targeted searches for the banner and guest-name rendering paths.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md } else { 'README.md not found' }" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md } else { 'BUGS.md not found' }" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'подтверждён|tableConfirmed|showTableConfirmSheet|showSuccessBanner|currentGuest\\?\\.name|guestName|#\\"'$'"\\{|guestNumber|Вы:' -CaseSensitive:"'$false' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem pages/PublicMenu | Select-Object Name,Length' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 21.25s:
+
+ exited 124 in 21.30s:
+
+ exited 124 in 22.11s:
+
+ exited 124 in 22.18s:
+
+codex
+The shell is slow to start in this environment, so I’m verifying command execution first before reading the file in smaller slices. After that I’ll pull only the relevant lines around the two fixes.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command 'Get-Date -Format o' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command Get-Location in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 7.39s:
+
+Path                                                
+----                                                
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review
+
+
+ succeeded in 7.17s:
+2026-03-26T23:46:56.8500576+05:00
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md } else { 'BUGS.md not found' }" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md } else { 'README.md not found' }" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command 'Get-ChildItem pages/PublicMenu | Select-Object Name,Length' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 9.20s:
+---
+version: "7.0"
+updated: "2026-03-13"
+session: 119
+---
+
+# PublicMenu â€” README
+
+Ð¡Ñ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ñ€ÐµÑÑ‚Ð¾Ñ€Ð°Ð½Ð° (`/x`). Ð“Ð¾ÑÑ‚ÑŒ ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐµÑ‚ QR-ÐºÐ¾Ð´, Ð²Ð¸Ð´Ð¸Ñ‚ Ð¼ÐµÐ½ÑŽ,
+Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð±Ð»ÑŽÐ´Ð°, Ð¾Ñ„Ð¾Ñ€Ð¼Ð»ÑÐµÑ‚ Ð·Ð°ÐºÐ°Ð·. Ð Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð² Ñ‚Ñ€Ñ‘Ñ… Ñ€ÐµÐ¶Ð¸Ð¼Ð°Ñ…: Ð·Ð°Ð», ÑÐ°Ð¼Ð¾Ð²Ñ‹Ð²Ð¾Ð·, Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ°.
+
+## Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ RELEASE
+
+| Ð¤Ð°Ð¹Ð» | RELEASE | Ð”Ð°Ñ‚Ð° | Ð¡ÐµÑÑÐ¸Ñ |
+|---|---|---|---|
+| x.jsx | `260306-01 x RELEASE.jsx` | 06 Ð¼Ð°Ñ€ 2026 | S87 |
+| CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S82 |
+| MenuView.jsx | `260305-02 MenuView RELEASE.jsx` | 05 Ð¼Ð°Ñ€ 2026 | S79 |
+| useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 Ð¼Ð°Ñ€ 2026 | S68 |
+
+ succeeded in 9.45s:
+
+Name                                  Length
+----                                  ------
+components                                  
+versions                                    
+260320-01 useTableSession RELEASE.jsx 30461 
+260323-03 CheckoutView RELEASE.jsx    7840  
+260324-04 MenuView RELEASE.jsx        16326 
+260325-04 MenuView RELEASE.jsx        16109 
+260325-06 CartView RELEASE.jsx        42351 
+260326-00 x RELEASE.jsx               149218
+260326-01 CartView RELEASE.jsx        44686 
+ACCEPTANCE_CRITERIA_PHASE1.md         12831 
+BUGS.md                               64412 
+CartView.jsx                          44686 
+CheckoutView.jsx                      7840  
+COPY_SPEC.md                          10857 
+i18n_DrawerUX_S79.csv                 464   
+i18n_WorkingHours_S79.csv             1206  
+MenuView.jsx                          16109 
+ succeeded in 10.41s:
+---
+version: "36.0"
+updated: "2026-03-26"
+session: 182
+---
+
+# PublicMenu â€” Bug Registry
+
+Ð ÐµÐ³Ð¸ÑÑ‚Ñ€ Ð²ÑÐµÑ… Ð¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ñ… Ð±Ð°Ð³Ð¾Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ (x.jsx + useTableSession.jsx).
+Ð¦ÐµÐ»ÑŒ: Ð½Ðµ Ñ‚ÐµÑ€ÑÑ‚ÑŒ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚, Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ñ‡Ð¸Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ñ‹Ðµ Ð±Ð°Ð³Ð¸, Ð½Ðµ Ð´Ð¾Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ñ€ÐµÐ³Ñ€ÐµÑÑÐ¸Ð¹.
+
+---
+
+## Active Bugs (Ð½Ðµ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹)
+
+*9 active bugs remaining (0x P0, 4x P1, 4x P2, 0x P3, 1x suggestion).*
+
+### BUG-PM-132: List mode stepper buttons use w-9 h-9 (36px) instead of w-11 h-11 (44px) (P2)
+- **ÐŸÑ€Ð¸Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚:** P2
+- **ÐšÐ¾Ð³Ð´Ð°:** S177 (found by Codex in chain 74b9, confirmed by CC)
+codex
+I have the page-folder context. Next I’m reading only the `x.jsx` slices tied to `tableConfirmed`/banner rendering and guest-name display so the review stays inside Fix 1 and Fix 2.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'tableConfirmed|подтвержд|showTableConfirmSheet|showSuccessBanner' -CaseSensitive:"'$false -Context 6,10' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'currentGuest\\?\\.name|guestName|guestNumber|#\\"'$'"\\{|Вы:|currentGuestDisplay|displayGuest' -CaseSensitive:"'$false -Context 6,10' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 36.03s:
+
+  pages\PublicMenu\x.jsx:1351:  // Guest code (4-digit code for showing to waiter)
+  pages\PublicMenu\x.jsx:1352:  const [guestCode, setGuestCode] = useState(null);
+  pages\PublicMenu\x.jsx:1353:
+  pages\PublicMenu\x.jsx:1354:  // Hall UI state (not in session hook)
+  pages\PublicMenu\x.jsx:1355:  const [splitType, setSplitType] = useState('single'); // 'single' | 'all'
+  pages\PublicMenu\x.jsx:1356:  const [otherGuestsExpanded, setOtherGuestsExpanded] = useState(false);
+> pages\PublicMenu\x.jsx:1357:  const [guestNameInput, setGuestNameInput] = useState(() => {
+  pages\PublicMenu\x.jsx:1358:    try { return localStorage.getItem('menuapp_guest_name') || ''; } catch (e) { return 
+''; }
+  pages\PublicMenu\x.jsx:1359:  });
+  pages\PublicMenu\x.jsx:1360:  const [isEditingName, setIsEditingName] = useState(false);
+  pages\PublicMenu\x.jsx:1361:
+  pages\PublicMenu\x.jsx:1362:  // Bill request state
+  pages\PublicMenu\x.jsx:1363:  const [billRequested, setBillRequested] = useState(false);
+  pages\PublicMenu\x.jsx:1364:  const [billCooldown, setBillCooldown] = useState(false);
+  pages\PublicMenu\x.jsx:1365:
+  pages\PublicMenu\x.jsx:1366:  // Rating flow state (TASK-260130-09)
+  pages\PublicMenu\x.jsx:1367:  const [hasRatedInSession, setHasRatedInSession] = useState(false);
+  pages\PublicMenu\x.jsx:3139:      submitLockRef.current = false;
+ succeeded in 39.22s:
+
+  pages\PublicMenu\x.jsx:475:  "cart.verify.info_table_code_point1": "Код обычно указан на столе",
+  pages\PublicMenu\x.jsx:476:  "cart.verify.info_table_code_point2": "Если не видно — спросите у официанта",
+  pages\PublicMenu\x.jsx:477:  "cart.verify.info_table_code_title": "Код стола",
+  pages\PublicMenu\x.jsx:478:  "cart.verify.locked": "Слишком много попыток. Повторите через",
+  pages\PublicMenu\x.jsx:479:  "cart.verify.online_order_title": "Онлайн-заказ официанту",
+  pages\PublicMenu\x.jsx:480:  "cart.verify.points_discount_label": "Списание баллов",
+> pages\PublicMenu\x.jsx:481:  "cart.verify.table_verified": "Стол подтверждён",
+  pages\PublicMenu\x.jsx:482:  // CartView — loyalty
+  pages\PublicMenu\x.jsx:483:  "loyalty.apply": "Применить",
+  pages\PublicMenu\x.jsx:484:  "loyalty.email_label": "Email для бонусов",
+  pages\PublicMenu\x.jsx:485:  "loyalty.email_placeholder": "email@example.com",
+  pages\PublicMenu\x.jsx:486:  "loyalty.email_saved": "Email сохранён! Бонусы будут начислены.",
+  pages\PublicMenu\x.jsx:487:  "loyalty.enter_email_for_bonus": "Введите email для начисления бонусов:",
+  pages\PublicMenu\x.jsx:488:  "loyalty.enter_email_hint": "Введите email для начисления бонусов",
+  pages\PublicMenu\x.jsx:489:  "loyalty.get_bonus": "Получить бонусы",
+  pages\PublicMenu\x.jsx:490:  "loyalty.new_customer": "Вы получите {points} бонусов за первый заказ",
+  pages\PublicMenu\x.jsx:491:  "loyalty.your_balance": "Ваш баланс: {points} баллов",
+  pages\PublicMenu\x.jsx:1292:  const [orderStatusToken, setOrderStatusToken] = useState(initialTrackToken);
+  pages\PublicMenu\x.jsx:1293:  
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$m = Select-String -Path pages/PublicMenu/x.jsx -Pattern '"'cart.verify.table_verified' -CaseSensitive:"'$false; if ($m) { $line=$m.LineNumber; Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip ($line-8) -First 20 }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'getGuestDisplayName|displayName|guestDisplay|guestCode|guestNumber|currentGuest' -CaseSensitive:"'$false -Context 8,16' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 9.98s:
+  "cart.verify.info_online_title": "ÐžÐ½Ð»Ð°Ð¹Ð½-Ð·Ð°ÐºÐ°Ð· Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ",
+  "cart.verify.info_table_code_point1": "ÐšÐ¾Ð´ Ð¾Ð±Ñ‹Ñ‡Ð½Ð¾ ÑƒÐºÐ°Ð·Ð°Ð½ Ð½Ð° ÑÑ‚Ð¾Ð»Ðµ",
+  "cart.verify.info_table_code_point2": "Ð•ÑÐ»Ð¸ Ð½Ðµ Ð²Ð¸Ð´Ð½Ð¾ â€” ÑÐ¿Ñ€Ð¾ÑÐ¸Ñ‚Ðµ Ñƒ Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ð°",
+  "cart.verify.info_table_code_title": "ÐšÐ¾Ð´ ÑÑ‚Ð¾Ð»Ð°",
+  "cart.verify.locked": "Ð¡Ð»Ð¸ÑˆÐºÐ¾Ð¼ Ð¼Ð½Ð¾Ð³Ð¾ Ð¿Ð¾Ð¿Ñ‹Ñ‚Ð¾Ðº. ÐŸÐ¾Ð²Ñ‚Ð¾Ñ€Ð¸Ñ‚Ðµ Ñ‡ÐµÑ€ÐµÐ·",
+  "cart.verify.online_order_title": "ÐžÐ½Ð»Ð°Ð¹Ð½-Ð·Ð°ÐºÐ°Ð· Ð¾Ñ„Ð¸Ñ†Ð¸Ð°Ð½Ñ‚Ñƒ",
+  "cart.verify.points_discount_label": "Ð¡Ð¿Ð¸ÑÐ°Ð½Ð¸Ðµ Ð±Ð°Ð»Ð»Ð¾Ð²",
+  "cart.verify.table_verified": "Ð¡Ñ‚Ð¾Ð» Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´Ñ‘Ð½",
+  // CartView â€” loyalty
+  "loyalty.apply": "ÐŸÑ€Ð¸Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ",
+  "loyalty.email_label": "Email Ð´Ð»Ñ Ð±Ð¾Ð½ÑƒÑÐ¾Ð²",
+  "loyalty.email_placeholder": "email@example.com",
+  "loyalty.email_saved": "Email ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½! Ð‘Ð¾Ð½ÑƒÑÑ‹ Ð±ÑƒÐ´ÑƒÑ‚ Ð½Ð°Ñ‡Ð¸ÑÐ»ÐµÐ½Ñ‹.",
+  "loyalty.enter_email_for_bonus": "Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ email Ð´Ð»Ñ Ð½Ð°Ñ‡Ð¸ÑÐ»ÐµÐ½Ð¸Ñ Ð±Ð¾Ð½ÑƒÑÐ¾Ð²:",
+  "loyalty.enter_email_hint": "Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ email Ð´Ð»Ñ Ð½Ð°Ñ‡Ð¸ÑÐ»ÐµÐ½Ð¸Ñ Ð±Ð¾Ð½ÑƒÑÐ¾Ð²",
+  "loyalty.get_bonus": "ÐŸÐ¾Ð»ÑƒÑ‡Ð¸Ñ‚ÑŒ Ð±Ð¾Ð½ÑƒÑÑ‹",
+  "loyalty.new_customer": "Ð’Ñ‹ Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ñ‚Ðµ {points} Ð±Ð¾Ð½ÑƒÑÐ¾Ð² Ð·Ð° Ð¿ÐµÑ€Ð²Ñ‹Ð¹ Ð·Ð°ÐºÐ°Ð·",
+  "loyalty.your_balance": "Ð’Ð°Ñˆ Ð±Ð°Ð»Ð°Ð½Ñ: {points} Ð±Ð°Ð»Ð»Ð¾Ð²",
+  "loyalty.max_redeem": "ÐœÐ°ÐºÑÐ¸Ð¼ÑƒÐ¼ {max} Ð±Ð°Ð»Ð»Ð¾Ð² ({percent}% Ð¾Ñ‚ Ð·Ð°ÐºÐ°Ð·Ð°)",
+  "loyalty.instant_discount": "Ð¡ÐºÐ¸Ð´ÐºÐ° {percent}% Ð¿Ñ€Ð¸Ð¼ÐµÐ½ÐµÐ½Ð°",
+ succeeded in 10.13s:
+
+  pages\PublicMenu\x.jsx:50:
+  pages\PublicMenu\x.jsx:51:import {
+  pages\PublicMenu\x.jsx:52:  getOrCreateSession,
+  pages\PublicMenu\x.jsx:53:  addGuestToSession,
+  pages\PublicMenu\x.jsx:54:  findGuestByDevice,
+  pages\PublicMenu\x.jsx:55:  getSessionGuests,
+  pages\PublicMenu\x.jsx:56:  getSessionOrders,
+  pages\PublicMenu\x.jsx:57:  getDeviceId,
+> pages\PublicMenu\x.jsx:58:  getGuestDisplayName,
+  pages\PublicMenu\x.jsx:59:  getNextOrderNumber,
+  pages\PublicMenu\x.jsx:60:  isSessionExpired,
+  pages\PublicMenu\x.jsx:61:} from "@/components/sessionHelpers";
+  pages\PublicMenu\x.jsx:62:
+  pages\PublicMenu\x.jsx:63:import {
+  pages\PublicMenu\x.jsx:64:  normalizeMode,
+  pages\PublicMenu\x.jsx:65:  isDishEnabledForMode,
+  pages\PublicMenu\x.jsx:66:  sortCategoriesStable,
+  pages\PublicMenu\x.jsx:67:  sortDishesStable,
+  pages\PublicMenu\x.jsx:68:  buildDishesByCategory,
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'guestCode|hallGuestCodeEnabled|getGuestDisplayName\\(' -CaseSensitive:"'$false -Context 3,8' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'table_verified|confirmed|tableConfirm|success banner|showSuccess' -CaseSensitive:"'$false -Context 6,12' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.41s:
+
+  pages\PublicMenu\x.jsx:1349:  const [submitError, setSubmitError] = useState(null);
+  pages\PublicMenu\x.jsx:1350:
+  pages\PublicMenu\x.jsx:1351:  // Guest code (4-digit code for showing to waiter)
+> pages\PublicMenu\x.jsx:1352:  const [guestCode, setGuestCode] = useState(null);
+  pages\PublicMenu\x.jsx:1353:
+  pages\PublicMenu\x.jsx:1354:  // Hall UI state (not in session hook)
+  pages\PublicMenu\x.jsx:1355:  const [splitType, setSplitType] = useState('single'); // 'single' | 'all'
+  pages\PublicMenu\x.jsx:1356:  const [otherGuestsExpanded, setOtherGuestsExpanded] = useState(false);
+  pages\PublicMenu\x.jsx:1357:  const [guestNameInput, setGuestNameInput] = useState(() => {
+  pages\PublicMenu\x.jsx:1358:    try { return localStorage.getItem('menuapp_guest_name') || ''; } catch (e) { return 
+''; }
+  pages\PublicMenu\x.jsx:1359:  });
+  pages\PublicMenu\x.jsx:1360:  const [isEditingName, setIsEditingName] = useState(false);
+  pages\PublicMenu\x.jsx:1595:  };
+  pages\PublicMenu\x.jsx:1596:
+  pages\PublicMenu\x.jsx:1597:  // Hall settings (simplified - only guest code)
+> pages\PublicMenu\x.jsx:1598:  const hallGuestCodeEnabled = partner?.hall_guest_code_enabled === true;
+  pages\PublicMenu\x.jsx:1599:
+  pages\PublicMenu\x.jsx:1600:  // Set language from URL param or partner default
+ succeeded in 8.50s:
+
+  pages\PublicMenu\x.jsx:475:  "cart.verify.info_table_code_point1": "Код обычно указан на столе",
+  pages\PublicMenu\x.jsx:476:  "cart.verify.info_table_code_point2": "Если не видно — спросите у официанта",
+  pages\PublicMenu\x.jsx:477:  "cart.verify.info_table_code_title": "Код стола",
+  pages\PublicMenu\x.jsx:478:  "cart.verify.locked": "Слишком много попыток. Повторите через",
+  pages\PublicMenu\x.jsx:479:  "cart.verify.online_order_title": "Онлайн-заказ официанту",
+  pages\PublicMenu\x.jsx:480:  "cart.verify.points_discount_label": "Списание баллов",
+> pages\PublicMenu\x.jsx:481:  "cart.verify.table_verified": "Стол подтверждён",
+  pages\PublicMenu\x.jsx:482:  // CartView — loyalty
+  pages\PublicMenu\x.jsx:483:  "loyalty.apply": "Применить",
+  pages\PublicMenu\x.jsx:484:  "loyalty.email_label": "Email для бонусов",
+  pages\PublicMenu\x.jsx:485:  "loyalty.email_placeholder": "email@example.com",
+  pages\PublicMenu\x.jsx:486:  "loyalty.email_saved": "Email сохранён! Бонусы будут начислены.",
+  pages\PublicMenu\x.jsx:487:  "loyalty.enter_email_for_bonus": "Введите email для начисления бонусов:",
+  pages\PublicMenu\x.jsx:488:  "loyalty.enter_email_hint": "Введите email для начисления бонусов",
+  pages\PublicMenu\x.jsx:489:  "loyalty.get_bonus": "Получить бонусы",
+  pages\PublicMenu\x.jsx:490:  "loyalty.new_customer": "Вы получите {points} бонусов за первый заказ",
+  pages\PublicMenu\x.jsx:491:  "loyalty.your_balance": "Ваш баланс: {points} баллов",
+  pages\PublicMenu\x.jsx:492:  "loyalty.max_redeem": "Максимум {max} баллов ({percent}% от заказа)",
+  pages\PublicMenu\x.jsx:493:  "loyalty.instant_discount": "Скидка {percent}% применена",
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'bg-green|text-green|border-green|green-|table_verified|подтвержд' -CaseSensitive:"'$false -Context 4,10' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'Banner|banner|success|verified|currentTableId' -CaseSensitive:"'$false -Context 4,10' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 14.43s:
+
+  pages\PublicMenu\x.jsx:477:  "cart.verify.info_table_code_title": "Код стола",
+  pages\PublicMenu\x.jsx:478:  "cart.verify.locked": "Слишком много попыток. Повторите через",
+  pages\PublicMenu\x.jsx:479:  "cart.verify.online_order_title": "Онлайн-заказ официанту",
+  pages\PublicMenu\x.jsx:480:  "cart.verify.points_discount_label": "Списание баллов",
+> pages\PublicMenu\x.jsx:481:  "cart.verify.table_verified": "Стол подтверждён",
+  pages\PublicMenu\x.jsx:482:  // CartView — loyalty
+  pages\PublicMenu\x.jsx:483:  "loyalty.apply": "Применить",
+  pages\PublicMenu\x.jsx:484:  "loyalty.email_label": "Email для бонусов",
+  pages\PublicMenu\x.jsx:485:  "loyalty.email_placeholder": "email@example.com",
+  pages\PublicMenu\x.jsx:486:  "loyalty.email_saved": "Email сохранён! Бонусы будут начислены.",
+  pages\PublicMenu\x.jsx:487:  "loyalty.enter_email_for_bonus": "Введите email для начисления бонусов:",
+  pages\PublicMenu\x.jsx:488:  "loyalty.enter_email_hint": "Введите email для начисления бонусов",
+  pages\PublicMenu\x.jsx:489:  "loyalty.get_bonus": "Получить бонусы",
+  pages\PublicMenu\x.jsx:490:  "loyalty.new_customer": "Вы получите {points} бонусов за первый заказ",
+  pages\PublicMenu\x.jsx:491:  "loyalty.your_balance": "Ваш баланс: {points} баллов",
+  pages\PublicMenu\x.jsx:583:  const STATUS_CONFIG = {
+  pages\PublicMenu\x.jsx:584:    new: { icon: '🔵', label: t('status.new'), bg: 'bg-blue-100', color: 'text-blue-700' 
+},
+  pages\PublicMenu\x.jsx:585:    accepted: { icon: '🔵', label: t('status.accepted'), bg: 'bg-blue-100', color: 
+ succeeded in 13.64s:
+
+  pages\PublicMenu\x.jsx:98:import ReviewDialog from "@/components/publicMenu/ReviewDialog";
+  pages\PublicMenu\x.jsx:99:import StickyCartBar from "@/components/publicMenu/StickyCartBar";
+  pages\PublicMenu\x.jsx:100:import MenuView from "@/components/publicMenu/MenuView";
+  pages\PublicMenu\x.jsx:101:import CartView from "@/components/publicMenu/CartView";
+> pages\PublicMenu\x.jsx:102:import RedirectBanner from "@/components/publicMenu/refactor/RedirectBanner";
+  pages\PublicMenu\x.jsx:103:import DishReviewsModal from "@/components/publicMenu/DishReviewsModal";
+  pages\PublicMenu\x.jsx:104:import ModeTabs from "@/components/publicMenu/refactor/ModeTabs";
+  pages\PublicMenu\x.jsx:105:import CategoryChips from "@/components/publicMenu/refactor/CategoryChips";
+  pages\PublicMenu\x.jsx:106:import HallVerifyBlock from "@/components/publicMenu/refactor/HallVerifyBlock";
+  pages\PublicMenu\x.jsx:107:import ErrorState from "@/components/publicMenu/refactor/ErrorState";
+  pages\PublicMenu\x.jsx:108:import EmptyMenuState from "@/components/publicMenu/refactor/EmptyMenuState";
+  pages\PublicMenu\x.jsx:109:import CheckoutView from "@/components/publicMenu/views/CheckoutView";
+  pages\PublicMenu\x.jsx:110:import { useCurrency } from "@/components/publicMenu/refactor/hooks/useCurrency";
+  pages\PublicMenu\x.jsx:111:import { useHallTable } from "@/components/publicMenu/refactor/hooks/useHallTable";
+  pages\PublicMenu\x.jsx:112:import { useHelpRequests } from "@/components/publicMenu/refactor/hooks/useHelpRequests";
+  pages\PublicMenu\x.jsx:477:  "cart.verify.info_table_code_title": "Код стола",
+  pages\PublicMenu\x.jsx:478:  "cart.verify.locked": "Слишком много попыток. Повторите через",
+  pages\PublicMenu\x.jsx:479:  "cart.verify.online_order_title": "Онлайн-заказ официанту",
+  pages\PublicMenu\x.jsx:480:  "cart.verify.points_discount_label": "Списание баллов",
+codex
+I’ve narrowed the likely touch points. I’m reading a few exact line ranges now: the main menu render around `ModeTabs`, the cart handoff into `CartView`, and the confirmation path that still calls `getGuestDisplayName(...)`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=3348; $count=38; for($i=$start; $i -lt ($start+$count); $i++){ '"'{0}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=2768; $count=10; for($i=$start; $i -lt ($start+$count); $i++){ '"'{0}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=3516; $count=24; for($i=$start; $i -lt ($start+$count); $i++){ '"'{0}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.39s:
+2769:       // FIX P1: Use finalTotal (post-discount) instead of raw cart.reduce
+2770:       const confirmedItems = [...cart];
+2771:       const confirmedTotal = finalTotal;
+2772:       const guestLabel = guestToUse
+2773:         ? getGuestDisplayName(guestToUse)
+2774:         : null;
+2775: 
+2776:       // Clear form
+2777:       clearCart();
+2778:       clearCartStorage(partner.id);
+ succeeded in 11.12s:
+3517:           </DrawerHeader>
+3518:           <div className="overflow-y-auto max-h-[calc(85vh-2rem)]">
+3519:             <CartView
+3520:               partner={partner}
+3521:               currentTable={currentTable}
+3522:               currentGuest={currentGuest}
+3523:               t={t}
+3524:               setView={setView}
+3525:               isEditingName={isEditingName}
+3526:               guestNameInput={guestNameInput}
+3527:               setGuestNameInput={setGuestNameInput}
+3528:               handleUpdateGuestName={handleUpdateGuestName}
+3529:               setIsEditingName={setIsEditingName}
+3530:               getGuestDisplayName={getGuestDisplayName}
+3531:               cart={cart}
+3532:               formatPrice={formatPrice}
+3533:               updateQuantity={updateQuantity}
+3534:               sessionGuests={sessionGuests}
+3535:               splitType={splitType}
+3536:               setSplitType={setSplitType}
+ succeeded in 11.50s:
+3349:         enabledCurrencies={enabledCurrencies}
+3350:         lang={lang}
+3351:         activeCurrency={activeCurrency}
+3352:         onLangChange={handleLangChange}
+3353:         onCurrencyChange={handleCurrencyChange}
+3354:         onContactClick={handleContactClick}
+3355:         isSafeUrl={isSafeUrl}
+3356:         t={t}
+3357:         CURRENCY_SYMBOLS={CURRENCY_SYMBOLS}
+3358:       />
+3359: 
+3360:       {/* Redirect banner */}
+3361:       {redirectBanner && (
+3362:         <RedirectBanner
+3363:           redirectBanner={redirectBanner}
+3364:           onClose={() => setRedirectBanner(null)}
+3365:           t={t}
+3366:         />
+3367:       )}
+3368: 
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern '\\bverifiedByCode\\b' -CaseSensitive:"'$false' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern '\\bcurrentTable\\b|\\bcurrentTableId\\b|\\bisTableVerified\\b' -CaseSensitive:"'$false | Select-Object -First 80' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 8.43s:
+
+pages\PublicMenu\x.jsx:1566:    verifiedByCode,
+pages\PublicMenu\x.jsx:1619:  const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
+pages\PublicMenu\x.jsx:3382:          verifiedByCode={verifiedByCode}
+
+
+ succeeded in 8.62s:
+
+pages\PublicMenu\x.jsx:1619:  const isTableVerified = isHallMode && (!!resolvedTable?.id || verifiedByCode);
+pages\PublicMenu\x.jsx:1629:  // P0-2: currentTableId only from resolved table or code verification
+pages\PublicMenu\x.jsx:1630:  const currentTableId = resolvedTable?.id || verifiedTableId || null;
+pages\PublicMenu\x.jsx:1633:  const currentTable = resolvedTable || verifiedTable || null;
+pages\PublicMenu\x.jsx:1649:  } = useHelpRequests({ partner, currentTableId, t, toast, isRateLimitError, 
+saveTableSelection });
+pages\PublicMenu\x.jsx:1658:  // PM-133: Guard for null currentTableId — redirect to table code entry
+pages\PublicMenu\x.jsx:1661:    if (!currentTableId) {
+pages\PublicMenu\x.jsx:1671:  }, [pushOverlay, currentTableId, setShowTableConfirmSheet, setHelpComment]);
+pages\PublicMenu\x.jsx:2124:    isTableVerified,
+pages\PublicMenu\x.jsx:2125:    currentTableId,
+pages\PublicMenu\x.jsx:2150:    currentTableId,
+pages\PublicMenu\x.jsx:2210:  const showCartButton = isHallMode && (isTableVerified || (cart?.length || 0) > 0);
+pages\PublicMenu\x.jsx:2216:    if (!isTableVerified || tableSession) return;
+pages\PublicMenu\x.jsx:2219:  }, [isTableVerified, tableSession]);
+pages\PublicMenu\x.jsx:2220:  const isSessionLoading = isTableVerified && !tableSession && !sessionCheckTimedOut;
+pages\PublicMenu\x.jsx:2224:    if (pendingSubmitRef.current && isTableVerified && currentTableId) {
+pages\PublicMenu\x.jsx:2235:  }, [isTableVerified, currentTableId]);
+pages\PublicMenu\x.jsx:2452:    if (currentTableId) {
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=3140; $count=28; for($i=$start; $i -lt ($start+$count); $i++){ '"'{0}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Select-String -Path pages/PublicMenu/x.jsx -Pattern 'replace\\(|split\\(|#\\d|guestLabel|guest.name|getGuestDisplayName|menuapp_guest_name' -CaseSensitive:"'$false -Context 3,6' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 12.03s:
+3141:     }
+3142:   };
+3143: 
+3144:   // Update guest name (inline on cart page)
+3145:   const handleUpdateGuestName = async () => {
+3146:     const trimmedName = guestNameInput.trim();
+3147:     if (!trimmedName) return;
+3148: 
+3149:     try {
+3150:       // DB update only if guest record exists
+3151:       if (currentGuest?.id) {
+3152:         await base44.entities.SessionGuest.update(currentGuest.id, {
+3153:           name: trimmedName
+3154:         });
+3155:         setSessionGuests(prev => prev.map(g =>
+3156:           g.id === currentGuest.id ? { ...g, name: trimmedName } : g
+3157:         ));
+3158:       }
+3159: 
+3160:       // Always: persist locally + update state
+ succeeded in 11.96s:
+
+  pages\PublicMenu\x.jsx:55:  getSessionGuests,
+  pages\PublicMenu\x.jsx:56:  getSessionOrders,
+  pages\PublicMenu\x.jsx:57:  getDeviceId,
+> pages\PublicMenu\x.jsx:58:  getGuestDisplayName,
+  pages\PublicMenu\x.jsx:59:  getNextOrderNumber,
+  pages\PublicMenu\x.jsx:60:  isSessionExpired,
+  pages\PublicMenu\x.jsx:61:} from "@/components/sessionHelpers";
+  pages\PublicMenu\x.jsx:62:
+  pages\PublicMenu\x.jsx:63:import {
+  pages\PublicMenu\x.jsx:64:  normalizeMode,
+  pages\PublicMenu\x.jsx:122:  !!dish?.description && dish.description.toLowerCase().includes(":::archived:::");
+  pages\PublicMenu\x.jsx:123:
+  pages\PublicMenu\x.jsx:124:const getCleanDescription = (desc) =>
+> pages\PublicMenu\x.jsx:125:  desc ? desc.replace(/:::archived:::/gi, "").trim() : "";
+  pages\PublicMenu\x.jsx:126:
+  pages\PublicMenu\x.jsx:127:const looksLikePartnerId = (value) =>
+  pages\PublicMenu\x.jsx:128:  /^[0-9a-f]{24}$/i.test(String(value || "").trim());
+  pages\PublicMenu\x.jsx:129:
+  pages\PublicMenu\x.jsx:130:// P0-5: Rate limit detection
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command '$lines = Get-Content pages/PublicMenu/x.jsx; $start=3340; $count=20; for($i=$start; $i -lt ($start+$count); $i++){ '"'{0}: {1}' -f ("'$i+1), $lines[$i] }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 13.82s:
+3341: 
+3342:   return (
+3343:     <div className="min-h-screen bg-slate-50 pb-24 font-sans">
+3344:       <PublicMenuHeader
+3345:         partner={partner}
+3346:         activeContactLinks={activeContactLinks}
+3347:         viewMode={viewMode}
+3348:         enabledLanguages={enabledLanguages}
+3349:         enabledCurrencies={enabledCurrencies}
+3350:         lang={lang}
+3351:         activeCurrency={activeCurrency}
+3352:         onLangChange={handleLangChange}
+3353:         onCurrencyChange={handleCurrencyChange}
+3354:         onContactClick={handleContactClick}
+3355:         isSafeUrl={isSafeUrl}
+3356:         t={t}
+3357:         CURRENCY_SYMBOLS={CURRENCY_SYMBOLS}
+3358:       />
+3359: 
+3360:       {/* Redirect banner */}
+codex
+The review itself is done. I’m writing the findings to the pipeline file the task requested, and also saving the repo-required review note plus the full command log in `pages/PublicMenu`.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command 'Test-Path pipeline/chain-state' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command 'Test-Path pages/PublicMenu/review_2026-03-26.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command 'Test-Path pages/PublicMenu/commands_2026-03-26.log' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 13.69s:
+False
+ succeeded in 13.79s:
+True
+ succeeded in 15.03s:
+False
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-26.log
+# Command log for PublicMenu review on 2026-03-26
+# Timed out:
+Get-ChildItem -Name pages/PublicMenu
+Get-Content pages/PublicMenu/x.jsx
+if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md }
+if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md }
+Get-ChildItem pages/PublicMenu | Select-Object Name,Length
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'подтверждён|tableConfirmed|showTableConfirmSheet|showSuccessBanner|currentGuest\?\.name|guestName|#\$\{|guestNumber|Вы:' -CaseSensitive:$false
+if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md } else { 'README.md not found' }
+if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md } else { 'BUGS.md not found' }
+
+# Completed:
+Get-Location
+Get-Date -Format o
+Get-ChildItem pages/PublicMenu | Select-Object Name,Length
+if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md } else { 'README.md not found' }
+if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md } else { 'BUGS.md not found' }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'tableConfirmed|подтвержд|showTableConfirmSheet|showSuccessBanner' -CaseSensitive:$false -Context 6,10
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'currentGuest\?\.name|guestName|guestNumber|#\$\{|Вы:|currentGuestDisplay|displayGuest' -CaseSensitive:$false -Context 6,10
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'getGuestDisplayName|displayName|guestDisplay|guestCode|guestNumber|currentGuest' -CaseSensitive:$false -Context 8,16
+$m = Select-String -Path pages/PublicMenu/x.jsx -Pattern 'cart.verify.table_verified' -CaseSensitive:$false; if ($m) { $line=$m.LineNumber; Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip ($line-8) -First 20 }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'table_verified|confirmed|tableConfirm|success banner|showSuccess' -CaseSensitive:$false -Context 6,12
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'guestCode|hallGuestCodeEnabled|getGuestDisplayName\(' -CaseSensitive:$false -Context 3,8
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'bg-green|text-green|border-green|green-|table_verified|подтвержд' -CaseSensitive:$false -Context 4,10
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'Banner|banner|success|verified|currentTableId' -CaseSensitive:$false -Context 4,10
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=3348; $count=38; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=3516; $count=24; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=2768; $count=10; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
+Select-String -Path pages/PublicMenu/x.jsx -Pattern '\bverifiedByCode\b' -CaseSensitive:$false
+Select-String -Path pages/PublicMenu/x.jsx -Pattern '\bcurrentTable\b|\bcurrentTableId\b|\bisTableVerified\b' -CaseSensitive:$false | Select-Object -First 80
+Select-String -Path pages/PublicMenu/x.jsx -Pattern 'replace\(|split\(|#\d|guestLabel|guest.name|getGuestDisplayName|menuapp_guest_name' -CaseSensitive:$false -Context 3,6
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=3140; $count=28; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
+$lines = Get-Content pages/PublicMenu/x.jsx; $start=3340; $count=20; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
+Test-Path pipeline/chain-state
+Test-Path pages/PublicMenu/review_2026-03-26.md
+Test-Path pages/PublicMenu/commands_2026-03-26.log
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260326-234309-77f1
+
+## Findings
+1. [P3] PM-148 removal is not enforced in `x.jsx` — the main menu still renders `ModeTabs` with the full table-verification payload, including `verifiedByCode`, `currentTableId`, `currentTable`, and `resolvedTable` (`pages/PublicMenu/x.jsx:3371-3384`). In this file there is no explicit gate that disables the post-verification success/banner state after table-code confirmation, so the banner removal is not guaranteed at the page boundary. FIX: remove the banner-driving prop/path from the menu render in `x.jsx`, or pass an explicit "do not show confirmation banner" flag while keeping the bottom-sheet table confirmation flow unchanged.
+2. [P3] Guest-facing name output is still unsanitized in `x.jsx` — the file passes `getGuestDisplayName` straight into `CartView` (`pages/PublicMenu/x.jsx:3519-3530`) and also uses `getGuestDisplayName(guestToUse)` for the hall-order confirmation label (`pages/PublicMenu/x.jsx:2772-2774`, `pages/PublicMenu/x.jsx:3478-3481`). There is no display-only stripping of a trailing ` #N` suffix anywhere in this file, so guest-facing UI can still show the internal guest ID if the shared helper returns it. FIX: derive a guest-facing formatter in `x.jsx` that strips a trailing `\\s+#\\d+$` before passing/rendering the label, while keeping the stored guest data and staff-facing displays unchanged.
+
+## Summary
+Total: 2 findings (0 P0, 0 P1, 0 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — the task names `x.jsx` as the only target, but the banner-owning UI block is not identified inside this file; `x.jsx` only forwards verification props to child UI.
+- Missing context (what info would have helped): Whether Fix 2 should also remove the suffix from the hall-order confirmation label in `x.jsx`, not only the cart header.
+- Scope questions (anything you weren't sure if it's in scope): The task says target only `x.jsx`, but Fix 2 text references `x.jsx / CartView.jsx` display. Review stayed inside `x.jsx` only.
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-26.md
+# Review — PublicMenu `x.jsx` — 2026-03-26
+
+Scope reviewed: `pages/PublicMenu/x.jsx` plus page-folder context from `README.md` and `BUGS.md`, per task instructions.
+
+## Findings
+1. [P3] PM-148 removal is not enforced in `x.jsx` — the main menu still renders `ModeTabs` with `verifiedByCode`, `currentTableId`, `currentTable`, and `resolvedTable` at `pages/PublicMenu/x.jsx:3371-3384`. This file does not add an explicit guard that disables the post-verification success/banner path after table-code confirmation. FIX: remove the banner-driving prop/path from the menu render in `x.jsx`, or pass an explicit "do not show confirmation banner" flag while preserving the bottom-sheet flow.
+2. [P3] Guest-facing name output is still unsanitized in `x.jsx` — `getGuestDisplayName` is passed directly to `CartView` at `pages/PublicMenu/x.jsx:3519-3530`, and the same helper is used for the hall-order confirmation label at `pages/PublicMenu/x.jsx:2772-2774` and `pages/PublicMenu/x.jsx:3478-3481`. This file does not strip the trailing ` #N` suffix for guest-facing UI. FIX: format the display string in `x.jsx` before passing/rendering it, stripping a trailing `\\s+#\\d+$` while leaving underlying guest data unchanged.
+
+## Summary
+- Total findings: 2
+- Priority split: 0 P0, 0 P1, 0 P2, 2 P3
+- Prompt clarity: 4/5
+apply_patch(auto_approved=true) exited 0 in 850ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md
+A pages/PublicMenu/review_2026-03-26.md
+A pages/PublicMenu/commands_2026-03-26.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-26.log b/pages/PublicMenu/commands_2026-03-26.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..bc4764d883062f5a4feb7b0711c7ea67f426552b
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-26.log
+@@ -0,0 +1,36 @@
++# Command log for PublicMenu review on 2026-03-26
++# Timed out:
++Get-ChildItem -Name pages/PublicMenu
++Get-Content pages/PublicMenu/x.jsx
++if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md }
++if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md }
++Get-ChildItem pages/PublicMenu | Select-Object Name,Length
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'подтверждён|tableConfirmed|showTableConfirmSheet|showSuccessBanner|currentGuest\?\.name|guestName|#\$\{|guestNumber|Вы:' -CaseSensitive:$false
++if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md } else { 'README.md not found' }
++if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md } else { 'BUGS.md not found' }
++
++# Completed:
++Get-Location
++Get-Date -Format o
++Get-ChildItem pages/PublicMenu | Select-Object Name,Length
++if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md } else { 'README.md not found' }
++if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md } else { 'BUGS.md not found' }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'tableConfirmed|подтвержд|showTableConfirmSheet|showSuccessBanner' -CaseSensitive:$false -Context 6,10
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'currentGuest\?\.name|guestName|guestNumber|#\$\{|Вы:|currentGuestDisplay|displayGuest' -CaseSensitive:$false -Context 6,10
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'getGuestDisplayName|displayName|guestDisplay|guestCode|guestNumber|currentGuest' -CaseSensitive:$false -Context 8,16
++$m = Select-String -Path pages/PublicMenu/x.jsx -Pattern 'cart.verify.table_verified' -CaseSensitive:$false; if ($m) { $line=$m.LineNumber; Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip ($line-8) -First 20 }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'table_verified|confirmed|tableConfirm|success banner|showSuccess' -CaseSensitive:$false -Context 6,12
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'guestCode|hallGuestCodeEnabled|getGuestDisplayName\(' -CaseSensitive:$false -Context 3,8
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'bg-green|text-green|border-green|green-|table_verified|подтвержд' -CaseSensitive:$false -Context 4,10
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'Banner|banner|success|verified|currentTableId' -CaseSensitive:$false -Context 4,10
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3348; $count=38; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3516; $count=24; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=2768; $count=10; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern '\bverifiedByCode\b' -CaseSensitive:$false
++Select-String -Path pages/PublicMenu/x.jsx -Pattern '\bcurrentTable\b|\bcurrentTableId\b|\bisTableVerified\b' -CaseSensitive:$false | Select-Object -First 80
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'replace\(|split\(|#\d|guestLabel|guest.name|getGuestDisplayName|menuapp_guest_name' -CaseSensitive:$false -Context 3,6
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3140; $count=28; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3340; $count=20; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++Test-Path pipeline/chain-state
++Test-Path pages/PublicMenu/review_2026-03-26.md
++Test-Path pages/PublicMenu/commands_2026-03-26.log
+diff --git a/pages/PublicMenu/review_2026-03-26.md b/pages/PublicMenu/review_2026-03-26.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..dddcd26cde6dfa991a7c4082fe104f919e583682
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-26.md
+@@ -0,0 +1,12 @@
++# Review — PublicMenu `x.jsx` — 2026-03-26
++
++Scope reviewed: `pages/PublicMenu/x.jsx` plus page-folder context from `README.md` and `BUGS.md`, per task instructions.
++
++## Findings
++1. [P3] PM-148 removal is not enforced in `x.jsx` — the main menu still renders `ModeTabs` with `verifiedByCode`, `currentTableId`, `currentTable`, and `resolvedTable` at `pages/PublicMenu/x.jsx:3371-3384`. This file does not add an explicit guard that disables the post-verification success/banner path after table-code confirmation. FIX: remove the banner-driving prop/path from the menu render in `x.jsx`, or pass an explicit "do not show confirmation banner" flag while preserving the bottom-sheet flow.
++2. [P3] Guest-facing name output is still unsanitized in `x.jsx` — `getGuestDisplayName` is passed directly to `CartView` at `pages/PublicMenu/x.jsx:3519-3530`, and the same helper is used for the hall-order confirmation label at `pages/PublicMenu/x.jsx:2772-2774` and `pages/PublicMenu/x.jsx:3478-3481`. This file does not strip the trailing ` #N` suffix for guest-facing UI. FIX: format the display string in `x.jsx` before passing/rendering it, stripping a trailing `\\s+#\\d+$` while leaving underlying guest data unchanged.
++
++## Summary
++- Total findings: 2
++- Priority split: 0 P0, 0 P1, 0 P2, 2 P3
++- Prompt clarity: 4/5
+diff --git a/pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md b/pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c13c215f460d4f88913f43858b40eba71a418430
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260326-234309-77f1
++
++## Findings
++1. [P3] PM-148 removal is not enforced in `x.jsx` — the main menu still renders `ModeTabs` with the full table-verification payload, including `verifiedByCode`, `currentTableId`, `currentTable`, and `resolvedTable` (`pages/PublicMenu/x.jsx:3371-3384`). In this file there is no explicit gate that disables the post-verification success/banner state after table-code confirmation, so the banner removal is not guaranteed at the page boundary. FIX: remove the banner-driving prop/path from the menu render in `x.jsx`, or pass an explicit "do not show confirmation banner" flag while keeping the bottom-sheet table confirmation flow unchanged.
++2. [P3] Guest-facing name output is still unsanitized in `x.jsx` — the file passes `getGuestDisplayName` straight into `CartView` (`pages/PublicMenu/x.jsx:3519-3530`) and also uses `getGuestDisplayName(guestToUse)` for the hall-order confirmation label (`pages/PublicMenu/x.jsx:2772-2774`, `pages/PublicMenu/x.jsx:3478-3481`). There is no display-only stripping of a trailing ` #N` suffix anywhere in this file, so guest-facing UI can still show the internal guest ID if the shared helper returns it. FIX: derive a guest-facing formatter in `x.jsx` that strips a trailing `\\s+#\\d+$` before passing/rendering the label, while keeping the stored guest data and staff-facing displays unchanged.
++
++## Summary
++Total: 2 findings (0 P0, 0 P1, 0 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — the task names `x.jsx` as the only target, but the banner-owning UI block is not identified inside this file; `x.jsx` only forwards verification props to child UI.
++- Missing context (what info would have helped): Whether Fix 2 should also remove the suffix from the hall-order confirmation label in `x.jsx`, not only the cart header.
++- Scope questions (anything you weren't sure if it's in scope): The task says target only `x.jsx`, but Fix 2 text references `x.jsx / CartView.jsx` display. Review stayed inside `x.jsx` only.
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-26.log b/pages/PublicMenu/commands_2026-03-26.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..bc4764d883062f5a4feb7b0711c7ea67f426552b
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-26.log
+@@ -0,0 +1,36 @@
++# Command log for PublicMenu review on 2026-03-26
++# Timed out:
++Get-ChildItem -Name pages/PublicMenu
++Get-Content pages/PublicMenu/x.jsx
++if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md }
++if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md }
++Get-ChildItem pages/PublicMenu | Select-Object Name,Length
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'подтверждён|tableConfirmed|showTableConfirmSheet|showSuccessBanner|currentGuest\?\.name|guestName|#\$\{|guestNumber|Вы:' -CaseSensitive:$false
++if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md } else { 'README.md not found' }
++if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md } else { 'BUGS.md not found' }
++
++# Completed:
++Get-Location
++Get-Date -Format o
++Get-ChildItem pages/PublicMenu | Select-Object Name,Length
++if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md } else { 'README.md not found' }
++if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md } else { 'BUGS.md not found' }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'tableConfirmed|подтвержд|showTableConfirmSheet|showSuccessBanner' -CaseSensitive:$false -Context 6,10
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'currentGuest\?\.name|guestName|guestNumber|#\$\{|Вы:|currentGuestDisplay|displayGuest' -CaseSensitive:$false -Context 6,10
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'getGuestDisplayName|displayName|guestDisplay|guestCode|guestNumber|currentGuest' -CaseSensitive:$false -Context 8,16
++$m = Select-String -Path pages/PublicMenu/x.jsx -Pattern 'cart.verify.table_verified' -CaseSensitive:$false; if ($m) { $line=$m.LineNumber; Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip ($line-8) -First 20 }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'table_verified|confirmed|tableConfirm|success banner|showSuccess' -CaseSensitive:$false -Context 6,12
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'guestCode|hallGuestCodeEnabled|getGuestDisplayName\(' -CaseSensitive:$false -Context 3,8
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'bg-green|text-green|border-green|green-|table_verified|подтвержд' -CaseSensitive:$false -Context 4,10
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'Banner|banner|success|verified|currentTableId' -CaseSensitive:$false -Context 4,10
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3348; $count=38; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3516; $count=24; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=2768; $count=10; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern '\bverifiedByCode\b' -CaseSensitive:$false
++Select-String -Path pages/PublicMenu/x.jsx -Pattern '\bcurrentTable\b|\bcurrentTableId\b|\bisTableVerified\b' -CaseSensitive:$false | Select-Object -First 80
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'replace\(|split\(|#\d|guestLabel|guest.name|getGuestDisplayName|menuapp_guest_name' -CaseSensitive:$false -Context 3,6
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3140; $count=28; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3340; $count=20; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++Test-Path pipeline/chain-state
++Test-Path pages/PublicMenu/review_2026-03-26.md
++Test-Path pages/PublicMenu/commands_2026-03-26.log
+diff --git a/pages/PublicMenu/review_2026-03-26.md b/pages/PublicMenu/review_2026-03-26.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..dddcd26cde6dfa991a7c4082fe104f919e583682
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-26.md
+@@ -0,0 +1,12 @@
++# Review — PublicMenu `x.jsx` — 2026-03-26
++
++Scope reviewed: `pages/PublicMenu/x.jsx` plus page-folder context from `README.md` and `BUGS.md`, per task instructions.
++
++## Findings
++1. [P3] PM-148 removal is not enforced in `x.jsx` — the main menu still renders `ModeTabs` with `verifiedByCode`, `currentTableId`, `currentTable`, and `resolvedTable` at `pages/PublicMenu/x.jsx:3371-3384`. This file does not add an explicit guard that disables the post-verification success/banner path after table-code confirmation. FIX: remove the banner-driving prop/path from the menu render in `x.jsx`, or pass an explicit "do not show confirmation banner" flag while preserving the bottom-sheet flow.
++2. [P3] Guest-facing name output is still unsanitized in `x.jsx` — `getGuestDisplayName` is passed directly to `CartView` at `pages/PublicMenu/x.jsx:3519-3530`, and the same helper is used for the hall-order confirmation label at `pages/PublicMenu/x.jsx:2772-2774` and `pages/PublicMenu/x.jsx:3478-3481`. This file does not strip the trailing ` #N` suffix for guest-facing UI. FIX: format the display string in `x.jsx` before passing/rendering it, stripping a trailing `\\s+#\\d+$` while leaving underlying guest data unchanged.
++
++## Summary
++- Total findings: 2
++- Priority split: 0 P0, 0 P1, 0 P2, 2 P3
++- Prompt clarity: 4/5
+diff --git a/pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md b/pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c13c215f460d4f88913f43858b40eba71a418430
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260326-234309-77f1
++
++## Findings
++1. [P3] PM-148 removal is not enforced in `x.jsx` — the main menu still renders `ModeTabs` with the full table-verification payload, including `verifiedByCode`, `currentTableId`, `currentTable`, and `resolvedTable` (`pages/PublicMenu/x.jsx:3371-3384`). In this file there is no explicit gate that disables the post-verification success/banner state after table-code confirmation, so the banner removal is not guaranteed at the page boundary. FIX: remove the banner-driving prop/path from the menu render in `x.jsx`, or pass an explicit "do not show confirmation banner" flag while keeping the bottom-sheet table confirmation flow unchanged.
++2. [P3] Guest-facing name output is still unsanitized in `x.jsx` — the file passes `getGuestDisplayName` straight into `CartView` (`pages/PublicMenu/x.jsx:3519-3530`) and also uses `getGuestDisplayName(guestToUse)` for the hall-order confirmation label (`pages/PublicMenu/x.jsx:2772-2774`, `pages/PublicMenu/x.jsx:3478-3481`). There is no display-only stripping of a trailing ` #N` suffix anywhere in this file, so guest-facing UI can still show the internal guest ID if the shared helper returns it. FIX: derive a guest-facing formatter in `x.jsx` that strips a trailing `\\s+#\\d+$` before passing/rendering the label, while keeping the stored guest data and staff-facing displays unchanged.
++
++## Summary
++Total: 2 findings (0 P0, 0 P1, 0 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — the task names `x.jsx` as the only target, but the banner-owning UI block is not identified inside this file; `x.jsx` only forwards verification props to child UI.
++- Missing context (what info would have helped): Whether Fix 2 should also remove the suffix from the hall-order confirmation label in `x.jsx`, not only the cart header.
++- Scope questions (anything you weren't sure if it's in scope): The task says target only `x.jsx`, but Fix 2 text references `x.jsx / CartView.jsx` display. Review stayed inside `x.jsx` only.
+
+codex
+The report files are written. I’m doing a quick sanity read of the saved findings and review note, then I’ll close with the file paths and count.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command 'Get-Content pages/PublicMenu/review_2026-03-26.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command 'Get-Content pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.23s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260326-234309-77f1
+
+## Findings
+1. [P3] PM-148 removal is not enforced in `x.jsx` â€” the main menu still renders `ModeTabs` with the full table-verification payload, including `verifiedByCode`, `currentTableId`, `currentTable`, and `resolvedTable` (`pages/PublicMenu/x.jsx:3371-3384`). In this file there is no explicit gate that disables the post-verification success/banner state after table-code confirmation, so the banner removal is not guaranteed at the page boundary. FIX: remove the banner-driving prop/path from the menu render in `x.jsx`, or pass an explicit "do not show confirmation banner" flag while keeping the bottom-sheet table confirmation flow unchanged.
+2. [P3] Guest-facing name output is still unsanitized in `x.jsx` â€” the file passes `getGuestDisplayName` straight into `CartView` (`pages/PublicMenu/x.jsx:3519-3530`) and also uses `getGuestDisplayName(guestToUse)` for the hall-order confirmation label (`pages/PublicMenu/x.jsx:2772-2774`, `pages/PublicMenu/x.jsx:3478-3481`). There is no display-only stripping of a trailing ` #N` suffix anywhere in this file, so guest-facing UI can still show the internal guest ID if the shared helper returns it. FIX: derive a guest-facing formatter in `x.jsx` that strips a trailing `\\s+#\\d+$` before passing/rendering the label, while keeping the stored guest data and staff-facing displays unchanged.
+
+## Summary
+Total: 2 findings (0 P0, 0 P1, 0 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY â€” do NOT skip this section)
+- Overall clarity: 4
+- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 â€” the task names `x.jsx` as the only target, but the banner-owning UI block is not identified inside this file; `x.jsx` only forwards verification props to child UI.
+- Missing context (what info would have helped): Whether Fix 2 should also remove the suffix from the hall-order confirmation label in `x.jsx`, not only the cart header.
+- Scope questions (anything you weren't sure if it's in scope): The task says target only `x.jsx`, but Fix 2 text references `x.jsx / CartView.jsx` display. Review stayed inside `x.jsx` only.
+ succeeded in 2.31s:
+# Review â€” PublicMenu `x.jsx` â€” 2026-03-26
+
+Scope reviewed: `pages/PublicMenu/x.jsx` plus page-folder context from `README.md` and `BUGS.md`, per task instructions.
+
+## Findings
+1. [P3] PM-148 removal is not enforced in `x.jsx` â€” the main menu still renders `ModeTabs` with `verifiedByCode`, `currentTableId`, `currentTable`, and `resolvedTable` at `pages/PublicMenu/x.jsx:3371-3384`. This file does not add an explicit guard that disables the post-verification success/banner path after table-code confirmation. FIX: remove the banner-driving prop/path from the menu render in `x.jsx`, or pass an explicit "do not show confirmation banner" flag while preserving the bottom-sheet flow.
+2. [P3] Guest-facing name output is still unsanitized in `x.jsx` â€” `getGuestDisplayName` is passed directly to `CartView` at `pages/PublicMenu/x.jsx:3519-3530`, and the same helper is used for the hall-order confirmation label at `pages/PublicMenu/x.jsx:2772-2774` and `pages/PublicMenu/x.jsx:3478-3481`. This file does not strip the trailing ` #N` suffix for guest-facing UI. FIX: format the display string in `x.jsx` before passing/rendering it, stripping a trailing `\\s+#\\d+$` while leaving underlying guest data unchanged.
+
+## Summary
+- Total findings: 2
+- Priority split: 0 P0, 0 P1, 0 P2, 2 P3
+- Prompt clarity: 4/5
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-26.log b/pages/PublicMenu/commands_2026-03-26.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..bc4764d883062f5a4feb7b0711c7ea67f426552b
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-26.log
+@@ -0,0 +1,36 @@
++# Command log for PublicMenu review on 2026-03-26
++# Timed out:
++Get-ChildItem -Name pages/PublicMenu
++Get-Content pages/PublicMenu/x.jsx
++if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md }
++if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md }
++Get-ChildItem pages/PublicMenu | Select-Object Name,Length
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'подтверждён|tableConfirmed|showTableConfirmSheet|showSuccessBanner|currentGuest\?\.name|guestName|#\$\{|guestNumber|Вы:' -CaseSensitive:$false
++if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md } else { 'README.md not found' }
++if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md } else { 'BUGS.md not found' }
++
++# Completed:
++Get-Location
++Get-Date -Format o
++Get-ChildItem pages/PublicMenu | Select-Object Name,Length
++if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md } else { 'README.md not found' }
++if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md } else { 'BUGS.md not found' }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'tableConfirmed|подтвержд|showTableConfirmSheet|showSuccessBanner' -CaseSensitive:$false -Context 6,10
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'currentGuest\?\.name|guestName|guestNumber|#\$\{|Вы:|currentGuestDisplay|displayGuest' -CaseSensitive:$false -Context 6,10
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'getGuestDisplayName|displayName|guestDisplay|guestCode|guestNumber|currentGuest' -CaseSensitive:$false -Context 8,16
++$m = Select-String -Path pages/PublicMenu/x.jsx -Pattern 'cart.verify.table_verified' -CaseSensitive:$false; if ($m) { $line=$m.LineNumber; Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip ($line-8) -First 20 }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'table_verified|confirmed|tableConfirm|success banner|showSuccess' -CaseSensitive:$false -Context 6,12
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'guestCode|hallGuestCodeEnabled|getGuestDisplayName\(' -CaseSensitive:$false -Context 3,8
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'bg-green|text-green|border-green|green-|table_verified|подтвержд' -CaseSensitive:$false -Context 4,10
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'Banner|banner|success|verified|currentTableId' -CaseSensitive:$false -Context 4,10
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3348; $count=38; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3516; $count=24; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=2768; $count=10; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern '\bverifiedByCode\b' -CaseSensitive:$false
++Select-String -Path pages/PublicMenu/x.jsx -Pattern '\bcurrentTable\b|\bcurrentTableId\b|\bisTableVerified\b' -CaseSensitive:$false | Select-Object -First 80
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'replace\(|split\(|#\d|guestLabel|guest.name|getGuestDisplayName|menuapp_guest_name' -CaseSensitive:$false -Context 3,6
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3140; $count=28; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3340; $count=20; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++Test-Path pipeline/chain-state
++Test-Path pages/PublicMenu/review_2026-03-26.md
++Test-Path pages/PublicMenu/commands_2026-03-26.log
+diff --git a/pages/PublicMenu/review_2026-03-26.md b/pages/PublicMenu/review_2026-03-26.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..dddcd26cde6dfa991a7c4082fe104f919e583682
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-26.md
+@@ -0,0 +1,12 @@
++# Review — PublicMenu `x.jsx` — 2026-03-26
++
++Scope reviewed: `pages/PublicMenu/x.jsx` plus page-folder context from `README.md` and `BUGS.md`, per task instructions.
++
++## Findings
++1. [P3] PM-148 removal is not enforced in `x.jsx` — the main menu still renders `ModeTabs` with `verifiedByCode`, `currentTableId`, `currentTable`, and `resolvedTable` at `pages/PublicMenu/x.jsx:3371-3384`. This file does not add an explicit guard that disables the post-verification success/banner path after table-code confirmation. FIX: remove the banner-driving prop/path from the menu render in `x.jsx`, or pass an explicit "do not show confirmation banner" flag while preserving the bottom-sheet flow.
++2. [P3] Guest-facing name output is still unsanitized in `x.jsx` — `getGuestDisplayName` is passed directly to `CartView` at `pages/PublicMenu/x.jsx:3519-3530`, and the same helper is used for the hall-order confirmation label at `pages/PublicMenu/x.jsx:2772-2774` and `pages/PublicMenu/x.jsx:3478-3481`. This file does not strip the trailing ` #N` suffix for guest-facing UI. FIX: format the display string in `x.jsx` before passing/rendering it, stripping a trailing `\\s+#\\d+$` while leaving underlying guest data unchanged.
++
++## Summary
++- Total findings: 2
++- Priority split: 0 P0, 0 P1, 0 P2, 2 P3
++- Prompt clarity: 4/5
+diff --git a/pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md b/pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c13c215f460d4f88913f43858b40eba71a418430
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260326-234309-77f1
++
++## Findings
++1. [P3] PM-148 removal is not enforced in `x.jsx` — the main menu still renders `ModeTabs` with the full table-verification payload, including `verifiedByCode`, `currentTableId`, `currentTable`, and `resolvedTable` (`pages/PublicMenu/x.jsx:3371-3384`). In this file there is no explicit gate that disables the post-verification success/banner state after table-code confirmation, so the banner removal is not guaranteed at the page boundary. FIX: remove the banner-driving prop/path from the menu render in `x.jsx`, or pass an explicit "do not show confirmation banner" flag while keeping the bottom-sheet table confirmation flow unchanged.
++2. [P3] Guest-facing name output is still unsanitized in `x.jsx` — the file passes `getGuestDisplayName` straight into `CartView` (`pages/PublicMenu/x.jsx:3519-3530`) and also uses `getGuestDisplayName(guestToUse)` for the hall-order confirmation label (`pages/PublicMenu/x.jsx:2772-2774`, `pages/PublicMenu/x.jsx:3478-3481`). There is no display-only stripping of a trailing ` #N` suffix anywhere in this file, so guest-facing UI can still show the internal guest ID if the shared helper returns it. FIX: derive a guest-facing formatter in `x.jsx` that strips a trailing `\\s+#\\d+$` before passing/rendering the label, while keeping the stored guest data and staff-facing displays unchanged.
++
++## Summary
++Total: 2 findings (0 P0, 0 P1, 0 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — the task names `x.jsx` as the only target, but the banner-owning UI block is not identified inside this file; `x.jsx` only forwards verification props to child UI.
++- Missing context (what info would have helped): Whether Fix 2 should also remove the suffix from the hall-order confirmation label in `x.jsx`, not only the cart header.
++- Scope questions (anything you weren't sure if it's in scope): The task says target only `x.jsx`, but Fix 2 text references `x.jsx / CartView.jsx` display. Review stayed inside `x.jsx` only.
+
+codex
+Saved the review outputs.
+
+`2` P3 findings were documented, limited to Fix 1 and Fix 2 only: the table-confirmation banner removal is not enforced at the `x.jsx` page boundary, and guest-facing name rendering in `x.jsx` still passes unsanitized guest display values through guest UI paths.
+
+Findings file: [publicmenu-260326-234309-77f1-codex-findings.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md)
+
+Repo-required artifacts: [review_2026-03-26.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-26.md) and [commands_2026-03-26.log](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-26.log)
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-26.log b/pages/PublicMenu/commands_2026-03-26.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..bc4764d883062f5a4feb7b0711c7ea67f426552b
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-26.log
+@@ -0,0 +1,36 @@
++# Command log for PublicMenu review on 2026-03-26
++# Timed out:
++Get-ChildItem -Name pages/PublicMenu
++Get-Content pages/PublicMenu/x.jsx
++if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md }
++if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md }
++Get-ChildItem pages/PublicMenu | Select-Object Name,Length
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'подтверждён|tableConfirmed|showTableConfirmSheet|showSuccessBanner|currentGuest\?\.name|guestName|#\$\{|guestNumber|Вы:' -CaseSensitive:$false
++if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md } else { 'README.md not found' }
++if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md } else { 'BUGS.md not found' }
++
++# Completed:
++Get-Location
++Get-Date -Format o
++Get-ChildItem pages/PublicMenu | Select-Object Name,Length
++if (Test-Path pages/PublicMenu/README.md) { Get-Content pages/PublicMenu/README.md } else { 'README.md not found' }
++if (Test-Path pages/PublicMenu/BUGS.md) { Get-Content pages/PublicMenu/BUGS.md } else { 'BUGS.md not found' }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'tableConfirmed|подтвержд|showTableConfirmSheet|showSuccessBanner' -CaseSensitive:$false -Context 6,10
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'currentGuest\?\.name|guestName|guestNumber|#\$\{|Вы:|currentGuestDisplay|displayGuest' -CaseSensitive:$false -Context 6,10
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'getGuestDisplayName|displayName|guestDisplay|guestCode|guestNumber|currentGuest' -CaseSensitive:$false -Context 8,16
++$m = Select-String -Path pages/PublicMenu/x.jsx -Pattern 'cart.verify.table_verified' -CaseSensitive:$false; if ($m) { $line=$m.LineNumber; Get-Content pages/PublicMenu/x.jsx | Select-Object -Skip ($line-8) -First 20 }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'table_verified|confirmed|tableConfirm|success banner|showSuccess' -CaseSensitive:$false -Context 6,12
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'guestCode|hallGuestCodeEnabled|getGuestDisplayName\(' -CaseSensitive:$false -Context 3,8
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'bg-green|text-green|border-green|green-|table_verified|подтвержд' -CaseSensitive:$false -Context 4,10
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'Banner|banner|success|verified|currentTableId' -CaseSensitive:$false -Context 4,10
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3348; $count=38; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3516; $count=24; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=2768; $count=10; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++Select-String -Path pages/PublicMenu/x.jsx -Pattern '\bverifiedByCode\b' -CaseSensitive:$false
++Select-String -Path pages/PublicMenu/x.jsx -Pattern '\bcurrentTable\b|\bcurrentTableId\b|\bisTableVerified\b' -CaseSensitive:$false | Select-Object -First 80
++Select-String -Path pages/PublicMenu/x.jsx -Pattern 'replace\(|split\(|#\d|guestLabel|guest.name|getGuestDisplayName|menuapp_guest_name' -CaseSensitive:$false -Context 3,6
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3140; $count=28; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++$lines = Get-Content pages/PublicMenu/x.jsx; $start=3340; $count=20; for($i=$start; $i -lt ($start+$count); $i++){ '{0}: {1}' -f ($i+1), $lines[$i] }
++Test-Path pipeline/chain-state
++Test-Path pages/PublicMenu/review_2026-03-26.md
++Test-Path pages/PublicMenu/commands_2026-03-26.log
+diff --git a/pages/PublicMenu/review_2026-03-26.md b/pages/PublicMenu/review_2026-03-26.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..dddcd26cde6dfa991a7c4082fe104f919e583682
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-26.md
+@@ -0,0 +1,12 @@
++# Review — PublicMenu `x.jsx` — 2026-03-26
++
++Scope reviewed: `pages/PublicMenu/x.jsx` plus page-folder context from `README.md` and `BUGS.md`, per task instructions.
++
++## Findings
++1. [P3] PM-148 removal is not enforced in `x.jsx` — the main menu still renders `ModeTabs` with `verifiedByCode`, `currentTableId`, `currentTable`, and `resolvedTable` at `pages/PublicMenu/x.jsx:3371-3384`. This file does not add an explicit guard that disables the post-verification success/banner path after table-code confirmation. FIX: remove the banner-driving prop/path from the menu render in `x.jsx`, or pass an explicit "do not show confirmation banner" flag while preserving the bottom-sheet flow.
++2. [P3] Guest-facing name output is still unsanitized in `x.jsx` — `getGuestDisplayName` is passed directly to `CartView` at `pages/PublicMenu/x.jsx:3519-3530`, and the same helper is used for the hall-order confirmation label at `pages/PublicMenu/x.jsx:2772-2774` and `pages/PublicMenu/x.jsx:3478-3481`. This file does not strip the trailing ` #N` suffix for guest-facing UI. FIX: format the display string in `x.jsx` before passing/rendering it, stripping a trailing `\\s+#\\d+$` while leaving underlying guest data unchanged.
++
++## Summary
++- Total findings: 2
++- Priority split: 0 P0, 0 P1, 0 P2, 2 P3
++- Prompt clarity: 4/5
+diff --git a/pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md b/pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c13c215f460d4f88913f43858b40eba71a418430
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md
+@@ -0,0 +1,14 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260326-234309-77f1
++
++## Findings
++1. [P3] PM-148 removal is not enforced in `x.jsx` — the main menu still renders `ModeTabs` with the full table-verification payload, including `verifiedByCode`, `currentTableId`, `currentTable`, and `resolvedTable` (`pages/PublicMenu/x.jsx:3371-3384`). In this file there is no explicit gate that disables the post-verification success/banner state after table-code confirmation, so the banner removal is not guaranteed at the page boundary. FIX: remove the banner-driving prop/path from the menu render in `x.jsx`, or pass an explicit "do not show confirmation banner" flag while keeping the bottom-sheet table confirmation flow unchanged.
++2. [P3] Guest-facing name output is still unsanitized in `x.jsx` — the file passes `getGuestDisplayName` straight into `CartView` (`pages/PublicMenu/x.jsx:3519-3530`) and also uses `getGuestDisplayName(guestToUse)` for the hall-order confirmation label (`pages/PublicMenu/x.jsx:2772-2774`, `pages/PublicMenu/x.jsx:3478-3481`). There is no display-only stripping of a trailing ` #N` suffix anywhere in this file, so guest-facing UI can still show the internal guest ID if the shared helper returns it. FIX: derive a guest-facing formatter in `x.jsx` that strips a trailing `\\s+#\\d+$` before passing/rendering the label, while keeping the stored guest data and staff-facing displays unchanged.
++
++## Summary
++Total: 2 findings (0 P0, 0 P1, 0 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 4
++- Ambiguous Fix descriptions (list Fix # and what was unclear): Fix 1 — the task names `x.jsx` as the only target, but the banner-owning UI block is not identified inside this file; `x.jsx` only forwards verification props to child UI.
++- Missing context (what info would have helped): Whether Fix 2 should also remove the suffix from the hall-order confirmation label in `x.jsx`, not only the cart header.
++- Scope questions (anything you weren't sure if it's in scope): The task says target only `x.jsx`, but Fix 2 text references `x.jsx / CartView.jsx` display. Review stayed inside `x.jsx` only.
+
+tokens used
+183 661
+Saved the review outputs.
+
+`2` P3 findings were documented, limited to Fix 1 and Fix 2 only: the table-confirmation banner removal is not enforced at the `x.jsx` page boundary, and guest-facing name rendering in `x.jsx` still passes unsanitized guest display values through guest UI paths.
+
+Findings file: [publicmenu-260326-234309-77f1-codex-findings.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260326-234309-77f1-codex-findings.md)
+
+Repo-required artifacts: [review_2026-03-26.md](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-26.md) and [commands_2026-03-26.log](C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-26.log)

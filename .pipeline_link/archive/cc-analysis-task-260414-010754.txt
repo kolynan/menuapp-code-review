@@ -1,0 +1,201 @@
+# PSSK v2: CC Analysis of Updated KS Prompt — SOM Batch A
+# Session: S266 | Task: task-260414-010754
+# Date: 2026-04-14 | Reviewer: Claude Code (Opus 4.6)
+# Source verified against: staffordersmobile.jsx (4524 lines)
+
+## Overall Assessment
+
+The v2 draft is a significant improvement over S263. Line numbers for B1/B3/B4 branches
+are now accurate. Fix3 remains clear. However, several issues need resolution before
+implementation can begin.
+
+---
+
+## Fix 1 — Guest Count: RATING: *** Needs Clarification ***
+
+### What's correct:
+- B1 lines 670, 680, 708 — VERIFIED, all use `newOrders.length` / `inProgressOrders.length` / `readyOrders.length` with `HALL_UI_TEXT.guests`
+- B3 lines 1281, 1291, 1319 — VERIFIED, same pattern
+- B6 lines 2331, 2333, 2335, 2337 — VERIFIED, use `.length` with hardcoded Russian strings
+- B1/B3 served sections (718, 1329) correctly excluded — they show dish count only, no guest count
+- The `new Set(orders.map(o => getLinkId(o.guest))).size` approach is correct
+
+### Issues found:
+
+**Issue 1.1 (P1): Wrong location count in section title**
+Prompt says "6 TOCHNYKH MEST v trekh render-vetkakh" but lists 6 (B1/B3) + 4 (B6) = 10 locations.
+FIX: Change title to "10 TOCHNYKH MEST v trekh render-vetkakh" or restructure.
+
+**Issue 1.2 (P1): Grep verification will miss B6 entirely**
+B6 (lines 2331, 2333, 2335, 2337) uses hardcoded "gost'", "gostya", "gostey" — NOT `HALL_UI_TEXT.guests`.
+The grep `grep -n "HALL_UI_TEXT.guests"` returns only B1/B3 matches (6 hits), missing all 4 B6 locations.
+FIX: Add second grep: `grep -n 'pluralRu.*гост' staffordersmobile.jsx` to catch B6.
+
+**Issue 1.3 (P2): "Recommendation" should be REQUIRED**
+The BEFORE/AFTER pattern evaluates `new Set(orders.map(...)).size` TWICE in the same template literal.
+`uniqueGuests(orders)` extraction should be REQUIRED, not "recommended", for readability and DRY.
+
+**Issue 1.4 (P2): Fix1+Fix4 interaction wording is misleading**
+Lines 680 and 1291 say "После Fix4 это место удаляется — учесть при мерже". But Fix4 removes the
+WRAPPER, not the content. After Fix4, guest counts move from "В РАБОТЕ" aggregate header to
+per-section headers. Clarify: "After Fix4, this aggregate header is removed. Per-section headers
+(inside inProgressSections.map) will need their own uniqueGuests count — see B6 line 2333 as model."
+
+**Issue 1.5 (P3): B2/B4 legacy sections after Fix4**
+After Fix4 promotes B2/B4 `subGroups.map(...)` to root level, each sub-group shows
+`orders.length` as count. Should these also get unique guest count? Currently unspecified.
+Impact is low (legacy card view) but creates inconsistency.
+
+---
+
+## Fix 2 — closeSession Served Visibility: RATING: *** Needs Clarification (Change 3 = Rewrite) ***
+
+### What's correct:
+- Root cause analysis at line 3539-3544 is accurate
+- Change 1 (bulk-close in sessionHelpers.js) is well-specified
+- Change 2 (remove 'served' from activeOrders filter) is correct and minimal
+- Anti-patterns section is good
+
+### Issues found:
+
+**Issue 2.1 (P0-CRITICAL): closeSession is NOT only used in SOM**
+The prompt states: "closeSession is used ONLY in SOM (verified grep 2026-04-14)."
+THIS IS FACTUALLY WRONG. PartnerTables also uses closeSession:
+  - Import: `pages/partnertables/260301-00 partnertables RELEASE.js:61`
+  - Call: `pages/partnertables/260301-00 partnertables RELEASE.js:1981`
+
+The bulk-close addition will also fire when PartnerTables closes a session.
+This may be ACCEPTABLE (PartnerTables closing = session done = orders should be closed too),
+but it MUST be acknowledged and verified:
+  1. Does PartnerTables UI display order statuses after close? If so, does 'closed' render correctly?
+  2. Are there any PartnerTables filters that exclude 'closed' orders unexpectedly?
+
+FIX: Update the "verified grep" claim. Add note: "Also used in PartnerTables — bulk-close
+is intentionally beneficial there (consistent behavior). Verify PartnerTables still renders
+closed sessions correctly."
+
+**Issue 2.2 (P1): Change 3 is self-contradictory**
+The prompt says "verify, no edit needed" and then immediately says "Eto bag" and provides
+a code fix. This is confusing and contradictory.
+FIX: Rename to "Change 3 — REQUIRED edit in filteredGroups" and remove "no edit needed".
+
+**Issue 2.3 (P1): Change 3 gives TWO approaches without choosing one**
+"Decision for implementor: dobavit' v hasActiveOrder proverku... ILI dobavit' otdel'noe uslovie"
+Two options = ambiguity. The implementor will pick one; if they pick wrong, the review round
+will reject it.
+FIX: Pick ONE approach. The second option (separate `hasServedButNotClosed` variable) is cleaner
+because it keeps the "active order" concept pure and adds a new orthogonal condition. Recommend
+locking to Option 2.
+
+**Issue 2.4 (P1): tabCounts update has no code**
+The prompt says "Takzhe obnovit' tabCounts (lines 3804-3818) po toy zhe logike" but provides
+no BEFORE/AFTER code. The implementor must infer the change.
+FIX: Add explicit BEFORE/AFTER for tabCounts:
+```javascript
+// BEFORE (line 3814)
+if (hasActiveOrder || hasActiveRequest) active++; else completed++;
+// AFTER
+const hasServedButNotClosed = group.orders.some(o => {
+  const config = getStatusConfig(o);
+  return config.isFinishStage && o.status !== 'closed' && o.status !== 'cancelled';
+});
+if (hasActiveOrder || hasActiveRequest || hasServedButNotClosed) active++; else completed++;
+```
+
+**Issue 2.5 (P2): Promise.all concurrency risk**
+Bulk-close uses `Promise.all(sessionOrders.filter(...).map(...update...))`. A table with
+20+ orders fires 20+ concurrent API calls. Base44 may throttle or rate-limit.
+Consider noting: "If order count >10, consider sequential processing or batching."
+(Minor — most tables have <10 orders in practice.)
+
+---
+
+## Fix 3 — Star Badge stopPropagation: RATING: *** CLEAR ***
+
+### Verification:
+- Line 2249-2252: star badge div — VERIFIED, no onClick handler, needs stopPropagation
+- Line 2259-2262: free badge div — VERIFIED, no onClick handler, needs stopPropagation
+- Line 2255: lock badge — VERIFIED, already has stopPropagation (button element)
+- Fix is minimal, unambiguous, no scope creep risk
+
+No issues found. Ready for implementation.
+
+---
+
+## Fix 4 — Remove "В РАБОТЕ" Wrapper: RATING: *** Needs Clarification ***
+
+### What's correct:
+- B1 lines 677-703 — VERIFIED wrapper with toggle + conditional
+- B2 lines 761-769 — VERIFIED legacy wrapper
+- B3 lines 1288-1314 — VERIFIED mirror of B1
+- B4 lines 1372-1398 — VERIFIED mirror of B2
+- inProgressExpanded state preservation — CORRECT (used at 1780, 1816, 1823, 2346)
+- Legacy branch 2346 exclusion — CORRECT per Arman decision B-3
+- B6 line 2333 reference model — CORRECT, already has root-level sections
+
+### Issues found:
+
+**Issue 4.1 (P1): Active/passive styling per section is underspecified**
+The prompt says: "Gotovo k vydache = active (expanded, colored). Prinyato/Gotovitsya/Vydano = passive
+(collapsed, grey, opacity 0.6)."
+BUT: it doesn't tell the implementor HOW to identify which section is "Gotovo k vydache."
+By `section.sid`? By `section.label`? By `cfg.internal_code === 'ready'`?
+This is critical because the implementor will create an if/else to apply styling.
+FIX: Specify the detection method. Example: "Active section = stage where
+`cfg.internal_code === 'ready_to_serve'` (or whatever the actual internal_code is).
+All other inProgress sections = passive."
+Or: "Use B6 line 2333 opacity pattern — all inProgress sections get opacity-60.
+Active section detection is already in the existing code via section.isActive (if such
+property exists) or needs a new property."
+
+**Issue 4.2 (P2): B2/B4 single-subgroup edge case**
+In B2 (line 767) and B4 (line 1385), there's a special case:
+`if (subGroups.length === 1) return <div key={sid} className="space-y-2">{orders.map(renderLegacyOrderCard)}</div>;`
+When there's only 1 subGroup, it renders cards directly without a section header.
+After Fix4 removes the "В РАБОТЕ" wrapper, this single subGroup still has no header.
+Should the implementor add a section header even for single-subgroup cases?
+The prompt doesn't address this edge case.
+
+**Issue 4.3 (P2): Branches B2/B4 use `subGroups` not `inProgressSections`**
+B1/B3 use `inProgressSections.map(...)` (well-structured with section metadata).
+B2/B4 use `subGroups.map(...)` (simpler, uses `{ sid, orders, cfg }`).
+The prompt says to use B6 line 2333 as reference model — but B6 uses `inProgressSections`,
+not `subGroups`. Should B2/B4 switch from `subGroups` to `inProgressSections`? Or keep
+`subGroups` but just remove the wrapper? This structural difference is not addressed.
+
+---
+
+## Meta Issues
+
+**Meta 1: File name discrepancy**
+Prompt prose: "RELEASE source: 260413-00 StaffOrdersMobile RELEASE.jsx (4524 lines)"
+Prompt yaml: "code_file: pages/StaffOrdersMobile/staffordersmobile.jsx"
+The file `260413-00` may exist in the main repo but NOT in the worktree. The yaml path is
+the correct one for implementation. Align the prose with the yaml.
+
+**Meta 2: Implementation order matters but isn't specified**
+Fix4 removes wrappers that Fix1 targets (lines 680, 1291). The prompt notes this
+("После Fix4 это место удаляется") but doesn't specify implementation ORDER.
+Recommend: Implement Fix3 first (trivial), then Fix1, then Fix4, then Fix2.
+Fix1 before Fix4 ensures guest counts are fixed before wrappers are removed.
+Fix2 last because it touches a different file and has the most complexity.
+
+---
+
+## Summary Table
+
+| Fix | Rating | Score | Blocking Issues |
+|-----|--------|-------|-----------------|
+| Fix 1 | Needs Clarification | 3.5/5 | 1.1 (wrong count), 1.2 (grep misses B6) |
+| Fix 2 | Needs Clarification | 3/5 | 2.1 (CRITICAL: PartnerTables), 2.2-2.4 (Change 3 rewrite) |
+| Fix 3 | CLEAR | 5/5 | None |
+| Fix 4 | Needs Clarification | 3.5/5 | 4.1 (active/passive detection) |
+
+**Target: all 4 Fix >= 4/5.**
+- Fix 3: PASSES (5/5)
+- Fix 1: Fails (3.5/5) — needs minor clarifications (location count + grep)
+- Fix 2: Fails (3/5) — needs PartnerTables acknowledgment + Change 3 rewrite
+- Fix 4: Fails (3.5/5) — needs active/passive detection specification
+
+**Recommendation:** Fix the identified issues in the prompt, then re-review before
+sending to implementation. Total effort: ~30 min of prompt editing.

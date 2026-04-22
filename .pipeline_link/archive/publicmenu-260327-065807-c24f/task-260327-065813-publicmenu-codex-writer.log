@@ -1,0 +1,570 @@
+OpenAI Codex v0.116.0 (research preview)
+--------
+workdir: C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, C:\Users\ASUS\.codex\memories]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019d2d03-81b8-76c2-ae9e-175d345cb72b
+--------
+user
+Review the file(s) specified in TASK CONTEXT below for a React restaurant QR-menu app on Base44 platform. Also check README.md and BUGS.md in the same page folder for context (read-only, do NOT modify). SPEED RULES — this is a time-sensitive pipeline step: - Read ONLY the TARGET files + README/BUGS for context. Do NOT search the repo, do NOT read old findings, do NOT read files outside the page folder. - Do NOT run rg/grep across the whole repo. Do NOT cross-reference with other pages. - Limit analysis to the target page code. Be concise. ⛔ SCOPE RESTRICTION (MANDATORY): If the TASK CONTEXT below contains a numbered Fix list (Fix 1, Fix 2, etc.): - Do NOT report ANY issues outside the numbered Fix list. - If you see other bugs — IGNORE them completely. - Your output must contain ONLY findings for Fix 1, Fix 2, etc. - Extra findings outside the Fix list = task FAILURE. - BAD example: Task says "Fix 1: button position" → you report touch targets, aria-labels, i18n issues. This is WRONG. - GOOD example: Task says "Fix 1: button position" → you report ONLY your analysis of Fix 1 (button position). Nothing else. If there is NO numbered Fix list → find ALL bugs. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns. For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed. Write findings to: pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md FORMAT: # Codex Writer Findings — PublicMenu Chain: publicmenu-260327-065807-c24f ## Findings 1. [P0/P1/P2/P3] Title — Description. FIX: ... 2. ... ## Summary Total: N findings (X P0, Y P1, Z P2, W P3) ## Prompt Clarity (MANDATORY — do NOT skip this section) Rate the task description quality (1-5). For any score below 4, explain what was unclear: - Overall clarity: [1-5] - Ambiguous Fix descriptions (list Fix # and what was unclear): ... - Missing context (what info would have helped): ... - Scope questions (anything you weren't sure if it's in scope): ... YOU MUST FILL IN ALL FIELDS ABOVE. Findings without Prompt Clarity are incomplete. Do NOT apply fixes — only document findings. === TASK CONTEXT === # Small UX Fixes — ModeTabs + CartView (#162 v2) Reference: `BUGS_MASTER.md` (PM-148, PM-149). UX agreed S182. Production page: https://menu-app-mvp-49a4f5b2.base44.app **Context:** Two small guest-facing UX cleanups. Previous attempt (chain 77f1) targeted the wrong file (x.jsx) and was reverted. Root cause found by Cowork: both bugs are in child components, not x.jsx. This task targets the correct files with exact line numbers. TARGET FILES (modify): - `pages/PublicMenu/ModeTabs.jsx` - `pages/PublicMenu/CartView.jsx` CONTEXT FILES (read-only): - `BUGS_MASTER.md` ⚠️ DO NOT touch `pages/PublicMenu/x.jsx` — previous failed attempt already reverted from there. --- ## Fix 1 — PM-148 (P3) [MUST-FIX]: Remove table confirmation banner ### File `pages/PublicMenu/ModeTabs.jsx` — only 84 lines total, easy to scan. ### Сейчас After confirming table code, a green banner shows on the menu screen: `✓ Стол 22 подтверждён` This adds no value — the guest just scanned their own QR code, they already know which table they're at. ### Должно быть Remove the green banner entirely. The banner block is at **lines 55–65**: ``` {/* Verified badge in menu view */} {isHallMode && isTableVerified && currentTableId && ( <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4"> <div className="flex items-center justify-center gap-2 text-green-800"> <CheckCircle2 className="w-5 h-5" /> <span className="font-medium"> {t('form.table')} {currentTable?.name || currentTable?.code || ""} {t('x.hall.verified')} </span> </div> </div> )} ``` Delete this entire block (lines 55–65 including the comment). Nothing else. ### НЕ должно быть - The green banner must NOT appear after table confirmation - The amber "invalid table code" warning block (starts at line 67: `{isHallMode && tableCodeParam && !resolvedTable && !verifiedByCode &&`) must remain untouched ### Проверка 1. Scan QR / confirm table code → menu screen opens 2. Green "Стол X подтверждён" banner does NOT appear 3. Menu, categories, mode tabs (В зале / Самовывоз / Доставка) are visible normally --- ## Fix 2 — PM-149 (P3) [MUST-FIX]: Remove guest ID suffix from display ### File `pages/PublicMenu/CartView.jsx` (~1046 lines). Search for: `guestDisplay` or `effectiveGuestCode` — around **line 307**. ### Сейчас Cart header shows: `Вы: Гость 1 #1313 ✏️` or `Вы: Timur #1313 ✏️` The `#1313` is a system-generated guest code — internal tech detail not meaningful to the guest. The suffix is explicitly constructed at **lines 307–309**: ``` const guestDisplay = effectiveGuestCode ? `${guestBaseName} #${effectiveGuestCode}` : guestBaseName; ``` ### Должно быть Change lines 307–309 to simply: ``` const guestDisplay = guestBaseName; ``` The `effectiveGuestCode` variable (line 300) should remain — it is used for backend/data purposes. Only the visual display construction changes. The variable `guestDisplay` is rendered at line 578. ### НЕ должно быть - `#1313` (or any `#N` suffix) must NOT appear in the cart header - The guest name save/edit functionality must continue to work - `effectiveGuestCode` variable must NOT be deleted — only removed from `guestDisplay` construction ### Проверка 1. Open cart (bottom strip) → shows `Вы: Гость 1 ✏️` (no `#1313`) 2. Tap ✏️ → enter "Timur" → save → shows `Вы: Timur ✏️` (no `#1313`) 3. The name saves correctly on next open --- ## ⛔ SCOPE LOCK - Modify ONLY `pages/PublicMenu/ModeTabs.jsx` (remove lines 55–65) and `pages/PublicMenu/CartView.jsx` (change lines 307–309) - Do NOT touch `pages/PublicMenu/x.jsx` - Do NOT touch any other file - Do NOT change: table code confirmation logic, guest name save/edit logic, `effectiveGuestCode` variable, amber warning block in ModeTabs ## FROZEN UX (DO NOT CHANGE) - PM-133 ✅: help drawer flow (openHelpDrawer logic) — in x.jsx, not touched - PM-145 ✅: CartView floating-point total fix — keep all number formatting intact - PM-139 ✅: guest name saves correctly (setCurrentGuest null guard) ## FROZEN UX grep verification Before commit, verify these patterns still exist unchanged: ``` grep -n "verifiedByCode" pages/PublicMenu/ModeTabs.jsx grep -n "effectiveGuestCode" pages/PublicMenu/CartView.jsx ``` Both should return results (variable still present, not deleted). ## MOBILE-FIRST CHECK (MANDATORY before commit) This is a mobile-first restaurant app. Primary usage: customer phone at the table. Before committing, verify ALL changes at 375px viewport width: - [ ] Close/chevron buttons: RIGHT-ALIGNED (not centered), sticky top - [ ] Touch targets ≥ 44×44px (h-11 w-11) - [ ] No excessive whitespace/gaps on small screens - [ ] Bottom sheet content scrollable without losing close/submit button - [ ] No duplicate visual indicators (e.g. two gray lines that look the same) - [ ] Text truncation: long item names don't overflow - [ ] Sticky footer buttons don't overlap content ## Regression Check (MANDATORY after implementation) - [ ] Table code input still works (Bottom Sheet opens, code accepted) - [ ] Guest name edit still saves correctly (tap ✏️ → enter name → save) - [ ] Cart header shows correct name after save - [ ] Amber "invalid table code" warning still shows for bad QR codes (ModeTabs line 68+) ## Implementation Notes - TARGET FILES: `pages/PublicMenu/ModeTabs.jsx`, `pages/PublicMenu/CartView.jsx` - Do NOT use `git add .` — only: `git add pages/PublicMenu/ModeTabs.jsx pages/PublicMenu/CartView.jsx` - git commit -m "fix(PublicMenu): remove table confirm banner (PM-148) + strip guest ID suffix (PM-149)" - git push === END ===
+mcp startup: no servers
+codex
+I’m reviewing only the two target files plus page-local context files, and I’ll keep the analysis locked to Fix 1 and Fix 2. I’ll write the findings file the task requested, and also save the required review artifacts in the page folder.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/CartView.jsx'; "'$start=280; $end=330; $i=1; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '"'{0,4}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$i=1; Get-Content '"'pages/PublicMenu/ModeTabs.jsx' | ForEach-Object { '{0,4}: {1}' -f "'$i, $_; $i++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Force pages/PublicMenu | Select-Object Name,Length,LastWriteTime' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/CartView.jsx'; "'$start=560; $end=595; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '"'{0,4}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review exited 124 in 11.57s:
+
+ exited 124 in 11.69s:
+
+ succeeded in 10.08s:
+ 560:                     onChange={(e) => setGuestNameInput(e.target.value)}
+ 561:                     placeholder={tr('guest.name_placeholder', 'Ð˜Ð¼Ñ')}
+ 562:                     className="w-20 px-1 py-0.5 text-xs border rounded"
+ 563:                     autoFocus
+ 564:                     onKeyDown={(e) => {
+ 565:                       if (e.key === 'Enter' && guestNameInput.trim()) handleUpdateGuestName();
+ 566:                       if (e.key === 'Escape') { setIsEditingName(false); setGuestNameInput(''); }
+ 567:                     }}
+ 568:                   />
+ 569:                   <button onClick={handleUpdateGuestName} disabled={!guestNameInput.trim()} className="text-green-600 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label={tr('common.save', 'Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ')}>âœ“</button>
+ 570:                   <button onClick={() => { setIsEditingName(false); setGuestNameInput(''); }} className="text-slate-400 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label={tr('common.cancel', 'ÐžÑ‚Ð¼ÐµÐ½Ð°')}>âœ•</button>
+ 571:                 </span>
+ 572:               ) : (
+ 573:                 <button
+ 574:                   onClick={() => { setGuestNameInput(currentGuest?.name || ''); setIsEditingName(true); }}
+ 575:                   className="hover:underline"
+ 576:                   style={{color: primaryColor}}
+ 577:                 >
+ 578:                   {guestDisplay} {(!currentGuest?.name) && <span className="text-xs">âœï¸</span>}
+ 579:                 </button>
+ succeeded in 9.96s:
+
+Name                                  Length LastWriteTime        
+----                                  ------ -------------        
+components                                   3/23/2026 8:47:41 AM 
+versions                                     3/26/2026 11:13:28 PM
+260320-01 useTableSession RELEASE.jsx 30461  3/20/2026 6:45:53 PM 
+260323-03 CheckoutView RELEASE.jsx    7840   3/23/2026 11:26:26 AM
+260324-04 MenuView RELEASE.jsx        16326  3/24/2026 3:34:11 PM 
+260325-04 MenuView RELEASE.jsx        16109  3/25/2026 4:09:16 PM 
+260325-06 CartView RELEASE.jsx        42351  3/25/2026 9:16:08 PM 
+260326-00 x RELEASE.jsx               149218 3/26/2026 10:00:57 PM
+260326-01 CartView RELEASE.jsx        44686  3/26/2026 11:13:29 PM
+260327-00 x RELEASE.jsx               149420 3/27/2026 12:16:21 AM
+ACCEPTANCE_CRITERIA_PHASE1.md         12831  3/7/2026 7:58:18 PM  
+BUGS.md                               64886  3/27/2026 12:11:52 AM
+CartView.jsx                          44686  3/26/2026 11:13:08 PM
+CheckoutView.jsx                      7840   3/23/2026 11:02:54 AM
+COPY_SPEC.md                          10857  3/7/2026 7:58:18 PM  
+i18n_DrawerUX_S79.csv                 464    3/5/2026 4:38:10 PM  
+i18n_WorkingHours_S79.csv             1206   3/5/2026 3:53:06 PM  
+codex
+I’ve confirmed the page-local files available in `pages/PublicMenu`. Next I’m checking only the fix-specific code paths and any matching context notes in the page README/BUGS files.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/ModeTabs.jsx'; "'$start=1; $end=90; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '"'{0,4}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/CartView.jsx'; "'$start=295; $end=315; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '"'{0,4}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-148|PM-149|ModeTabs|CartView|guestDisplay|effectiveGuestCode|verified' -CaseSensitive:"'$false | ForEach-Object { '"'{0}: {1}' -f "'$_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/PublicMenu README.md' -Pattern 'ModeTabs|CartView|table|guest|hall|pickup|delivery' -CaseSensitive:"'$false | Select-Object Path,LineNumber,Line | ForEach-Object { '"'{0}:{1}: {2}' -f "'$_.Path, $_.LineNumber, $_.Line.Trim() }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 11.65s:
+ 295:       return null;
+ 296:     }
+ 297:   }, []);
+ 298: 
+ 299:   // Effective guest code: prop takes priority, fallback to localStorage (only if hall guest codes enabled)
+ 300:   const effectiveGuestCode = guestCode || (hallGuestCodeEnabled ? guestCodeFromStorage : null);
+ 301: 
+ 302:   // Guest display: "Ð˜Ð¼Ñ #6475" or "Ð“Ð¾ÑÑ‚ÑŒ #6475"
+ 303:   const guestBaseName = currentGuest
+ 304:     ? (currentGuest.name || getGuestDisplayName(currentGuest))
+ 305:     : tr("cart.guest", "Ð“Ð¾ÑÑ‚ÑŒ");
+ 306: 
+ 307:   const guestDisplay = effectiveGuestCode 
+ 308:     ? `${guestBaseName} #${effectiveGuestCode}` 
+ 309:     : guestBaseName;
+ 310: 
+ 311:   // Table label: avoid "Ð¡Ñ‚Ð¾Ð» Ð¡Ñ‚Ð¾Ð» 3"
+ 312:   const tablePrefix = tr("form.table", "Ð¡Ñ‚Ð¾Ð»");
+ 313:   const rawTableLabel = currentTable?.name || currentTable?.code || "â€”";
+ 314:   const tableLabel = React.useMemo(() => {
+ succeeded in 11.89s:
+   1: import React from "react";
+   2: import { CheckCircle2, AlertCircle } from "lucide-react";
+   3: 
+   4: export default function ModeTabs({
+   5:   visibleModeTabs,
+   6:   orderMode,
+   7:   onModeChange,
+   8:   getModeDescription,
+   9:   isHallMode,
+  10:   isTableVerified,
+  11:   currentTableId,
+  12:   currentTable,
+  13:   tableCodeParam,
+  14:   resolvedTable,
+  15:   verifiedByCode,
+  16:   t,
+  17:   primaryColor = '#1A1A1A',
+  18: }) {
+  19:   return (
+  20:     <div className="max-w-2xl mx-auto px-4 mt-4">
+ succeeded in 12.39s:
+28: - **Файл:** CartView.jsx
+29: - **Симптом:** CartView renders same layout regardless of visit state. Missing 3 distinct drawer layouts per spec (before send / after send+draft / after send no draft).
+35: - **Файл:** CartView.jsx
+55: - **Файл:** x.jsx / CartView.jsx
+62: - **Файл:** CartView.jsx
+82: - **Файл:** x.jsx (OrderStatusBadge, osGetStatusConfig), CartView.jsx (getSafeStatus)
+89: - **Файл:** x.jsx (OrderStatusBadge, osGetStatusConfig), CartView.jsx (getSafeStatus)
+119: - **Симптом:** Table confirmation Bottom Sheet doesn't display attempt counter or lockout countdown. CartView cooldown logic still prevents brute-force via shared state, but user doesn't see countdown in Bottom Sheet.
+142: ### FIX-CHAIN-77f1: PM-148+PM-149 — Small UX fixes (banner + guest ID suffix) — FIXED S184
+146: - PM-148 (P3): Removed table confirmation banner — stopped forwarding verifiedByCode to ModeTabs, removed unused i18n key
+147: - PM-149 (P3): Stripped #N guest ID suffix from guest-facing display — added getGuestDisplayNameClean() wrapper at confirmation screen + CartView
+149: ### FIX-CHAIN-f62f: PM-142+143+144+145 — CartView drawer redesign, current visit only — FIXED S182
+151: - **Файлы:** CartView.jsx
+179: - **Файлы:** x.jsx, CartView.jsx
+183: - PM-127 (P2): Bell icon restored on main menu (fixed bottom-left, amber style, visible in hall mode when table verified)
+227: - **Skipped:** PM-104 (P3, CartView.jsx is read-only).
+237: - **Skipped:** PM-104 (P3, requires CartView.jsx which is read-only). PM-096, PM-discount-check, #84b already fixed in prior КС.
+288: ### FIX-PM-083-087-CHAIN-203829: CartView mobile UX — 5 bugs fixed — FIXED S162
+290: - **Файл:** CartView.jsx
+332: 1. [P1] Move `!isTableVerified` check before `validate()` in `handleSubmitOrder` — root cause of BS not opening (Codex)
+ succeeded in 11.39s:
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\README.md:17: | CartView.jsx | `260305-03 CartView RELEASE.jsx` | 05 мар 2026 | S82 |
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\README.md:19: | useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 02 мар 2026 | S68 |
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\README.md:33: - Full CC code review всех 6 base файлов (CartView, CheckoutView, MenuView, ModeTabs, useTableSession, x.jsx)
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\README.md:36: - BUG-PM-041 (P0): Polling timer leak in useTableSession after cleanup
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\README.md:95: - Защита от двойного сабмита (submitLockRef + safeguard restore guest)
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\PublicMenu README.md:17: | `useTableSession.jsx` | Хук для работы со столами в зале (~758 строк) |
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\PublicMenu README.md:18: | `CartView.jsx` | Корзина (drawer снизу) |
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\PublicMenu README.md:21: | `ModeTabs.jsx` | Переключатель зал/самовывоз/доставка |
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\PublicMenu README.md:31: | useTableSession.jsx | `260302-06 useTableSession RELEASE.jsx` | 2 мар 2026 |
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\PublicMenu README.md:32: | CartView.jsx | `260305-03 CartView RELEASE.jsx` | 5 мар 2026 |
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\PublicMenu README.md:35: | ModeTabs.jsx | `260223-00 ModeTabs RELEASE.jsx` | 23 фев 2026 |
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\PublicMenu README.md:50: - **Drawer UX Refactor (CartView v3):** 5 UX-улучшений корзины: (1) Sticky header — шапка (Bell + Стол/Гость + X) фиксирована при скролле. (2) Авто-рост drawer — 2 детента: 60% (mid) и 90% (full), авто-переход в full при >4 позициях. (3) Код стола вынесен из аккордеона "Подробности" в отдельный компактный блок между "Ваш заказ" и "Выгода". (4) 2-строчный layout блюд — название+цена на строке 1, stepper на строке 2, `line-clamp-2` для длинных названий. (5) "Новый заказ" -> "Ваш заказ", "Подробности" -> "Выгода", упрощённый "Счёт" без "Только мне" для одного гостя.
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\PublicMenu README.md:76: - Новые i18n ключи: `cart.details`, `cart.my_orders_row`, `cart.bill_row`, `cart.bill_title`, `cart.my_orders_title`, `cart.order_more`, `cart.choose_dishes`, `cart.other_guests`, `cart.no_orders_yet`, `cart.order_label`, `cart.order_sent`, `cart.verify_to_submit`
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\PublicMenu README.md:83: - i18n новые ключи: `confirmation.sent_to_waiter`, `confirmation.order_sent`, `confirmation.status_hint_hall`, `confirmation.status_hint`, `status.sent`, `loyalty.thanks_short`, `loyalty.points_symbol`
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\PublicMenu README.md:88: - **Discount Breakdown в CheckoutView (pickup/delivery):** В режимах самовывоз и доставка скидка за онлайн-заказ теперь отображается отдельной строкой между подытогом и итого. Ранее пользователь видел разницу в цене без объяснения (например, блюдо 56 ₸, а итого 54 ₸). Теперь показываются: подытог, скидка за онлайн (зелёный, с минусом), списание баллов (если есть), итого. В режиме "зал" без изменений — скидка уже отображалась в жёлтом блоке корзины.
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\PublicMenu README.md:115: - **BUG-PM-011 fix:** `hasRecentActivity()` guard в `useTableSession`. Сессия закрывается только если `isSessionExpired() && !hasRecentActivity()`. Защита от закрытия активных столов при длинных сменах (>8ч с момента открытия). Fallback: `last_activity_at || updated_at || opened_at`.
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\PublicMenu README.md:120: - P0-1: `useTableSession` теперь закрывает просроченные сессии в БД при загрузке (cleanup-before-show). Ранее сессии оставались `open` навечно.
+C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\pages\PublicMenu\PublicMenu README.md:121: - P0-2: Заказ в зале не создастся без валидной сессии. Если сессия истекла — закрывается, создаётся новая. Защита от `table_session: null`.
+codex
+I have enough context now. The current target files still contain the exact two behaviors the task says to remove, so I’m saving a tightly scoped report with only those two findings and the required review artifacts.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path='"'pages/PublicMenu/CartView.jsx'; "'$start=572; $end=580; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '"'{0,4}: {1}' -f "'$start, $_; $start++ }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@('pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md','pages/PublicMenu/review_2026-03-27.md','pages/PublicMenu/commands_2026-03-27.log') | ForEach-Object { '{0}: {1}' -f "'$_, (Test-Path $_) }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 5.76s:
+pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md: False
+pages/PublicMenu/review_2026-03-27.md: False
+pages/PublicMenu/commands_2026-03-27.log: False
+ succeeded in 5.95s:
+ 572:               ) : (
+ 573:                 <button
+ 574:                   onClick={() => { setGuestNameInput(currentGuest?.name || ''); setIsEditingName(true); }}
+ 575:                   className="hover:underline"
+ 576:                   style={{color: primaryColor}}
+ 577:                 >
+ 578:                   {guestDisplay} {(!currentGuest?.name) && <span className="text-xs">âœï¸</span>}
+ 579:                 </button>
+ 580:               )}
+codex
+I’m checking the output directories before writing so I can save the report cleanly without touching anything outside the requested artifacts.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@('pipeline','pipeline/chain-state','pages/PublicMenu') | ForEach-Object { '{0}: {1}' -f "'$_, (Test-Path $_) }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 3.48s:
+pipeline: True
+pipeline/chain-state: True
+pages/PublicMenu: True
+file update
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/commands_2026-03-27.log
+[exit 0] Get-ChildItem -Force pages/PublicMenu | Select-Object Name,Length,LastWriteTime
+[exit 124 timeout] $i=1; Get-Content 'pages/PublicMenu/ModeTabs.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+[exit 124 timeout] $path='pages/PublicMenu/CartView.jsx'; $start=280; $end=330; $i=1; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
+[exit 0] $path='pages/PublicMenu/CartView.jsx'; $start=560; $end=595; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
+[exit 0] $path='pages/PublicMenu/ModeTabs.jsx'; $start=1; $end=90; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
+[exit 0] $path='pages/PublicMenu/CartView.jsx'; $start=295; $end=315; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
+[exit 0] Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-148|PM-149|ModeTabs|CartView|guestDisplay|effectiveGuestCode|verified' -CaseSensitive:$false | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
+[exit 0] Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/PublicMenu README.md' -Pattern 'ModeTabs|CartView|table|guest|hall|pickup|delivery' -CaseSensitive:$false | Select-Object Path,LineNumber,Line | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
+[exit 0] @('pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md','pages/PublicMenu/review_2026-03-27.md','pages/PublicMenu/commands_2026-03-27.log') | ForEach-Object { '{0}: {1}' -f $_, (Test-Path $_) }
+[exit 0] $path='pages/PublicMenu/CartView.jsx'; $start=572; $end=580; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
+[exit 0] @('pipeline','pipeline/chain-state','pages/PublicMenu') | ForEach-Object { '{0}: {1}' -f $_, (Test-Path $_) }
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md
+# Codex Writer Findings — PublicMenu Chain: publicmenu-260327-065807-c24f
+## Findings
+1. [P3] PM-148 still present in `ModeTabs.jsx` — `pages/PublicMenu/ModeTabs.jsx:55-65` still renders the green verified-table banner when `isHallMode && isTableVerified && currentTableId` is truthy, so the menu screen will continue showing `Стол X подтверждён` after table confirmation. FIX: delete the entire verified badge block, including the comment and wrapper at lines 55-65, and leave the amber invalid-code warning block at lines 67+ unchanged.
+2. [P3] PM-149 still present in `CartView.jsx` — `pages/PublicMenu/CartView.jsx:307-309` still builds `guestDisplay` as ``${guestBaseName} #${effectiveGuestCode}``, and `pages/PublicMenu/CartView.jsx:578` renders that value in the cart header, so guests will keep seeing the internal `#N` suffix. FIX: change `guestDisplay` to `const guestDisplay = guestBaseName;` and keep `effectiveGuestCode` itself intact for backend/state usage.
+
+## Summary
+Total: 2 findings (0 P0, 0 P1, 0 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY — do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none
+- Scope questions (anything you weren't sure if it's in scope): none
+A C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review\pages/PublicMenu/review_2026-03-27.md
+## Code Review Report: PublicMenu (ModeTabs.jsx, CartView.jsx)
+
+### Summary
+Review was limited to Fix 1 (PM-148) and Fix 2 (PM-149) in the target page files, plus page-local README/BUGS context. Both requested UX removals are still missing in the current code.
+
+### Critical Issues (P0) — Must Fix
+None.
+
+### High Priority (P1) — Should Fix
+None.
+
+### Medium Priority (P2) — Recommended
+None.
+
+### Low Priority (P3) — Nice to Have
+1. [P3] PM-148 still present in `ModeTabs.jsx`
+   - File: `pages/PublicMenu/ModeTabs.jsx:55-65`
+   - The verified-table banner block is still rendered under `isHallMode && isTableVerified && currentTableId`, so the menu continues to show the green `Стол X подтверждён` confirmation banner that the task explicitly removes.
+   - FIX: delete the entire verified badge block, including the comment and wrapper. Do not change the amber invalid-code warning block at line 67+.
+
+2. [P3] PM-149 still present in `CartView.jsx`
+   - File: `pages/PublicMenu/CartView.jsx:307-309`, rendered at `pages/PublicMenu/CartView.jsx:578`
+   - `guestDisplay` still appends `#${effectiveGuestCode}` to the visible guest name, so the cart header exposes the internal guest code to the user.
+   - FIX: replace the current ternary with `const guestDisplay = guestBaseName;` and keep `effectiveGuestCode` defined for non-UI usage.
+
+### Statistics
+- Total issues: 2 (P0: 0, P1: 0, P2: 0, P3: 2)
+- Files analyzed: 2 target files + 3 page-local context files
+- Lines of code: ~1,130 reviewed selectively per task scope
+apply_patch(auto_approved=true) exited 0 in 658ms:
+Success. Updated the following files:
+A pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md
+A pages/PublicMenu/review_2026-03-27.md
+A pages/PublicMenu/commands_2026-03-27.log
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-27.log b/pages/PublicMenu/commands_2026-03-27.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..cb920aaacc092d41652d54c2a475571b3f6e7201
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-27.log
+@@ -0,0 +1,11 @@
++[exit 0] Get-ChildItem -Force pages/PublicMenu | Select-Object Name,Length,LastWriteTime
++[exit 124 timeout] $i=1; Get-Content 'pages/PublicMenu/ModeTabs.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
++[exit 124 timeout] $path='pages/PublicMenu/CartView.jsx'; $start=280; $end=330; $i=1; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] $path='pages/PublicMenu/CartView.jsx'; $start=560; $end=595; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] $path='pages/PublicMenu/ModeTabs.jsx'; $start=1; $end=90; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] $path='pages/PublicMenu/CartView.jsx'; $start=295; $end=315; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-148|PM-149|ModeTabs|CartView|guestDisplay|effectiveGuestCode|verified' -CaseSensitive:$false | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++[exit 0] Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/PublicMenu README.md' -Pattern 'ModeTabs|CartView|table|guest|hall|pickup|delivery' -CaseSensitive:$false | Select-Object Path,LineNumber,Line | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
++[exit 0] @('pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md','pages/PublicMenu/review_2026-03-27.md','pages/PublicMenu/commands_2026-03-27.log') | ForEach-Object { '{0}: {1}' -f $_, (Test-Path $_) }
++[exit 0] $path='pages/PublicMenu/CartView.jsx'; $start=572; $end=580; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] @('pipeline','pipeline/chain-state','pages/PublicMenu') | ForEach-Object { '{0}: {1}' -f $_, (Test-Path $_) }
+diff --git a/pages/PublicMenu/review_2026-03-27.md b/pages/PublicMenu/review_2026-03-27.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..616e48172870ee7eb05b160502a0427d8485800b
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-27.md
+@@ -0,0 +1,29 @@
++## Code Review Report: PublicMenu (ModeTabs.jsx, CartView.jsx)
++
++### Summary
++Review was limited to Fix 1 (PM-148) and Fix 2 (PM-149) in the target page files, plus page-local README/BUGS context. Both requested UX removals are still missing in the current code.
++
++### Critical Issues (P0) — Must Fix
++None.
++
++### High Priority (P1) — Should Fix
++None.
++
++### Medium Priority (P2) — Recommended
++None.
++
++### Low Priority (P3) — Nice to Have
++1. [P3] PM-148 still present in `ModeTabs.jsx`
++   - File: `pages/PublicMenu/ModeTabs.jsx:55-65`
++   - The verified-table banner block is still rendered under `isHallMode && isTableVerified && currentTableId`, so the menu continues to show the green `Стол X подтверждён` confirmation banner that the task explicitly removes.
++   - FIX: delete the entire verified badge block, including the comment and wrapper. Do not change the amber invalid-code warning block at line 67+.
++
++2. [P3] PM-149 still present in `CartView.jsx`
++   - File: `pages/PublicMenu/CartView.jsx:307-309`, rendered at `pages/PublicMenu/CartView.jsx:578`
++   - `guestDisplay` still appends `#${effectiveGuestCode}` to the visible guest name, so the cart header exposes the internal guest code to the user.
++   - FIX: replace the current ternary with `const guestDisplay = guestBaseName;` and keep `effectiveGuestCode` defined for non-UI usage.
++
++### Statistics
++- Total issues: 2 (P0: 0, P1: 0, P2: 0, P3: 2)
++- Files analyzed: 2 target files + 3 page-local context files
++- Lines of code: ~1,130 reviewed selectively per task scope
+diff --git a/pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md b/pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..9460143859efcee3504da6098269cc7d6bcae6c8
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260327-065807-c24f
++## Findings
++1. [P3] PM-148 still present in `ModeTabs.jsx` — `pages/PublicMenu/ModeTabs.jsx:55-65` still renders the green verified-table banner when `isHallMode && isTableVerified && currentTableId` is truthy, so the menu screen will continue showing `Стол X подтверждён` after table confirmation. FIX: delete the entire verified badge block, including the comment and wrapper at lines 55-65, and leave the amber invalid-code warning block at lines 67+ unchanged.
++2. [P3] PM-149 still present in `CartView.jsx` — `pages/PublicMenu/CartView.jsx:307-309` still builds `guestDisplay` as ``${guestBaseName} #${effectiveGuestCode}``, and `pages/PublicMenu/CartView.jsx:578` renders that value in the cart header, so guests will keep seeing the internal `#N` suffix. FIX: change `guestDisplay` to `const guestDisplay = guestBaseName;` and keep `effectiveGuestCode` itself intact for backend/state usage.
++
++## Summary
++Total: 2 findings (0 P0, 0 P1, 0 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-27.log b/pages/PublicMenu/commands_2026-03-27.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..cb920aaacc092d41652d54c2a475571b3f6e7201
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-27.log
+@@ -0,0 +1,11 @@
++[exit 0] Get-ChildItem -Force pages/PublicMenu | Select-Object Name,Length,LastWriteTime
++[exit 124 timeout] $i=1; Get-Content 'pages/PublicMenu/ModeTabs.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
++[exit 124 timeout] $path='pages/PublicMenu/CartView.jsx'; $start=280; $end=330; $i=1; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] $path='pages/PublicMenu/CartView.jsx'; $start=560; $end=595; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] $path='pages/PublicMenu/ModeTabs.jsx'; $start=1; $end=90; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] $path='pages/PublicMenu/CartView.jsx'; $start=295; $end=315; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-148|PM-149|ModeTabs|CartView|guestDisplay|effectiveGuestCode|verified' -CaseSensitive:$false | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++[exit 0] Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/PublicMenu README.md' -Pattern 'ModeTabs|CartView|table|guest|hall|pickup|delivery' -CaseSensitive:$false | Select-Object Path,LineNumber,Line | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
++[exit 0] @('pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md','pages/PublicMenu/review_2026-03-27.md','pages/PublicMenu/commands_2026-03-27.log') | ForEach-Object { '{0}: {1}' -f $_, (Test-Path $_) }
++[exit 0] $path='pages/PublicMenu/CartView.jsx'; $start=572; $end=580; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] @('pipeline','pipeline/chain-state','pages/PublicMenu') | ForEach-Object { '{0}: {1}' -f $_, (Test-Path $_) }
+diff --git a/pages/PublicMenu/review_2026-03-27.md b/pages/PublicMenu/review_2026-03-27.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..616e48172870ee7eb05b160502a0427d8485800b
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-27.md
+@@ -0,0 +1,29 @@
++## Code Review Report: PublicMenu (ModeTabs.jsx, CartView.jsx)
++
++### Summary
++Review was limited to Fix 1 (PM-148) and Fix 2 (PM-149) in the target page files, plus page-local README/BUGS context. Both requested UX removals are still missing in the current code.
++
++### Critical Issues (P0) — Must Fix
++None.
++
++### High Priority (P1) — Should Fix
++None.
++
++### Medium Priority (P2) — Recommended
++None.
++
++### Low Priority (P3) — Nice to Have
++1. [P3] PM-148 still present in `ModeTabs.jsx`
++   - File: `pages/PublicMenu/ModeTabs.jsx:55-65`
++   - The verified-table banner block is still rendered under `isHallMode && isTableVerified && currentTableId`, so the menu continues to show the green `Стол X подтверждён` confirmation banner that the task explicitly removes.
++   - FIX: delete the entire verified badge block, including the comment and wrapper. Do not change the amber invalid-code warning block at line 67+.
++
++2. [P3] PM-149 still present in `CartView.jsx`
++   - File: `pages/PublicMenu/CartView.jsx:307-309`, rendered at `pages/PublicMenu/CartView.jsx:578`
++   - `guestDisplay` still appends `#${effectiveGuestCode}` to the visible guest name, so the cart header exposes the internal guest code to the user.
++   - FIX: replace the current ternary with `const guestDisplay = guestBaseName;` and keep `effectiveGuestCode` defined for non-UI usage.
++
++### Statistics
++- Total issues: 2 (P0: 0, P1: 0, P2: 0, P3: 2)
++- Files analyzed: 2 target files + 3 page-local context files
++- Lines of code: ~1,130 reviewed selectively per task scope
+diff --git a/pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md b/pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..9460143859efcee3504da6098269cc7d6bcae6c8
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260327-065807-c24f
++## Findings
++1. [P3] PM-148 still present in `ModeTabs.jsx` — `pages/PublicMenu/ModeTabs.jsx:55-65` still renders the green verified-table banner when `isHallMode && isTableVerified && currentTableId` is truthy, so the menu screen will continue showing `Стол X подтверждён` after table confirmation. FIX: delete the entire verified badge block, including the comment and wrapper at lines 55-65, and leave the amber invalid-code warning block at lines 67+ unchanged.
++2. [P3] PM-149 still present in `CartView.jsx` — `pages/PublicMenu/CartView.jsx:307-309` still builds `guestDisplay` as ``${guestBaseName} #${effectiveGuestCode}``, and `pages/PublicMenu/CartView.jsx:578` renders that value in the cart header, so guests will keep seeing the internal `#N` suffix. FIX: change `guestDisplay` to `const guestDisplay = guestBaseName;` and keep `effectiveGuestCode` itself intact for backend/state usage.
++
++## Summary
++Total: 2 findings (0 P0, 0 P1, 0 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+
+codex
+The report files are written. I’m doing a final sanity check on the saved findings so the output path and counts match the task exactly.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "@('pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md','pages/PublicMenu/review_2026-03-27.md','pages/PublicMenu/commands_2026-03-27.log') | ForEach-Object { '{0}: {1}' -f "'$_, (Test-Path $_) }' in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-reviewexec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content 'pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md'" in C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review succeeded in 2.22s:
+pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md: True
+pages/PublicMenu/review_2026-03-27.md: True
+pages/PublicMenu/commands_2026-03-27.log: True
+ succeeded in 2.26s:
+# Codex Writer Findings â€” PublicMenu Chain: publicmenu-260327-065807-c24f
+## Findings
+1. [P3] PM-148 still present in `ModeTabs.jsx` â€” `pages/PublicMenu/ModeTabs.jsx:55-65` still renders the green verified-table banner when `isHallMode && isTableVerified && currentTableId` is truthy, so the menu screen will continue showing `Ð¡Ñ‚Ð¾Ð» X Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´Ñ‘Ð½` after table confirmation. FIX: delete the entire verified badge block, including the comment and wrapper at lines 55-65, and leave the amber invalid-code warning block at lines 67+ unchanged.
+2. [P3] PM-149 still present in `CartView.jsx` â€” `pages/PublicMenu/CartView.jsx:307-309` still builds `guestDisplay` as ``${guestBaseName} #${effectiveGuestCode}``, and `pages/PublicMenu/CartView.jsx:578` renders that value in the cart header, so guests will keep seeing the internal `#N` suffix. FIX: change `guestDisplay` to `const guestDisplay = guestBaseName;` and keep `effectiveGuestCode` itself intact for backend/state usage.
+
+## Summary
+Total: 2 findings (0 P0, 0 P1, 0 P2, 2 P3)
+
+## Prompt Clarity (MANDATORY â€” do NOT skip this section)
+- Overall clarity: 5
+- Ambiguous Fix descriptions (list Fix # and what was unclear): none
+- Missing context (what info would have helped): none
+- Scope questions (anything you weren't sure if it's in scope): none
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-27.log b/pages/PublicMenu/commands_2026-03-27.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..cb920aaacc092d41652d54c2a475571b3f6e7201
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-27.log
+@@ -0,0 +1,11 @@
++[exit 0] Get-ChildItem -Force pages/PublicMenu | Select-Object Name,Length,LastWriteTime
++[exit 124 timeout] $i=1; Get-Content 'pages/PublicMenu/ModeTabs.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
++[exit 124 timeout] $path='pages/PublicMenu/CartView.jsx'; $start=280; $end=330; $i=1; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] $path='pages/PublicMenu/CartView.jsx'; $start=560; $end=595; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] $path='pages/PublicMenu/ModeTabs.jsx'; $start=1; $end=90; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] $path='pages/PublicMenu/CartView.jsx'; $start=295; $end=315; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-148|PM-149|ModeTabs|CartView|guestDisplay|effectiveGuestCode|verified' -CaseSensitive:$false | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++[exit 0] Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/PublicMenu README.md' -Pattern 'ModeTabs|CartView|table|guest|hall|pickup|delivery' -CaseSensitive:$false | Select-Object Path,LineNumber,Line | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
++[exit 0] @('pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md','pages/PublicMenu/review_2026-03-27.md','pages/PublicMenu/commands_2026-03-27.log') | ForEach-Object { '{0}: {1}' -f $_, (Test-Path $_) }
++[exit 0] $path='pages/PublicMenu/CartView.jsx'; $start=572; $end=580; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] @('pipeline','pipeline/chain-state','pages/PublicMenu') | ForEach-Object { '{0}: {1}' -f $_, (Test-Path $_) }
+diff --git a/pages/PublicMenu/review_2026-03-27.md b/pages/PublicMenu/review_2026-03-27.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..616e48172870ee7eb05b160502a0427d8485800b
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-27.md
+@@ -0,0 +1,29 @@
++## Code Review Report: PublicMenu (ModeTabs.jsx, CartView.jsx)
++
++### Summary
++Review was limited to Fix 1 (PM-148) and Fix 2 (PM-149) in the target page files, plus page-local README/BUGS context. Both requested UX removals are still missing in the current code.
++
++### Critical Issues (P0) — Must Fix
++None.
++
++### High Priority (P1) — Should Fix
++None.
++
++### Medium Priority (P2) — Recommended
++None.
++
++### Low Priority (P3) — Nice to Have
++1. [P3] PM-148 still present in `ModeTabs.jsx`
++   - File: `pages/PublicMenu/ModeTabs.jsx:55-65`
++   - The verified-table banner block is still rendered under `isHallMode && isTableVerified && currentTableId`, so the menu continues to show the green `Стол X подтверждён` confirmation banner that the task explicitly removes.
++   - FIX: delete the entire verified badge block, including the comment and wrapper. Do not change the amber invalid-code warning block at line 67+.
++
++2. [P3] PM-149 still present in `CartView.jsx`
++   - File: `pages/PublicMenu/CartView.jsx:307-309`, rendered at `pages/PublicMenu/CartView.jsx:578`
++   - `guestDisplay` still appends `#${effectiveGuestCode}` to the visible guest name, so the cart header exposes the internal guest code to the user.
++   - FIX: replace the current ternary with `const guestDisplay = guestBaseName;` and keep `effectiveGuestCode` defined for non-UI usage.
++
++### Statistics
++- Total issues: 2 (P0: 0, P1: 0, P2: 0, P3: 2)
++- Files analyzed: 2 target files + 3 page-local context files
++- Lines of code: ~1,130 reviewed selectively per task scope
+diff --git a/pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md b/pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..9460143859efcee3504da6098269cc7d6bcae6c8
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260327-065807-c24f
++## Findings
++1. [P3] PM-148 still present in `ModeTabs.jsx` — `pages/PublicMenu/ModeTabs.jsx:55-65` still renders the green verified-table banner when `isHallMode && isTableVerified && currentTableId` is truthy, so the menu screen will continue showing `Стол X подтверждён` after table confirmation. FIX: delete the entire verified badge block, including the comment and wrapper at lines 55-65, and leave the amber invalid-code warning block at lines 67+ unchanged.
++2. [P3] PM-149 still present in `CartView.jsx` — `pages/PublicMenu/CartView.jsx:307-309` still builds `guestDisplay` as ``${guestBaseName} #${effectiveGuestCode}``, and `pages/PublicMenu/CartView.jsx:578` renders that value in the cart header, so guests will keep seeing the internal `#N` suffix. FIX: change `guestDisplay` to `const guestDisplay = guestBaseName;` and keep `effectiveGuestCode` itself intact for backend/state usage.
++
++## Summary
++Total: 2 findings (0 P0, 0 P1, 0 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+
+codex
+Findings saved to [publicmenu-260327-065807-c24f-codex-findings.md](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md).
+
+- [P3] PM-148 not implemented: [ModeTabs.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/ModeTabs.jsx#L55) still renders the green verified-table banner at lines 55-65. Fix: delete that block only and leave the amber invalid-table warning intact.
+- [P3] PM-149 not implemented: [CartView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L307) still builds `guestDisplay` with `#${effectiveGuestCode}`, and [CartView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L578) renders it. Fix: change it to `const guestDisplay = guestBaseName;` and keep `effectiveGuestCode`.
+
+Page-local artifacts were also saved at [review_2026-03-27.md](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-27.md) and [commands_2026-03-27.log](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-27.log). Review scope stayed locked to Fix 1 and Fix 2 only.
+file update:
+diff --git a/pages/PublicMenu/commands_2026-03-27.log b/pages/PublicMenu/commands_2026-03-27.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..cb920aaacc092d41652d54c2a475571b3f6e7201
+--- /dev/null
++++ b/pages/PublicMenu/commands_2026-03-27.log
+@@ -0,0 +1,11 @@
++[exit 0] Get-ChildItem -Force pages/PublicMenu | Select-Object Name,Length,LastWriteTime
++[exit 124 timeout] $i=1; Get-Content 'pages/PublicMenu/ModeTabs.jsx' | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
++[exit 124 timeout] $path='pages/PublicMenu/CartView.jsx'; $start=280; $end=330; $i=1; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] $path='pages/PublicMenu/CartView.jsx'; $start=560; $end=595; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] $path='pages/PublicMenu/ModeTabs.jsx'; $start=1; $end=90; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] $path='pages/PublicMenu/CartView.jsx'; $start=295; $end=315; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] Select-String -Path 'pages/PublicMenu/BUGS.md' -Pattern 'PM-148|PM-149|ModeTabs|CartView|guestDisplay|effectiveGuestCode|verified' -CaseSensitive:$false | ForEach-Object { '{0}: {1}' -f $_.LineNumber, $_.Line.Trim() }
++[exit 0] Select-String -Path 'pages/PublicMenu/README.md','pages/PublicMenu/PublicMenu README.md' -Pattern 'ModeTabs|CartView|table|guest|hall|pickup|delivery' -CaseSensitive:$false | Select-Object Path,LineNumber,Line | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }
++[exit 0] @('pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md','pages/PublicMenu/review_2026-03-27.md','pages/PublicMenu/commands_2026-03-27.log') | ForEach-Object { '{0}: {1}' -f $_, (Test-Path $_) }
++[exit 0] $path='pages/PublicMenu/CartView.jsx'; $start=572; $end=580; Get-Content $path | Select-Object -Index (($start-1)..($end-1)) | ForEach-Object { '{0,4}: {1}' -f $start, $_; $start++ }
++[exit 0] @('pipeline','pipeline/chain-state','pages/PublicMenu') | ForEach-Object { '{0}: {1}' -f $_, (Test-Path $_) }
+diff --git a/pages/PublicMenu/review_2026-03-27.md b/pages/PublicMenu/review_2026-03-27.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..616e48172870ee7eb05b160502a0427d8485800b
+--- /dev/null
++++ b/pages/PublicMenu/review_2026-03-27.md
+@@ -0,0 +1,29 @@
++## Code Review Report: PublicMenu (ModeTabs.jsx, CartView.jsx)
++
++### Summary
++Review was limited to Fix 1 (PM-148) and Fix 2 (PM-149) in the target page files, plus page-local README/BUGS context. Both requested UX removals are still missing in the current code.
++
++### Critical Issues (P0) — Must Fix
++None.
++
++### High Priority (P1) — Should Fix
++None.
++
++### Medium Priority (P2) — Recommended
++None.
++
++### Low Priority (P3) — Nice to Have
++1. [P3] PM-148 still present in `ModeTabs.jsx`
++   - File: `pages/PublicMenu/ModeTabs.jsx:55-65`
++   - The verified-table banner block is still rendered under `isHallMode && isTableVerified && currentTableId`, so the menu continues to show the green `Стол X подтверждён` confirmation banner that the task explicitly removes.
++   - FIX: delete the entire verified badge block, including the comment and wrapper. Do not change the amber invalid-code warning block at line 67+.
++
++2. [P3] PM-149 still present in `CartView.jsx`
++   - File: `pages/PublicMenu/CartView.jsx:307-309`, rendered at `pages/PublicMenu/CartView.jsx:578`
++   - `guestDisplay` still appends `#${effectiveGuestCode}` to the visible guest name, so the cart header exposes the internal guest code to the user.
++   - FIX: replace the current ternary with `const guestDisplay = guestBaseName;` and keep `effectiveGuestCode` defined for non-UI usage.
++
++### Statistics
++- Total issues: 2 (P0: 0, P1: 0, P2: 0, P3: 2)
++- Files analyzed: 2 target files + 3 page-local context files
++- Lines of code: ~1,130 reviewed selectively per task scope
+diff --git a/pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md b/pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..9460143859efcee3504da6098269cc7d6bcae6c8
+--- /dev/null
++++ b/pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md
+@@ -0,0 +1,13 @@
++# Codex Writer Findings — PublicMenu Chain: publicmenu-260327-065807-c24f
++## Findings
++1. [P3] PM-148 still present in `ModeTabs.jsx` — `pages/PublicMenu/ModeTabs.jsx:55-65` still renders the green verified-table banner when `isHallMode && isTableVerified && currentTableId` is truthy, so the menu screen will continue showing `Стол X подтверждён` after table confirmation. FIX: delete the entire verified badge block, including the comment and wrapper at lines 55-65, and leave the amber invalid-code warning block at lines 67+ unchanged.
++2. [P3] PM-149 still present in `CartView.jsx` — `pages/PublicMenu/CartView.jsx:307-309` still builds `guestDisplay` as ``${guestBaseName} #${effectiveGuestCode}``, and `pages/PublicMenu/CartView.jsx:578` renders that value in the cart header, so guests will keep seeing the internal `#N` suffix. FIX: change `guestDisplay` to `const guestDisplay = guestBaseName;` and keep `effectiveGuestCode` itself intact for backend/state usage.
++
++## Summary
++Total: 2 findings (0 P0, 0 P1, 0 P2, 2 P3)
++
++## Prompt Clarity (MANDATORY — do NOT skip this section)
++- Overall clarity: 5
++- Ambiguous Fix descriptions (list Fix # and what was unclear): none
++- Missing context (what info would have helped): none
++- Scope questions (anything you weren't sure if it's in scope): none
+
+tokens used
+21 695
+Findings saved to [publicmenu-260327-065807-c24f-codex-findings.md](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pipeline/chain-state/publicmenu-260327-065807-c24f-codex-findings.md).
+
+- [P3] PM-148 not implemented: [ModeTabs.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/ModeTabs.jsx#L55) still renders the green verified-table banner at lines 55-65. Fix: delete that block only and leave the amber invalid-table warning intact.
+- [P3] PM-149 not implemented: [CartView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L307) still builds `guestDisplay` with `#${effectiveGuestCode}`, and [CartView.jsx](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/CartView.jsx#L578) renders it. Fix: change it to `const guestDisplay = guestBaseName;` and keep `effectiveGuestCode`.
+
+Page-local artifacts were also saved at [review_2026-03-27.md](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/review_2026-03-27.md) and [commands_2026-03-27.log](/C:/Users/ASUS/Dev/Menu AI Cowork/menuapp-code-review/pages/PublicMenu/commands_2026-03-27.log). Review scope stayed locked to Fix 1 and Fix 2 only.

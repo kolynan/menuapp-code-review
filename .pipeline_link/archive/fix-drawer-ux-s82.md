@@ -1,0 +1,45 @@
+---
+task: fix-drawer-ux-s82
+type: bugfix
+budget: "$10"
+priority: P0
+page: PublicMenu
+bugs: S81-01, S81-03
+---
+
+# Задача: Фикс Drawer UX — pull-down + видимость кнопки
+
+## Баги
+
+### BUG-S81-01: Drawer pull-down не закрывает drawer
+- **Описание:** Свайп вниз по серой линии (drag handle) в drawer не закрывает/сворачивает drawer
+- **Ожидаемое:** Pull down → drawer сворачивается (стандарт bottom sheet)
+- **Где:** `/x` — drawer корзины (bottom sheet)
+
+### BUG-S81-03: Кнопка «Отправить официанту» не видна без ручного раскрытия drawer
+- **Описание:** В дефолтном состоянии drawer кнопка отправки заказа скрыта за экраном — нужно вручную раскрывать drawer
+- **Ожидаемое:** Кнопка действия (CTA) всегда видна — либо sticky footer в drawer, либо drawer авто-раскрывается когда корзина не пустая
+
+## Acceptance criteria
+
+1. Свайп вниз по drag handle → drawer сворачивается до минимального состояния (peek / collapsed)
+2. Кнопка «Отправить официанту» (или «Оформить» для Самовывоз/Доставка) видна без ручного раскрытия
+3. Поведение корректно на мобильном viewport (320px–430px)
+4. Не ломает существующую логику корзины и итоговой суммы
+
+## Файл для изменения
+
+`menuapp-code-review/pages/PublicMenu/260305-03 x RELEASE.jsx`
+(также может потребоваться `260305-03 CartView RELEASE.jsx`)
+
+## RELEASE
+
+`260305-04 x RELEASE.jsx`
+(или CartView если изменения только там)
+
+## Note для CC+Codex
+
+Оба бага относятся к bottom sheet drawer поведению.
+- S81-01: найти drag handle / onDrag обработчик, добавить swipe-down-to-close
+- S81-03: найти состояние drawer (mid/full), убедиться что CTA в sticky footer или drawer open by default при непустой корзине
+CC и Codex должны проверить друг друга. Если расходятся в подходе — написать оба варианта.

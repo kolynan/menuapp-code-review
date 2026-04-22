@@ -1,0 +1,112 @@
+## CV-B2a Review Report — CartView.jsx (S273)
+## Reviewed by: Claude Code
+## Date: 2026-04-14
+## Commit: ae7a217 (fix applied + pushed)
+
+---
+
+### Fix 1 — CV-BUG-04 — [BUG CONFIRMED + FIXED]
+
+**Problem:** "Оценить" chip onClick at lines 936 and 1009 (original numbering) lacked `e.stopPropagation()`. Click bubbles to parent `<button>` at line 984 which toggles `expandedStatuses[key]`, immediately collapsing the "served" group after the chip handler expands it.
+
+**Fix applied:** Added `e.stopPropagation()` to both onClick handlers (2 locations, +1 line each).
+- Location 1: line 937 (post-edit) — single-group render path
+- Location 2: line 1011 (post-edit) — 2-group (CV-52) render path
+
+**Verification:**
+- `grep -an stopPropagation` confirms 4 chip handlers now have it (927, 937, 1001, 1011) + 1 in bottom sheet overlay (1111)
+- Reference pattern ("Готово" chip at 927/1001) already had stopPropagation — now consistent
+- Line count: 1192 → 1194 (+2 lines, expected)
+
+**Regression check:** Parent toggle at line 984 still functions for empty-area clicks. "Готово" chips unchanged. `setIsRatingMode(true)` still fires after stopPropagation.
+
+---
+
+### Fix 2 — CV-BUG-03 — [VERIFIED with NOTE]
+
+**Finding:** `scrollable.scrollTop = 0` at line 206 fires inside a `useEffect` that depends on `[isTableVerified]` (line 208). It runs when `isTableVerified` becomes `true` — i.e., after successful table-code verification.
+
+**Assessment:** This is NOT a general "drawer open" scroll reset. It only fires when `isTableVerified` transitions to `true`. If the cart drawer is reopened without re-verification (e.g., user navigates back to cart), this effect will NOT fire and stale scroll position may persist.
+
+**Status: VERIFIED (partial)** — Works correctly for verification flow. No code change needed per scope. If a general drawer-open scroll reset is desired, that's a separate task (would need an effect on the drawer open prop/state).
+
+---
+
+### Fix 3 — CV-76 — [ISSUE FOUND: error state is dead-end]
+
+**Verification results:**
+
+(a) **Double-tap prevention: OK** — Line 1168: `disabled={submitPhase !== 'idle' || cart.length === 0}` disables button during 'submitting'. Additionally, onClick guard at line 1164: `if (submitPhase !== 'idle') return;`. Double-tap fully blocked.
+
+(b) **Error path reset: MISSING** — The `submitPhase` state machine has NO transition from 'error' back to 'idle'. Current transitions:
+  - idle → submitting (line 132, when isSubmitting becomes true)
+  - submitting → error (line 136, when submitError present)
+  - submitting → success (line 138, when no error)
+  - success → idle (line 146, after 1.5s timeout)
+  - error → ??? (NO transition exists)
+
+**Impact:** When submission fails, the CTA shows "Повторить отправку" (Retry) but the button is `disabled={submitPhase !== 'idle'}` — permanently disabled. User cannot retry without closing/reopening the drawer.
+
+**Suggested fix (OUT OF SCOPE for B2a, log for next batch):**
+```jsx
+// Add after line 148:
+React.useEffect(() => {
+  if (submitPhase === 'error') {
+    const timer = setTimeout(() => setSubmitPhase('idle'), 2000);
+    return () => clearTimeout(timer);
+  }
+}, [submitPhase]);
+```
+
+(c) **Unmount cleanup: OK** — Line 147: `return () => clearTimeout(timer);` properly cleans up success→idle timeout. No timeout exists for error path (since there's no error→idle transition — see issue above).
+
+---
+
+### Fix 4 — CV-78 — [VERIFIED]
+
+**Footer structure (line 1149-1189):**
+- Sticky container: `<div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 -mx-4">`
+- Both buttons (submit CTA and "order more") use `size="lg"` and `className="w-full min-h-[44px]"`
+- Submit button content changes text only across submitPhase states (same `<Button>` element, same classes)
+- No structural DOM changes between phases — just text and background color swap
+- No layout shift risk
+
+**Status: VERIFIED** — Footer height is stable across all submitPhase transitions.
+
+---
+
+### Mobile-First Check (375px)
+
+- **Оценить chip tap target:** The chip itself is small (`px-2 py-0.5`, ~16px tall). However, it sits inside a parent `<button>` row with `min-h-[44px]`. Tapping the exact chip text is the only way to enter rating mode (vs tapping the row which toggles expand/collapse). On small screens, precision tapping a ~16px chip may be difficult. **P3 suggestion:** increase chip padding to `px-3 py-1.5` for better touch target. Not in scope for B2a.
+- **Footer CTA:** `min-h-[44px]`, `w-full` — no overflow risk. Safe-area: `sticky bottom-0` with `p-4` provides adequate bottom spacing on most devices (no explicit `pb-safe` but p-4 = 16px is sufficient for non-notch devices).
+- **No horizontal scroll** introduced by the fix.
+
+---
+
+### Summary
+
+| Fix | ID | Status | Action |
+|---|---|---|---|
+| 1 | CV-BUG-04 | BUG CONFIRMED + FIXED | Added e.stopPropagation() at 2 locations |
+| 2 | CV-BUG-03 | VERIFIED (partial) | Fires on verification, not drawer-open. No change needed per scope. |
+| 3 | CV-76 | ISSUE FOUND | error→idle transition missing. Double-tap prevention OK. Log for next batch. |
+| 4 | CV-78 | VERIFIED | Footer height stable across all phases |
+
+### Ambiguities
+- Fix 2: "drawer open" vs "table verified" — the scroll reset only triggers on verification. Clarify if a general drawer-open reset is needed.
+
+### Risks
+- CV-76 error dead-end: if network errors are common, users will be stuck. Should be prioritized in CV-B2c or next batch.
+- Оценить chip tap target is small but functional.
+
+### Execution Plan
+1. Fix 1: DONE — committed and pushed (ae7a217)
+2. Fix 2: No action. Verified.
+3. Fix 3: Log error→idle bug as CV-BUG-76-01 for next batch. Suggested 2s auto-reset.
+4. Fix 4: No action. Verified.
+
+### Prompt Clarity: 4/5
+- Clear scope lock and frozen UX context were very helpful
+- Line numbers were accurate (matched within 1-2 lines of actual)
+- Minor: the task references "line 206" for scroll-to-top but doesn't mention the trigger is `isTableVerified`, which is the key question to verify
+- Excellent reference pattern provided (Готово chip at line 926)
