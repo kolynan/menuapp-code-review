@@ -1760,14 +1760,16 @@ export default function X() {
   } = useHallTable({ partner, location, orderMode, t });
 
   // Auto-clear code input after wrong entry (PM-069)
+  // S339-cont3: only clear when error happened at FULL code length (avoid premature clear on partial input)
   useEffect(() => {
-    if (codeVerificationError && !isVerifyingCode) {
+    const inputLen = String(tableCodeInput || '').replace(/\D/g, '').length;
+    if (codeVerificationError && !isVerifyingCode && inputLen === tableCodeLength) {
       const timer = setTimeout(() => {
         if (typeof setTableCodeInput === 'function') setTableCodeInput('');
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [codeVerificationError, isVerifyingCode]);
+  }, [codeVerificationError, isVerifyingCode, tableCodeInput, tableCodeLength]);
 
   // Helper for saving table selection (used by help requests and other features)
   const saveTableSelection = (partnerId, tableId) => {
@@ -1912,7 +1914,7 @@ export default function X() {
     if (!sentAt) return '';
     const elapsedSec = Math.floor((Date.now() - sentAt) / 1000);
     if (elapsedSec >= 24 * 60 * 60) return tr('help.stale_status', 'Данные могли устареть');
-    if (elapsedSec < 60) return '<1м';
+    if (elapsedSec < 60) return tr('help.timer.just_now', 'только что');
     const min = Math.floor(elapsedSec / 60);
     return `${min}м`;
   }, []);
@@ -4915,7 +4917,8 @@ export default function X() {
                   {t('common.loading')}
                 </div>
               )}
-              {codeVerificationError && !isVerifyingCode && (
+              {/* S339-cont3: show error only when full code entered (avoid "not enough digits" noise on partial input) */}
+              {codeVerificationError && !isVerifyingCode && String(tableCodeInput || '').replace(/\D/g, '').length === tableCodeLength && (
                 <p className="text-sm text-red-600 text-center">{codeVerificationError}</p>
               )}
             </div>

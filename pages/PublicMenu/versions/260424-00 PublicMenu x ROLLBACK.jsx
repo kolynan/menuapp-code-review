@@ -920,8 +920,24 @@ function OrderConfirmationScreen({
         </CardContent>
       </Card>
 
-      {/* Secondary actions in scroll content â€" CV-NEW-04 split (S338) */}
-      <div className="flex flex-col items-center gap-3 mt-6 mb-24">
+      {/* Action buttons */}
+      <div className="space-y-3">
+        <Button
+          className="w-full h-12 text-white"
+          style={{backgroundColor: primaryColor}}
+          onClick={onBackToMenu}
+        >
+          {tr("confirmation.back_to_menu", "Back to menu")}
+        </Button>
+
+        <Button
+          variant="outline"
+          className="w-full h-12"
+          onClick={onOpenOrders}
+        >
+          {tr("confirmation.my_orders", "My orders")}
+        </Button>
+
         {/* Track order â€" pickup/delivery only (GAP-02: navigate to embedded status view) */}
         {orderMode !== "hall" && publicToken && (
           <Button
@@ -935,33 +951,6 @@ function OrderConfirmationScreen({
             {tr("confirmation.track_order", "Track order")}
           </Button>
         )}
-        <button
-          type="button"
-          onClick={onOpenOrders}
-          className="text-gray-600 underline text-sm"
-        >
-          {tr("confirmation.my_orders", "My orders")}
-        </button>
-      </div>
-    </div>
-
-    {/* Sticky primary CTA footer â€" CV-71 LOCKED pattern (S338 CV-NEW-04) */}
-    <div
-      className="sticky bottom-0 bg-white"
-      style={{
-        borderTop: '1px solid #eee',
-        boxShadow: '0 -2px 8px rgba(0,0,0,0.03)',
-        padding: '12px 16px calc(12px + env(safe-area-inset-bottom))',
-      }}
-    >
-      <div className="max-w-md mx-auto">
-        <Button
-          className="w-full h-12 text-white"
-          style={{backgroundColor: primaryColor}}
-          onClick={onBackToMenu}
-        >
-          {tr("confirmation.back_to_menu", "Back to menu")}
-        </Button>
       </div>
     </div>
     </div>
@@ -2148,48 +2137,6 @@ export default function X() {
     });
   }, [getNormalizedHelpState, requestStates, timerTick]);
 
-  // Fix 3: Handle resolve (mark request as done by guest)
-  // MOVED HERE (S339-cont3, PQ-099): was at line 2514, used in deps array of #284 auto-resolve useEffect below → TDZ white screen
-  const handleResolve = useCallback((type, otherId) => {
-    const now = Date.now();
-
-    setRequestStates((prev) => {
-      if (type === 'other') {
-        const otherRows = Array.isArray(prev.other) ? prev.other : [];
-        return {
-          ...prev,
-          other: otherRows.map((entry) => (
-            entry.id === otherId
-              ? {
-                  ...entry,
-                  status: 'closed_by_guest',
-                  pendingAction: null,
-                  errorKind: null,
-                  errorMessage: '',
-                  terminalHideAt: now + HELP_CLOSED_HIDE_MS,
-                  syncSource: 'local',
-                }
-              : entry
-          )),
-        };
-      }
-
-      const current = prev[type] || { id: type, sentAt: now };
-      return {
-        ...prev,
-        [type]: {
-          ...current,
-          status: 'closed_by_guest',
-          pendingAction: null,
-          errorKind: null,
-          errorMessage: '',
-          terminalHideAt: now + HELP_CLOSED_HIDE_MS,
-          syncSource: 'local',
-        },
-      };
-    });
-  }, []);
-
   // #284: Auto-resolve requests older than 24h
   useEffect(() => {
     const STALE_MS = 24 * 60 * 60 * 1000;
@@ -2551,6 +2498,47 @@ export default function X() {
     handlePresetSelect(type);
     setPendingHelpActionTick((value) => value + 1);
   }, [getNormalizedHelpState, handlePresetSelect, requestStates, setHelpComment]);
+
+  // Fix 3: Handle resolve (mark request as done by guest)
+  const handleResolve = useCallback((type, otherId) => {
+    const now = Date.now();
+
+    setRequestStates((prev) => {
+      if (type === 'other') {
+        const otherRows = Array.isArray(prev.other) ? prev.other : [];
+        return {
+          ...prev,
+          other: otherRows.map((entry) => (
+            entry.id === otherId
+              ? {
+                  ...entry,
+                  status: 'closed_by_guest',
+                  pendingAction: null,
+                  errorKind: null,
+                  errorMessage: '',
+                  terminalHideAt: now + HELP_CLOSED_HIDE_MS,
+                  syncSource: 'local',
+                }
+              : entry
+          )),
+        };
+      }
+
+      const current = prev[type] || { id: type, sentAt: now };
+      return {
+        ...prev,
+        [type]: {
+          ...current,
+          status: 'closed_by_guest',
+          pendingAction: null,
+          errorKind: null,
+          errorMessage: '',
+          terminalHideAt: now + HELP_CLOSED_HIDE_MS,
+          syncSource: 'local',
+        },
+      };
+    });
+  }, []);
 
   const handleSosCancel = useCallback((type) => {
     const activeRow = activeRequests.find(r => r.type === type);
@@ -4930,8 +4918,22 @@ export default function X() {
                 </p>
               );
             })()}
-            {/* CV-BUG-02 (S338): removed redundant "Send" button â€"
-                auto-verify in CartView.jsx (250ms debounce on full code) covers submit path */}
+            {/* Primary CTA: Confirm and submit (PM-064 A3) */}
+            <Button
+              className="w-full mt-6 text-white"
+              style={{ backgroundColor: primaryColor }}
+              disabled={isVerifyingCode || String(tableCodeInput || '').replace(/\D/g, '').length < tableCodeLength}
+              onClick={() => {
+                const code = String(tableCodeInput || '').replace(/\D/g, '').slice(0, tableCodeLength);
+                if (code.length === tableCodeLength && typeof verifyTableCode === 'function') {
+                  verifyTableCode(code);
+                }
+              }}
+            >
+              {isVerifyingCode
+                ? t('common.loading')
+                : tr('cart.confirm_table.submit', 'Send')}
+            </Button>
           </div>
         </DrawerContent>
       </Drawer>
