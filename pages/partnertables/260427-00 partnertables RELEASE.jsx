@@ -1271,12 +1271,15 @@ export default function PartnerTables() {
   }, []);
 
   // D2: Load active sessions
+  // S394 #493: status enum = ["open", "expired", "closed"] per B44 schema (S388 verified)
+  // "active" was vocabulary drift — sessionHelpers.createSession writes status: "open"
+  // Filter "active" returned 0 sessions → ЛКП показывал все столы как «Свободен» → блокер для #492 close-table flow
   const loadSessions = useCallback(async (partnerId) => {
     if (!partnerId) return [];
     try {
       const sessions = await base44.entities.TableSession.filter({
         partner: partnerId,
-        status: "active"
+        status: "open"
       });
       return sessions || [];
     } catch (err) {
