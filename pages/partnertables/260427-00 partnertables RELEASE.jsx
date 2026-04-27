@@ -2524,4 +2524,10 @@ export default function PartnerTables() {
                 <Printer className="h-4 w-4 mr-2" />
                 {t('partnertables.qr.print')} ({qrSelectedCount})
               </Button>
-            </
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </TooltipProvider>
+    </PartnerShell>
+  );
+}
