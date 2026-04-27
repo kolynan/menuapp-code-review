@@ -947,7 +947,7 @@ function AreaSection({
                     {tableSession && (
                       <TableSessionInfo 
                         session={tableSession}
-                        onClose={() => onCloseSession(tableSession.id)}
+                        onClose={() => onCloseSession(tableSession.id, tableId)}
                         userRole={userRole}
                         t={t}
                       />
@@ -1969,16 +1969,17 @@ export default function PartnerTables() {
 
   // D2-006, D2-007: Handle close session
   // P0-6: Removed || fallbacks
-  const handleCloseSession = async (sessionId) => {
+  // S394 #492: Pass tableId for ServiceRequest cleanup branch (sessionHelpers.js:175-188)
+  const handleCloseSession = async (sessionId, tableId) => {
     // Normalize in case object is passed
     const id = typeof sessionId === 'string' ? sessionId : getLinkId(sessionId);
     if (!id) return;
-    
+
     // D2-006: Confirm before closing
     if (!confirm(t('partnertables.confirm.delete_table'))) return;
-    
+
     try {
-      await closeSession(id);
+      await closeSession(id, tableId);
       // P0-1: Using mm1 for consistency
       toast.success(t('partnertables.toast.table_closed'), { id: STORAGE_KEYS.TOAST_ID });
       // D2-007: Refetch sessions
