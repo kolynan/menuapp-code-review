@@ -204,20 +204,6 @@ import { getGuestDisplayName, closeSession } from "@/components/sessionHelpers";
 import { runSessionCleanup } from "@/components/sessionCleanupJob";
 // BUG-S76-01/02: i18n for OrderStage names
 import { useI18n } from "@/components/i18n";
-// RF-1 Bundle 4 (S434): canonical Russian pluralization (replaces local pluralRu @1727)
-import { pluralizeRu as pluralRu } from "@/components/_shared/i18n/pluralizeRu";
-// RF-1 Bundle 5 (S436): canonical browser storage helpers — replaces 10 local
-// load*/save* functions @ ex-lines 948-1044 (getOrCreateDeviceId/loadNotifPrefs/
-// saveNotifPrefs/loadPollingInterval/savePollingInterval/loadSortMode/
-// saveSortMode/loadSortOrder/saveSortOrder/loadMyTables/saveMyTables). Audit
-// ref: outputs/permanent/Pre_Release_Refactor_Audit.md v2.0 §Final Synth
-// Bundle 5. Local function names + signatures preserved (delegating bodies).
-import {
-  getJSON,
-  setJSON,
-  getString,
-  setString,
-} from "@/components/_shared/storage/safeStorage";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CONSTANTS
@@ -957,58 +943,83 @@ function genDeviceId() {
   return `dev_${Math.random().toString(16).slice(2)}_${Date.now()}`;
 }
 
-// RF-1 Bundle 5 (S436): 10 storage functions below now delegate to canonical
-// helpers @/components/_shared/storage/safeStorage (imported above). Function
-// names + signatures preserved — all callsites unchanged.
-
 function getOrCreateDeviceId() {
-  const existing = getString(DEVICE_ID_STORAGE_KEY, null);
-  if (existing) return existing;
-  const id = genDeviceId();
-  setString(DEVICE_ID_STORAGE_KEY, id);
-  return id;
+  try {
+    const existing = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+    if (existing) return existing;
+    const id = genDeviceId();
+    localStorage.setItem(DEVICE_ID_STORAGE_KEY, id);
+    return id;
+  } catch {
+    return genDeviceId();
+  }
 }
 
 function loadNotifPrefs() {
   const defaults = { enabled: true, sound: false, vibrate: true, system: false };
-  const stored = getJSON(NOTIF_PREFS_STORAGE_KEY, null);
-  return stored ? { ...defaults, ...stored } : defaults;
+  try {
+    const raw = localStorage.getItem(NOTIF_PREFS_STORAGE_KEY);
+    if (!raw) return defaults;
+    return { ...defaults, ...JSON.parse(raw) };
+  } catch {
+    return defaults;
+  }
 }
 
 function saveNotifPrefs(prefs) {
-  setJSON(NOTIF_PREFS_STORAGE_KEY, prefs);
+  try {
+    localStorage.setItem(NOTIF_PREFS_STORAGE_KEY, JSON.stringify(prefs));
+  } catch { /* ignore */ }
 }
 
 function loadPollingInterval() {
-  const raw = getString(POLLING_INTERVAL_KEY, null, { storage: "session" });
-  if (!raw) return DEFAULT_POLLING_INTERVAL;
-  const val = parseInt(raw, 10);
-  if (POLLING_OPTIONS.some((o) => o.value === val)) return val;
-  return DEFAULT_POLLING_INTERVAL;
+  try {
+    const raw = sessionStorage.getItem(POLLING_INTERVAL_KEY);
+    if (!raw) return DEFAULT_POLLING_INTERVAL;
+    const val = parseInt(raw, 10);
+    if (POLLING_OPTIONS.some((o) => o.value === val)) return val;
+    return DEFAULT_POLLING_INTERVAL;
+  } catch {
+    return DEFAULT_POLLING_INTERVAL;
+  }
 }
 
 function savePollingInterval(val) {
-  setString(POLLING_INTERVAL_KEY, String(val), { storage: "session" });
+  try {
+    sessionStorage.setItem(POLLING_INTERVAL_KEY, String(val));
+  } catch { /* ignore */ }
 }
 
 function loadSortMode() {
-  const raw = getString(SORT_MODE_KEY, null, { storage: "session" });
-  if (raw === "priority" || raw === "time") return raw;
-  return DEFAULT_SORT_MODE;
+  try {
+    const raw = sessionStorage.getItem(SORT_MODE_KEY);
+    if (raw === "priority" || raw === "time") return raw;
+    return DEFAULT_SORT_MODE;
+  } catch {
+    return DEFAULT_SORT_MODE;
+  }
 }
 
 function saveSortMode(val) {
-  setString(SORT_MODE_KEY, val, { storage: "session" });
+  try {
+    sessionStorage.setItem(SORT_MODE_KEY, val);
+  } catch { /* ignore */ }
 }
 
 function loadSortOrder() {
-  const raw = getString(SORT_ORDER_KEY, null, { storage: "session" });
-  if (raw === "newest" || raw === "oldest") return raw;
-  return DEFAULT_SORT_ORDER;
+  try {
+    const raw = sessionStorage.getItem(SORT_ORDER_KEY);
+    if (raw === "newest" || raw === "oldest") return raw;
+    return DEFAULT_SORT_ORDER;
+  } catch {
+    return DEFAULT_SORT_ORDER;
+  }
 }
 
 function saveSortOrder(val) {
-  setString(SORT_ORDER_KEY, val, { storage: "session" });
+  try {
+    sessionStorage.setItem(SORT_ORDER_KEY, val);
+  } catch { /* ignore */ }
 }
 
 function getMyTablesKey(userIdOrToken) {
@@ -1016,11 +1027,18 @@ function getMyTablesKey(userIdOrToken) {
 }
 
 function loadMyTables(userIdOrToken) {
-  return getJSON(getMyTablesKey(userIdOrToken), []);
+  try {
+    const raw = localStorage.getItem(getMyTablesKey(userIdOrToken));
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
 }
 
 function saveMyTables(userIdOrToken, tables) {
-  setJSON(getMyTablesKey(userIdOrToken), tables);
+  try {
+    localStorage.setItem(getMyTablesKey(userIdOrToken), JSON.stringify(tables));
+  } catch { /* ignore */ }
 }
 
 function tryVibrate(enabled) {
@@ -1706,8 +1724,14 @@ function OrderCard({
   );
 }
 
-// pluralRu moved to @/components/_shared/i18n/pluralizeRu (RF-1 Bundle 4, S434)
-// Imported as `pluralRu` alias above to preserve callsite signatures.
+function pluralRu(n, one, few, many) {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return many;
+  if (last > 1 && last < 5) return few;
+  if (last === 1) return one;
+  return many;
+}
 
 function OrderGroupCard({
   group,
