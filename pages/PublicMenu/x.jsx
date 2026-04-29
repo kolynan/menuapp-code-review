@@ -122,7 +122,8 @@ import { useTableSession } from "@/components/publicMenu/refactor/hooks/useTable
 // Audit ref: outputs/permanent/Pre_Release_Refactor_Audit.md v2.0
 // §Final Synth Bundle 2.
 import { generateShortCode } from "@/components/_shared/utils/generateShortCode";
-import { isFeatureEnabled } from "@/components/_shared/featureFlags";
+// featureFlags — inlined (B44 does not support component file creation via editor UI)
+const isFeatureEnabled = (partner, flag) => partner ? partner[`${flag}_enabled`] === true : false;
 
 // ============================================================
 // CONSTANTS & HELPERS
