@@ -26,7 +26,7 @@
 //       (2) Core (preferred) — `getJSON` / `setJSON` / `getString` /
 //           `setString` / `removeStored`. All accept opts={ storage, silent }.
 //   * `silent` flag (default true): swallow errors silently (matches existing
-//     SOM `/* ignore */` pattern). silent=false → re-throw on quota / DOM.
+//     SOM `// ignore` pattern). silent=false → re-throw on quota / DOM.
 //   * sessionStorage support via opts.storage='session'. Default 'local'.
 //   * SSR/Node safety: typeof window === 'undefined' → no-op + return fallback.
 //
@@ -85,7 +85,7 @@ export function safeLsGet(key, fallback) {
 
 /**
  * Write a raw string to localStorage (no JSON serialize). Errors silently
- * swallowed (matches MenuDishes:151 `/* ignore */` pattern).
+ * swallowed (matches MenuDishes:151 `// ignore` pattern).
  *
  * Backward-compat alias for MenuDishes:151 — preserves exact signature.
  *
@@ -174,7 +174,7 @@ export function getJSON(key, fallback, opts) {
 
 /**
  * JSON.stringify and write a value to storage. Errors silently swallowed
- * by default (matches SOM `/* ignore */` pattern). Pass `silent: false`
+ * by default (matches SOM `// ignore` pattern). Pass `silent: false`
  * to re-throw quota / serialize failures.
  *
  * @param {string} key

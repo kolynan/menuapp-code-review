@@ -145,7 +145,7 @@ export default function AdminPageHelp() {
       setLoading(false);
     }
     load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps — t excluded: unstable reference causes infinite refetches
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- t excluded: unstable reference causes infinite refetches
   }, [authLoading, isAdmin]);
   
   // Filtered list
