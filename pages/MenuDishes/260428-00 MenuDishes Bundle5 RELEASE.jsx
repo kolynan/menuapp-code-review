@@ -100,12 +100,6 @@ import { normStr } from "@/components/_shared/utils/normStr";
 // Refactor_Audit.md v2.0 §Final Synth Bundle 5 (foundation primitives).
 import { safeLsGet, safeLsSet } from "@/components/_shared/storage/safeStorage";
 
-// RF-1 Bundle 6 (S443, FINAL): canonical getDishCategoryIds + DnD trio from
-// shared helpers. Replaces local definitions @ ex-lines 224-264 — pure utility
-// functions with identical signatures. Audit ref: §Final Synth Bundle 6.
-import { getDishCategoryIds } from "@/components/_shared/entities/dish";
-import { syncOrderIds, moveToIndex, reorderInsert } from "@/components/_shared/dnd/reorderHelpers";
-
 /* ============================================================
    CONSTANTS
    ============================================================ */
@@ -226,9 +220,48 @@ function formatPriceDisplay(price, currencyCode = "KZT") {
   return `${formatted} ${symbol}`;
 }
 
-// RF-1 Bundle 6 (S443): getDishCategoryIds + syncOrderIds + moveToIndex + reorderInsert
-// migrated to canonical helpers — see imports above (line ~103-107).
-// Local definitions removed. Functions retain identical signatures + behavior.
+// Get ALL category IDs for a dish (not just primary)
+function getDishCategoryIds(dish) {
+  const a = dish?.categories;
+  const b = dish?.category_ids;
+  if (Array.isArray(a) && a.length) return a.filter(Boolean);
+  if (Array.isArray(b) && b.length) return b.filter(Boolean);
+  const single = dish?.category;
+  return single ? [single] : [];
+}
+
+function syncOrderIds(prevIds, currentIds) {
+  const set = new Set(currentIds);
+  const filtered = (Array.isArray(prevIds) ? prevIds : []).filter((id) => set.has(id));
+  const filteredSet = new Set(filtered);
+  const missing = currentIds.filter((id) => !filteredSet.has(id));
+  return [...filtered, ...missing];
+}
+
+function moveToIndex(ids, id, index) {
+  const cur = Array.isArray(ids) ? [...ids] : [];
+  const from = cur.indexOf(id);
+  if (from === -1) return cur;
+  const clamped = Math.max(0, Math.min(Number(index ?? 0), cur.length));
+  cur.splice(from, 1);
+  const nextIndex = from < clamped ? clamped - 1 : clamped;
+  cur.splice(nextIndex, 0, id);
+  return cur;
+}
+
+function reorderInsert(ids, movingId, insertIndex) {
+  const cur = Array.isArray(ids) ? [...ids] : [];
+  const from = cur.indexOf(movingId);
+  if (from !== -1) {
+    cur.splice(from, 1);
+  }
+  let idx = Number(insertIndex ?? 0);
+  if (Number.isNaN(idx)) idx = 0;
+  if (from !== -1 && from < idx) idx -= 1;
+  idx = Math.max(0, Math.min(idx, cur.length));
+  cur.splice(idx, 0, movingId);
+  return cur;
+}
 
 // BUG 1 FIX: Row-based grid insert calculation
 function getGridInsertIndex(pointerX, pointerY, gridEl, dishItemRefs, targetCatId, orderedIds, excludeDishId) {

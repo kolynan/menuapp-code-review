@@ -7,8 +7,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Rating from "@/components/Rating";
 import { pluralizeRu } from "@/components/_shared/i18n/pluralizeRu";
 import { makeSafeT } from "@/components/_shared/i18n/makeSafeT";
-import { makeIsCancelledOrder } from "@/components/_shared/orders/makeIsCancelledOrder";
-import { isValidEmail } from "@/components/_shared/validators/email";
 
 function lightenColor(hex, amount) {
   const num = parseInt(hex.replace('#', ''), 16);
@@ -406,8 +404,13 @@ export default function CartView({
   );
   const canSplit = guestCount > 1;
 
-  // ===== CV-B2 Fix 1.0: Shared cancelled-order helper (S443 RF-1 Bundle 6 — migrated to canonical factory) =====
-  const isCancelledOrder = makeIsCancelledOrder(getOrderStatus);
+  // ===== CV-B2 Fix 1.0: Shared cancelled-order helper =====
+  const isCancelledOrder = (o) => {
+    const stageInfo = getOrderStatus(o);
+    return stageInfo?.internal_code === 'cancel'
+      || stageInfo?.internal_code === 'cancelled'
+      || (!stageInfo?.internal_code && (o.status || '').toLowerCase() === 'cancelled');
+  };
 
   // ===== PM-142/143/154: Filter myOrders to 06:00 business-day + sort by datetime =====
   const todayMyOrders = React.useMemo(() => {
@@ -1224,7 +1227,7 @@ export default function CartView({
               disabled={!rewardEmail.trim() || rewardEmailSubmitting}
               onClick={() => {
                 if (!rewardEmail.trim()) return;
-                if (!isValidEmail(rewardEmail)) {
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rewardEmail.trim())) {
                   if (toast) toast.error(tr('loyalty.invalid_email', 'Введите корректный email'));
                   return;
                 }

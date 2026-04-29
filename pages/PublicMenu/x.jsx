@@ -116,6 +116,13 @@ import { useLoyalty } from "@/components/publicMenu/refactor/hooks/useLoyalty";
 import { useReviews } from "@/components/publicMenu/refactor/hooks/useReviews";
 import { useTableSession } from "@/components/publicMenu/refactor/hooks/useTableSession";
 
+// RF-1 Bundle 2 (S402): canonical generateShortCode from shared helper.
+// Closes x.jsx:3438 guest_code Math.random vulnerability (CC unique S367
+// finding, security 🔴). secure=true uses crypto.getRandomValues (CSPRNG).
+// Audit ref: outputs/permanent/Pre_Release_Refactor_Audit.md v2.0
+// §Final Synth Bundle 2.
+import { generateShortCode } from "@/components/_shared/utils/generateShortCode";
+
 // ============================================================
 // CONSTANTS & HELPERS
 // ============================================================
@@ -1912,7 +1919,7 @@ export default function X() {
     if (!sentAt) return '';
     const elapsedSec = Math.floor((Date.now() - sentAt) / 1000);
     if (elapsedSec >= 24 * 60 * 60) return tr('help.stale_status', 'Данные могли устареть');
-    if (elapsedSec < 60) return '<1м';
+    if (elapsedSec < 60) return tr('help.timer.just_now', 'только что');
     const min = Math.floor(elapsedSec / 60);
     return `${min}м`;
   }, []);
@@ -3433,9 +3440,11 @@ export default function X() {
     
     try {
       // P2-2: Should be tied to partner, but keeping simple for now
+      // S402 RF-1 Bundle 2: closes Math.random security 🔴 (S367 CC finding)
+      // via canonical generateShortCode + crypto.getRandomValues (CSPRNG).
       let code = localStorage.getItem("menu_guest_code");
       if (!code) {
-        code = String(Math.floor(1000 + Math.random() * 9000));
+        code = generateShortCode({ digits: 4, secure: true });
         localStorage.setItem("menu_guest_code", code);
       }
       setGuestCode(code);

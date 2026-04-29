@@ -5,10 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Rating from "@/components/Rating";
-import { pluralizeRu } from "@/components/_shared/i18n/pluralizeRu";
-import { makeSafeT } from "@/components/_shared/i18n/makeSafeT";
-import { makeIsCancelledOrder } from "@/components/_shared/orders/makeIsCancelledOrder";
-import { isValidEmail } from "@/components/_shared/validators/email";
 
 function lightenColor(hex, amount) {
   const num = parseInt(hex.replace('#', ''), 16);
@@ -286,9 +282,33 @@ export default function CartView({
 
 
   // ===== P0 UX helpers =====
-  // tr/trFormat moved to @/components/_shared/i18n/makeSafeT (RF-1 Bundle 4, S434)
-  // pluralizeRu moved to @/components/_shared/i18n/pluralizeRu (RF-1 Bundle 4, S434)
-  const { tr, trFormat } = React.useMemo(() => makeSafeT(t), [t]);
+
+  // Safe translation with fallback
+  const tr = (key, fallback) => {
+    const val = typeof t === "function" ? t(key) : "";
+    if (!val || typeof val !== "string") return fallback;
+    const norm = val.trim();
+    if (norm === key || norm.startsWith(key + ":")) return fallback;
+    return norm;
+  };
+
+  // Translation with params
+  const trFormat = (key, params, fallback) => {
+    const val = typeof t === "function" ? t(key, params) : "";
+    if (!val || typeof val !== "string") return fallback;
+    const norm = val.trim();
+    if (norm === key || norm.startsWith(key)) return fallback;
+    return norm;
+  };
+
+  const pluralizeRu = (n, one, few, many) => {
+    const abs = Math.abs(n);
+    const m10 = abs % 10;
+    const m100 = abs % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  };
 
   // Safe status label - guest-facing (CV-52: only 2 statuses)
   const getSafeStatus = (status) => {
@@ -406,8 +426,13 @@ export default function CartView({
   );
   const canSplit = guestCount > 1;
 
-  // ===== CV-B2 Fix 1.0: Shared cancelled-order helper (S443 RF-1 Bundle 6 — migrated to canonical factory) =====
-  const isCancelledOrder = makeIsCancelledOrder(getOrderStatus);
+  // ===== CV-B2 Fix 1.0: Shared cancelled-order helper =====
+  const isCancelledOrder = (o) => {
+    const stageInfo = getOrderStatus(o);
+    return stageInfo?.internal_code === 'cancel'
+      || stageInfo?.internal_code === 'cancelled'
+      || (!stageInfo?.internal_code && (o.status || '').toLowerCase() === 'cancelled');
+  };
 
   // ===== PM-142/143/154: Filter myOrders to 06:00 business-day + sort by datetime =====
   const todayMyOrders = React.useMemo(() => {
@@ -1224,7 +1249,7 @@ export default function CartView({
               disabled={!rewardEmail.trim() || rewardEmailSubmitting}
               onClick={() => {
                 if (!rewardEmail.trim()) return;
-                if (!isValidEmail(rewardEmail)) {
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rewardEmail.trim())) {
                   if (toast) toast.error(tr('loyalty.invalid_email', 'Введите корректный email'));
                   return;
                 }
@@ -1289,11 +1314,4 @@ export default function CartView({
               </Button>
               <p className="text-center text-sm text-slate-500">
                 {tr('cart.cta.need_help_or_bill', 'Нужна помощь или счёт? Нажмите')} <Bell className="inline w-4 h-4 align-middle" />
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+          
