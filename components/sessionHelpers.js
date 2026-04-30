@@ -88,7 +88,7 @@ export async function getOrCreateSession(tableId, partnerId) {
   // Delegate to B44 Backend Function for server-side filter+create.
   // Function signature: createTableSession({ partnerId, tableId })
   // Function implementation: outputs/permanent/B44_Functions/createTableSession.js
-  return await base44.functions.createTableSession.call({ partnerId, tableId });
+  return await base44.functions.invoke("createTableSession", { partnerId, tableId });
 }
 
 // ============================================================
