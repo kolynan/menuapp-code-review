@@ -383,12 +383,21 @@ export function getGuestDisplayName(guest) {
 }
 
 // ============================================================
-// FUNCTION 12: markOrdersPaid (RF-4 Sub-4 Variant A, S490)
+// FUNCTION 12: markOrdersPaid (RF-4 Sub-4 Variant A, S490, JSDoc hotfix S492)
 // Marks N orders as payment_status='paid' using batch sequential
 // updates with 120ms BATCH_DELAY (anti-429, same pattern as
-// closeSession FUNCTION 8 line 316-323).
+// closeSession FUNCTION 8 line 319-323).
 //
-// Idempotent: repeated call on already-paid order → no harm.
+// Trust-caller contract (Variant A spec, S487 Opus decision):
+// Caller MUST pass only ids of orders that are:
+//   (a) within current partner+session+guest scope (caller has filtered Order objects),
+//   (b) payment_status !== 'paid' (helper is idempotent but no-op wastes one RPC + 120ms),
+//   (c) status !== 'cancelled' (semantically nonsensical to pay cancelled orders).
+// Helper does NOT validate these — caller responsibility per Variant A externalization.
+// closeSession FUNCTION 8 internalizes filter because its only param is sessionId;
+// markOrdersPaid externalizes filter because caller already holds filtered Order objects.
+//
+// Idempotent at DB level: repeated set 'paid' → no harm (DB no-op).
 // Best-effort: partial failure does NOT abort the loop.
 // Returns { updated: string[], failed: Array<{id, error}> }
 // for caller reconciliation (SOM display layer shows partial state).

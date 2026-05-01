@@ -87,6 +87,8 @@ export default function CartView({
   hallGuestCodeEnabled,
   guestCode,
   showLoyaltySection,
+  // BUG-CV-S491 #582: session closed by host (reactive, from useTableSession polling)
+  isSessionClosed = false,
 }) {
   const primaryColor = partner?.primary_color || '#1A1A1A';
 
@@ -593,6 +595,31 @@ export default function CartView({
 
   const showTableOrdersSection = otherGuestIdsFromOrders.length > 0;
 
+  // RF-4 Sub-4 hotfix (S492): derive paid state from server orders.payment_status
+  // Placed BEFORE payment handlers so effectivePaidGuestIds is in scope for useCallback deps.
+  // Page reload safe: guestIdsPaid (optimistic) ∪ persistedPaidGuestIds (server-confirmed)
+  const persistedPaidGuestIds = React.useMemo(() => {
+    const s = new Set();
+    if (!ordersByGuestId) return s;
+    ordersByGuestId.forEach((orders, gid) => {
+      if (orders.length === 0) return;
+      // Guest is "paid" only if ALL non-cancelled orders are payment_status='paid'
+      const payable = orders.filter(o => !isCancelledOrder(o));
+      if (payable.length === 0) return; // cancelled-only — handled by allGuestsPaid payableGids fix
+      if (payable.every(o => o.payment_status === 'paid')) {
+        s.add(gid);
+      }
+    });
+    return s;
+  }, [ordersByGuestId, isCancelledOrder]);
+
+  // Union: optimistic (in-flight) ∪ persisted (server-confirmed) = effective paid state
+  const effectivePaidGuestIds = React.useMemo(() => {
+    const s = new Set(persistedPaidGuestIds);
+    guestIdsPaid.forEach(g => s.add(g));
+    return s;
+  }, [persistedPaidGuestIds, guestIdsPaid]);
+
   // ===== PAYMENT HANDLERS (RF-4 Sub-4 Variant A, S490) =====
   // Defined here so tr + ordersByGuestId are in scope.
 
@@ -606,11 +633,11 @@ export default function CartView({
       if (failed.length > 0) {
         // Partial failure → rollback + notify
         setGuestIdsPaid(prev => { const s = new Set(prev); s.delete(guestId); return s; });
-        if (toast) toast({ title: 'Не все заказы отмечены, повторите', variant: 'destructive' });
+        if (toast) toast({ title: tr('cart.payment.toast.partialFail', 'Не все заказы отмечены, повторите'), variant: 'destructive' });
       }
     } catch {
       setGuestIdsPaid(prev => { const s = new Set(prev); s.delete(guestId); return s; });
-      if (toast) toast({ title: 'Ошибка оплаты, повторите', variant: 'destructive' });
+      if (toast) toast({ title: tr('cart.payment.toast.error', 'Ошибка оплаты, повторите'), variant: 'destructive' });
     } finally {
       setPayingGuestId(null);
     }
@@ -620,7 +647,11 @@ export default function CartView({
     const allUnpaidIds = [];
     const allGuestIds = [];
     ordersByGuestId.forEach((orders, gid) => {
-      const unpaid = orders.filter(o => !isCancelledOrder(o) && !guestIdsPaid.has(gid));
+      const unpaid = orders.filter(o =>
+        o.payment_status !== 'paid' &&
+        !isCancelledOrder(o) &&
+        !effectivePaidGuestIds.has(gid) // P1#2 chain — effectivePaidGuestIds
+      );
       if (unpaid.length > 0) {
         allUnpaidIds.push(...unpaid.map(o => o.id));
         allGuestIds.push(gid);
@@ -634,23 +665,26 @@ export default function CartView({
       const { failed } = await markOrdersPaid(allUnpaidIds);
       if (failed.length > 0) {
         setGuestIdsPaid(prev => { const s = new Set(prev); allGuestIds.forEach(g => s.delete(g)); return s; });
-        if (toast) toast({ title: 'Не все заказы отмечены, повторите', variant: 'destructive' });
+        if (toast) toast({ title: tr('cart.payment.toast.partialFail', 'Не все заказы отмечены, повторите'), variant: 'destructive' });
       }
     } catch {
       setGuestIdsPaid(prev => { const s = new Set(prev); allGuestIds.forEach(g => s.delete(g)); return s; });
-      if (toast) toast({ title: 'Ошибка оплаты, повторите', variant: 'destructive' });
+      if (toast) toast({ title: tr('cart.payment.toast.error', 'Ошибка оплаты, повторите'), variant: 'destructive' });
     } finally {
       setPayingAll(false);
     }
-  }, [ordersByGuestId, guestIdsPaid, isCancelledOrder, toast]);
+  }, [ordersByGuestId, effectivePaidGuestIds, isCancelledOrder, toast]);
 
   // All guests paid? (for «Все оплачено» state display)
+  // RF-4 Sub-4 hotfix (S492): only consider guests with at least 1 payable order
   const allGuestsPaid = React.useMemo(() => {
     if (!showTableOrdersSection) return false;
-    const allGids = Array.from(ordersByGuestId.keys());
-    if (allGids.length === 0) return false;
-    return allGids.every(gid => guestIdsPaid.has(gid));
-  }, [ordersByGuestId, guestIdsPaid, showTableOrdersSection]);
+    const payableGids = Array.from(ordersByGuestId.entries())
+      .filter(([_, orders]) => orders.some(o => !isCancelledOrder(o)))
+      .map(([gid]) => gid);
+    if (payableGids.length === 0) return false;
+    return payableGids.every(gid => effectivePaidGuestIds.has(gid));
+  }, [ordersByGuestId, effectivePaidGuestIds, isCancelledOrder, showTableOrdersSection]);
 
   // ===== Review Reward Flow (P1) =====
   const reviewRewardPoints = Number(partner?.loyalty_review_points || 0);
@@ -850,6 +884,20 @@ export default function CartView({
 
   return (
     <div className="max-w-2xl mx-auto px-4 mt-2 pb-4">
+      {/* BUG-CV-S491 #582: Session closed banner — shown when host closes table in SOM */}
+      {isSessionClosed && (
+        <div className="bg-amber-50 border border-amber-300 rounded-lg px-4 py-3 mb-3 flex items-start gap-3">
+          <span className="text-amber-500 text-xl mt-0.5">⚠️</span>
+          <div>
+            <p className="font-semibold text-amber-800 text-sm">
+              {tr('cart.session_closed.title', 'Стол закрыт')}
+            </p>
+            <p className="text-amber-700 text-xs mt-0.5">
+              {tr('cart.session_closed.body', 'Официант завершил сессию. Пожалуйста, отсканируйте QR-код ещё раз чтобы сделать новый заказ.')}
+            </p>
+          </div>
+        </div>
+      )}
       {/* P0 Header: [🔔] Стол · Гость · [˅] — #140: chevron moved into table card, not sticky */}
       <div className="bg-white rounded-lg shadow-sm border px-3 py-2 mb-4 mt-2">
         <div className="flex items-center justify-between">
@@ -986,20 +1034,22 @@ export default function CartView({
                   ));
                 })}
               </div>
-              {/* RF-4 Sub-4: per-guest payment CTA (UX v8 pattern 10, S490) */}
-              {guestIdsPaid.has(myGuestId) ? (
+              {/* RF-4 Sub-4: per-guest payment CTA (UX v8 pattern 10, S490; hotfix S492) */}
+              {effectivePaidGuestIds.has(myGuestId) ? (
                 <div className="mt-3 flex items-center justify-center gap-1 text-green-600 text-sm font-medium">
-                  <CheckCircle2 className="w-4 h-4" /> ✓ Оплачено
+                  <CheckCircle2 className="w-4 h-4" /> {tr('cart.payment.cta.paid_badge', '✓ Оплачено')}
                 </div>
               ) : (
                 <Button
                   size="sm"
                   disabled={payingGuestId === myGuestId || payingAll}
-                  onClick={() => handlePayGuest(myGuestId, selfOrders.map(o => o.id))}
+                  onClick={() => handlePayGuest(myGuestId, selfOrders
+                    .filter(o => o.payment_status !== 'paid' && !isCancelledOrder(o))
+                    .map(o => o.id))}
                   className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white"
                 >
                   {payingGuestId === myGuestId ? <Loader2 className="w-4 h-4 animate-spin mr-2 inline" /> : null}
-                  Оплачено
+                  {tr('cart.payment.cta.pay', 'Оплачено')}
                 </Button>
               )}
             </CardContent>
@@ -1062,23 +1112,25 @@ export default function CartView({
                   </div>
                 )}
               </div>
-              {/* RF-4 Sub-4: per-guest payment CTA (UX v8 pattern 10, S490) */}
-              {guestIdsPaid.has(gid) ? (
+              {/* RF-4 Sub-4: per-guest payment CTA (UX v8 pattern 10, S490; hotfix S492) */}
+              {effectivePaidGuestIds.has(gid) ? (
                 <div className="mt-3 flex items-center justify-center gap-1 text-green-600 text-sm font-medium">
-                  <CheckCircle2 className="w-4 h-4" /> ✓ Оплачено
+                  <CheckCircle2 className="w-4 h-4" /> {tr('cart.payment.cta.paid_badge', '✓ Оплачено')}
                 </div>
               ) : (
                 <Button
                   size="sm"
                   disabled={payingGuestId === gid || payingAll}
                   onClick={() => {
-                    const unpaidIds = guestOrders.filter(o => !isCancelledOrder(o)).map(o => o.id);
+                    const unpaidIds = guestOrders
+                      .filter(o => o.payment_status !== 'paid' && !isCancelledOrder(o))
+                      .map(o => o.id);
                     handlePayGuest(gid, unpaidIds);
                   }}
                   className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white"
                 >
                   {payingGuestId === gid ? <Loader2 className="w-4 h-4 animate-spin mr-2 inline" /> : null}
-                  Оплачено
+                  {tr('cart.payment.cta.pay', 'Оплачено')}
                 </Button>
               )}
             </CardContent>
@@ -1086,7 +1138,7 @@ export default function CartView({
         );
       })}
 
-      {/* RF-4 Sub-4: «Все оплачено» table-level CTA (UX v8 pattern 11/12, S490) */}
+      {/* RF-4 Sub-4: «Все оплачено» table-level CTA (UX v8 pattern 11/12, S490; hotfix S492) */}
       {showTableOrdersSection && cartTab === 'table' && !allGuestsPaid && (
         <Button
           size="sm"
@@ -1095,15 +1147,15 @@ export default function CartView({
           className="w-full mb-4 bg-green-600 hover:bg-green-700 text-white"
         >
           {payingAll ? <Loader2 className="w-4 h-4 animate-spin mr-2 inline" /> : null}
-          Все оплачено · {formatPrice(parseFloat(renderedTableTotal.toFixed(2)))}
+          {tr('cart.payment.cta.all_pay', 'Все оплачено')} · {formatPrice(parseFloat(renderedTableTotal.toFixed(2)))}
         </Button>
       )}
       {showTableOrdersSection && cartTab === 'table' && allGuestsPaid && (
         <div className="w-full mb-4 p-3 rounded-lg bg-green-50 border border-green-200 text-center">
           <div className="flex items-center justify-center gap-2 text-green-700 font-medium text-sm">
-            <CheckCircle2 className="w-5 h-5" /> Все оплачено · {formatPrice(parseFloat(renderedTableTotal.toFixed(2)))}
+            <CheckCircle2 className="w-5 h-5" /> {tr('cart.payment.cta.all_pay', 'Все оплачено')} · {formatPrice(parseFloat(renderedTableTotal.toFixed(2)))}
           </div>
-          <p className="text-xs text-green-600 mt-1">Можно попросить официанта закрыть стол</p>
+          <p className="text-xs text-green-600 mt-1">{tr('cart.payment.cta.close_hint', 'Можно попросить официанта закрыть стол')}</p>
         </div>
       )}
 
@@ -1394,7 +1446,7 @@ export default function CartView({
                 if (submitError && setSubmitError) setSubmitError(null);
                 handleSubmitOrder();
               }}
-              disabled={submitPhase === 'submitting' || submitPhase === 'success' || cart.length === 0}
+              disabled={submitPhase === 'submitting' || submitPhase === 'success' || cart.length === 0 || isSessionClosed}
             >
               {submitPhase === 'submitting'
                 ? tr('cart.submit.sending', 'Отправляем...')
