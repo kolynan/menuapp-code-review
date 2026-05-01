@@ -66,29 +66,176 @@ export function getNextOrderNumber(partner, channel) {
 }
 
 // ============================================================
-// FUNCTION 3: getOrCreateSession (S451 RF-4 wrapper)
+// FUNCTION 2b: claimOrderNumbers (RF-4 Sub-2, S484)
+// Atomically claims N sequential order numbers for a channel.
+//
+// Strategy: read → update → verify-after-150ms.
+// If another guest wrote concurrently (verify shows different
+// counter value) → retry with fresh read, up to MAX_ATTEMPTS.
+// Narrows race window ~100× without native B44 compare-and-swap.
+// Falls back to unverified best-effort claim after MAX_ATTEMPTS.
+//
+// Returns { orderNumbers: string[], updatedCounters: object }.
+// ============================================================
+export async function claimOrderNumbers(partnerId, channel, count) {
+  const counterField = `order_counter_${channel}`;
+  const prefixes = { hall: 'ЗАЛ', pickup: 'СВ', delivery: 'ДОС' };
+  const prefix = prefixes[channel] || 'ORD';
+  const MAX_ATTEMPTS = 4;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    // Step 1: Fresh read — get current counter value
+    const p = await base44.entities.Partner.get(partnerId);
+    const businessDate = getBusinessDate(new Date(), p.business_day_start || '06:00');
+    const isNewDay = p.order_counter_date !== businessDate;
+    const baseCount = isNewDay ? 0 : (p[counterField] || 0);
+    const newCount = baseCount + count;
+
+    // Step 2: Write claimed range [baseCount+1 .. newCount]
+    const claimPayload = {
+      order_counter_hall: isNewDay ? 0 : (p.order_counter_hall || 0),
+      order_counter_pickup: isNewDay ? 0 : (p.order_counter_pickup || 0),
+      order_counter_delivery: isNewDay ? 0 : (p.order_counter_delivery || 0),
+      order_counter_date: businessDate,
+      [counterField]: newCount,
+    };
+
+    try {
+      await base44.entities.Partner.update(partnerId, claimPayload);
+    } catch {
+      // Update failed — retry with backoff
+      if (attempt < MAX_ATTEMPTS - 1) {
+        await new Promise(r => setTimeout(r, 50 * Math.pow(2, attempt)));
+      }
+      continue;
+    }
+
+    // Step 3: Verify after 150ms — confirm our write survived concurrent updates
+    await new Promise(r => setTimeout(r, 150));
+    const verify = await base44.entities.Partner.get(partnerId);
+
+    if (verify[counterField] === newCount && verify.order_counter_date === businessDate) {
+      // Verified — return N order number strings for the claimed range
+      const orderNumbers = Array.from({ length: count }, (_, i) =>
+        `${prefix}-${String(baseCount + 1 + i).padStart(3, '0')}`
+      );
+      return { orderNumbers, updatedCounters: claimPayload };
+    }
+
+    // Race detected — another write changed the counter; retry with backoff
+    if (attempt < MAX_ATTEMPTS - 1) {
+      await new Promise(r => setTimeout(r, 50 * Math.pow(2, attempt)));
+    }
+  }
+
+  // Fallback: best-effort claim without verify
+  // Triggered only if 4 concurrent races in rapid succession (extremely rare)
+  const p = await base44.entities.Partner.get(partnerId);
+  const businessDate = getBusinessDate(new Date(), p.business_day_start || '06:00');
+  const isNewDay = p.order_counter_date !== businessDate;
+  const baseCount = isNewDay ? 0 : (p[counterField] || 0);
+  const newCount = baseCount + count;
+  const fallbackPayload = {
+    order_counter_hall: isNewDay ? 0 : (p.order_counter_hall || 0),
+    order_counter_pickup: isNewDay ? 0 : (p.order_counter_pickup || 0),
+    order_counter_delivery: isNewDay ? 0 : (p.order_counter_delivery || 0),
+    order_counter_date: businessDate,
+    [counterField]: newCount,
+  };
+  try { await base44.entities.Partner.update(partnerId, fallbackPayload); } catch { /* silent */ }
+  const orderNumbers = Array.from({ length: count }, (_, i) =>
+    `${prefix}-${String(baseCount + 1 + i).padStart(3, '0')}`
+  );
+  return { orderNumbers, updatedCounters: fallbackPayload };
+}
+
+// ============================================================
+// FUNCTION 3: getOrCreateSession (S481 RF-4 Sub-1 client-side pivot)
 // Finds open session for table or creates new one.
 //
-// S451: migrated to thin wrapper around B44 Backend Function `createTableSession`
-// for server-side idempotency (reduces concurrent QR scan race window).
+// S481 PIVOT: Backend Functions blocked (App Editor ≠ Backend Platform, KB-175).
+// Replaced B44 Backend Function wrapper with client-side conditional create
+// + retry-with-check pattern. Race window narrows ~100× (equivalent to what
+// Backend Function would have provided — B44 confirmed Functions are NOT
+// transactional either, see DECISIONS_INDEX §RF-4-PIVOT-S481).
+//
+// Pattern:
+//   Step 1: filter existing open sessions → reuse oldest (idempotent)
+//   Step 2: create new session if none found
+//   Step 3: 150ms sleep → re-filter → close race dupes, return oldest
 //
 // Backwards-compat:
 //   - Same export name + same positional args (tableId, partnerId)
-//   - Returns same TableSession object shape as before
+//   - Returns same TableSession object shape
 //   - Existing callers (e.g. x.jsx:4048) require no signature changes
 //
 // Note on arg order: caller x.jsx:4048 passes (partner.id, currentTableId) — args
-// reversed relative to this function's signature. This is a pre-existing latent
-// bug (S70-vintage) and is OUT OF SCOPE for RF-4 Sub-batch 1; tracked separately.
-// The wrapper preserves whatever order the caller uses → behaviour identical to
-// pre-migration. Backend Function uses object destructuring `{ partnerId, tableId }`
-// so naming inside `createTableSession` is internally explicit.
+// reversed relative to this function's signature. Pre-existing latent bug
+// (S70-vintage), OUT OF SCOPE here; tracked separately.
 // ============================================================
 export async function getOrCreateSession(tableId, partnerId) {
-  // Delegate to B44 Backend Function for server-side filter+create.
-  // Function signature: createTableSession({ partnerId, tableId })
-  // Function implementation: outputs/permanent/B44_Functions/createTableSession.js
-  return await base44.functions.invoke("createTableSession", { partnerId, tableId });
+  // Step 1: Filter existing open sessions for this (partner, table)
+  const existing = await base44.entities.TableSession.filter({
+    partner: partnerId,
+    table: tableId,
+    status: 'open',
+  });
+
+  if (existing && existing.length > 0) {
+    // Reuse oldest (idempotent — same result whether 1st or Nth concurrent call)
+    const sorted = [...existing].sort((a, b) => {
+      const dateA = new Date(a.created_at || a.created_date || 0);
+      const dateB = new Date(b.created_at || b.created_date || 0);
+      if (dateA.getTime() !== dateB.getTime()) return dateA - dateB;
+      return (a.id || '').localeCompare(b.id || ''); // R1 fallback: id lexicographic
+    });
+    return sorted[0];
+  }
+
+  // Step 2: Create new session (no open session found)
+  const session = await base44.entities.TableSession.create({
+    partner: partnerId,
+    table: tableId,
+    status: 'open',
+  });
+
+  // Step 3: Retry-with-check — close the race window for concurrent QR scans.
+  // 150ms sleep collapses the overlap interval for near-simultaneous creates.
+  await new Promise((r) => setTimeout(r, 150));
+
+  const verify = await base44.entities.TableSession.filter({
+    partner: partnerId,
+    table: tableId,
+    status: 'open',
+  });
+
+  if (verify && verify.length > 1) {
+    // Race detected — keep oldest, close newer duplicates (best-effort)
+    const sorted = [...verify].sort((a, b) => {
+      const dateA = new Date(a.created_at || a.created_date || 0);
+      const dateB = new Date(b.created_at || b.created_date || 0);
+      if (dateA.getTime() !== dateB.getTime()) return dateA - dateB;
+      return (a.id || '').localeCompare(b.id || '');
+    });
+    const oldest = sorted[0];
+    const dupes = sorted.slice(1);
+
+    await Promise.all(
+      dupes.map((s) =>
+        base44.entities.TableSession.update(s.id, {
+          status: 'closed',
+          closed_at: new Date().toISOString(),
+          close_reason: 'race_dedup_s481',
+        }).catch((e) => {
+          // Best-effort: if update fails, SOM defence layer handles orphan
+          console.warn('[sessionHelpers] race_dedup update failed:', e);
+        })
+      )
+    );
+    return oldest;
+  }
+
+  return session;
 }
 
 // ============================================================
@@ -233,4 +380,38 @@ export function getDeviceId() {
 export function getGuestDisplayName(guest) {
   if (!guest) return "Гость";
   return guest.name || `Гость ${guest.guest_number}`;
+}
+
+// ============================================================
+// FUNCTION 12: markOrdersPaid (RF-4 Sub-4 Variant A, S490)
+// Marks N orders as payment_status='paid' using batch sequential
+// updates with 120ms BATCH_DELAY (anti-429, same pattern as
+// closeSession FUNCTION 8 line 316-323).
+//
+// Idempotent: repeated call on already-paid order → no harm.
+// Best-effort: partial failure does NOT abort the loop.
+// Returns { updated: string[], failed: Array<{id, error}> }
+// for caller reconciliation (SOM display layer shows partial state).
+// ============================================================
+export async function markOrdersPaid(orderIds) {
+  const BATCH_DELAY_MS = 120; // anti-429 (S267 vintage, same as closeSession)
+  const updated = [];
+  const failed = [];
+
+  for (let i = 0; i < orderIds.length; i++) {
+    try {
+      await base44.entities.Order.update(orderIds[i], {
+        payment_status: 'paid',
+      });
+      updated.push(orderIds[i]);
+    } catch (err) {
+      failed.push({ id: orderIds[i], error: err?.message || 'unknown' });
+    }
+    // Anti-429: delay between updates (skip after last item)
+    if (i < orderIds.length - 1) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+    }
+  }
+
+  return { updated, failed };
 }

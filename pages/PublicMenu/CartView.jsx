@@ -1,5 +1,5 @@
 import React from "react";
-import { Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, Minus, Plus } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, Minus, Plus, CheckCircle2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,8 @@ import { makeSafeT } from "@/components/_shared/i18n/makeSafeT";
 import { makeIsCancelledOrder } from "@/components/_shared/orders/makeIsCancelledOrder";
 import { isValidEmail } from "@/components/_shared/validators/email";
 import { isFeatureEnabled } from "@/components/_shared/featureFlags";
+// RF-4 Sub-4 Variant A (S490): payment helper
+import { markOrdersPaid } from "@/components/sessionHelpers";
 
 function lightenColor(hex, amount) {
   const num = parseInt(hex.replace('#', ''), 16);
@@ -110,6 +112,17 @@ export default function CartView({
   const manualOverrideRef = React.useRef({});
   // CV-46: Track previous group keys for structural change detection
   const prevGroupKeysRef = React.useRef('');
+
+  // ===== RF-4 Sub-4: Payment state (S490 Variant A) =====
+  // guestIdsPaid: Set of guestIds whose orders have been marked paid (optimistic)
+  const [guestIdsPaid, setGuestIdsPaid] = React.useState(new Set());
+  // payingGuestId: guestId currently in-flight (null = none)
+  const [payingGuestId, setPayingGuestId] = React.useState(null);
+  // payingAll: true while «Все оплачено» batch is in-flight
+  const [payingAll, setPayingAll] = React.useState(false);
+
+  // RF-4 Sub-4: payment handlers defined below after tr + ordersByGuestId (see "PAYMENT HANDLERS" marker)
+
   const [showRewardEmailForm, setShowRewardEmailForm] = React.useState(false);
   const [rewardEmail, setRewardEmail] = React.useState('');
   const [rewardEmailSubmitting, setRewardEmailSubmitting] = React.useState(false);
@@ -580,6 +593,65 @@ export default function CartView({
 
   const showTableOrdersSection = otherGuestIdsFromOrders.length > 0;
 
+  // ===== PAYMENT HANDLERS (RF-4 Sub-4 Variant A, S490) =====
+  // Defined here so tr + ordersByGuestId are in scope.
+
+  const handlePayGuest = React.useCallback(async (guestId, orderIds) => {
+    if (!orderIds || orderIds.length === 0) return;
+    // Optimistic: mark paid immediately
+    setPayingGuestId(guestId);
+    setGuestIdsPaid(prev => { const s = new Set(prev); s.add(guestId); return s; });
+    try {
+      const { failed } = await markOrdersPaid(orderIds);
+      if (failed.length > 0) {
+        // Partial failure → rollback + notify
+        setGuestIdsPaid(prev => { const s = new Set(prev); s.delete(guestId); return s; });
+        if (toast) toast({ title: 'Не все заказы отмечены, повторите', variant: 'destructive' });
+      }
+    } catch {
+      setGuestIdsPaid(prev => { const s = new Set(prev); s.delete(guestId); return s; });
+      if (toast) toast({ title: 'Ошибка оплаты, повторите', variant: 'destructive' });
+    } finally {
+      setPayingGuestId(null);
+    }
+  }, [toast]);
+
+  const handlePayAll = React.useCallback(async () => {
+    const allUnpaidIds = [];
+    const allGuestIds = [];
+    ordersByGuestId.forEach((orders, gid) => {
+      const unpaid = orders.filter(o => !isCancelledOrder(o) && !guestIdsPaid.has(gid));
+      if (unpaid.length > 0) {
+        allUnpaidIds.push(...unpaid.map(o => o.id));
+        allGuestIds.push(gid);
+      }
+    });
+    if (allUnpaidIds.length === 0) return;
+    setPayingAll(true);
+    // Optimistic: mark all guests paid immediately
+    setGuestIdsPaid(prev => { const s = new Set(prev); allGuestIds.forEach(g => s.add(g)); return s; });
+    try {
+      const { failed } = await markOrdersPaid(allUnpaidIds);
+      if (failed.length > 0) {
+        setGuestIdsPaid(prev => { const s = new Set(prev); allGuestIds.forEach(g => s.delete(g)); return s; });
+        if (toast) toast({ title: 'Не все заказы отмечены, повторите', variant: 'destructive' });
+      }
+    } catch {
+      setGuestIdsPaid(prev => { const s = new Set(prev); allGuestIds.forEach(g => s.delete(g)); return s; });
+      if (toast) toast({ title: 'Ошибка оплаты, повторите', variant: 'destructive' });
+    } finally {
+      setPayingAll(false);
+    }
+  }, [ordersByGuestId, guestIdsPaid, isCancelledOrder, toast]);
+
+  // All guests paid? (for «Все оплачено» state display)
+  const allGuestsPaid = React.useMemo(() => {
+    if (!showTableOrdersSection) return false;
+    const allGids = Array.from(ordersByGuestId.keys());
+    if (allGids.length === 0) return false;
+    return allGids.every(gid => guestIdsPaid.has(gid));
+  }, [ordersByGuestId, guestIdsPaid, showTableOrdersSection]);
+
   // ===== Review Reward Flow (P1) =====
   const reviewRewardPoints = Number(partner?.loyalty_review_points || 0);
   const isReviewRewardActive = Number.isFinite(reviewRewardPoints) && reviewRewardPoints > 0;
@@ -914,6 +986,22 @@ export default function CartView({
                   ));
                 })}
               </div>
+              {/* RF-4 Sub-4: per-guest payment CTA (UX v8 pattern 10, S490) */}
+              {guestIdsPaid.has(myGuestId) ? (
+                <div className="mt-3 flex items-center justify-center gap-1 text-green-600 text-sm font-medium">
+                  <CheckCircle2 className="w-4 h-4" /> ✓ Оплачено
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  disabled={payingGuestId === myGuestId || payingAll}
+                  onClick={() => handlePayGuest(myGuestId, selfOrders.map(o => o.id))}
+                  className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {payingGuestId === myGuestId ? <Loader2 className="w-4 h-4 animate-spin mr-2 inline" /> : null}
+                  Оплачено
+                </Button>
+              )}
             </CardContent>
           </Card>
         );
@@ -974,11 +1062,50 @@ export default function CartView({
                   </div>
                 )}
               </div>
+              {/* RF-4 Sub-4: per-guest payment CTA (UX v8 pattern 10, S490) */}
+              {guestIdsPaid.has(gid) ? (
+                <div className="mt-3 flex items-center justify-center gap-1 text-green-600 text-sm font-medium">
+                  <CheckCircle2 className="w-4 h-4" /> ✓ Оплачено
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  disabled={payingGuestId === gid || payingAll}
+                  onClick={() => {
+                    const unpaidIds = guestOrders.filter(o => !isCancelledOrder(o)).map(o => o.id);
+                    handlePayGuest(gid, unpaidIds);
+                  }}
+                  className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {payingGuestId === gid ? <Loader2 className="w-4 h-4 animate-spin mr-2 inline" /> : null}
+                  Оплачено
+                </Button>
+              )}
             </CardContent>
           </Card>
         );
       })}
 
+      {/* RF-4 Sub-4: «Все оплачено» table-level CTA (UX v8 pattern 11/12, S490) */}
+      {showTableOrdersSection && cartTab === 'table' && !allGuestsPaid && (
+        <Button
+          size="sm"
+          disabled={payingAll}
+          onClick={handlePayAll}
+          className="w-full mb-4 bg-green-600 hover:bg-green-700 text-white"
+        >
+          {payingAll ? <Loader2 className="w-4 h-4 animate-spin mr-2 inline" /> : null}
+          Все оплачено · {formatPrice(parseFloat(renderedTableTotal.toFixed(2)))}
+        </Button>
+      )}
+      {showTableOrdersSection && cartTab === 'table' && allGuestsPaid && (
+        <div className="w-full mb-4 p-3 rounded-lg bg-green-50 border border-green-200 text-center">
+          <div className="flex items-center justify-center gap-2 text-green-700 font-medium text-sm">
+            <CheckCircle2 className="w-5 h-5" /> Все оплачено · {formatPrice(parseFloat(renderedTableTotal.toFixed(2)))}
+          </div>
+          <p className="text-xs text-green-600 mt-1">Можно попросить официанта закрыть стол</p>
+        </div>
+      )}
 
       {/* CV-01: Empty state — no orders and no cart */}
       {(!showTableOrdersSection || cartTab === 'my') && statusBuckets.served.length === 0 && statusBuckets.in_progress.length === 0 && statusBuckets.pending_unconfirmed.length === 0 && cart.length === 0 && todayMyOrders.length === 0 && (
