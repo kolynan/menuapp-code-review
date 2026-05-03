@@ -225,21 +225,16 @@ export default function CartView({
     lastSentVerifyCodeRef.current = null;
   }, [nowTs, codeLockedUntil]);
 
-  // Reset attempts on successful verification + scroll to top + clear stale submitError (CV-BUG-18 S496)
+  // Reset attempts on successful verification + scroll to top
   React.useEffect(() => {
     if (isTableVerified === true) {
       setCodeAttempts(0);
       setCodeLockedUntil(null);
-      // CV-BUG-18 (S496): Clear stale submitError from earlier failed-submit attempts so the
-      // AC-08 error block (line ~1378) does not render on the first post-verification screen.
-      // Without this, hall-mode users see «Ошибка отправки / Please try again» right after a
-      // successful code entry even though no submit was attempted yet.
-      if (submitError && typeof setSubmitError === 'function') setSubmitError(null);
       // Scroll drawer back to top after successful verification
       const scrollable = document.querySelector('[data-radix-scroll-area-viewport], [role="dialog"]');
       if (scrollable) scrollable.scrollTop = 0;
     }
-  }, [isTableVerified, submitError, setSubmitError]);
+  }, [isTableVerified]);
 
   // Count failed attempts (UI-level), and apply cooldown after max attempts.
   React.useEffect(() => {
