@@ -50,7 +50,7 @@ export function makeIsCancelledOrder(getOrderStatus) {
     return (
       stageInfo?.internal_code === 'cancel'
       || stageInfo?.internal_code === 'cancelled'
-      || (!stageInfo?.internal_code && (o?.status || '').toLowerCase() === 'cancelled')
+      || (!stageInfo?.internal_code && ['cancel', 'cancelled'].includes((o?.status || '').toLowerCase()))
     );
   };
 }
