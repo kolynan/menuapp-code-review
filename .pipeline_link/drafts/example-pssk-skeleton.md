@@ -12,7 +12,7 @@ pc_verdict: GO
 
 <!-- PC-VERDICT: GO (S308, 2026-04-17 — 2 исправления: B12 Fix-маркер + E1 MOBILE-FIRST CHECK) -->
 
-> ⚠️ **ПРИМЕР-СКЕЛЕТ** — сгенерирован `skills/pssk-generator.md` v1.0 (S308) для демонстрации структуры.
+> ⚠️ **ПРИМЕР-СКЕЛЕТ** — сгенерирован по шаблону Section 2 (Generator) из `skills/pssk.md` v3.0 (S362, ранее `skills/pssk-generator.md` v1.0 S308 → archived в `skills/versions/` как часть BACKLOG #451 closure).
 > Использует реальный файл `menudishes.jsx` (2995 строк) и реальные anchors.
 > Задача вымышленная: замена amber-кнопки «Попробовать снова» на shadcn variant="secondary".
 

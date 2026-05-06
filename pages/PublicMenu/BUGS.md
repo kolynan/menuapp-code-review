@@ -1,7 +1,7 @@
 ---
-version: "41.0"
-updated: "2026-04-01"
-session: 214
+version: "42.0"
+updated: "2026-05-05"
+session: 567
 ---
 
 # PublicMenu — Bug Registry
@@ -9,42 +9,49 @@ session: 214
 Регистр всех известных багов страницы публичного меню (x.jsx + useTableSession.jsx).
 Цель: не терять контекст, быстро чинить повторные баги, не допускать регрессий.
 
+**S567 (M0505 NS-642-PM triage):** Top-5 pre-2026 stale bugs resolved — BUG-PM-132 ✅ FIXED (code grep verified), BUG-PM-058/059 ❌ WONTFIX (superseded LOCKED 2-mode DECISIONS §7), BUG-PM-056/057 🔵 RE-PRI P1→P3 (B44 cloud component, defer to visual test cycle). Closes Weekly Audit S532 QW3.
+
 ---
 
 ## Active Bugs (не исправлены)
 
-*3 active bugs remaining (0x P0, 3x P1, 0x P2, 0x P3, 0x suggestion). 7 bugs fixed in CV-B1-Polish chain.*
+*Остальные active bugs, не охваченные S567 triage. Note: header counts pre-S567 могут быть stale; ground truth — per-bug Статус markers ниже.*
 
-### BUG-PM-132: List mode stepper buttons use w-9 h-9 (36px) instead of w-11 h-11 (44px) (P2)
+### ✅ BUG-PM-132: List mode stepper buttons use w-9 h-9 (36px) instead of w-11 h-11 (44px) (P2) — FIXED S567
+- **Статус:** ✅ FIXED S567 (M0505 NS-642-PM triage) — code grep confirmed ZERO `w-9 h-9` matches in `MenuView.jsx` and 6× `w-11 h-11` on all stepper buttons (lines 156, 168, 178, 234, 246, 256). All 44px touch targets compliant. Bug fixed implicitly during refactor post-S177; FROZEN UX batch 10 lock no longer applicable.
 - **Приоритет:** P2
 - **Когда:** S177 (found by Codex in chain 74b9, confirmed by CC)
 - **Файл:** MenuView.jsx, lines 156, 168, 178
 - **Симптом:** List mode +/- buttons are 36px (w-9 h-9) while tile mode uses 44px (w-11 h-11). Violates 44px minimum touch target spec.
 - **Фикс:** Change w-9 h-9 to w-11 h-11 in list mode renderListCard stepper buttons. Deferred — FROZEN UX in batch 10 forbade stepper size changes.
 
-### BUG-PM-056: Drawer layout not visit-state-driven (P1 — Batch 2)
-- **Приоритет:** P1
+### BUG-PM-056: Drawer layout not visit-state-driven (P3 — Batch 2) 🔵 RE-PRI S567 P1→P3
+- **Статус:** 🔵 RE-PRI S567 (M0505 NS-642-PM triage) P1→P3 — `CartView.jsx` lives at `@/components/publicMenu/CartView` (B44 cloud-component, NOT in repo; Glob timeouts confirmed absence). Cannot grep-verify locally. Visit Summary V8 (DECISIONS_INDEX §7:153 LOCKED) partially covers all-served state. Defer to next PublicMenu visual test cycle (Chrome MCP / Arman manual capture). If reproduces in B44 prod after RF waves — escalate back to P1.
+- **Приоритет:** ~~P1~~ → P3
 - **Когда:** S153 (consensus chain publicmenu-260321-093745)
 - **Файл:** CartView.jsx
 - **Симптом:** CartView renders same layout regardless of visit state. Missing 3 distinct drawer layouts per spec (before send / after send+draft / after send no draft).
 - **Фикс:** Introduce `drawerLayout` variable, conditionally reorder sections, add collapsible bill.
 
-### BUG-PM-057: CTA 7-state matrix not implemented (P1 — Batch 2)
-- **Приоритет:** P1
+### BUG-PM-057: CTA 7-state matrix not implemented (P3 — Batch 2) 🔵 RE-PRI S567 P1→P3
+- **Статус:** 🔵 RE-PRI S567 (M0505 NS-642-PM triage) P1→P3 — Foundational 7-state matrix premise SUPERSEDED by LOCKED `DECISIONS_INDEX §7:150` "Одна панель, **2 режима**: draft + visit". Sister to BUG-PM-058/059. CTA labels («Заказать ещё», «Открыть счёт») may still need separate audit against current CartView (B44 cloud — cannot grep locally). Defer to same visual test cycle as #056. If CTA text drift confirmed by visual capture — open as P2 fresh bug, not retain stale 7-state premise.
+- **Приоритет:** ~~P1~~ → P3
 - **Когда:** S153 (consensus chain publicmenu-260321-093745)
 - **Файл:** CartView.jsx
 - **Симптом:** Submit button text doesn't vary by visit+draft state. Missing "Заказать ещё", "Открыть счёт" CTAs.
 - **Фикс:** Compute CTA text/behavior from 7-state matrix.
 
-### BUG-PM-058: StickyCartBar missing 7-state visibility (P1 — Batch 3)
-- **Приоритет:** P1
+### BUG-PM-058: StickyCartBar missing 7-state visibility (Batch 3) ❌ WONTFIX S567
+- **Статус:** ❌ WONTFIX S567 (M0505 NS-642-PM triage) — 7-state visibility spec SUPERSEDED by LOCKED `DECISIONS_INDEX §7:150` "Одна панель, **2 режима**: draft и visit". Current `x.jsx:3418-3425` 4-state machine (`hallStickyMode = "cart" | "myBill" | "tableOrders" | "cartEmpty"`) coerces 2-mode + visit-state variants per LOCKED simplified design. `hallStickyShowBillAmount` (3456) + `hallStickyIsLoadingBill` (3458-3461) cover paid/loading transitions. Closed-table edge case handled at parent rendering level (sessionOrders=0 → cartEmpty fallback). Spec evolution made 7-state premise obsolete; current implementation correct per LOCKED 2-mode design.
+- **Приоритет:** ~~P1~~ → CLOSED (WONTFIX)
 - **Когда:** S153 (consensus chain publicmenu-260321-093745)
 - **Файл:** x.jsx
 - **Симптом:** `hallStickyMode` only has 4 states. Missing: paid fade-out, closed hidden, closed+items confirm reset, two text modes.
 - **Фикс:** Full state detection from tableSession.
 
-### BUG-PM-059: StickyCartBar text modes not implemented (P1 — Batch 3)
-- **Приоритет:** P1
+### BUG-PM-059: StickyCartBar text modes not implemented (Batch 3) ❌ WONTFIX S567
+- **Статус:** ❌ WONTFIX S567 (M0505 NS-642-PM triage) — Sister to BUG-PM-058. Text modes implemented per LOCKED 2-mode spec via `hallStickyButtonLabel` (x.jsx:3428-3437) + `hallStickyModeLabel` (3440-3445) with distinct strings per state: cart→"Checkout", myBill→"My bill", tableOrders→"Table orders", cartEmpty→"Open"/"Loading...". Bill amount conditional via `hallStickyBillTotal` (3448-3453). 4-state coercion of LOCKED 2-mode covers draft (cart) + visit (myBill/tableOrders/cartEmpty) text variants completely.
+- **Приоритет:** ~~P1~~ → CLOSED (WONTFIX)
 - **Когда:** S153 (consensus chain publicmenu-260321-093745)
 - **Файл:** x.jsx
 - **Симптом:** No separate draft-mode vs visit-mode text formats for StickyCartBar.

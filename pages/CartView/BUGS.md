@@ -1,7 +1,7 @@
 ---
-version: "1.4"
-updated: "2026-04-16"
-session: 297
+version: "1.5"
+updated: "2026-05-01"
+session: 494
 release: "260415-01 CartView RELEASE.jsx (CV-B1-Polish chain cartview-260415-225026-8ace)"
 ---
 
@@ -162,6 +162,56 @@ release: "260415-01 CartView RELEASE.jsx (CV-B1-Polish chain cartview-260415-225
 
 ---
 
+### ~~CV-BUG-18~~ — ✅ FIXED S497 (S496-v2 Variant B applied, commit `ce6afc2`)
+**Status:** ✅ FIXED (visible симптом scenarios 1+2). Race condition в scenario 3 → отдельный CV-BUG-19.
+**Original repro:** `mode=hall` → ввести верный код стола → код проверен успешно → CartView показывает красный блок «Ошибка отправки» / «Please try again» + красная кнопка «Повторить отправку».
+**Saga (S495-cont/S496/S497):**
+- **S496 attempt (Cowork-direct, FAILED):** single-line `setSubmitError(null)` в isTableVerified useEffect. Smoke FAIL, git revert `129d4c8`. VVV #125 (Cowork-direct без review для multi-state logic). Closed only 1 of 4 gates.
+- **ССП+КП review (3 рецензента):** GO_WITH_CAVEATS, 4 gates identified — (a) `submitError` prop, (b) `submitPhase` local state, (c) x.jsx auto-submit race, (d) i18n RU dict missing.
+- **S496-v2 Variant B (ССП Implementation, APPLIED commit `ce6afc2`):** dual-state reset (CartView submitError + submitPhase=idle, deps `[isTableVerified, setSubmitError]`) + x.jsx auto-submit gate `&& showTableConfirmSheet` + I18N_FALLBACKS_RU 2 keys + makeSafeT lang.toLowerCase normalization.
+- **Smoke S497:** scenarios 1 (hall + correct code → no red block) ✅ + 2 (wrong → correct → no stale red block) ✅. RU текст корректен в error блоке.
+- **Scenario 3 race → CV-BUG-19** (отдельный bug): auto-submit fires до загрузки tableSession → first try fails → retry CTA legitimately shown.
+- **Smoke 4+5 pending — handoff to НС.**
+**RELEASE:** `260502-00 CartView RELEASE.jsx` (1488 lines) + `260502-00 x RELEASE.jsx` (5398 lines).
+**Cross-refs:** BACKLOG ~~#588~~ DONE, BACKLOG #589 (CV-BUG-19 race), [NS_588 review codex](computer://C:\Users\ASUS\Dev\Menu AI Cowork\menuapp-code-review\outputs\NS_588_CV_BUG_18_review_codex.md), commit `ce6afc2`, скрин original `pages/CartView/screenshots/current/CV-BUG-18-hall-mode-submit-error-S495.jpg`.
+
+---
+
+### ✅ CV-BUG-19 — Hall mode auto-submit race: tableSession async load vs 100мс auto-submit timer (S518 FIXED)
+**Воспроизведение:** `mode=hall` → tap «Отправить» до verify (открывает табличный код sheet) → ввести верный код → 100мс delay → `processHallOrder` срабатывает но `tableSession` ещё не загружен → throws → catch ставит `submitError` → красная AC-08 retry CTA с RU текстом «Не удалось отправить / Попробуйте снова».
+**Контекст:** Найден S497 smoke scenario 3 после S496-v2 deploy. Existing race КП identified в review §1: «`tableSession` typically hasn't loaded yet (the same component already has a 3 s `sessionCheckTimedOut` for that exact race), so `processHallOrder` throws and `setSubmitError(t('error.send.title'))` fires.»
+**Root cause:** x.jsx:3386 useEffect setTimeout 100мс недостаточен для async tableSession load (~500мс-3с). Same component already has `sessionCheckTimedOut` 3s constant for this exact race, но auto-submit не использует.
+**Workaround (UX):** гость может тапнуть «Повторить отправку» — должно сработать (tableSession загружен к этому моменту).
+**Status:** ✅ FIXED S518 (commit `f537f2a`). Fix: extend auto-submit useEffect gate condition с `&& (tableSession?.id || sessionCheckTimedOut)` + add deps `tableSession?.id, sessionCheckTimedOut` per ССП-1 review proposal. PM-075 UX preserved (auto-submit fires когда session loads OR sessionCheckTimedOut истекает после 3s). Code: `pages/PublicMenu/x.jsx:3386-3407`. RELEASE: `260504-00 x RELEASE.jsx`. ССП review GO (Q1-Q6 4/5/4/5/5/5 avg 4.67), КП procedural NO_GO (shell timeout KB-176).
+**Batch:** S518 (CV-BUG-19 + CV-BUG-20 saga).
+**Ref:** S497 скрин Arman (hall mode, 3 блюда, Стол 22). Скрин: `pages/CartView/screenshots/current/CV-BUG-18-scenario-3-auto-submit-real-fail-S496-v2-smoke.jpg`. Cross-ref: ССП review NS_589_review_cc.md, КП review NS_589_review_codex.md, BACKLOG ~~#589~~ DONE.
+
+---
+
+### ✅ CV-BUG-20 — TableSession.create payload missing opened_at + expires_at fields → 4× HTTP 422 backend validation rejection (S518 FIXED)
+**Воспроизведение (S518):** hall mode, **table verified successfully**, корзина с 2+ dishes, тап «Отправить официанту» → красный блок «Не удалось отправить» / «Попробуйте снова» + красная кнопка retry. DevTools Network: **4× HTTP 422** на `/api/apps/.../entities/TableSession`. Console: `Failed to load resource: 422 ()` × 4. Workaround нет — все 4 retry попытки fail с тем же 422.
+**Root cause:** `components/sessionHelpers.js:200-205` `TableSession.create` payload missing `opened_at` + `expires_at` fields. Backend schema требует `opened_at` (read at sessionHelpers.js:352 `isSessionExpired` + sort key at useTableSession.jsx:318). Без него backend rejects payload с 422 validation error.
+**4× 422 explained (ССП review):** 4 sequential user retry taps (1 initial submit + 3 «Повторить отправку» button presses), **NOT concurrent fan-out**. Verified через `submitLockRef` / `pendingSubmitRef` / polling-dormancy / StrictMode analysis.
+**Regression history:**
+- 2026-04-15 (S70-era) `260415-00 sessionHelpers RELEASE.js`: client-side `.create()` had `opened_at` + `expires_at` ✅ (baseline)
+- 2026-04-29 (S451 RF-4): pivot to B44 Backend Function — server-side filled fields, client passed only IDs
+- 2026-04-30 (S485 RF-4 Sub-1): Backend Functions blocked, rewrite client-side filter+create+verify, **fields NOT restored** (regression)
+- 2026-05-01 commit `9751ed5` (RF-4 Sub-4): production deploy → 422 errors начались
+- 2026-05-04 today: Arman hits the bug
+**Status:** ✅ FIXED S518 (commit `0a95564`). Fix: literal restoration of 2 fields из S70-era baseline:
+```javascript
+opened_at: new Date().toISOString(),
+expires_at: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+```
+Net change: +2 lines additive внутри `getOrCreateSession` `TableSession.create()` payload block. RELEASE: `260504-00 sessionHelpers RELEASE.js`. ССП investigation ROOT_CAUSE_PROBABLE → ССП Implementer applied → КП Reviewer GO (Q1-Q6 5/5/5/5/4/5 avg 4.83). Smoke PASS.
+**Backwards compat:** legacy TableSession rows без `opened_at` (создан между 9751ed5 и сейчас) НЕ broken — `new Date(undefined)` yields NaN, `hoursDiff = NaN`, `NaN > 8` = false, `isSessionExpired` returns false. Sort fallback to created_at. Pre-existing tolerance, не regression.
+**Приоритет:** P1 — production blocker для всех hall-mode submits после verify (since 9751ed5 deploy).
+**Batch:** S518 (CV-BUG-19 + CV-BUG-20 saga).
+**Cross-refs:** [NS_589_CV_BUG_20_Investigation_Prompt.md](computer://C:\Users\ASUS\Dev\Menu AI Cowork\outputs\NS_589_CV_BUG_20_Investigation_Prompt.md), [NS_589_CV_BUG_20_Implementation_Prompt.md](computer://C:\Users\ASUS\Dev\Menu AI Cowork\outputs\NS_589_CV_BUG_20_Implementation_Prompt.md), [NS_589_CV_BUG_20_KP_Review_Prompt.md](computer://C:\Users\ASUS\Dev\Menu AI Cowork\outputs\NS_589_CV_BUG_20_KP_Review_Prompt.md), commit `0a95564`, BACKLOG ~~#589~~ DONE + #651 spawned (UX loader gap).
+**Spawn UX follow-up:** BACKLOG #651 — loader during table verify→submit transition (P3 polish, ~30-45 мин, parallel-safe).
+
+---
+
 ### ~~CV-BUG-14~~ — NOT A BUG (закрыт S303)
 **Статус:** ✅ NOT A BUG — поведение корректное по дизайну.
 **Логика форматирования цен (by design):** Количество знаков после запятой определяется ценой блюда в меню партнёра, а не валютой. Если блюдо стоит 80 ₸ → показываем «80 ₸». Если 80.50 ₸ → показываем «80.50 ₸». Это осознанное решение: цена отображается ровно так, как задал партнёр. Decimals=0 по умолчанию для KZT — неверное допущение.
@@ -174,6 +224,47 @@ release: "260415-01 CartView RELEASE.jsx (CV-B1-Polish chain cartview-260415-225
 **Что имеется в виду "большая кнопка":** Это она — primary green CTA в footer для State C/C2.
 **Статус:** Запланировано в Batch CV-B3 (rating flow full).
 **Ref:** Скрин 00d19632 — footer "Заказать ещё" outline, а ожидается primary green CTA.
+
+---
+
+### ~~CV-BUG-15~~ ✅ DONE S511 (auto-resolved by CV-B2-B `a133651`, code verified) — «⏳ Ожидает» bucket никогда не появляется: status 'submitted' vs 'new' (P1)
+**Воспроизведение:** Отправить заказ (State A2) → таб «Мои» → группа «⏳ Ожидает» не отображается.
+**Ожидалось (State A2, mockup v11 S302, DECISIONS §1):** После отправки в «Мои» появляется amber-группа «⏳ Ожидает (N)» с подсказкой «ⓘ Ждём подтверждения ресторана».
+**Факт:** `statusBuckets` useMemo проверяет `o.status === 'submitted'`, но B44 возвращает `status: 'new'` для только что созданного заказа. Условие `isPending` всегда `false` → bucket не заполняется → группа невидима.
+**Строка кода:** RELEASE.jsx ~477: `const isPending = !stageInfo?.internal_code && (o.status || '').toLowerCase() === 'submitted';`
+**Фикс:** заменить `=== 'submitted'` на `=== 'new'` (или `['new','submitted'].includes(...)` для совместимости).
+**Приоритет:** P1 — ключевой UX-момент (State A2) полностью сломан.
+**Batch:** CV-B3 (Ожидает batch).
+**Ref:** S494 discovery, mockup v11 S302 State A2, DECISIONS_INDEX LOCKED.
+**S511 verify:** Code at CartView.jsx:472 = `(o.status || '').toLowerCase() === 'new'` ✅ (committed `a133651` CV-B2-B batch). Comment label says "CV-BUG-16" but fix is for CV-BUG-15 (minor mislabel, no functional impact). **Smoke pending:** Arman test in prod (отправить заказ → bucket «⏳ Ожидает» visible).
+
+---
+
+### ~~CV-BUG-16~~ ✅ DONE S511 (auto-resolved by CV-B2-B `a133651`, code verified) — Неверный порядок bucket: «⏳ Ожидает» сверху вместо снизу (P2)
+**Воспроизведение:** Даже если bucket получит данные — он рендерится ПЕРВЫМ (сверху).
+**Ожидалось (DECISIONS_INDEX LOCKED, S302):** Порядок снизу вверх: Выдано (top, dimmed) → В работе → Ожидает (bottom, amber).
+**Факт:** `bucketOrder = ['pending_unconfirmed', 'served', 'in_progress']` — Ожидает идёт первым.
+**Строка кода:** RELEASE.jsx ~1094: `const bucketOrder = ['pending_unconfirmed', 'served', 'in_progress'];`
+**Фикс:** `['served', 'in_progress', 'pending_unconfirmed']`
+**Приоритет:** P2 — нарушение LOCKED layout-решения.
+**Batch:** CV-B3 (Ожидает batch).
+**Ref:** S494 discovery, DECISIONS_INDEX «Ожидает bucket СНИЗУ «Мои»».
+**S511 verify:** Code at CartView.jsx:1259 = `const bucketOrder = ['served', 'in_progress', 'pending_unconfirmed'];` ✅ (committed `a133651` CV-B2-B batch + R1 LOCKED comment). **Smoke pending:** Arman test in prod (Ожидает в самом низу).
+
+---
+
+### ~~CV-BUG-17~~ ✅ DONE S498 (CV-B3 v2 deploy 260503-00, code verified S511) — Отсутствует hint «ⓘ Ждём подтверждения ресторана» под bucket «Ожидает» (P2)
+**Воспроизведение:** State A2 → группа «⏳ Ожидает» (если будет видна) — без подсказки.
+**Ожидалось (mockup v11 S302 State A2, строки 415-417):** Под шапкой bucket «⏳ Ожидает» — серая italic-строка «ⓘ Ждём подтверждения ресторана».
+**Факт:** В коде отсутствует hint-элемент для `pending_unconfirmed` bucket. Рендерится стандартный bucket без дополнительного текста.
+**Строка кода:** RELEASE.jsx ~1102-1160 (normal bucket render) — нет ветки для pending hint.
+**Фикс:** добавить после шапки `pending_unconfirmed` bucket JSX-элемент с hint-текстом.
+**Приоритет:** P2 — UX-уточнение, важно для State A2 сценария.
+**Batch:** CV-B3 (Ожидает batch).
+**Ref:** S494 discovery, mockup v11 S302 State A2 lines ~415-417.
+**S511 verify:** Code at CartView.jsx:1321-1326 = JSX block with marker `CV-BUG-17 (S498, #587)` + hint text `ⓘ {tr('cart.pending.hint', 'Ждём подтверждения ресторана')}` rendered when `key === 'pending_unconfirmed'` ✅. Working copy uncommitted (paired deploy 260503-00 без commit per S498 — chain-lock guard active). **Smoke pending:** Arman test in prod (отправить заказ → bucket «⏳ Ожидает» → hint видна).
+
+---
 
 ## 🟡 UX-вопросы (закрыты S271 GPT v7 → UX v7.0 FROZEN)
 

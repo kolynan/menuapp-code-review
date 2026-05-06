@@ -36,7 +36,7 @@ For each finding: [P0/P1/P2/P3] Title - Description. FIX: code change needed.
 
 Write findings to (ABSOLUTE PATH — required, see KB-139): C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/chain-state/{{CHAIN_ID}}-codex-findings.md
 
-**KB-158 write-fallback:** if absolute path write fails (sandbox read-only), fallback to relative `pages/{{PAGE}}/{{CHAIN_ID}}-codex-findings.md`. Always include `{{CHAIN_ID}}` in filename. NEVER write to generic `review_YYYY-MM-DD.md` — comparator cannot locate it.
+**KB-158 write-fallback:** if absolute path write fails (sandbox read-only), fallback to `C:/Users/ASUS/Dev/Menu AI Cowork/pages/{{PAGE}}/{{CHAIN_ID}}-codex-findings.md`. Always include `{{CHAIN_ID}}` in filename. NEVER write to generic `review_YYYY-MM-DD.md` — comparator cannot locate it.
 
 FORMAT:
 # Codex Writer Findings — {{PAGE}}

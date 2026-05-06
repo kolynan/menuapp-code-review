@@ -11,12 +11,19 @@ export default function CategoryChips({
 }) {
   return (
     <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 border-b border-slate-200 py-2 shadow-sm">
+      {/* Hide horizontal scrollbar on mobile only; keep default on desktop (≥768px) */}
+      <style>{`
+        @media (max-width: 767px) {
+          .category-chips-scroll::-webkit-scrollbar { display: none; }
+          .category-chips-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+        }
+      `}</style>
       <div className="max-w-2xl mx-auto px-4">
-        <div className="flex gap-2 overflow-x-auto snap-x pb-1">
+        <div className="category-chips-scroll flex gap-2 overflow-x-auto snap-x pb-1">
           <button
             ref={(el) => (chipRefs.current.all = el)}
             onClick={() => onCategoryClick("all")}
-            className={`snap-start flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+            className={`snap-start flex-shrink-0 px-3 py-2.5 rounded-full text-sm font-medium border transition-all ${
               activeCategoryKey === "all"
                 ? "text-white border-transparent shadow-sm"
                 : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 shadow-sm"
@@ -31,7 +38,7 @@ export default function CategoryChips({
               key={cat.id}
               ref={(el) => (chipRefs.current[cat.id] = el)}
               onClick={() => onCategoryClick(cat.id)}
-              className={`snap-start flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+              className={`snap-start flex-shrink-0 px-3 py-2.5 rounded-full text-sm font-medium border transition-all ${
                 activeCategoryKey === cat.id
                   ? "text-white border-transparent shadow-sm"
                   : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 shadow-sm"

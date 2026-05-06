@@ -322,7 +322,7 @@ const HALL_UI_TEXT = {
   new: "\u041D\u041E\u0412\u042B\u0415",
   newShort: "\u041D\u043E\u0432\u044B\u0435",
   ready: "\u0413\u041E\u0422\u041E\u0412\u041E",
-  readyShort: "\u0413\u043E\u0442\u043E\u0432\u043E",
+  readyShort: "\u0412\u044B\u0434\u0430\u0442\u044C",
   inProgress: "\u0412 \u0420\u0410\u0411\u041E\u0422\u0415",
   served: "\u0412\u042B\u0414\u0410\u041D\u041E",
   bill: "\u0421\u0427\u0401\u0422",
@@ -773,7 +773,7 @@ function getLinkId(field) {
                     <div className="min-w-0 flex-1">
                       <div className="text-[11px] font-bold uppercase tracking-wider text-slate-600">{HALL_UI_TEXT.bill}</div>
                       <div className="mt-1 text-sm font-semibold text-slate-900">{`${HALL_UI_TEXT.total} ${formatHallMoney(billData.total)}`}</div>
-                      {!billExpanded && billData.remaining < billData.total && <div className="mt-1 text-xs text-slate-500">{`${HALL_UI_TEXT.remaining} ${formatHallMoney(billData.remaining)}`}</div>}
+                      {!billExpanded && <div className="mt-1 text-xs text-slate-500">{`${HALL_UI_TEXT.remaining} ${formatHallMoney(billData.remaining)}`}</div>}
                     </div>
                     {billExpanded ? <ChevronUp className="w-4 h-4 text-slate-400 mt-1" /> : <ChevronDown className="w-4 h-4 text-slate-400 mt-1" />}
                   </button>

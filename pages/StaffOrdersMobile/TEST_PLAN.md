@@ -5,6 +5,14 @@ created: "2026-03-02"
 session: 66
 ---
 
+<!-- WARN S509 - version drift: CLAUDE.md S293 утверждает «все 29 страниц на v2.0» но этот файл всё ещё v1.0 (нет секций Functional/Security/UI-Visual/Performance/Integration). Spot-check S509 показал HP-2/EC-3 FRESH, ER-1 PARTIAL (feature gap = BACKLOG #613 offline policy). См. BACKLOG #621 S509 entry. -->
+
+<!-- STALE-FRESH MARKERS S509 (per BACKLOG #621):
+- HP-2 (Принятие заказа): FRESH — handleAction L1607, actionLabel "Принять" L230, tooltip L2517 (260504-00 RELEASE.jsx)
+- EC-3 (Много заказов одновременно): FRESH — getOldestAgeMinutes L2043+ + stage_entered_at sort/summary L2067-2128 — sort by age implemented
+- ER-1 (Потеря связи): PARTIAL — refetchInterval L3499/3521 ✅ есть auto-refresh; «Нет связи» indicator + reconnect feedback ❌ отсутствуют → совпадает с feature gap BACKLOG #613 (Offline policy)
+-->
+
 # TEST_PLAN: StaffOrdersMobile
 
 ## Назначение страницы

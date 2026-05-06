@@ -1,8 +1,37 @@
 // ======================================================
-// pages/orderstatus.jsx — PUBLIC ORDER STATUS PAGE (GAP-02)
+// ⚠️⚠️⚠️ DEPRECATED — STANDALONE ORPHAN — DO NOT EDIT ⚠️⚠️⚠️
+// ======================================================
+// Marked: 2026-04-27, Session 400 (CW S400 OrderStatus Snapshot mockup)
+//
+// 🚨 THIS FILE IS NOT DEPLOYABLE 🚨
+//
+// /orderstatus route returns 404 в B44 — platform routing managed
+// internally; добавление этого файла НЕ регистрирует SPA route.
+// (BUG-PM-012, S71 GAP-02, see pages/PublicMenu/BUGS.md:906)
+//
+// PRODUCTION REALITY:
+//   OrderStatusScreen встроен как view state в pages/PublicMenu/x.jsx
+//   (line 1073-1230). Track-button делает setView("orderstatus")
+//   вместо navigation. View toggle: menu | checkout | confirmation | orderstatus.
+//
+// THIS FILE IS:
+//   ✓ Reference baseline для RF-5 batch (OrderStatus dedup,
+//     audit C-02, Pre-Release Refactor Audit) — 95% structurally
+//     identical к embedded version, минус per-partner statusPrimaryColor.
+//   ✓ Useful для grep/ctags при разработке RF-5.
+//   ✗ NOT a target for edits — изменения здесь не достигают prod.
+//   ✗ NOT used by any route, link, redirect, or import in active code.
+//
+// IF YOU CAME HERE TO FIX A BUG IN OrderStatus:
+//   → Edit pages/PublicMenu/x.jsx OrderStatusScreen@1073 instead.
+//   → Mockup reference: ux-concepts/OrderStatus/260427-00 OrderStatus Snapshot S400.html
+//
+// CLEANUP OWNER: RF-5 batch [Opus, M effort, after RF-5a + RF-1].
+// ======================================================
+// pages/orderstatus.jsx — PUBLIC ORDER STATUS PAGE (GAP-02) — orphan reference
 // Created: 2026-03-03, Session 71
-// Purpose: Pickup/delivery guests track their order status
-// Route: /orderstatus?token=<public_token>
+// Purpose: Pickup/delivery guests track their order status (NOT REACHABLE in prod)
+// Route: /orderstatus?token=<public_token> (returns 404 — see above)
 // ======================================================
 
 import React, { useEffect, useMemo, useRef, useState } from "react";

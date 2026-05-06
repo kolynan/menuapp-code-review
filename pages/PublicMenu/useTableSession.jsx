@@ -500,8 +500,18 @@ export function useTableSession({
     async function pollSessionData() {
       if (isLoadingSessionRef.current) return;
       isLoadingSessionRef.current = true;
-      
+
       try {
+        // BUG-CV-S491 #582: Re-fetch TableSession to detect status changes (e.g. host closes table in SOM)
+        const freshSessions = await base44.entities.TableSession.filter({ id: sessionId });
+        const freshSession = freshSessions?.[0];
+        if (cancelled) return;
+        if (!freshSession || freshSession.status !== 'open') {
+          // Session was closed/expired by host — propagate status to UI and stop polling data
+          if (freshSession) setTableSession(freshSession);
+          return;
+        }
+
         // Load guests
         const guests = await getSessionGuests(sessionId);
         if (cancelled) return;

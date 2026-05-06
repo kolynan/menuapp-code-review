@@ -11,8 +11,8 @@ INSTRUCTIONS:
 3. Do your OWN independent analysis
 4. Focus on: logic errors, missing error handling, i18n issues, UI/UX for mobile-first, React anti-patterns
 5. For each finding: [P0/P1/P2/P3] Title - Description. FIX: description of code change needed.
-6. Write your findings to: pipeline/chain-state/{{CHAIN_ID}}-cc-findings.md
-   - **KB-158 write-fallback:** before writing, test-touch the path. If `pipeline/chain-state/` is read-only (worktree sandbox), write to `pages/{{PAGE}}/{{CHAIN_ID}}-cc-findings.md` AS A FALLBACK — comparator will find it there. Record fallback location in cc-analysis-*.txt.
+6. Write your findings to: C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/chain-state/{{CHAIN_ID}}-cc-findings.md
+   - **KB-158 write-fallback:** before writing, test-touch the path. If `pipeline/chain-state/` is read-only (worktree sandbox), write to `C:/Users/ASUS/Dev/Menu AI Cowork/pages/{{PAGE}}/{{CHAIN_ID}}-cc-findings.md` AS A FALLBACK — comparator will find it there. Record fallback location in cc-analysis-*.txt.
    - ⚠️ NEVER write findings with generic name like `review_YYYY-MM-DD.md` — always include `{{CHAIN_ID}}` in filename so comparator can locate.
 7. Do NOT apply any fixes yet — only document findings
 

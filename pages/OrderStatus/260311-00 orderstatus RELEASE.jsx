@@ -1,8 +1,21 @@
 // ======================================================
-// pages/orderstatus.jsx — PUBLIC ORDER STATUS PAGE (GAP-02)
+// ⚠️⚠️⚠️ DEPRECATED — STANDALONE ORPHAN — DO NOT EDIT ⚠️⚠️⚠️
+// ======================================================
+// Marked: 2026-04-27, Session 400
+//
+// 🚨 THIS RELEASE FILE WAS NEVER ACTUALLY DEPLOYED 🚨
+//
+// /orderstatus route returns 404 в B44 — platform routing managed
+// internally; this file's RELEASE generation was a no-op for prod.
+// (BUG-PM-012, S71 GAP-02)
+//
+// Production: OrderStatusScreen embedded в pages/PublicMenu/x.jsx@1073-1230.
+// Edit там, не здесь. RF-5 batch removes both standalone + extracts shared.
+// Mockup: ux-concepts/OrderStatus/260427-00 OrderStatus Snapshot S400.html
+// ======================================================
+// pages/orderstatus.jsx — PUBLIC ORDER STATUS PAGE (GAP-02) — orphan reference
 // Created: 2026-03-03, Session 71
-// Purpose: Pickup/delivery guests track their order status
-// Route: /orderstatus?token=<public_token>
+// Route: /orderstatus?token=<public_token> (returns 404 in B44)
 // ======================================================
 
 import React, { useEffect, useMemo, useRef, useState } from "react";

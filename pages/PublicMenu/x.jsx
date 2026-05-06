@@ -122,6 +122,7 @@ import { useTableSession } from "@/components/publicMenu/refactor/hooks/useTable
 // Audit ref: outputs/permanent/Pre_Release_Refactor_Audit.md v2.0
 // §Final Synth Bundle 2.
 import { generateShortCode } from "@/components/_shared/utils/generateShortCode";
+import { useMenuData, useCategories } from "@/components/_shared/hooks/useMenuCatalog";
 // featureFlags — inlined (B44 does not support component file creation via editor UI)
 const isFeatureEnabled = (partner, flag) => partner ? partner[`${flag}_enabled`] === true : false;
 
@@ -2889,19 +2890,12 @@ export default function X() {
   });
 
   // P0-4: Menu data - filter by partner on server side
-  const { data: allDishes, isLoading: loadingDishes, error: dishesError } = useQuery({
-    queryKey: ["dishes", partner?.id],
-    enabled: !!partner?.id,
-    retry: shouldRetry,
-    queryFn: () => base44.entities.Dish.filter({ partner: partner.id }),
-  });
+  // S574 (BACKLOG #674): extracted to @/components/_shared/hooks/useMenuCatalog
+  // per Q-C1 LOCKED Discovery (refactor BEFORE Б6.2 UI / WaiterMenuPicker).
+  // Cache keys preserved exactly: ["dishes", partnerId] / ["categories", partnerId].
+  const { data: allDishes, isLoading: loadingDishes, error: dishesError } = useMenuData(partner?.id, { retry: shouldRetry });
 
-  const { data: allCategories, error: categoriesError } = useQuery({
-    queryKey: ["categories", partner?.id],
-    enabled: !!partner?.id,
-    retry: shouldRetry,
-    queryFn: () => base44.entities.Category.filter({ partner: partner.id }),
-  });
+  const { data: allCategories, error: categoriesError } = useCategories(partner?.id, { retry: shouldRetry });
 
   // P0-4: Warning if limit reached
   useEffect(() => {

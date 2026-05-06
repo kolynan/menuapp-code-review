@@ -13,7 +13,7 @@ INSTRUCTIONS:
 4. For EACH question: write your analysis with a recommended answer and reasoning.
 5. Focus on: mobile-first UX, restaurant app context, real-world user behavior, LMP (best practices).
 6. When reviewing a code-review prompt (ПССК): verify line numbers against the actual source AND check whether each referenced line sits inside a block comment (`/* ... */`) or a commented-out JSX snapshot. Call out dead-code false positives explicitly (KB-149 — S271 lost a round because lines 639/1254 were inside comment blocks 546-785 / 1148-1418).
-7. Write your position to: pipeline/chain-state/{{CHAIN_ID}}-cc-position.md
+7. Write your position to (ABSOLUTE PATH — required, see KB-139): C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/chain-state/{{CHAIN_ID}}-cc-position.md
 8. Do NOT read or reference any Codex output.
 
 FORMAT for position file:

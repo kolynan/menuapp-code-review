@@ -8,6 +8,7 @@ import Rating from "@/components/Rating";
 import { pluralizeRu } from "@/components/_shared/i18n/pluralizeRu";
 import { makeSafeT } from "@/components/_shared/i18n/makeSafeT";
 import { makeIsCancelledOrder } from "@/components/_shared/orders/makeIsCancelledOrder";
+import { mapLegacyStatus } from "@/components/_shared/orderStage";
 import { isValidEmail } from "@/components/_shared/validators/email";
 import { isFeatureEnabled } from "@/components/_shared/featureFlags";
 // RF-4 Sub-4 Variant A (S490): payment helper
@@ -322,10 +323,14 @@ export default function CartView({
     }
 
     const code = status.internal_code;
-    if (code === 'ready' || code === 'prepared' || code === 'in_progress' || code === 'accepted' || code === 'new') {
+    // R5a-2 Phase A: добавлены canonical codes 'start' / 'middle'
+    // (post-S343 OrderStage schema enforces start|middle|finish);
+    // legacy codes ('ready'/'prepared'/'in_progress'/'accepted'/'new'/'served'/'delivered')
+    // оставлены для backward compat с pre-S343 partner records.
+    if (code === 'start' || code === 'middle' || code === 'ready' || code === 'prepared' || code === 'in_progress' || code === 'accepted' || code === 'new') {
       return { label: tr('cart.group.in_progress', 'В работе'), icon: '⏳', color: '#64748b' };
     }
-    if (code === 'served' || code === 'delivered' || code === 'finish') {
+    if (code === 'finish' || code === 'served' || code === 'delivered') {
       return { label: tr('cart.group.served', 'Выдано'), icon: '✓', color: '#059669' };
     }
     if (code === 'cancel' || code === 'cancelled') {
@@ -467,9 +472,9 @@ export default function CartView({
       if (isCancelledOrder(o)) return;
       const stageInfo = getOrderStatus(o);
       const isServed = stageInfo?.internal_code === 'finish'
-        || (!stageInfo?.internal_code && ['served', 'completed'].includes((o.status || '').toLowerCase()));
-      // CV-BUG-16: B44 pending status string is 'new'
-      const isPending = !stageInfo?.internal_code && (o.status || '').toLowerCase() === 'new';
+        || (!stageInfo?.internal_code && mapLegacyStatus(o.status) === 'finish');
+      // CV-BUG-16: B44 pending status string is 'new' → canonical 'start' code
+      const isPending = !stageInfo?.internal_code && mapLegacyStatus(o.status) === 'start';
       if (isServed) groups.served.push(o);
       else if (isPending) groups.pending_unconfirmed.push(o);
       else groups.in_progress.push(o);
@@ -1017,8 +1022,8 @@ export default function CartView({
                 {selfOrders.map((order) => {
                   const items = itemsByOrder.get(order.id) || [];
                   const status = getSafeStatus(getOrderStatus(order));
-                  // CV-BUG-16: B44 pending status string is 'new'
-                  const isOrderPending = !getOrderStatus(order)?.internal_code && (order.status || '').toLowerCase() === 'new';
+                  // CV-BUG-16: self order pending detection (B44 pending status string 'new' → canonical 'start' code)
+                  const isOrderPending = !getOrderStatus(order)?.internal_code && mapLegacyStatus(order.status) === 'start';
 
                   if (items.length === 0) {
                     return (
@@ -1102,8 +1107,8 @@ export default function CartView({
                         );
                       }
 
-                      // CV-BUG-16: B44 pending status string is 'new'
-                      const isOrderPending = !getOrderStatus(order)?.internal_code && (order.status || '').toLowerCase() === 'new';
+                      // CV-BUG-16: other-guest order pending detection (B44 pending status string 'new' → canonical 'start' code)
+                      const isOrderPending = !getOrderStatus(order)?.internal_code && mapLegacyStatus(order.status) === 'start';
                       return items.map((item, idx) => (
                         <div key={`${order.id}-${idx}`} className="flex justify-between items-center text-xs">
                           <span className="text-slate-600">
@@ -1316,6 +1321,12 @@ export default function CartView({
                 {isServed && shouldShowReviewRewardHint && (
                   <p className="text-xs text-slate-500 mt-0.5 pb-1">
                     {tr('loyalty.review_bonus_hint', 'За отзыв можно получить')} +{reviewRewardPoints} {tr('loyalty.points_short', 'баллов')}
+                  </p>
+                )}
+                {/* CV-BUG-17 (S498, #587): Pending bucket hint per mockup v11 State A2 — visible collapsed or expanded */}
+                {key === 'pending_unconfirmed' && (
+                  <p className="text-xs text-slate-500 italic mt-0.5 pb-1">
+                    ⓘ {tr('cart.pending.hint', 'Ждём подтверждения ресторана')}
                   </p>
                 )}
                 {isExpanded && renderBucketOrders(orders, showRating)}

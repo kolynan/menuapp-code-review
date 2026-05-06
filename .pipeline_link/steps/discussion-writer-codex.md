@@ -31,7 +31,26 @@ INSTRUCTIONS:
 5. Focus on: mobile-first UX, restaurant app context, real-world user behavior, best practices.
 6. When reviewing a code-review prompt (ПССК): verify line numbers against the inline source AND check whether each referenced line sits inside a block comment (`/* ... */`) or a commented-out JSX snapshot. Call out dead-code false positives explicitly.
 7. Write your position to (ABSOLUTE PATH — required, see KB-139): C:/Users/ASUS/Dev/Menu AI Cowork/pipeline/chain-state/{{CHAIN_ID}}-codex-position.md
-8. Do NOT read or reference any CC output.
+
+8. **SANDBOX FALLBACK — KB-165 + S447 #538 fix (MANDATORY — do this AFTER step 7, always):**
+   Codex sandbox scopes file writes to menuapp-code-review/ only — pipeline/chain-state/ is outside
+   the sandbox boundary and may receive an Access Denied / permission error silently.
+   To guarantee the watcher can recover your position, emit the COMPLETE position content
+   to stdout immediately after step 7, using this EXACT header line (no leading spaces):
+
+   # Codex Position — {{PAGE}}
+
+   Then continue with the full position body (Chain: line, questions, summary table, etc.)
+   exactly as written in the FORMAT section above.
+
+   The watcher's extract_codex_findings_from_log function (KB-165, S447 #538 fix) will detect
+   "# Codex Position" in task.log post-step and write it to the correct chain-state path even if
+   the Write tool returned an error.
+
+   **EMIT THIS REGARDLESS** — even if the Write tool in step 7 appeared to succeed.
+   Redundancy is safe and ensures the synthesizer always has your position available.
+
+9. Do NOT read or reference any CC output.
 
 FORMAT for position file:
 # Codex Discussion Position — {{PAGE}}

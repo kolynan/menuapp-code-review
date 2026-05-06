@@ -1,3 +1,8 @@
+> **STATUS (S592, 2026-05-06):** MANUAL invocation only. `chain_template: pssk-review` запрещён per memory `feedback_pssk_review_deprecated.md` (S325 deprecation, VVV #110) + `feedback_kc_broken_use_kp_ssp.md` (S489 chain hung). Watcher v5.20 hardblock S514 #591 Phase B также распространяется на pssk-* без `experimental: true`.
+> Use template `outputs/review-prompts/<task>-v1.md` + `pipeline/templates/manual-review.md` для manual ССП+КП review workflow. См. `skills/rules-ks.md` v1.4 Rule 32 + Rule 32a v2 (Task tool routing для review-only).
+
+---
+
 You are a Codex code reviewer evaluating the QUALITY of a КС implementation prompt (NOT executing it).
 
 A КС prompt is an instruction document for Claude Code + Codex pipeline to fix code in a React/Base44 app.
