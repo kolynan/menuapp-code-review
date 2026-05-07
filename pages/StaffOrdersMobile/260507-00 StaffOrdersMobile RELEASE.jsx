@@ -5013,27 +5013,4 @@ export default function StaffOrdersMobile() {
                     Назад
                   </button>
                   <button type="button" onClick={handleSubmitWaiterOrder} disabled={waiterSubmitting || waiterCart.length === 0}
-                    className="flex-1 min-h-[44px] rounded-lg bg-indigo-600 text-white text-sm font-semibold active:scale-[0.98] disabled:opacity-50">
-                    {waiterSubmitting ? 'Отправка…' : 'Отправить'}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {toastMsg && (
-        <div className="fixed left-0 right-0 bottom-6 z-50 flex justify-center px-4 pointer-events-none">
-          <div className="bg-slate-900 text-white text-sm px-4 py-2 rounded-full shadow-lg">{toastMsg}</div>
-        </div>
-      )}
-      {/* V2-09: Sprint D — Banner notification overlay */}
-      <BannerNotification
-        banner={bannerData}
-        onDismiss={handleBannerDismiss}
-        onNavigate={handleBannerNavigate}
-      />
-    </div>
-  );
-}
+                    className="f
