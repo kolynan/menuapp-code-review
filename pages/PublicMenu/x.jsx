@@ -123,7 +123,8 @@ import { useTableSession } from "@/components/publicMenu/refactor/hooks/useTable
 // §Final Synth Bundle 2.
 import { generateShortCode } from "@/components/_shared/utils/generateShortCode";
 import { useMenuData, useCategories } from "@/components/_shared/hooks/useMenuCatalog";
-// featureFlags — inlined (B44 does not support component file creation via editor UI)
+// featureFlags — inlined here (legacy, RF-2 era). B44 supports new files in src/ since S612 verify.
+// Migration to import from "@/components/_shared/featureFlags" planned in RF-3 sprint.
 const isFeatureEnabled = (partner, flag) => partner ? partner[`${flag}_enabled`] === true : false;
 
 // ============================================================
