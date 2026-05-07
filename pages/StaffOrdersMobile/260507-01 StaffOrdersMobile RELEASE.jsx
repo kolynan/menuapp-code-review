@@ -191,7 +191,6 @@ import {
   DollarSign,
   CheckCircle2,
   Lock,
-  Plus,
   Receipt,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -431,9 +430,9 @@ function extractGuestMarker(label) {
   return match ? match[1] : null;
 }
 
-const isWaiterOpenedTable = (tableData) => {
-  return tableData?.session?.type === 'waiter_proxy'
-    || tableData?.orders?.some((order) => order.submitter_role === 'waiter');
+const isWaiterOpenedTable = (group) => {
+  if (group.type !== 'table') return false;
+  return group.orders?.some((o) => o.submitter_role === 'waiter') ?? false;
 };
 
 const ROLE_LABELS = {
@@ -1747,11 +1746,7 @@ function OrderGroupCard({
   const tableData = tableId ? tableMap[tableId] : null;
   const tableStatus = computeTableStatus(group, activeRequests, getStatusConfig);
   const style = TABLE_STATUS_STYLES[tableStatus] || TABLE_STATUS_STYLES.PREPARING;
-  const isWaiterOpened = group.type === "table" && isWaiterOpenedTable({
-    session: tableData?.session,
-    orders: group.orders,
-  });
-  const tableCardClass = isWaiterOpened ? "bg-amber-50 border-l-4 border-l-amber-300" : `${style.bgClass} ${style.borderClass}`;
+  const isWaiterOpened = isWaiterOpenedTable(group);
 
   const workOrders = useMemo(
     () => group.orders.filter((order) => !["served", "closed", "cancelled"].includes(order.status)),
@@ -2291,13 +2286,9 @@ function OrderGroupCard({
   }, [advanceMutation.isPending, buildAdvancePayload, getOrderActionMeta, getStatusConfig, guestName, handleSingleAction, itemsByOrder]);
 
   const highlightRing = isHighlighted ? "ring-2 ring-indigo-400 ring-offset-1" : "";
-  const tableIdentityStyle = {
-    ...(isWaiterOpened ? { background: '#fef3c7', border: '1.5px solid #fcd34d' } : URGENCY_IDENTITY_STYLE[scsUrgency]),
-    ...(ownershipState === 'free' ? {outline:'2.5px solid #34c75980', outlineOffset:'3px'} : {}),
-  };
 
   return (
-    <div data-group-id={group.compositeKey} className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-all duration-300 ${tableCardClass} ${highlightRing}`}>
+    <div data-group-id={group.compositeKey} className={`mb-3 rounded-lg border border-slate-200 overflow-hidden transition-all duration-300 ${isWaiterOpened ? 'bg-amber-50 border-l-[3px] border-l-amber-300' : `${style.bgClass} ${style.borderClass}`} ${highlightRing}`}>
       <div className="px-4 pt-3 pb-3 cursor-pointer active:opacity-80" onClick={onToggleExpand} role="button" aria-expanded={isExpanded} aria-label={group.type === "table" ? identifier : `${identifier}: ${statusLabel}`}>
         {group.type === "table" ? (
           <div>
@@ -2318,13 +2309,13 @@ function OrderGroupCard({
                     {'\u2606'}
                   </div>
                 )}
-                <div style={{width:'78px', height:'54px', borderRadius:'12px', display:'flex', alignItems:'center', justifyContent:'center', ...tableIdentityStyle}}>
-                  <span style={{fontSize:'26px', fontWeight:700, color:isWaiterOpened ? '#92400e' : '#1c1c1e', fontVariantNumeric:'tabular-nums'}}>{compactTableLabel}</span>
+                <div style={{width:'78px', height:'54px', borderRadius:'12px', display:'flex', alignItems:'center', justifyContent:'center', ...URGENCY_IDENTITY_STYLE[scsUrgency], ...(isWaiterOpened ? {background:'#fef3c7', border:'1px solid #fcd34d'} : {}), ...(ownershipState === 'free' ? {outline:'2.5px solid #34c75980', outlineOffset:'3px'} : {})}}>
+                  <span style={{fontSize:'26px', fontWeight:700, color: isWaiterOpened ? '#92400e' : '#1c1c1e', fontVariantNumeric:'tabular-nums'}}>{compactTableLabel}</span>
                 </div>
               </div>
               <div style={{flex:1, display:'flex', flexWrap:'wrap', gap:'6px', minWidth:0, alignContent:'center'}}>
                 {isWaiterOpened && (
-                  <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-semibold bg-amber-100 text-amber-900 self-center">
+                  <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-semibold bg-amber-100 text-amber-900 self-center" style={{flexBasis:'100%'}}>
                     офц открыл
                   </span>
                 )}
@@ -5013,4 +5004,5 @@ export default function StaffOrdersMobile() {
                     Назад
                   </button>
                   <button type="button" onClick={handleSubmitWaiterOrder} disabled={waiterSubmitting || waiterCart.length === 0}
-                    className="f
+                    className="flex-1 min-h-[44px] rounded-lg bg-indigo-600 text-white text-sm font-semibold active:scale-[0.98] disabled:opacity-50">
+                    {waiterSubmitting ? 'Отправка…' : 
