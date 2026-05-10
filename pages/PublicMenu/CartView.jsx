@@ -1,10 +1,7 @@
 import React from "react";
-import { Loader2, ChevronDown, ChevronUp, Users, Gift, ShoppingBag, Bell, Minus, Plus, CheckCircle2 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Bell, ChevronDown } from "lucide-react";
 // R6-1 Phase B.1 (S615): removed dead Input import (only consumer was extracted to PostRatingEmailSheet)
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Rating from "@/components/Rating";
 import { pluralizeRu } from "@/components/_shared/i18n/pluralizeRu";
 import { makeSafeT } from "@/components/_shared/i18n/makeSafeT";
 import { makeIsCancelledOrder } from "@/components/_shared/orders/makeIsCancelledOrder";
@@ -16,8 +13,12 @@ import { markOrdersPaid } from "@/components/sessionHelpers";
 // R6-1 Phase B.1 (S615): post-rating email capture sheet — extracted sub-component
 import { PostRatingEmailSheet } from "@/components/publicMenu/refactor/PostRatingEmailSheet";
 import TableCodeGateT1CodexApp03 from "@/components/publicMenu/refactor/TableCodeGateT1CodexApp03";
-import TerminalScreenT1CodexApp01 from "@/components/publicMenu/refactor/TerminalScreenT1CodexApp01";
 import StickyFooterCTAT1CodexApp02 from "@/components/publicMenu/refactor/StickyFooterCTAT1CodexApp02";
+import GuestNameEdit from "@/components/publicMenu/refactor/GuestNameEdit";
+import LoyaltyPanel from "@/components/publicMenu/refactor/LoyaltyPanel";
+import MyOrdersSection from "@/components/publicMenu/refactor/MyOrdersSection";
+import RatingSection from "@/components/publicMenu/refactor/RatingSection";
+import TableBillSummary from "@/components/publicMenu/refactor/TableBillSummary";
 
 function lightenColor(hex, amount) {
   const num = parseInt(hex.replace('#', ''), 16);
@@ -637,117 +638,22 @@ export default function CartView({
   // CV-28: getOrderSummary/getOrderTime removed — flat dish list replaces per-order collapse
 
   // ===== CV-28: Render flat dish list for a status bucket (grouped by dish name) =====
-  const renderBucketOrders = (orders, showRating) => {
-    // Collect ALL items from ALL orders in this bucket
-    const allItems = [];
-    orders.forEach(order => {
-      const orderItems = itemsByOrder.get(order.id) || [];
-      orderItems.forEach((item, idx) => {
-        allItems.push({
-          ...item,
-          itemId: item.id || `${order.id}_${idx}`,
-          orderId: order.id,
-        });
-      });
-    });
-
-    // Group by dish_name for display
-    const grouped = new Map();
-    allItems.forEach(item => {
-      const name = item.dish_name || 'Unknown';
-      if (!grouped.has(name)) {
-        grouped.set(name, { name, totalQty: 0, totalPrice: 0, items: [] });
-      }
-      const g = grouped.get(name);
-      g.totalQty += (item.quantity || 1);
-      g.totalPrice += (item.line_total ?? (item.dish_price * (item.quantity || 1)));
-      g.items.push(item);
-    });
-
-    const groups = Array.from(grouped.values());
-
-    return (
-      <div className="space-y-1 mt-1">
-        {groups.map(g => (
-          <div key={g.name}>
-            <div className="flex justify-between items-center text-sm py-1">
-              <span className="text-slate-700">
-                {g.name}{g.totalQty > 1 ? ` ×${g.totalQty}` : ''}
-              </span>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-600">{formatPrice(parseFloat(g.totalPrice.toFixed(2)))}</span>
-                {/* CV-05 v2 view mode: rating text indicators (no star widgets) */}
-                {showRating && reviewsEnabled && !isRatingMode && (() => {
-                  const anyRated = g.items.some(i => safeReviewedItems.has(i.itemId) || (safeDraftRatings[i.itemId] || 0) > 0);
-                  if (anyRated) {
-                    const bestRating = Math.max(...g.items.map(i => safeDraftRatings[i.itemId] || 0));
-                    return <span className="text-xs text-amber-500">⭐{bestRating}</span>;
-                  }
-                  return <span className="text-xs text-slate-400">{tr('review.rate_action', 'Оценить')}</span>;
-                })()}
-              </div>
-            </div>
-            {/* CV-04/CV-05 v2: Per-item ratings — view mode vs rating mode */}
-            {showRating && reviewsEnabled && g.items.map((item, itemIdx) => {
-              const hasReview = safeReviewedItems.has(item.itemId);
-              const draftRating = safeDraftRatings[item.itemId] || 0;
-              const isRated = hasReview || draftRating > 0;
-              const isFirstUnrated = !isRated && itemIdx === g.items.findIndex(i => {
-                const dr = safeDraftRatings[i.itemId] || 0;
-                return !safeReviewedItems.has(i.itemId) && !(dr > 0);
-              });
-
-              if (!isRatingMode) {
-                // View mode: show text indicators inline, no star widgets
-                return null; // Rating text is shown inline in the dish row above
-              }
-
-              // Rating mode: show star widgets
-              return (
-                <div
-                  key={item.itemId}
-                  className="flex items-center gap-2 pl-2 min-h-[44px]"
-                  {...(isFirstUnrated ? {'data-first-unrated': true} : {})}
-                >
-                  <Rating
-                    value={draftRating}
-                    onChange={(val) => {
-                      if (ratingSavingByItemId?.[item.itemId] === true) return;
-                      updateDraftRating(item.itemId, val);
-                      if (val > 0 && handleRateDish) {
-                        const dishId = typeof item.dish === 'object' ? item.dish?.id : item.dish;
-                        handleRateDish({
-                          itemId: item.itemId,
-                          dishId,
-                          orderId: item.orderId,
-                          rating: val,
-                        });
-                      }
-                    }}
-                    size="md"
-                    readonly={ratingSavingByItemId?.[item.itemId] === true}
-                  />
-                  {ratingSavingByItemId?.[item.itemId] === true && (
-                    <span className="text-xs text-slate-400 flex items-center gap-1">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      {tr('review.saving', 'Сохраняем...')}
-                    </span>
-                  )}
-                  {isRated && ratingSavingByItemId?.[item.itemId] !== true && (
-                    <span className="text-xs text-green-600">✓ {tr('review.saved', 'Сохранено')}</span>
-                  )}
-                  {ratingSavingByItemId?.[item.itemId] === 'error' && (
-                    <span className="text-xs text-red-500">{tr('review.save_error', 'Ошибка. Повторить')}</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ))}
-        {/* CV-50: Inline subtotal removed — money only in drawer header */}
-      </div>
-    );
-  };
+  const renderBucketOrders = (orders, showRating) => (
+    <RatingSection
+      orders={orders}
+      showRating={showRating}
+      itemsByOrder={itemsByOrder}
+      formatPrice={formatPrice}
+      tr={tr}
+      reviewsEnabled={reviewsEnabled}
+      isRatingMode={isRatingMode}
+      safeReviewedItems={safeReviewedItems}
+      safeDraftRatings={safeDraftRatings}
+      ratingSavingByItemId={ratingSavingByItemId}
+      updateDraftRating={updateDraftRating}
+      handleRateDish={handleRateDish}
+    />
+  );
 
   return (
     <div className="max-w-2xl mx-auto px-4 mt-2 pb-4">
@@ -799,32 +705,17 @@ export default function CartView({
             <div className="flex items-center justify-center gap-1 text-sm">
               <span className="font-medium text-slate-700">{tableLabel}</span>
               <span className="text-slate-400">·</span>
-              {isEditingName ? (
-                <span className="inline-flex items-center gap-1">
-                  <input
-                    type="text"
-                    value={guestNameInput}
-                    onChange={(e) => setGuestNameInput(e.target.value)}
-                    placeholder={tr('guest.name_placeholder', 'Имя')}
-                    className="w-20 px-1 py-0.5 text-xs border rounded"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && guestNameInput.trim()) handleUpdateGuestName();
-                      if (e.key === 'Escape') { setIsEditingName(false); setGuestNameInput(''); }
-                    }}
-                  />
-                  <button onClick={handleUpdateGuestName} disabled={!guestNameInput.trim()} className="text-green-600 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label={tr('common.save', 'Сохранить')}>✓</button>
-                  <button onClick={() => { setIsEditingName(false); setGuestNameInput(''); }} className="text-slate-400 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label={tr('common.cancel', 'Отмена')}>✕</button>
-                </span>
-              ) : (
-                <button
-                  onClick={() => { setGuestNameInput(currentGuest?.name || ''); setIsEditingName(true); }}
-                  className="min-h-[32px] flex items-center hover:underline"
-                  style={{color: primaryColor}}
-                >
-                  {guestDisplay} <span className="text-xs ml-0.5">›</span>
-                </button>
-              )}
+              <GuestNameEdit
+                isEditingName={isEditingName}
+                guestNameInput={guestNameInput}
+                setGuestNameInput={setGuestNameInput}
+                handleUpdateGuestName={handleUpdateGuestName}
+                setIsEditingName={setIsEditingName}
+                currentGuest={currentGuest}
+                guestDisplay={guestDisplay}
+                primaryColor={primaryColor}
+                tr={tr}
+              />
             </div>
             {/* CV-B2 Fix 1.3: Attributed header — Стол / Вы */}
             {cartTab === 'table' && renderedTableTotal > 0 ? (
@@ -870,344 +761,63 @@ export default function CartView({
         </Tabs>
       )}
 
-      {/* CV-B2 Fix 4.1: Self-block Card — your own orders in Стол tab */}
-      {showTableOrdersSection && cartTab === 'table' && myGuestId && (ordersByGuestId.get(myGuestId) || []).some(o => !isCancelledOrder(o)) && (() => {
-        const selfOrders = (ordersByGuestId.get(myGuestId) || []).filter(o => !isCancelledOrder(o));
-        const selfTotal = selfOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
-        return (
-          <Card className="mb-4">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <ShoppingBag className="w-4 h-4 text-slate-500" />
-                  <span className="text-sm font-semibold text-slate-600">
-                    {tr('cart.self_orders', 'Вы')} ({getGuestLabelById(myGuestId)})
-                  </span>
-                </div>
-                <span className="font-bold text-slate-700">{formatPrice(parseFloat(selfTotal.toFixed(2)))}</span>
-              </div>
-              <div className="pl-2 border-l-2 border-slate-200 space-y-1">
-                {selfOrders.map((order) => {
-                  const items = itemsByOrder.get(order.id) || [];
-                  const status = getSafeStatus(getOrderStatus(order));
-                  // CV-BUG-16: self order pending detection (B44 pending status string 'new' → canonical 'start' code)
-                  const isOrderPending = !getOrderStatus(order)?.internal_code && mapLegacyStatus(order.status) === 'start';
+      <TableBillSummary
+        showTableOrdersSection={showTableOrdersSection}
+        cartTab={cartTab}
+        myGuestId={myGuestId}
+        ordersByGuestId={ordersByGuestId}
+        isCancelledOrder={isCancelledOrder}
+        formatPrice={formatPrice}
+        getGuestLabelById={getGuestLabelById}
+        itemsByOrder={itemsByOrder}
+        getSafeStatus={getSafeStatus}
+        getOrderStatus={getOrderStatus}
+        effectivePaidGuestIds={effectivePaidGuestIds}
+        payingGuestId={payingGuestId}
+        payingAll={payingAll}
+        handlePayGuest={handlePayGuest}
+        otherGuestIdsFromOrders={otherGuestIdsFromOrders}
+        sessionItems={sessionItems}
+        sessionOrders={sessionOrders}
+        tr={tr}
+        handlePayAll={handlePayAll}
+        allGuestsPaid={allGuestsPaid}
+        renderedTableTotal={renderedTableTotal}
+      />
 
-                  if (items.length === 0) {
-                    return (
-                      <div key={order.id} className="flex justify-between items-center text-xs">
-                        <span className="text-slate-600">
-                          {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(parseFloat(Number(order.total_amount).toFixed(2)))}
-                          {isOrderPending && <span className="ml-1 text-amber-600 font-medium">{tr('cart.badge.pending', '⏳ Ожидает')}</span>}
-                        </span>
-                        <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
-                      </div>
-                    );
-                  }
 
-                  return items.map((item, idx) => (
-                    <div key={`${order.id}-${idx}`} className="flex justify-between items-center text-xs">
-                      <span className="text-slate-600">
-                        {item.dish_name} × {item.quantity}
-                        {isOrderPending && <span className="ml-1 text-amber-600 font-medium">{tr('cart.badge.pending', '⏳ Ожидает')}</span>}
-                      </span>
-                      <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
-                    </div>
-                  ));
-                })}
-              </div>
-              {/* RF-4 Sub-4: per-guest payment CTA (UX v8 pattern 10, S490; hotfix S492) */}
-              {effectivePaidGuestIds.has(myGuestId) ? (
-                <div className="mt-3 flex items-center justify-center gap-1 text-green-600 text-sm font-medium">
-                  <CheckCircle2 className="w-4 h-4" /> {tr('cart.payment.cta.paid_badge', '✓ Оплачено')}
-                </div>
-              ) : (
-                <Button
-                  size="sm"
-                  disabled={payingGuestId === myGuestId || payingAll}
-                  onClick={() => handlePayGuest(myGuestId, selfOrders
-                    .filter(o => o.payment_status !== 'paid' && !isCancelledOrder(o))
-                    .map(o => o.id))}
-                  className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white"
-                >
-                  {payingGuestId === myGuestId ? <Loader2 className="w-4 h-4 animate-spin mr-2 inline" /> : null}
-                  {tr('cart.payment.cta.pay', 'Оплачено')}
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })()}
-
-      {/* SECTION 5: TABLE ORDERS (other guests) — flat list, no wrapper group (CV-BUG-15) */}
-      {showTableOrdersSection && cartTab === 'table' && otherGuestIdsFromOrders.map((gid) => {
-        const guestOrders = ordersByGuestId.get(gid) || [];
-        // CV-BUG-06: exclude cancelled orders from guestTotal
-        const guestTotal = guestOrders.reduce((sum, o) => isCancelledOrder(o) ? sum : sum + (Number(o.total_amount) || 0), 0);
-
-        return (
-          <Card key={gid} className="mb-4">
-            <CardContent className="p-4">
-              <div className="text-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-slate-700">{getGuestLabelById(gid)}</span>
-                  {sessionItems.length === 0 && sessionOrders.length > 0 ? (
-                    <span className="text-slate-400">{tr('common.loading', 'Загрузка')}</span>
-                  ) : (
-                    <span className="font-bold text-slate-600">{formatPrice(parseFloat(Number(guestTotal).toFixed(2)))}</span>
-                  )}
-                </div>
-
-                {guestOrders.length > 0 ? (
-                  <div className="pl-2 border-l-2 border-slate-200 space-y-1">
-                    {guestOrders.map((order) => {
-                      const items = itemsByOrder.get(order.id) || [];
-                      const status = getSafeStatus(getOrderStatus(order));
-
-                      if (items.length === 0) {
-                        return (
-                          <div key={order.id} className="flex justify-between items-center text-xs">
-                            <span className="text-slate-600">
-                              {tr('cart.order_total', 'Сумма заказа')}: {formatPrice(parseFloat(Number(order.total_amount).toFixed(2)))}
-                            </span>
-                            <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
-                          </div>
-                        );
-                      }
-
-                      // CV-BUG-16: other-guest order pending detection (B44 pending status string 'new' → canonical 'start' code)
-                      const isOrderPending = !getOrderStatus(order)?.internal_code && mapLegacyStatus(order.status) === 'start';
-                      return items.map((item, idx) => (
-                        <div key={`${order.id}-${idx}`} className="flex justify-between items-center text-xs">
-                          <span className="text-slate-600">
-                            {item.dish_name} × {item.quantity}
-                            {isOrderPending && <span className="ml-1 text-amber-600 font-medium">{tr('cart.badge.pending', '⏳ Ожидает')}</span>}
-                          </span>
-                          <span className="text-xs" style={{ color: status.color }}>{status.icon} {status.label}</span>
-                        </div>
-                      ));
-                    })}
-                  </div>
-                ) : (
-                  <div className="pl-2 text-xs text-slate-400">
-                    {tr('cart.no_orders_yet', 'Заказов пока нет')}
-                  </div>
-                )}
-              </div>
-              {/* RF-4 Sub-4: per-guest payment CTA (UX v8 pattern 10, S490; hotfix S492) */}
-              {effectivePaidGuestIds.has(gid) ? (
-                <div className="mt-3 flex items-center justify-center gap-1 text-green-600 text-sm font-medium">
-                  <CheckCircle2 className="w-4 h-4" /> {tr('cart.payment.cta.paid_badge', '✓ Оплачено')}
-                </div>
-              ) : (
-                <Button
-                  size="sm"
-                  disabled={payingGuestId === gid || payingAll}
-                  onClick={() => {
-                    const unpaidIds = guestOrders
-                      .filter(o => o.payment_status !== 'paid' && !isCancelledOrder(o))
-                      .map(o => o.id);
-                    handlePayGuest(gid, unpaidIds);
-                  }}
-                  className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white"
-                >
-                  {payingGuestId === gid ? <Loader2 className="w-4 h-4 animate-spin mr-2 inline" /> : null}
-                  {tr('cart.payment.cta.pay', 'Оплачено')}
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
-
-      {/* RF-4 Sub-4: «Все оплачено» table-level CTA (UX v8 pattern 11/12, S490; hotfix S492) */}
-      {showTableOrdersSection && cartTab === 'table' && !allGuestsPaid && (
-        <Button
-          size="sm"
-          disabled={payingAll}
-          onClick={handlePayAll}
-          className="w-full mb-4 bg-green-600 hover:bg-green-700 text-white"
-        >
-          {payingAll ? <Loader2 className="w-4 h-4 animate-spin mr-2 inline" /> : null}
-          {tr('cart.payment.cta.all_pay', 'Все оплачено')} · {formatPrice(parseFloat(renderedTableTotal.toFixed(2)))}
-        </Button>
-      )}
-      {showTableOrdersSection && cartTab === 'table' && allGuestsPaid && (
-        <div className="w-full mb-4 p-3 rounded-lg bg-green-50 border border-green-200 text-center">
-          <div className="flex items-center justify-center gap-2 text-green-700 font-medium text-sm">
-            <CheckCircle2 className="w-5 h-5" /> {tr('cart.payment.cta.all_pay', 'Все оплачено')} · {formatPrice(parseFloat(renderedTableTotal.toFixed(2)))}
-          </div>
-          <p className="text-xs text-green-600 mt-1">{tr('cart.payment.cta.close_hint', 'Можно попросить официанта закрыть стол')}</p>
-        </div>
-      )}
-
-      {/* CV-01: Empty state — no orders and no cart */}
-      {(!showTableOrdersSection || cartTab === 'my') && statusBuckets.served.length === 0 && statusBuckets.in_progress.length === 0 && statusBuckets.pending_unconfirmed.length === 0 && cart.length === 0 && todayMyOrders.length === 0 && (
-        <div className="text-center py-8">
-          <p className="text-sm text-slate-500">{tr('cart.empty', 'Корзина пуста')}</p>
-        </div>
-      )}
-
-      {/* Fix 9 — D3: All served + cart empty → «Ничего не ждёте» screen */}
-      {(!showTableOrdersSection || cartTab === 'my') && (() => {
-        const isV8 = statusBuckets.in_progress.length === 0
-          && statusBuckets.pending_unconfirmed.length === 0
-          && statusBuckets.served.length > 0
-          && cart.length === 0;
-
-        if (isV8) {
-          return (
-            <TerminalScreenT1CodexApp01
-              tr={tr}
-              statusBuckets={statusBuckets}
-              bucketDisplayNames={bucketDisplayNames}
-              reviewsEnabled={reviewsEnabled}
-              allServedRated={allServedRated}
-              isRatingMode={isRatingMode}
-              shouldShowReviewRewardNudge={shouldShowReviewRewardNudge}
-              setShowPostRatingEmailSheet={setShowPostRatingEmailSheet}
-              setIsRatingMode={setIsRatingMode}
-              setExpandedStatuses={setExpandedStatuses}
-              manualOverrideRef={manualOverrideRef}
-              expandedStatuses={expandedStatuses}
-              shouldShowReviewRewardHint={shouldShowReviewRewardHint}
-              reviewRewardPoints={reviewRewardPoints}
-              unratedServedCount={unratedServedCount}
-              renderBucketOrders={renderBucketOrders}
-            />
-          );
+      <MyOrdersSection
+        showTableOrdersSection={showTableOrdersSection}
+        cartTab={cartTab}
+        statusBuckets={statusBuckets}
+        cart={cart}
+        todayMyOrders={todayMyOrders}
+        tr={tr}
+        bucketDisplayNames={bucketDisplayNames}
+        reviewsEnabled={reviewsEnabled}
+        allServedRated={allServedRated}
+        isRatingMode={isRatingMode}
+        shouldShowReviewRewardNudge={shouldShowReviewRewardNudge}
+        setShowPostRatingEmailSheet={setShowPostRatingEmailSheet}
+        setIsRatingMode={setIsRatingMode}
+        setExpandedStatuses={setExpandedStatuses}
+        manualOverrideRef={manualOverrideRef}
+        expandedStatuses={expandedStatuses}
+        shouldShowReviewRewardHint={shouldShowReviewRewardHint}
+        reviewRewardPoints={reviewRewardPoints}
+        unratedServedCount={unratedServedCount}
+        renderBucketOrders={renderBucketOrders}
+        formatPrice={formatPrice}
+        updateQuantity={updateQuantity}
+        loyaltyPanel={
+          <LoyaltyPanel
+            show={isFeatureEnabled(partner, 'loyalty') && earnedPoints > 0}
+            earnedPoints={earnedPoints}
+            tr={tr}
+          />
         }
-        // Normal rendering: 2-group model (CV-52)
-        // R1 LOCKED: pending_unconfirmed показывается НИЖЕ in_progress (DECISIONS_INDEX §2)
-        const bucketOrder = ['served', 'in_progress', 'pending_unconfirmed'];
-        return bucketOrder.map(key => {
-          const orders = statusBuckets[key];
-          if (orders.length === 0) return null;
-          const isExpanded = !!expandedStatuses[key];
-          const isServed = key === 'served';
-          const showRating = isServed;
+      />
 
-          return (
-            <Card key={key} className="mb-4">
-              <CardContent className="px-3 py-1.5">
-                <button
-                  type="button"
-                  className="w-full flex items-center justify-between text-left min-h-[44px]"
-                  onClick={() => { if (key === 'served') manualOverrideRef.current.served = true; setExpandedStatuses(prev => ({ ...prev, [key]: !prev[key] })); }}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={`text-base font-semibold ${key === 'pending_unconfirmed' ? 'text-amber-600' : 'text-slate-800'}`}>
-                      {bucketDisplayNames[key]} ({orders.length})
-                    </span>
-                    {/* CV-05 v2: Accent chip on Подано only */}
-                    {isServed && reviewsEnabled && (
-                      allServedRated
-                        ? <span className="ml-1 text-xs text-green-600 font-medium">✓ {tr('review.all_rated_chip', 'Оценено')}</span>
-                        : isRatingMode
-                          ? <span
-                              role="button"
-                              tabIndex={0}
-                              className="ml-1 text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full cursor-pointer"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setIsRatingMode(false);
-                                if (shouldShowReviewRewardNudge) setShowPostRatingEmailSheet(true);
-                              }}
-                            >{tr('review.done', 'Готово')}</span>
-                          : <span
-                              role="button"
-                              tabIndex={0}
-                              className="ml-1 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full cursor-pointer"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedStatuses(prev => ({ ...prev, served: true }));
-                                setIsRatingMode(true);
-                                setTimeout(() => { document.querySelector('[data-first-unrated]')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 100);
-                              }}
-                            >{tr('review.rate', 'Оценить')} ({unratedServedCount})</span>
-                    )}
-                  </div>
-                  <div className="min-w-[44px] min-h-[44px] flex items-center justify-end">
-                    {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                  </div>
-                </button>
-                {/* CV-05 v2: Rating mode micro-label */}
-                {isServed && isRatingMode && !allServedRated && (
-                  <p className="text-xs text-slate-500 mt-0.5">{tr('review.rating_mode', 'Режим оценки')}</p>
-                )}
-                {/* CV-37: Bonus subline below header (visible collapsed or expanded) */}
-                {isServed && shouldShowReviewRewardHint && (
-                  <p className="text-xs text-slate-500 mt-0.5 pb-1">
-                    {tr('loyalty.review_bonus_hint', 'За отзыв можно получить')} +{reviewRewardPoints} {tr('loyalty.points_short', 'баллов')}
-                  </p>
-                )}
-                {/* CV-BUG-17 (S498, #587): Pending bucket hint per mockup v11 State A2 — visible collapsed or expanded */}
-                {key === 'pending_unconfirmed' && (
-                  <p className="text-xs text-slate-500 italic mt-0.5 pb-1">
-                    ⓘ {tr('cart.pending.hint', 'Ждём подтверждения ресторана')}
-                  </p>
-                )}
-                {isExpanded && renderBucketOrders(orders, showRating)}
-              </CardContent>
-            </Card>
-          );
-        });
-      })()}
-
-      {/* SECTION 2: NEW ORDER */}
-      {(!showTableOrdersSection || cartTab === 'my') && cart.length > 0 && (
-        <Card className="mb-4">
-          <CardContent className="px-3 py-2">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                {tr('cart.group.in_cart', 'В корзине')} ({cart.reduce((sum, item) => sum + (item.quantity || 1), 0)})
-              </h2>
-            </div>
-
-            <div className="space-y-2">
-              {cart.map((item) => (
-                <div key={item.dishId} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div className="flex-1">
-                    <div className="font-medium text-slate-900">{item.name}</div>
-                    {item.quantity > 1 && <div className="text-xs text-slate-500">{formatPrice(item.price)} × {item.quantity}</div>}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-900">{formatPrice(parseFloat((item.price * item.quantity).toFixed(2)))}</span>
-                    {/* FIX P2: Stepper (-/count/+) instead of just remove-all */}
-                    <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
-                      <button
-                        onClick={() => updateQuantity(item.dishId, -1)}
-                        className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white transition-colors"
-                        aria-label={tr('menu.remove', 'Убрать')}
-                      >
-                        <Minus className="w-3.5 h-3.5 text-slate-600" />
-                      </button>
-                      <span className="mx-1.5 text-sm font-semibold text-slate-900 min-w-[20px] text-center">{item.quantity}</span>
-                      <button
-                        onClick={() => updateQuantity(item.dishId, 1)}
-                        className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white transition-colors"
-                        aria-label={tr('menu.add', 'Добавить')}
-                      >
-                        <Plus className="w-3.5 h-3.5 text-slate-600" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* CV-33: Split-order section removed — each guest orders for themselves */}
-
-            {/* CV-33/Fix 5: Bonus line in cart group */}
-            {isFeatureEnabled(partner, 'loyalty') && earnedPoints > 0 && (
-              <div className="text-xs text-green-600 mt-1">+{earnedPoints} {tr('loyalty.points_short', 'баллов')}</div>
-            )}
-
-            {/* PM-086: Pre-checkout loyalty email removed — motivation text near submit button is sufficient */}
-
-          </CardContent>
-        </Card>
-      )}
 
       {/* Spacer so sticky footer doesn't overlap last content */}
       {(cart.length > 0 || todayMyOrders.length > 0) && <div className="h-14" />}
