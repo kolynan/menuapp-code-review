@@ -28,75 +28,103 @@ function lightenColor(hex, amount) {
   return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
 }
 
-export default function CartView({
-  partner,
-  currentTable,
-  currentGuest,
-  t,
-  setView,
-  isEditingName,
-  guestNameInput,
-  setGuestNameInput,
-  handleUpdateGuestName,
-  setIsEditingName,
-  getGuestDisplayName,
-  cart,
-  formatPrice,
-  updateQuantity,
-  sessionGuests,
-  splitType,
-  setSplitType,
-  // R6-1 Phase B.1 (S615): removed dead prop showLoginPromptAfterRating (declared but never used in body, count=1)
-  customerEmail,
-  setCustomerEmail,
-  loyaltyLoading,
-  loyaltyAccount,
-  earnedPoints,
-  maxRedeemPoints,
-  redeemedPoints,
-  setRedeemedPoints,
-  toast,
-  cartTotalAmount,
-  discountAmount,
-  pointsDiscountAmount,
-  isSubmitting,
-  submitError,
-  setSubmitError,
-  handleSubmitOrder,
-  myOrders,
-  itemsByOrder,
-  getOrderStatus,
-  reviewedItems,
-  draftRatings,
-  updateDraftRating,
-  sessionItems,
-  sessionOrders,
-  myBill,
-  reviewableItems,
-  openReviewDialog,
-  setOtherGuestsExpanded,
-  otherGuestsExpanded,
-  getLinkId,
-  otherGuestsReviewableItems,
-  tableTotal,
-  formatOrderTime,
-  handleRateDish,
-  ratingSavingByItemId,
-  // TASK-260203-01 P0: Drawer props
-  onClose,
-  onCallWaiter,
-  isTableVerified,
-  tableCodeInput,
-  isVerifyingCode,
-  verifyTableCode,
-  codeVerificationError,
-  hallGuestCodeEnabled,
-  guestCode,
-  showLoyaltySection,
+export default function CartView({ shell, cart, orders, ratings, loyalty, flow, toast }) {
+  const {
+    partner,
+    currentTable,
+    currentGuest,
+    t,
+    setView,
+    onClose,
+    onCallWaiter,
+    isTableVerified,
+    tableCodeInput,
+    setTableCodeInput,
+    isVerifyingCode,
+    verifyTableCode,
+    codeVerificationError,
+    hallGuestCodeEnabled,
+    guestCode,
+    isEditingName,
+    guestNameInput,
+    setGuestNameInput,
+    handleUpdateGuestName,
+    setIsEditingName,
+    getGuestDisplayName,
+    customerEmail,
+    setCustomerEmail,
+    showLoginPromptAfterRating,
+  } = shell;
+
+  const {
+    cart: cartItems,
+    cartTotalAmount,
+    formatPrice,
+    updateQuantity,
+    sessionGuests,
+    splitType,
+    setSplitType,
+  } = cart;
+
+  const {
+    myOrders,
+    itemsByOrder,
+    getOrderStatus,
+    sessionItems,
+    sessionOrders,
+    myBill,
+    tableTotal,
+    formatOrderTime,
+  } = orders;
+
+  const {
+    reviewedItems,
+    draftRatings,
+    updateDraftRating,
+    reviewableItems,
+    openReviewDialog,
+    otherGuestsReviewableItems,
+    handleRateDish,
+    ratingSavingByItemId,
+  } = ratings;
+
+  const {
+    loyaltyLoading,
+    loyaltyAccount,
+    earnedPoints,
+    maxRedeemPoints,
+    redeemedPoints,
+    setRedeemedPoints,
+    showLoyaltySection,
+  } = loyalty;
+
+  const {
+    isSubmitting,
+    submitError,
+    setSubmitError,
+    handleSubmitOrder,
+    cartTotalAmount: flowCartTotalAmount,
+    discountAmount,
+    pointsDiscountAmount,
+  } = flow;
+
   // BUG-CV-S491 #582: session closed by host (reactive, from useTableSession polling)
-  isSessionClosed = false,
-}) {
+  const isSessionClosed = flow?.isSessionClosed ?? false;
+
   const primaryColor = partner?.primary_color || '#1A1A1A';
+  const getLinkedId = React.useCallback((field) => {
+    if (field == null) return null;
+    if (typeof field === "string" || typeof field === "number") return String(field);
+    if (typeof field === "object") {
+      const value = field.id ?? field._id ?? field.value ?? null;
+      if (typeof value === "string" || typeof value === "number") return String(value);
+      if (value && typeof value === "object") {
+        const nested = value.id ?? value._id ?? null;
+        if (typeof nested === "string" || typeof nested === "number") return String(nested);
+      }
+    }
+    return null;
+  }, []);
 
   // ===== P0: Safe prop defaults (BUG-PM-023, BUG-PM-025) =====
   const safeReviewedItems = reviewedItems || new Set();
@@ -173,10 +201,10 @@ export default function CartView({
   // CV-48/Fix 3: Reset submitPhase on drawer close
   React.useEffect(() => {
     // When cart becomes empty after successful submit, reset phase
-    if (cart.length === 0 && submitPhase === 'success') {
+    if (cartItems.length === 0 && submitPhase === 'success') {
       // Will auto-transition via the success timer above
     }
-  }, [cart.length, submitPhase]);
+  }, [cartItems.length, submitPhase]);
 
 
   // ===== P0 UX helpers =====
@@ -273,7 +301,7 @@ export default function CartView({
     try {
       const ids = new Set(
         (sessionOrders || [])
-          .map(o => (getLinkId ? getLinkId(o.guest) : o.guest))
+          .map(o => getLinkedId(o.guest))
           .filter(Boolean)
           .map(x => String(x))
       );
@@ -281,7 +309,7 @@ export default function CartView({
     } catch {
       return 0;
     }
-  }, [sessionOrders, getLinkId]);
+  }, [sessionOrders, getLinkedId]);
 
   const guestCount = Math.max(
     Array.isArray(sessionGuests) ? sessionGuests.length : 0,
@@ -342,12 +370,12 @@ export default function CartView({
       statusBuckets.served.length > 0 &&
       statusBuckets.in_progress.length === 0 &&
       statusBuckets.pending_unconfirmed.length === 0 &&
-      cart.length === 0
+      cartItems.length === 0
     ) {
       return statusBuckets.served.map(o => String(o.id)).sort().join('-');
     }
     return '';
-  }, [statusBuckets, cart]);
+  }, [statusBuckets, cartItems]);
 
   // Fix 3: R4 — persist terminal version to localStorage when terminal state is active
   React.useEffect(() => {
@@ -362,7 +390,7 @@ export default function CartView({
     statusBuckets.served.length > 0 ? 'S' : '',
     statusBuckets.in_progress.length > 0 ? 'I' : '',
     statusBuckets.pending_unconfirmed.length > 0 ? 'P' : '',
-    cart.length > 0 ? 'C' : ''
+    cartItems.length > 0 ? 'C' : ''
   ].join('');
 
   React.useEffect(() => {
@@ -370,7 +398,7 @@ export default function CartView({
     prevGroupKeysRef.current = currentGroupKeys;
 
     if (structuralChange && !manualOverrideRef.current.served) {
-      const otherGroupsExist = statusBuckets.in_progress.length > 0 || statusBuckets.pending_unconfirmed.length > 0 || cart.length > 0;
+      const otherGroupsExist = statusBuckets.in_progress.length > 0 || statusBuckets.pending_unconfirmed.length > 0 || cartItems.length > 0;
       setExpandedStatuses(prev => ({
         ...prev,
         served: !otherGroupsExist
@@ -388,14 +416,14 @@ export default function CartView({
   const ordersByGuestId = React.useMemo(() => {
     const map = new Map();
     (sessionOrders || []).forEach((o) => {
-      const gid = getLinkId ? getLinkId(o.guest) : o.guest;
+      const gid = getLinkedId(o.guest);
       if (!gid) return;
       const k = String(gid);
       if (!map.has(k)) map.set(k, []);
       map.get(k).push(o);
     });
     return map;
-  }, [sessionOrders, getLinkId]);
+  }, [sessionOrders, getLinkedId]);
 
   const myGuestId = currentGuest?.id ? String(currentGuest.id) : null;
 
@@ -727,7 +755,7 @@ export default function CartView({
                 const items = itemsByOrder.get(o.id) || [];
                 return sum + items.reduce((s, it) => s + (it.quantity || 1), 0);
               }, 0);
-              const cartItemCount = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
+              const cartItemCount = cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
               const totalDishCount = ordersItemCount + cartItemCount;
               const headerTotal = ordersSum + (Number(cartTotalAmount) || 0);
               return totalDishCount > 0 ? (
@@ -790,7 +818,7 @@ export default function CartView({
         showTableOrdersSection={showTableOrdersSection}
         cartTab={cartTab}
         statusBuckets={statusBuckets}
-        cart={cart}
+        cart={cartItems}
         todayMyOrders={todayMyOrders}
         tr={tr}
         bucketDisplayNames={bucketDisplayNames}
@@ -820,10 +848,10 @@ export default function CartView({
 
 
       {/* Spacer so sticky footer doesn't overlap last content */}
-      {(cart.length > 0 || todayMyOrders.length > 0) && <div className="h-14" />}
+      {(cartItems.length > 0 || todayMyOrders.length > 0) && <div className="h-14" />}
 
       {/* AC-08: Error state with retry */}
-      {submitError && cart.length > 0 && (
+      {submitError && cartItems.length > 0 && (
         <div className="mx-0 mb-2 p-3 bg-red-50 border border-red-200 rounded-lg text-center">
           <p className="text-sm font-medium text-red-700">{submitError}</p>
           <p className="text-xs text-red-500 mt-1">
@@ -846,14 +874,14 @@ export default function CartView({
 
       {/* CV-51: Sticky footer - extracted to StickyFooterCTAT1CodexApp02 (R6-2a T1 fix v2 by Codex App) */}
       <StickyFooterCTAT1CodexApp02
-        show={cart.length > 0 || todayMyOrders.length > 0}
-        cartLength={cart.length}
+        show={cartItems.length > 0 || todayMyOrders.length > 0}
+        cartLength={cartItems.length}
         isSubmitting={isSubmitting}
         submitPhase={submitPhase}
         submitError={submitError}
         setSubmitError={setSubmitError}
         handleSubmitOrder={handleSubmitOrder}
-        cartTotalAmount={cartTotalAmount}
+        cartTotalAmount={flowCartTotalAmount}
         discountAmount={discountAmount}
         pointsDiscountAmount={pointsDiscountAmount}
         isSessionClosed={isSessionClosed}

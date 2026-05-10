@@ -1522,7 +1522,7 @@ export default function X() {
   }, []);
   
   const [activeCategoryKey, setActiveCategoryKey] = useState("all");
-  const [cart, setCart] = useState([]); // { dishId, name, price, quantity }
+  const [cartItems, setCart] = useState([]); // { dishId, name, price, quantity }
   const cartRestoredRef = useRef(false);
 
   // Mobile breakpoint detection
@@ -1662,8 +1662,8 @@ export default function X() {
   useEffect(() => {
     if (!partner?.id) return;
     if (!cartRestoredRef.current) return;
-    saveCartToStorage(partner.id, cart);
-  }, [cart, partner?.id]);
+    saveCartToStorage(partner.id, cartItems);
+  }, [cartItems, partner?.id]);
 
   // PM-153: Auto-save guest name to localStorage on every change (survives Chrome kill)
   useEffect(() => {
@@ -1679,7 +1679,7 @@ export default function X() {
     cartRestoredRef.current = true;
 
     const savedCart = getCartFromStorage(partner.id);
-    if (savedCart && savedCart.length > 0 && cart.length === 0) {
+    if (savedCart && savedCart.length > 0 && cartItems.length === 0) {
       setCart(savedCart);
     }
   }, [partner?.id]);
@@ -3055,7 +3055,7 @@ export default function X() {
 
   // P1-8: Sync cart names when language changes
   useEffect(() => {
-    if (!cart.length || !dishTransMap || Object.keys(dishTransMap).length === 0) return;
+    if (!cartItems.length || !dishTransMap || Object.keys(dishTransMap).length === 0) return;
     
     setCart(prev => prev.map(item => {
       const translated = dishTransMap[item.dishId];
@@ -3231,8 +3231,8 @@ export default function X() {
     return groups;
   }, [sortedCategoriesAll, visibleDishes, orderMode]);
 
-  const cartTotalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
-  const cartTotalAmount = parseFloat(cart.reduce((acc, item) => acc + Math.round(item.price * item.quantity * 100) / 100, 0).toFixed(2));
+  const cartTotalItems = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+  const cartTotalAmount = parseFloat(cartItems.reduce((acc, item) => acc + Math.round(item.price * item.quantity * 100) / 100, 0).toFixed(2));
 
   // Loyalty hook
   const {
@@ -3253,7 +3253,7 @@ export default function X() {
   // Loyalty visibility flags (RF-2: unified feature flag helper)
   const loyaltyEnabled = isFeatureEnabled(partner, 'loyalty');
   const discountEnabled = isFeatureEnabled(partner, 'discount');
-  const showLoyaltySection = (loyaltyEnabled || discountEnabled) && cart.length > 0;
+  const showLoyaltySection = (loyaltyEnabled || discountEnabled) && cartItems.length > 0;
 
   // TableSession hook
   const {
@@ -3302,7 +3302,7 @@ export default function X() {
     reviewDialogOpen,
     setReviewDialogOpen,
     reviewingItems,
-    ratings,
+    ratings: reviewDialogRatings,
     setRatings,
     submittingReview,
     handleSubmitReviews,
@@ -3368,7 +3368,7 @@ export default function X() {
   // Show cart button in hall mode: always when table verified, or when cart has items (even before verification)
   // TASK-260201-01: StickyBar Ð²Ð¸Ð´ÐµÐ½ Ð’Ð¡Ð•Ð"Ð"Ð Ð¿Ñ€Ð¸ Ð²ÐµÑ€Ð¸Ñ„Ð¸Ñ†Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð½Ð¾Ð¼ ÑÑ‚Ð¾Ð»Ðµ
   // Ð­Ñ‚Ð¾ Ñ€ÐµÑˆÐ°ÐµÑ‚ Ð¿Ñ€Ð¾Ð±Ð»ÐµÐ¼Ñƒ F5 â€" Ð½Ðµ Ð½ÑƒÐ¶Ð½Ð¾ Ð¶Ð´Ð°Ñ‚ÑŒ Ð²Ð¾ÑÑÑ‚Ð°Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ñ session/orders
-  const showCartButton = isHallMode && (isTableVerified || (cart?.length || 0) > 0);
+  const showCartButton = isHallMode && (isTableVerified || (cartItems?.length || 0) > 0);
 
   // After F5, table is verified from localStorage but session data is still loading from server
   // Time-bounded: after 3s assume no session exists (prevents permanent "loading" for new visits)
@@ -3424,7 +3424,7 @@ export default function X() {
 
   // Hall StickyBar mode: Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÑÐµÐ¼ Ñ‡Ñ‚Ð¾ Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°Ñ‚ÑŒ
   const hallStickyMode =
-    (cart?.length || 0) > 0
+    (cartItems?.length || 0) > 0
       ? "cart"
       : (myOrders?.length || 0) > 0
         ? "myBill"
@@ -3865,15 +3865,15 @@ export default function X() {
       let currentPartnerState = { ...partner };
       let accumulatedDiscount = 0;
 
-      for (let idx = 0; idx < cart.length; idx++) {
-        const item = cart[idx];
+      for (let idx = 0; idx < cartItems.length; idx++) {
+        const item = cartItems[idx];
         const itemGross = Math.round(item.price * item.quantity * 100) / 100;
 
         // Proportional discount; last item absorbs rounding remainder
         let itemDiscount;
         if (cartSubtotal <= 0) {
           itemDiscount = 0;
-        } else if (idx < cart.length - 1) {
+        } else if (idx < cartItems.length - 1) {
           itemDiscount = parseFloat((totalDiscount * (itemGross / cartSubtotal)).toFixed(2));
         } else {
           itemDiscount = parseFloat((totalDiscount - accumulatedDiscount).toFixed(2));
@@ -3993,7 +3993,7 @@ export default function X() {
         : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
       // BUG-PM-004: add _optimisticAt so polling merge preserves temp items
-      const allOptimisticItems = cart.map((item, i) => ({
+      const allOptimisticItems = cartItems.map((item, i) => ({
         id: `temp_${tempIdBase}_${i}`,
         order: createdOrders[i].id,
         dish: item.dishId,
@@ -4009,7 +4009,7 @@ export default function X() {
 
       // GAP-01: Save cart snapshot for confirmation screen BEFORE clearing
       // FIX P1: Use finalTotal (post-discount) instead of raw cart.reduce
-      const confirmedItems = [...cart];
+      const confirmedItems = [...cartItems];
       const confirmedTotal = finalTotal;
       const guestLabel = guestToUse
         ? getGuestDisplayName(guestToUse)
@@ -4057,7 +4057,7 @@ export default function X() {
     if (!validate()) return;
 
     // Empty cart guard
-    if (cart.length === 0) {
+    if (cartItems.length === 0) {
       toast.error(tr('cart.empty', 'Cart is empty'), { id: 'mm1' });
       return;
     }
@@ -4288,14 +4288,14 @@ export default function X() {
         const createdOrders = [];
         let accumulatedDiscount = 0;
 
-        for (let idx = 0; idx < cart.length; idx++) {
-          const item = cart[idx];
+        for (let idx = 0; idx < cartItems.length; idx++) {
+          const item = cartItems[idx];
           const itemGross = Math.round(item.price * item.quantity * 100) / 100;
 
           let itemDiscount;
           if (cartSubtotal <= 0) {
             itemDiscount = 0;
-          } else if (idx < cart.length - 1) {
+          } else if (idx < cartItems.length - 1) {
             itemDiscount = parseFloat((totalDiscount * (itemGross / cartSubtotal)).toFixed(2));
           } else {
             itemDiscount = parseFloat((totalDiscount - accumulatedDiscount).toFixed(2));
@@ -4388,7 +4388,7 @@ export default function X() {
           ? crypto.randomUUID()
           : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
-        const allOptimisticItems = cart.map((item, i) => ({
+        const allOptimisticItems = cartItems.map((item, i) => ({
           id: `temp_${tempIdBase}_${i}`,
           order: createdOrders[i].id,
           dish: item.dishId,
@@ -4402,7 +4402,7 @@ export default function X() {
         setSessionItems(prev => [...prev, ...allOptimisticItems]);
 
         // GAP-01: Save cart snapshot for confirmation screen BEFORE clearing
-        const confirmedItems = [...cart];
+        const confirmedItems = [...cartItems];
         const confirmedTotal = finalTotal;
         const savedClientName = clientName;
 
@@ -4634,6 +4634,157 @@ export default function X() {
     );
 };
 
+  const closeCart = useCallback(() => {
+    popOverlay('cart');
+    setDrawerMode(null);
+  }, [popOverlay, setDrawerMode]);
+
+  const shell = useMemo(() => ({
+    partner,
+    currentTable,
+    currentGuest,
+    t,
+    setView,
+    onClose: closeCart,
+    onCallWaiter: handleHelpFromCart,
+    isTableVerified,
+    tableCodeInput,
+    setTableCodeInput,
+    isVerifyingCode,
+    verifyTableCode,
+    codeVerificationError,
+    hallGuestCodeEnabled,
+    guestCode,
+    isEditingName,
+    guestNameInput,
+    setGuestNameInput,
+    handleUpdateGuestName,
+    setIsEditingName,
+    getGuestDisplayName,
+    customerEmail,
+    setCustomerEmail,
+    showLoginPromptAfterRating,
+  }), [
+    partner,
+    currentTable,
+    currentGuest,
+    t,
+    setView,
+    closeCart,
+    handleHelpFromCart,
+    isTableVerified,
+    tableCodeInput,
+    setTableCodeInput,
+    isVerifyingCode,
+    verifyTableCode,
+    codeVerificationError,
+    hallGuestCodeEnabled,
+    guestCode,
+    isEditingName,
+    guestNameInput,
+    setGuestNameInput,
+    handleUpdateGuestName,
+    setIsEditingName,
+    getGuestDisplayName,
+    customerEmail,
+    setCustomerEmail,
+    showLoginPromptAfterRating,
+  ]);
+
+  const cart = useMemo(() => ({
+    cart: cartItems,
+    cartTotalAmount,
+    formatPrice,
+    updateQuantity,
+    sessionGuests,
+    splitType,
+    setSplitType,
+  }), [
+    cartItems,
+    cartTotalAmount,
+    formatPrice,
+    updateQuantity,
+    sessionGuests,
+    splitType,
+    setSplitType,
+  ]);
+
+  const orders = useMemo(() => ({
+    myOrders,
+    itemsByOrder,
+    getOrderStatus,
+    sessionItems,
+    sessionOrders,
+    myBill,
+    tableTotal,
+    formatOrderTime,
+  }), [
+    myOrders,
+    itemsByOrder,
+    getOrderStatus,
+    sessionItems,
+    sessionOrders,
+    myBill,
+    tableTotal,
+    formatOrderTime,
+  ]);
+
+  const ratings = useMemo(() => ({
+    reviewedItems,
+    draftRatings,
+    updateDraftRating,
+    reviewableItems,
+    openReviewDialog,
+    otherGuestsReviewableItems,
+    handleRateDish,
+    ratingSavingByItemId,
+  }), [
+    reviewedItems,
+    draftRatings,
+    updateDraftRating,
+    reviewableItems,
+    openReviewDialog,
+    otherGuestsReviewableItems,
+    handleRateDish,
+    ratingSavingByItemId,
+  ]);
+
+  const loyalty = useMemo(() => ({
+    loyaltyLoading,
+    loyaltyAccount,
+    earnedPoints,
+    maxRedeemPoints,
+    redeemedPoints,
+    setRedeemedPoints,
+    showLoyaltySection,
+  }), [
+    loyaltyLoading,
+    loyaltyAccount,
+    earnedPoints,
+    maxRedeemPoints,
+    redeemedPoints,
+    setRedeemedPoints,
+    showLoyaltySection,
+  ]);
+
+  const flow = useMemo(() => ({
+    isSubmitting,
+    submitError,
+    setSubmitError,
+    handleSubmitOrder,
+    cartTotalAmount,
+    discountAmount,
+    pointsDiscountAmount,
+  }), [
+    isSubmitting,
+    submitError,
+    setSubmitError,
+    handleSubmitOrder,
+    cartTotalAmount,
+    discountAmount,
+    pointsDiscountAmount,
+  ]);
+
   return (
     <div className="min-h-screen bg-slate-50 pb-24 font-sans">
       <PublicMenuHeader
@@ -4709,7 +4860,7 @@ export default function X() {
           groupedDishes={groupedDishes}
           getCategoryName={getCategoryName}
           sectionRefs={sectionRefs}
-          cart={cart}
+          cart={cartItems}
           getDishName={getDishName}
           getDishDescription={getDishDescription}
           formatPrice={formatPrice}
@@ -4725,7 +4876,7 @@ export default function X() {
         <CheckoutView
           t={t}
           setView={setView}
-          cart={cart}
+          cart={cartItems}
           updateQuantity={updateQuantity}
           formatPrice={formatPrice}
           cartTotalItems={cartTotalItems}
@@ -4812,75 +4963,13 @@ export default function X() {
           </DrawerHeader>
           <div className="overflow-y-auto max-h-[calc(85vh-2rem)]">
             <CartView
-              partner={partner}
-              currentTable={currentTable}
-              currentGuest={currentGuest}
-              t={t}
-              setView={setView}
-              isEditingName={isEditingName}
-              guestNameInput={guestNameInput}
-              setGuestNameInput={setGuestNameInput}
-              handleUpdateGuestName={handleUpdateGuestName}
-              setIsEditingName={setIsEditingName}
-              getGuestDisplayName={getGuestDisplayName}
+              shell={shell}
               cart={cart}
-              formatPrice={formatPrice}
-              updateQuantity={updateQuantity}
-              sessionGuests={sessionGuests}
-              splitType={splitType}
-              setSplitType={setSplitType}
-              showLoyaltySection={showLoyaltySection}
-              showLoginPromptAfterRating={showLoginPromptAfterRating}
-              customerEmail={customerEmail}
-              setCustomerEmail={setCustomerEmail}
-              loyaltyLoading={loyaltyLoading}
-              loyaltyAccount={loyaltyAccount}
-              earnedPoints={earnedPoints}
-              maxRedeemPoints={maxRedeemPoints}
-              redeemedPoints={redeemedPoints}
-              setRedeemedPoints={setRedeemedPoints}
+              orders={orders}
+              ratings={ratings}
+              loyalty={loyalty}
+              flow={flow}
               toast={toast}
-              cartTotalAmount={cartTotalAmount}
-              discountAmount={discountAmount}
-              pointsDiscountAmount={pointsDiscountAmount}
-              isSubmitting={isSubmitting}
-              submitError={submitError}
-              setSubmitError={setSubmitError}
-              handleSubmitOrder={handleSubmitOrder}
-              myOrders={myOrders}
-              itemsByOrder={itemsByOrder}
-              getOrderStatus={getOrderStatus}
-              reviewedItems={reviewedItems}
-              draftRatings={draftRatings}
-              updateDraftRating={updateDraftRating}
-              sessionItems={sessionItems}
-              sessionOrders={sessionOrders}
-              myBill={myBill}
-              reviewableItems={reviewableItems}
-              openReviewDialog={openReviewDialog}
-              handleRequestBill={handleRequestBill}
-              billRequested={billRequested}
-              billCooldown={billCooldown}
-              otherGuestsBills={otherGuestsBills}
-              othersTotal={othersTotal}
-              setOtherGuestsExpanded={setOtherGuestsExpanded}
-              otherGuestsExpanded={otherGuestsExpanded}
-              getLinkId={getLinkId}
-              otherGuestsReviewableItems={otherGuestsReviewableItems}
-              tableTotal={tableTotal}
-              formatOrderTime={formatOrderTime}
-              handleRateDish={handleRateDish}
-              ratingSavingByItemId={ratingSavingByItemId}
-              onClose={() => { popOverlay('cart'); setDrawerMode(null); }}
-              onCallWaiter={handleHelpFromCart}
-              isTableVerified={isTableVerified}
-              tableCodeInput={tableCodeInput}
-              setTableCodeInput={setTableCodeInput}
-              isVerifyingCode={isVerifyingCode}
-              verifyTableCode={verifyTableCode}
-              codeVerificationError={codeVerificationError}
-              hallGuestCodeEnabled={hallGuestCodeEnabled}
-              guestCode={guestCode}
             />
           </div>
         </DrawerContent>
@@ -5257,7 +5346,7 @@ export default function X() {
         t={t}
         partner={partner}
         reviewingItems={reviewingItems}
-        ratings={ratings}
+        ratings={reviewDialogRatings}
         onChangeRating={(itemId, val) => setRatings(prev => ({
           ...prev,
           [itemId]: { ...prev[itemId], rating: val }
@@ -5372,7 +5461,7 @@ export default function X() {
               t={t}
               isHallMode={true}
               isDrawerOpen={drawerMode === 'cart'}
-              hasCart={(cart?.length || 0) > 0}
+              hasCart={(cartItems?.length || 0) > 0}
               cartTotalItems={cartTotalItems}
               formattedCartTotal={formatPrice(cartTotalAmount)}
               isLoadingBill={hallStickyIsLoadingBill}
@@ -5400,7 +5489,7 @@ export default function X() {
         }
 
         // Pickup/Delivery: original behavior
-        if (cart.length > 0) {
+        if (cartItems.length > 0) {
           return (
             <StickyCartBar
               t={t}
