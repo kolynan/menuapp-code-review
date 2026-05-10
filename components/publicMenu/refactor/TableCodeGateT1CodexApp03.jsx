@@ -31,8 +31,9 @@ export default function TableCodeGateT1CodexApp03({
   const lastSentVerifyCodeRef = React.useRef(null);
 
   const tr = React.useCallback((key, fallback) => {
-    if (typeof t === "function") return t(key, fallback);
-    return fallback;
+    if (typeof t !== "function") return fallback;
+    const value = t(key, fallback);
+    return typeof value === "string" && value.trim() ? value : fallback;
   }, [t]);
 
   const tableCodeLength = React.useMemo(() => {
@@ -147,9 +148,9 @@ export default function TableCodeGateT1CodexApp03({
   return (
     <Card className="mb-4 border-emerald-100 bg-emerald-50">
       <CardContent className="px-3 py-2 text-sm text-emerald-700">
-        {tr("cart.verify.table_verified", "Стол подтверждён")}
-        {currentTable?.name || currentTable?.code ? ` · ${currentTable.name || currentTable.code}` : ""}
-        {hallGuestCodeEnabled && guestCode ? ` · #${String(guestCode).replace(/^#/, "")}` : ""}
+        {tr("cart.verify.table_verified", "Table confirmed")}
+        {currentTable?.name || currentTable?.code ? ` - ${currentTable.name || currentTable.code}` : ""}
+        {hallGuestCodeEnabled && guestCode ? ` - #${String(guestCode).replace(/^#/, "")}` : ""}
       </CardContent>
     </Card>
   );
