@@ -336,7 +336,7 @@ export function useMenuDishesDnd({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dishes", partnerId] });
     },
-    onError: () => toast.error("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿ÐµÑ€ÐµÐ¼ÐµÑÑ‚Ð¸Ñ‚ÑŒ Ð±Ð»ÑŽÐ´Ð¾", { id: TOAST_ID }),
+    onError: () => toast.error("Не удалось переместить блюдо", { id: TOAST_ID }),
   });
 
   // P0.4: Use batched updates to avoid rate limit
@@ -366,7 +366,7 @@ export function useMenuDishesDnd({
     onError: (error, variables, context) => {
       // L-1 FIX: restore pre-drag order on error (mirrors cross-cat snapshotOrderByCat pattern)
       if (context?.snapshot) setCatOrderIds(context.snapshot);
-      toast.error("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ñ€ÑÐ´Ð¾Ðº", { id: TOAST_ID });
+      toast.error("Не удалось сохранить порядок", { id: TOAST_ID });
     },
   });
 
@@ -397,7 +397,7 @@ export function useMenuDishesDnd({
     onError: (error, variables, context) => {
       // L-1 FIX: restore pre-drag dish order on error (mirrors cross-cat snapshotOrderByCat pattern)
       if (context?.snapshot) setDishOrderByCat(context.snapshot);
-      toast.error("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð¿Ð¾Ñ€ÑÐ´Ð¾Ðº Ð±Ð»ÑŽÐ´", { id: TOAST_ID });
+      toast.error("Не удалось сохранить порядок блюд", { id: TOAST_ID });
     },
   });
 
@@ -466,14 +466,14 @@ export function useMenuDishesDnd({
       const r = tabEl.getBoundingClientRect();
       setDragPreview({
         type: "category",
-        title: normStr(safeCategories.find((c) => c.id === id)?.name || "Ð Ð°Ð·Ð´ÐµÐ»"),
+        title: normStr(safeCategories.find((c) => c.id === id)?.name || "Раздел"),
         width: r.width,
         height: r.height,
       });
       dragPreviewDimsRef.current = { width: r.width || 180, height: r.height || 36 };
       setDragPreviewPos({ x: e.clientX - r.width / 2, y: e.clientY - r.height / 2 });
     } else {
-      setDragPreview({ type: "category", title: "Ð Ð°Ð·Ð´ÐµÐ»", width: 180, height: 36 });
+      setDragPreview({ type: "category", title: "Раздел", width: 180, height: 36 });
       dragPreviewDimsRef.current = { width: 180, height: 36 };
       setDragPreviewPos({ x: e.clientX - 90, y: e.clientY - 18 });
     }
@@ -554,15 +554,15 @@ export function useMenuDishesDnd({
 
       persistCategoryOrder(nextIds);
 
-      toast("ÐŸÐ¾Ñ€ÑÐ´Ð¾Ðº ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½", {
+      toast("Порядок сохранён", {
         id: TOAST_ID,
         duration: 8000,
         action: {
-          label: "ÐžÑ‚Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ",
+          label: "Отменить",
           onClick: () => {
             setCatOrderIds(prevIds);
             persistCategoryOrder(prevIds);
-            toast.message("ÐžÑ‚Ð¼ÐµÐ½ÐµÐ½Ð¾", { id: TOAST_ID });
+            toast.message("Отменено", { id: TOAST_ID });
           },
         },
       });
@@ -627,7 +627,7 @@ export function useMenuDishesDnd({
       setDragPreview({
         type: "dish",
         title: normStr(
-          safeDishesRaw.find((d) => d.id === dishId)?.name || "Ð‘Ð»ÑŽÐ´Ð¾"
+          safeDishesRaw.find((d) => d.id === dishId)?.name || "Блюдо"
         ),
         width: Math.min(r.width, 280),
         height: Math.min(r.height, 200),
@@ -635,7 +635,7 @@ export function useMenuDishesDnd({
       dragPreviewDimsRef.current = { width: Math.min(r.width, 280), height: Math.min(r.height, 200) };
       setDragPreviewPos({ x: e.clientX - r.width / 2, y: e.clientY - 30 });
     } else {
-      setDragPreview({ type: "dish", title: "Ð‘Ð»ÑŽÐ´Ð¾", width: 240, height: 120 });
+      setDragPreview({ type: "dish", title: "Блюдо", width: 240, height: 120 });
       dragPreviewDimsRef.current = { width: 240, height: 120 };
       setDragPreviewPos({ x: e.clientX - 120, y: e.clientY - 60 });
     }
@@ -766,15 +766,15 @@ export function useMenuDishesDnd({
 
         persistDishOrder(targetCatId, currentIds);
 
-        toast("ÐŸÐ¾Ñ€ÑÐ´Ð¾Ðº Ð±Ð»ÑŽÐ´ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½", {
+        toast("Порядок блюд сохранён", {
           id: TOAST_ID,
           duration: 8000,
           action: {
-            label: "ÐžÑ‚Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ",
+            label: "Отменить",
             onClick: () => {
               setDishOrderByCat((prev) => ({ ...prev, [targetCatId]: prevIds }));
               persistDishOrder(targetCatId, prevIds);
-              toast.message("ÐžÑ‚Ð¼ÐµÐ½ÐµÐ½Ð¾", { id: TOAST_ID });
+              toast.message("Отменено", { id: TOAST_ID });
             },
           },
         });
@@ -829,7 +829,7 @@ export function useMenuDishesDnd({
         newCategories.push(targetCatId);
       }
 
-      const targetCatName = categoriesMap.get(targetCatId)?.name || "Ñ€Ð°Ð·Ð´ÐµÐ»";
+      const targetCatName = categoriesMap.get(targetCatId)?.name || "раздел";
 
       moveDishToCategoryMutation.mutate({
         dishId,
@@ -840,7 +840,7 @@ export function useMenuDishesDnd({
         onSuccess: () => {
           setPendingMoveDish(null);
 
-          toast.success(`ÐŸÐµÑ€ÐµÐ¼ÐµÑ‰ÐµÐ½Ð¾ Ð² Â«${targetCatName}Â»`, { id: TOAST_ID });
+          toast.success(`Перемещено в «${targetCatName}»`, { id: TOAST_ID });
 
           setTimeout(() => {
             const movedDishRefKey = `${targetCatId}-${dishId}`;
